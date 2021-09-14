@@ -38,7 +38,7 @@ classifiers = [  #! Update me
 [tool.poetry.dependencies]
 python = "^3.8"
 
-typer = {extras = ["all"], version = "^0.3.2"}
+typer = {extras = ["all"], version = "^0.4.0"}
 rich = "^10.7.0"
 transformers = {extras = ["sentencepiece"], version = "^4.10.0"}
 torch = "^1.9.0"
