@@ -1,0 +1,13 @@
+# This file contains values from Cookiecutter
+
+default_context:
+  project_name: "amseq"
+  project_description: "Attribution methods for sequence-to-sequence transformer models 🔍"
+  organization: "amseq"
+  license: "Apache Software License 2.0"
+  minimal_python_version: 3.8
+  github_name: "gsarti"
+  email: "gabriele.sarti996@gmail.com"
+  version: "0.1.0"
+  line_length: "88"
+  create_example_template: "cli"
