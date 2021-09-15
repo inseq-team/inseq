@@ -1,4 +1,4 @@
-from typing import NoReturn, Tuple, Union
+from typing import NoReturn, Optional, Tuple, Union
 
 import logging
 import warnings
@@ -87,7 +87,9 @@ class AttributionModel:
         if hasattr(decoder, "embed_scale"):
             self.decoder_embed_scale = decoder.embed_scale
 
-    def tokenize(self, text: str, return_ref: bool = False) -> TokenizedOutput:
+    def tokenize(
+        self, text: str, return_ref: Optional[bool] = False
+    ) -> TokenizedOutput:
         """Tokenize a text, producing a TokenizedOutput
 
         Args:
@@ -140,15 +142,17 @@ class AttributionModel:
         return score
 
     def attribute(
-        self, text: str, n_steps: int = 50, batch_size: int = 50
+        self, text: str, n_steps: Optional[int] = 50, batch_size: Optional[int] = 50
     ) -> GradientAttributionOutput:
         """Perform attribution for a given text.
 
         Args:
-            TODO
+            text (str): the text to attribute.
+            n_steps (int, optional): the number of attribution steps to perform.
+            batch_size (int, optional): the internal batch size for the attribution method.
 
         Returns:
-            TODO
+            GradientAttributionOutput: the attribution result.
 
         Examples:
             .. code:: python
