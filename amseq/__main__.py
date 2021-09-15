@@ -1,14 +1,13 @@
 # type: ignore[attr-defined]
 from typing import NoReturn
 
-import warnings
+import logging
 
 import typer
 from rich import print
 
 from amseq import AttributionModel
 
-warnings.filterwarnings("ignore")
 app = typer.Typer(
     name="amseq",
     help="Attribution methods for sequence-to-sequence transformer models 🔍",
@@ -53,4 +52,10 @@ def main(
 
 
 if __name__ == "__main__":
+    logger = logging.getLogger(__name__)
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(name)s - %(message)s",
+        datefmt="%m/%d/%Y %H:%M:%S",
+    )
     app()

@@ -5,6 +5,8 @@ import sys
 from importlib import metadata as importlib_metadata
 
 from .attribution_model import AttributionModel
+from .outputs import GradientAttributionOutput
+from .visualize import heatmap
 
 
 def get_version() -> str:

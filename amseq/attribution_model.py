@@ -1,7 +1,7 @@
 from typing import NoReturn, Tuple, Union
 
 import logging
-import re
+import warnings
 
 import torch
 from captum.attr import (
@@ -72,14 +72,16 @@ class AttributionModel:
         """
         encoder = self.model.get_encoder()
         decoder = self.model.get_decoder()
-        if not isinstance(encoder.embed_tokens, InterpretableEmbeddingBase):
-            self.encoder_int_embeds = configure_interpretable_embedding_layer(
-                encoder, "embed_tokens"
-            )
-        if not isinstance(decoder.embed_tokens, InterpretableEmbeddingBase):
-            self.decoder_int_embeds = configure_interpretable_embedding_layer(
-                decoder, "embed_tokens"
-            )
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=UserWarning)
+            if not isinstance(encoder.embed_tokens, InterpretableEmbeddingBase):
+                self.encoder_int_embeds = configure_interpretable_embedding_layer(
+                    encoder, "embed_tokens"
+                )
+            if not isinstance(decoder.embed_tokens, InterpretableEmbeddingBase):
+                self.decoder_int_embeds = configure_interpretable_embedding_layer(
+                    decoder, "embed_tokens"
+                )
         if hasattr(encoder, "embed_scale"):
             self.encoder_embed_scale = encoder.embed_scale
         if hasattr(decoder, "embed_scale"):
@@ -154,7 +156,7 @@ class AttributionModel:
                 >>> model = AttributionModel('Helsinki-NLP/opus-mt-en-it')
                 >>> attr_out = model.attribute('Hello world!')
         """
-        logger.info(f"Original: {text}")
+        logger.info(f'Original: "{text}"')
         # Build inputs
         out_tok = self.tokenize(text, return_ref=True)
         decoder_input_ids = torch.ones((1, 1), dtype=torch.long, device=self.device)
@@ -218,7 +220,7 @@ class AttributionModel:
         decoder_input_ids = torch.cat((decoder_input_ids, next_token[:, None]), dim=-1)
         tgt_ids = decoder_input_ids.squeeze(0)[1:]
         tgt = self.tokenizer.decode(tgt_ids, skip_special_tokens=True)
-        logger.info(f'Finished attributing generated string "{tgt}"')
+        logger.info(f'Generated: "{tgt}"')
         return GradientAttributionOutput(
             self.tokenizer.convert_ids_to_tokens(out_tok.input_ids.cpu().squeeze(0)),
             self.tokenizer.convert_ids_to_tokens(tgt_ids),
