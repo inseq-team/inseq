@@ -19,6 +19,32 @@
 
 </div>
 
+## Example usage
+
+```python
+import logging
+from amseq import AttributionModel, GradientAttributionOutput, heatmap
+
+logger = logging.getLogger(__name__)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(message)s",
+)
+model_name = f'Helsinki-NLP/opus-mt-en-it'
+model = AttributionModel(model_name)
+sample_text = "Hello world, today is a good day!"
+out: GradientAttributionOutput = model.attribute(sample_text, n_steps=10)
+heatmap(out)
+```
+
+```shell
+Original: "Hello world, today is a good day!"
+Generating: ▁Ciao▁mondo,▁oggi▁è▁una▁buona▁giornata!: : 12it [00:16, 1.40s/it]
+Generated: "Ciao mondo, oggi è una buona giornata!"
+```
+
+![En-It Attribution Heatmap](img/heatmap_enit.png)
+
 ## Todos
 
 - Generalize to other models
