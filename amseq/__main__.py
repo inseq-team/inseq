@@ -1,12 +1,12 @@
 # type: ignore[attr-defined]
-from typing import NoReturn
+from typing import List, NoReturn, Optional, Union
 
 import logging
 
 import typer
 from rich import print
 
-from amseq import AttributionModel
+import amseq
 
 app = typer.Typer(
     name="amseq",
@@ -15,40 +15,57 @@ app = typer.Typer(
 )
 
 
-@app.command(name="attribute")
-def main(
+@app.command()
+def attribute(
     model: str = typer.Option(
-        None,
+        ...,
         "-m",
         "--model",
         case_sensitive=False,
         help="Model name in the 🤗 Hub or path to folder containing local model files.",
     ),
-    text: str = typer.Option(
-        None,
+    attribution: str = typer.Option(
+        "integrated_gradients",
+        "-a",
+        "--attribution",
+        case_sensitive=False,
+        help="Attribution method to use.",
+    ),
+    texts: Union[str, List[str]] = typer.Option(
+        ...,
         "-t",
-        "--text",
+        "--texts",
         case_sensitive=False,
         help="Text to process for performing attribution",
     ),
-    n_steps: int = typer.Option(
-        50,
+    references: Optional[Union[str, List[str]]] = typer.Option(
+        None,
+        "-r",
+        "--references",
+        case_sensitive=False,
+        help="Reference texts for computing attribution scores",
+    ),
+    start_index: Optional[int] = typer.Option(
+        None,
         "-s",
-        "--steps",
+        "--start",
         case_sensitive=False,
-        help="Number of steps for the integrated gradient method",
+        help="Start index for computing attribution scores",
     ),
-    batch_size: int = typer.Option(
-        50,
-        "-b",
-        "--batch-size",
+    end_index: Optional[int] = typer.Option(
+        None,
+        "-e",
+        "--end",
         case_sensitive=False,
-        help="Batch size for the integrated gradient method",
+        help="End index for computing attribution scores",
     ),
+    **kwargs,
 ) -> NoReturn:
     """Perform attribution for the given text using the given model."""
-    model = AttributionModel(model)
-    print(f"\n{model.attribute(text, n_steps, batch_size)}")
+    model = amseq.load(model, attribution_method=attribution)
+    print(
+        f"\n{model.attribute(texts, references, attr_pos_start=start_index, attr_pos_end=end_index, **kwargs)}"
+    )
 
 
 if __name__ == "__main__":

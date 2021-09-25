@@ -32,21 +32,53 @@ logging.basicConfig(
 )
 model_name = f'Helsinki-NLP/opus-mt-en-it'
 model = AttributionModel(model_name)
-sample_text = "Hello world, today is a good day!"
-out: GradientAttributionOutput = model.attribute(sample_text, n_steps=10)
-heatmap(out)
+model = amseq.load("Helsinki-NLP/opus-mt-en-it", "integrated_gradients")
+sample_texts = ["Hello world, today is a good day!"]
+out = model.attribute(txt, references=None, attr_pos_end=None, return_convergence_delta=True, n_steps=300)
 ```
 
-```shell
-Original: "Hello world, today is a good day!"
-Generating: ▁Ciao▁mondo,▁oggi▁è▁una▁buona▁giornata!: : 12it [00:16, 1.40s/it]
-Generated: "Ciao mondo, oggi è una buona giornata!"
-```
-
-![En-It Attribution Heatmap](img/heatmap_enit.png)
+![En-It Attribution Heatmap](img/heatmap_helloworld_enit.png)
 
 ## Todos
 
-- Generalize to other models
-- Generalize to other attribution methods
-- Add constrained attribution
+- [x] Generalize to other HF models
+- [x] Generalize to other attribution methods
+- [x] Add constrained attribution
+- [x] Allow for batched attribution
+- Integrate fairseq models
+
+## Feature attribution steps
+
+1. **Define model name or path and attribution method**
+
+```python
+model_name = f"Helsinki-NLP/opus-mt-en-it"
+method = "integrated_gradients"
+```
+
+2. **Initialize model**
+
+```python
+model = AttributionModel.load(model_name)
+```
+
+What happens under the hood:
+
+- Disambiguate whether it's a HF or a fairseq model and load it and the tokenizer.
+
+- If the method is passed to the attribution model, perform the setup
+
+3. **Attribute a sample text**
+
+```python
+text = "The ultimate test of your knowledge is your capacity to convey it to another."
+out = model.attribute(text, method=method)
+```
+
+What happens under the hood:
+
+- Check if method parameter is defined and if it matches the one at initialization. If not, replace it for this time only. If missing, use the one at initialization. If both missing, raise an error. If not currently in use, perform the setup for the attribution method.
+
+- Check if a reference text is defined. If not, we perform a standard greedy decoding of the target (pick the highest value in the logits), else we tokenize the reference text and force the model to compute the attributions and decode the reference by picking the corresponding value in the logits.
+
+- Return one or more FeatureAttributionOutput objects.
