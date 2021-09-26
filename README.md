@@ -1,8 +1,8 @@
 <div align="center">
-  <h1>inseq</h1>
-  <h3>Attribution methods for sequence-to-sequence transformer models 🔍</h3>
+  <img style="max-width: 500px" src="img/inseq_logo.png"/>
+  <h3>Intepretability for Sequence-to-sequence Models 🔍</h3>
 </div>
-
+<br/>
 <div align="center">
 
 [![Build status](https://github.com/gsarti/inseq/workflows/build/badge.svg?branch=master&event=push)](https://github.com/gsarti/inseq/actions?query=workflow%3Abuild)
@@ -30,8 +30,6 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(message)s",
 )
-model_name = f'Helsinki-NLP/opus-mt-en-it'
-model = AttributionModel(model_name)
 model = inseq.load("Helsinki-NLP/opus-mt-en-it", "integrated_gradients")
 sample_texts = ["Hello world, today is a good day!"]
 out = model.attribute(txt, references=None, attr_pos_end=None, return_convergence_delta=True, n_steps=300)
