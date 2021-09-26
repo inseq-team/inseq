@@ -1,19 +1,19 @@
 <div align="center">
-  <h1>amseq</h1>
+  <h1>inseq</h1>
   <h3>Attribution methods for sequence-to-sequence transformer models 🔍</h3>
 </div>
 
 <div align="center">
 
-[![Build status](https://github.com/gsarti/amseq/workflows/build/badge.svg?branch=master&event=push)](https://github.com/gsarti/amseq/actions?query=workflow%3Abuild)
-[![Python Version](https://img.shields.io/pypi/pyversions/amseq.svg)](https://pypi.org/project/amseq/)
-[![Dependencies Status](https://img.shields.io/badge/dependencies-up%20to%20date-brightgreen.svg)](https://github.com/gsarti/amseq/pulls?utf8=%E2%9C%93&q=is%3Apr%20author%3Aapp%2Fdependabot)
+[![Build status](https://github.com/gsarti/inseq/workflows/build/badge.svg?branch=master&event=push)](https://github.com/gsarti/inseq/actions?query=workflow%3Abuild)
+[![Python Version](https://img.shields.io/pypi/pyversions/inseq.svg)](https://pypi.org/project/inseq/)
+[![Dependencies Status](https://img.shields.io/badge/dependencies-up%20to%20date-brightgreen.svg)](https://github.com/gsarti/inseq/pulls?utf8=%E2%9C%93&q=is%3Apr%20author%3Aapp%2Fdependabot)
 
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![Security: bandit](https://img.shields.io/badge/security-bandit-green.svg)](https://github.com/PyCQA/bandit)
-[![Pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](https://github.com/gsarti/amseq/blob/master/.pre-commit-config.yaml)
-[![Semantic Versions](https://img.shields.io/badge/%20%20%F0%9F%93%A6%F0%9F%9A%80-semantic--versions-e10079.svg)](https://github.com/gsarti/amseq/releases)
-[![License](https://img.shields.io/github/license/gsarti/amseq)](https://github.com/gsarti/amseq/blob/master/LICENSE)
+[![Pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](https://github.com/gsarti/inseq/blob/master/.pre-commit-config.yaml)
+[![Semantic Versions](https://img.shields.io/badge/%20%20%F0%9F%93%A6%F0%9F%9A%80-semantic--versions-e10079.svg)](https://github.com/gsarti/inseq/releases)
+[![License](https://img.shields.io/github/license/gsarti/inseq)](https://github.com/gsarti/inseq/blob/master/LICENSE)
 
 
 
@@ -23,7 +23,7 @@
 
 ```python
 import logging
-from amseq import AttributionModel, GradientAttributionOutput, heatmap
+from inseq import AttributionModel, GradientAttributionOutput, heatmap
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(
@@ -32,7 +32,7 @@ logging.basicConfig(
 )
 model_name = f'Helsinki-NLP/opus-mt-en-it'
 model = AttributionModel(model_name)
-model = amseq.load("Helsinki-NLP/opus-mt-en-it", "integrated_gradients")
+model = inseq.load("Helsinki-NLP/opus-mt-en-it", "integrated_gradients")
 sample_texts = ["Hello world, today is a good day!"]
 out = model.attribute(txt, references=None, attr_pos_end=None, return_convergence_delta=True, n_steps=300)
 ```

@@ -1,9 +1,9 @@
 # This file contains values from Cookiecutter
 
 default_context:
-  project_name: "amseq"
+  project_name: "inseq"
   project_description: "Attribution methods for sequence-to-sequence transformer models 🔍"
-  organization: "amseq"
+  organization: "inseq"
   license: "Apache Software License 2.0"
   minimal_python_version: 3.8
   github_name: "gsarti"

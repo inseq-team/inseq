@@ -1,4 +1,4 @@
-# Docker for amseq
+# Docker for inseq
 
 ## Installation
 
@@ -15,7 +15,7 @@ make docker-build VERSION=latest
 ```
 
 You may provide name and version for the image.
-Default name is `IMAGE := amseq`.
+Default name is `IMAGE := inseq`.
 Default version is `VERSION := latest`.
 
 ```bash
@@ -27,7 +27,7 @@ make docker-build IMAGE=some_name VERSION=0.1.0
 ```bash
 docker run -it --rm \
    -v $(pwd):/workspace \
-   amseq bash
+   inseq bash
 ```
 
 ## How to clean up

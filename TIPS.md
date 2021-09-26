@@ -3,7 +3,7 @@
 1. Initialize `git` inside your repo:
 
 ```bash
-cd amseq && git init
+cd inseq && git init
 ```
 
 2. If you don't have `Poetry` installed run:
@@ -31,7 +31,7 @@ make codestyle
 git add .
 git commit -m ":tada: Initial commit"
 git branch -M main
-git remote add origin https://github.com/gsarti/amseq.git
+git remote add origin https://github.com/gsarti/inseq.git
 git push -u origin main
 ```
 
@@ -94,56 +94,56 @@ Articles:
 ### Development features
 
 - Supports for `Python 3.8` and higher.
-- [`Poetry`](https://python-poetry.org/) as the dependencies manager. See configuration in [`pyproject.toml`](https://github.com/gsarti/amseq/blob/master/pyproject.toml) and [`setup.cfg`](https://github.com/gsarti/amseq/blob/master/setup.cfg).
+- [`Poetry`](https://python-poetry.org/) as the dependencies manager. See configuration in [`pyproject.toml`](https://github.com/gsarti/inseq/blob/master/pyproject.toml) and [`setup.cfg`](https://github.com/gsarti/inseq/blob/master/setup.cfg).
 - Automatic codestyle with [`black`](https://github.com/psf/black), [`isort`](https://github.com/timothycrosley/isort) and [`pyupgrade`](https://github.com/asottile/pyupgrade).
 - Ready-to-use [`pre-commit`](https://pre-commit.com/) hooks with code-formatting.
 - Type checks with [`mypy`](https://mypy.readthedocs.io); docstring checks with [`darglint`](https://github.com/terrencepreilly/darglint); security checks with [`safety`](https://github.com/pyupio/safety) and [`bandit`](https://github.com/PyCQA/bandit)
 - Testing with [`pytest`](https://docs.pytest.org/en/latest/).
-- Ready-to-use [`.editorconfig`](https://github.com/gsarti/amseq/blob/master/.editorconfig), [`.dockerignore`](https://github.com/gsarti/amseq/blob/master/.dockerignore), and [`.gitignore`](https://github.com/gsarti/amseq/blob/master/.gitignore). You don't have to worry about those things.
+- Ready-to-use [`.editorconfig`](https://github.com/gsarti/inseq/blob/master/.editorconfig), [`.dockerignore`](https://github.com/gsarti/inseq/blob/master/.dockerignore), and [`.gitignore`](https://github.com/gsarti/inseq/blob/master/.gitignore). You don't have to worry about those things.
 
 ### Deployment features
 
 - `GitHub` integration: issue and pr templates.
-- `Github Actions` with predefined [build workflow](https://github.com/gsarti/amseq/blob/master/.github/workflows/build.yml) as the default CI/CD.
-- Everything is already set up for security checks, codestyle checks, code formatting, testing, linting, docker builds, etc with [`Makefile`](https://github.com/gsarti/amseq/blob/master/Makefile#L89). More details in [makefile-usage](#makefile-usage).
-- [Dockerfile](https://github.com/gsarti/amseq/blob/master/docker/Dockerfile) for your package.
+- `Github Actions` with predefined [build workflow](https://github.com/gsarti/inseq/blob/master/.github/workflows/build.yml) as the default CI/CD.
+- Everything is already set up for security checks, codestyle checks, code formatting, testing, linting, docker builds, etc with [`Makefile`](https://github.com/gsarti/inseq/blob/master/Makefile#L89). More details in [makefile-usage](#makefile-usage).
+- [Dockerfile](https://github.com/gsarti/inseq/blob/master/docker/Dockerfile) for your package.
 - Always up-to-date dependencies with [`@dependabot`](https://dependabot.com/). You will only [enable it](https://docs.github.com/en/github/administering-a-repository/enabling-and-disabling-version-updates#enabling-github-dependabot-version-updates).
-- Automatic drafts of new releases with [`Release Drafter`](https://github.com/marketplace/actions/release-drafter). You may see the list of labels in [`release-drafter.yml`](https://github.com/gsarti/amseq/blob/master/.github/release-drafter.yml). Works perfectly with [Semantic Versions](https://semver.org/) specification.
+- Automatic drafts of new releases with [`Release Drafter`](https://github.com/marketplace/actions/release-drafter). You may see the list of labels in [`release-drafter.yml`](https://github.com/gsarti/inseq/blob/master/.github/release-drafter.yml). Works perfectly with [Semantic Versions](https://semver.org/) specification.
 
 ### Open source community features
 
-- Ready-to-use [Pull Requests templates](https://github.com/gsarti/amseq/blob/master/.github/PULL_REQUEST_TEMPLATE.md) and several [Issue templates](https://github.com/gsarti/amseq/tree/master/.github/ISSUE_TEMPLATE).
+- Ready-to-use [Pull Requests templates](https://github.com/gsarti/inseq/blob/master/.github/PULL_REQUEST_TEMPLATE.md) and several [Issue templates](https://github.com/gsarti/inseq/tree/master/.github/ISSUE_TEMPLATE).
 - Files such as: `LICENSE`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, and `SECURITY.md` are generated automatically.
-- [`Stale bot`](https://github.com/apps/stale) that closes abandoned issues after a period of inactivity. (You will only [need to setup free plan](https://github.com/marketplace/stale)). Configuration is [here](https://github.com/gsarti/amseq/blob/master/.github/.stale.yml).
+- [`Stale bot`](https://github.com/apps/stale) that closes abandoned issues after a period of inactivity. (You will only [need to setup free plan](https://github.com/marketplace/stale)). Configuration is [here](https://github.com/gsarti/inseq/blob/master/.github/.stale.yml).
 - [Semantic Versions](https://semver.org/) specification with [`Release Drafter`](https://github.com/marketplace/actions/release-drafter).
 
 ## Installation
 
 ```bash
-pip install -U amseq
+pip install -U inseq
 ```
 
 or install with `Poetry`
 
 ```bash
-poetry add amseq
+poetry add inseq
 ```
 
 Then you can run
 
 ```bash
-amseq --help
+inseq --help
 ```
 
 or with `Poetry`:
 
 ```bash
-poetry run amseq --help
+poetry run inseq --help
 ```
 
 ### Makefile usage
 
-[`Makefile`](https://github.com/gsarti/amseq/blob/master/Makefile) contains a lot of functions for faster development.
+[`Makefile`](https://github.com/gsarti/inseq/blob/master/Makefile) contains a lot of functions for faster development.
 
 <details>
 <summary>1. Download and remove Poetry</summary>
@@ -289,7 +289,7 @@ Remove docker image with
 make docker-remove
 ```
 
-More information [about docker](https://github.com/gsarti/amseq/tree/master/docker).
+More information [about docker](https://github.com/gsarti/inseq/tree/master/docker).
 
 </p>
 </details>
@@ -320,7 +320,7 @@ make clean-all
 
 ## 📈 Releases
 
-You can see the list of available releases on the [GitHub Releases](https://github.com/gsarti/amseq/releases) page.
+You can see the list of available releases on the [GitHub Releases](https://github.com/gsarti/inseq/releases) page.
 
 We follow [Semantic Versions](https://semver.org/) specification.
 
@@ -337,26 +337,26 @@ We use [`Release Drafter`](https://github.com/marketplace/actions/release-drafte
 |            `documentation`            |    📝 Documentation     |
 |            `dependencies`             | ⬆️ Dependencies updates |
 
-You can update it in [`release-drafter.yml`](https://github.com/gsarti/amseq/blob/master/.github/release-drafter.yml).
+You can update it in [`release-drafter.yml`](https://github.com/gsarti/inseq/blob/master/.github/release-drafter.yml).
 
 GitHub creates the `bug`, `enhancement`, and `documentation` labels for you. Dependabot creates the `dependencies` label. Create the remaining labels on the Issues tab of your GitHub repository, when you need them.
 
 ## 🛡 License
 
-[![License](https://img.shields.io/github/license/gsarti/amseq)](https://github.com/gsarti/amseq/blob/master/LICENSE)
+[![License](https://img.shields.io/github/license/gsarti/inseq)](https://github.com/gsarti/inseq/blob/master/LICENSE)
 
-This project is licensed under the terms of the `Apache Software License 2.0` license. See [LICENSE](https://github.com/gsarti/amseq/blob/master/LICENSE) for more details.
+This project is licensed under the terms of the `Apache Software License 2.0` license. See [LICENSE](https://github.com/gsarti/inseq/blob/master/LICENSE) for more details.
 
 ## 📃 Citation
 
 ```bibtex
-@misc{amseq,
+@misc{inseq,
   author = {Sarti, Gabriele},
   title = {Attribution methods for sequence-to-sequence transformer models 🔍},
   year = {2021},
   publisher = {GitHub},
   journal = {GitHub repository},
-  howpublished = {\url{https://github.com/gsarti/amseq}}
+  howpublished = {\url{https://github.com/gsarti/inseq}}
 }
 ```
 

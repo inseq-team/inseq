@@ -10,7 +10,7 @@ class UnknownAttributionMethodError(Exception):
     )
 
     def __init__(self, method_name: str, msg=UNKNOWN_ATTRIBUTION_METHOD_MSG, *args):
-        from amseq.attr import FeatureAttribution
+        from inseq.attr import FeatureAttribution
 
         msg = msg.format(
             attribution_method=method_name,
@@ -29,7 +29,7 @@ class MissingAttributionMethodError(Exception):
     )
 
     def __init__(self, msg=MISSING_ATTRIBUTION_METHOD_MSG, *args):
-        from amseq.attr import FeatureAttribution
+        from inseq.attr import FeatureAttribution
 
         msg = msg.format(
             available_methods=", ".join(get_available_methods(FeatureAttribution))

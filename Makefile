@@ -3,7 +3,7 @@ SHELL := /usr/bin/env bash
 PYTHON := python
 
 #* Docker variables
-IMAGE := amseq
+IMAGE := inseq
 VERSION := latest
 
 #* Poetry
@@ -45,7 +45,7 @@ test:
 check-codestyle:
 	poetry run isort --diff --check-only --settings-path pyproject.toml ./
 	poetry run black --diff --check --config pyproject.toml ./
-	poetry run darglint --verbosity 2 amseq tests
+	poetry run darglint --verbosity 2 inseq tests
 
 .PHONY: mypy
 mypy:
@@ -55,7 +55,7 @@ mypy:
 check-safety:
 	poetry check
 	poetry run safety check --full-report
-	poetry run bandit -ll --recursive amseq tests
+	poetry run bandit -ll --recursive inseq tests
 
 .PHONY: lint
 lint: test check-codestyle mypy check-safety

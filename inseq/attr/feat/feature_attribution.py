@@ -49,7 +49,7 @@ class FeatureAttribution(Registry):
         attribution_model=None,
         **kwargs,
     ) -> "FeatureAttribution":
-        from amseq import AttributionModel
+        from inseq import AttributionModel
 
         if model_name_or_path and attribution_model:
             raise OSError(

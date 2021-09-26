@@ -4,14 +4,14 @@ requires = ["poetry_core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
-name = "amseq"
+name = "inseq"
 version = "0.1.0"
 description = "Attribution methods for sequence-to-sequence transformer models 🔍"
 readme = "README.md"
 authors = ["gsarti <gabriele.sarti996@gmail.com>"]
 license = "Apache Software License 2.0"
-repository = "https://github.com/gsarti/amseq"
-homepage = "https://github.com/gsarti/amseq"
+repository = "https://github.com/gsarti/inseq"
+homepage = "https://github.com/gsarti/inseq"
 
 # Keywords description https://python-poetry.org/docs/pyproject/#keywords
 keywords = ["seq2seq", "transformers", "natural language processing", "XAI", "explainable ai", "interpretability"]  #! Update me
@@ -33,7 +33,7 @@ classifiers = [  #! Update me
 
 [tool.poetry.scripts]
 # Entry points for the package https://python-poetry.org/docs/pyproject/#scripts
-"amseq" = "amseq.__main__:app"
+"inseq" = "inseq.__main__:app"
 
 [tool.poetry.dependencies]
 python = "^3.8"

@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
 
-from amseq import attr
+from inseq import attr
 
 from ..utils import pretty_list
 from .batch import Batch, BatchEncoding

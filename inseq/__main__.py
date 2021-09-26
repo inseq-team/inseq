@@ -6,10 +6,10 @@ import logging
 import typer
 from rich import print
 
-import amseq
+import inseq
 
 app = typer.Typer(
-    name="amseq",
+    name="inseq",
     help="Attribution methods for sequence-to-sequence transformer models 🔍",
     add_completion=False,
 )
@@ -62,7 +62,7 @@ def attribute(
     **kwargs,
 ) -> NoReturn:
     """Perform attribution for the given text using the given model."""
-    model = amseq.load(model, attribution_method=attribution)
+    model = inseq.load(model, attribution_method=attribution)
     print(
         f"\n{model.attribute(texts, references, attr_pos_start=start_index, attr_pos_end=end_index, **kwargs)}"
     )
