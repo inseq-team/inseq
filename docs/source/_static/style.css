@@ -1,0 +1,445 @@
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p,
+body,
+a {
+  font-family: HKGroteskPro, serif !important;
+}
+
+h1,
+h2,
+h3 {
+  padding-top: 80px;
+  margin-top: -80px;
+}
+
+body {
+  background-color: #efefef;
+  color: #2b354f;
+}
+
+a {
+  cursor: pointer;
+}
+
+@font-face {
+  font-family: HKGroteskPro;
+  font-weight: 400;
+  src: url(hk-grotesk-pro/HKGroteskPro-Regular.woff2) format("woff2"),
+    url(hk-grotesk-pro/HKGroteskPro-Regular.woff) format("woff");
+}
+
+@font-face {
+  font-family: HKGroteskPro;
+  font-weight: 600;
+  src: url(hk-grotesk-pro/HKGroteskPro-Medium.woff2) format("woff2"),
+    url(hk-grotesk-pro/HKGroteskPro-Medium.woff) format("woff");
+}
+
+@font-face {
+  font-family: HKGroteskPro;
+  font-weight: 700;
+  src: url(hk-grotesk-pro/HKGroteskPro-SemiBold.woff2) format("woff2"),
+    url(hk-grotesk-pro/HKGroteskPro-SemiBold.woff) format("woff");
+}
+
+@font-face {
+  font-family: HKGroteskPro;
+  font-weight: 800;
+  src: url(hk-grotesk-pro/HKGroteskPro-Bold.woff2) format("woff2"),
+    url(hk-grotesk-pro/HKGroteskPro-Bold.woff) format("woff");
+}
+
+@media print {
+  .no-print,
+  .no-print * {
+    display: none !important;
+  }
+}
+
+.wy-side-nav-search > a,
+.wy-side-nav-search .wy-dropdown > a {
+  display: none !important;
+}
+
+.wy-nav-content {
+  width: auto !important;
+  max-width: max-content !important;
+}
+
+.wy-body-for-nav {
+  background-color: #efefef;
+  padding-top: 0px;
+}
+
+.section {
+  max-width: 800px;
+}
+
+.widetable {
+  min-width: 1000px !important;
+}
+
+.wy-side-scroll {
+  background: #efefef;
+}
+.wy-nav-top {
+  background: #efefef;
+  color: rgba(0, 0, 0, 0.65) !important;
+  position: fixed;
+  top: 16px;
+  font-size: 13px;
+}
+
+.wy-nav-top a {
+  display: none;
+}
+
+.wy-nav-top i {
+  font-size: 24px;
+}
+
+.wy-nav-content {
+  color: #222222;
+  background: #efefef;
+}
+
+.wy-nav-content-wrap {
+  background: #efefef;
+}
+
+.wy-side-nav-search {
+  background: #efefef !important;
+}
+
+.wy-menu-vertical a {
+  color: #222222;
+}
+
+.wy-menu-vertical a:hover {
+  color: #333333;
+  background: #00bfa5;
+}
+
+.wy-nav-side {
+  background: #efefef;
+  width: 340px;
+  padding-left: 20px;
+  padding-right: 10px;
+}
+
+/*HEADER STYLES*/
+
+.ge_header {
+  background-color: #3e3f42;
+  position: fixed;
+  z-index: 10000;
+  height: 64px;
+  width: 100%;
+  top: 0;
+}
+
+#header-logo {
+  overflow: hidden;
+  padding-left: 24px;
+  float: left;
+  line-height: 64px;
+  text-decoration: none;
+  height: auto;
+}
+
+#header-logo img {
+  display: inline;
+  vertical-align: middle;
+  margin-right: 16px;
+  max-width: 224px;
+  width: 100%;
+  margin-bottom: 0;
+}
+
+#header-actions {
+  float: right;
+  flex: 0 0 auto;
+  padding: 8px;
+  white-space: nowrap;
+  line-height: 46px;
+  font-size: 16px;
+}
+
+.header-item {
+  display: inline-block;
+  vertical-align: bottom;
+  padding: 0 20px;
+  display: block;
+  color: rgba(0, 0, 0, 0.65) !important;
+  float: left;
+  border-bottom: 2px solid transparent;
+  transition: border-bottom 0.3s cubic-bezier(0.645, 0.045, 0.355, 1),
+    background 0.3s cubic-bezier(0.645, 0.045, 0.355, 1),
+    padding 0.15s cubic-bezier(0.645, 0.045, 0.355, 1);
+}
+
+#header-actions a:hover {
+  color: #00bfa5 !important;
+  border-bottom: 2px solid #00bfa5;
+  transition: border-bottom 0.3s cubic-bezier(0.645, 0.045, 0.355, 1),
+    background 0.3s cubic-bezier(0.645, 0.045, 0.355, 1),
+    padding 0.15s cubic-bezier(0.645, 0.045, 0.355, 1);
+}
+
+#community-modal {
+  background: #fff;
+  min-width: 172px;
+  border-radius: 4px;
+  height: 0px;
+  transition: all 0.3s ease-in-out;
+  overflow: hidden;
+  position: relative;
+  margin-right: -24px;
+}
+
+#community-modal ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+#community-modal li {
+  margin-bottom: 8px;
+  padding: 0 16px 0 28px;
+  height: 40px;
+  border: none !important;
+  margin-top: 4px;
+  overflow: hidden;
+  font-size: 14px;
+  line-height: 40px;
+  text-overflow: ellipsis;
+}
+
+#community-modal a {
+  border-bottom: none !important;
+}
+
+#mobile-modal {
+  background: #fff;
+  border-radius: 4px;
+  height: 0px;
+  transition: all 0.3s ease-in-out;
+  overflow: hidden;
+  position: relative;
+  top: 37px;
+}
+
+#mobile-modal ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+#mobile-modal li {
+  margin-bottom: 8px;
+  padding: 0 0px 0 16px;
+  height: 40px;
+  border: none !important;
+  margin-top: 4px;
+  overflow: hidden;
+  font-size: 14px;
+  line-height: 40px;
+  text-overflow: ellipsis;
+  float: left;
+}
+
+#mobile-modal a {
+  border-bottom: none !important;
+}
+
+#header-mobile {
+  display: none;
+}
+
+#discourse-comments {
+  padding: 16px;
+  margin-bottom: 32px;
+  background-color: #fff;
+}
+
+@media only screen and (max-width: 768px) {
+  #header-actions {
+    display: none;
+  }
+
+  #header-mobile {
+    display: block;
+  }
+
+  .wy-nav-side {
+    width: 250px;
+  }
+}
+
+.rst-content .sidebar {
+  margin-top: 80px !important;
+}
+
+/*** Make the API Reference breadcrumbs look kind of normal ***/
+ul.wy-breadcrumbs li code span.pre{
+  font-size: 16px;
+  font-family: HKGroteskPro, serif;
+  font-weight: 400;
+  color: rgb(155, 89, 182);
+}
+
+/*** Code style ***/
+
+.highlight .c1, .highlight .sd{
+  color: #999
+}
+
+.highlight .nn, .highlight .k, .highlight .s1, .highlight .nb, .highlight .bp, .highlight .kc {
+  color: #FB8D68;
+}
+
+.highlight .kn, .highlight .nv, .highlight .s2, .highlight .ow {
+  color: #6670FF;
+}
+
+.highlight .gp {
+  color: #FB8D68;
+}
+
+/*** Huggingface Style ***/
+
+/* Copy button */
+
+a.copybtn {
+  margin: 3px;
+}
+
+
+/* To keep the logo centered */
+.wy-side-scroll {
+  width: auto;
+  font-size: 20px;
+}
+
+/* The div that holds the Hugging Face logo */
+.HuggingFaceDiv {
+  width: 100%
+}
+
+/* The research field on top of the toc tree */
+.wy-side-nav-search{
+  padding-top: 0;
+}
+
+/* The section headers in the toc tree */
+.wy-menu-vertical p.caption{
+  background-color: #4d59ff;
+  line-height: 40px;
+}
+
+/* The selected items in the toc tree */
+.wy-menu-vertical li.current{
+  background-color: #A6B0FF;
+}
+
+/* When a list item that does belong to the selected block from the toc tree is hovered */
+.wy-menu-vertical li.current a:hover{
+  background-color: #6f7079;
+}
+
+/* When a list item that does NOT belong to the selected block from the toc tree is hovered. */
+.wy-menu-vertical li a:hover{
+  background-color: #696a75;
+}
+
+/* The color inside the selected toc tree block */
+.wy-menu-vertical li.toctree-l2 a, .wy-menu-vertical li.toctree-l3 a, .wy-menu-vertical li.toctree-l4 a {
+  color: black;
+}
+
+/* Inside code snippets */
+.rst-content dl:not(.docutils) dt{
+  font-size: 15px;
+}
+
+.rst-content div[role="navigation"] {
+  padding-left: 30px;
+}
+
+
+/* Content bars */
+.rst-content dl:not(.docutils) dt {
+  background-color: rgba(251, 141, 104, 0.1);
+  border-right: solid 2px #FB8D68;
+  border-left: solid 2px #FB8D68;
+  color: #FB8D68;
+  font-family: Calibre-Light, sans-serif;
+  border-top: none;
+  font-style: normal !important;
+}
+
+/* Expand button */
+.wy-menu-vertical li.toctree-l2 span.toctree-expand,
+.wy-menu-vertical li.on a span.toctree-expand, .wy-menu-vertical li.current>a span.toctree-expand,
+.wy-menu-vertical li.toctree-l3 span.toctree-expand{
+  color: black;
+}
+
+/* Max window size */
+.wy-nav-content{
+  max-width: 1200px;
+}
+
+
+/* Source spans */
+.rst-content .viewcode-link, .rst-content .viewcode-back{
+  font-size: 110%;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+/* It would be better for table to be visible without horizontal scrolling */
+.wy-table-responsive table td, .wy-table-responsive table th{
+  white-space: normal;
+}
+
+.footer {
+  margin-top: 20px;
+}
+
+.footer__Social {
+  display: flex;
+  flex-direction: row;
+}
+
+.footer__CustomImage {
+  margin: 2px 5px 0 0;
+}
+
+/* class and method names in doc */
+.rst-content dl:not(.docutils) tt.descname, .rst-content dl:not(.docutils) tt.descclassname, .rst-content dl:not(.docutils) tt.descname, .rst-content dl:not(.docutils) code.descname, .rst-content dl:not(.docutils) tt.descclassname, .rst-content dl:not(.docutils) code.descclassname{
+  font-family: Calibre, sans-serif;
+  font-size: 20px !important;
+}
+
+/* class name in doc*/
+.rst-content dl:not(.docutils) tt.descname, .rst-content dl:not(.docutils) tt.descname, .rst-content dl:not(.docutils) code.descname{
+  margin-right: 10px;
+  font-family: Calibre-Medium, sans-serif;
+}
+
+/* Method and class parameters */
+.sig-param{
+  line-height: 23px;
+}
+
+/* Class introduction "class" string at beginning */
+.rst-content dl:not(.docutils) .property{
+  font-size: 18px;
+  color: black;
+}

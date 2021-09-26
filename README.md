@@ -35,7 +35,7 @@ sample_texts = ["Hello world, today is a good day!"]
 out = model.attribute(txt, references=None, attr_pos_end=None, return_convergence_delta=True, n_steps=300)
 ```
 
-![En-It Attribution Heatmap](img/heatmap_helloworld_enit.png)
+![En-It Attribution Heatmap](docs/source/images/heatmap_helloworld_enit.png)
 
 ## Todos
 

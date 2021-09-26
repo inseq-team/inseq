@@ -10,7 +10,7 @@ import inseq
 
 app = typer.Typer(
     name="inseq",
-    help="Attribution methods for sequence-to-sequence transformer models 🔍",
+    help="Interpretability for Sequence-to-sequence models 🔍",
     add_completion=False,
 )
 

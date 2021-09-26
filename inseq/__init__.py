@@ -1,5 +1,5 @@
 # type: ignore[attr-defined]
-"""Attribution methods for sequence-to-sequence transformer models 🔍"""
+"""Interpretability for Sequence-to-sequence models 🔍"""
 
 import sys
 from importlib import metadata as importlib_metadata

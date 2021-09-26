@@ -1,0 +1,19 @@
+include LICENSE
+include requirements.txt
+include *.md
+include *.py
+include *.yaml
+include *.yml
+recursive-include inseq *.py
+
+exclude Makefile
+# Exclude tests from package
+prune tests
+# Exclude the documentation files
+prune docs
+# Exclude the example files
+prune examples
+# Exclude notebooks
+prune notebooks
+# Exclude utils
+prune .github
