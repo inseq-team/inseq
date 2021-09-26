@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="img/inseq_logo.png" width="600"/>
+  <img src="docs/source/images//inseq_logo.png" width="600"/>
   <h3>Intepretability for Sequence-to-sequence Models 🔍</h3>
 </div>
 <br/>
