@@ -1,4 +1,4 @@
-from typing import Any, List, Optional
+from typing import Any, Optional, Sequence
 
 from contextlib import contextmanager
 
@@ -12,7 +12,7 @@ def optional(condition, context_manager):
         yield
 
 
-def pretty_list(l: Optional[List[Any]]) -> str:
+def pretty_list(l: Optional[Sequence[Any]]) -> str:
     if l is None:
         return "None"
     elif (

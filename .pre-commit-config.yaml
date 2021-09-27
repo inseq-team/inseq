@@ -33,12 +33,14 @@ repos:
         entry: poetry run isort --settings-path pyproject.toml
         types: [python]
         language: system
-  
+
   - repo: local
     hooks:
       - id: flake8
         name: flake8
         entry: poetry run flake8 --config setup.cfg
+        types: [python]
+        language: system
 
   - repo: local
     hooks:

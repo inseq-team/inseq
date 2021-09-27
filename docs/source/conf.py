@@ -6,6 +6,7 @@
 # http://www.sphinx-doc.org/en/master/config
 
 # -- Path setup --------------------------------------------------------------
+from typing import Dict
 
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
@@ -50,7 +51,7 @@ extensions = [
     "sphinx.ext.todo",
     "sphinx.ext.coverage",
     "sphinx.ext.napoleon",
-    'sphinx.ext.intersphinx',
+    "sphinx.ext.intersphinx",
     "sphinx_gitstamp",
     "recommonmark",
     "sphinx.ext.viewcode",
@@ -218,7 +219,7 @@ htmlhelp_basename = "inseq_doc"
 
 # -- Options for LaTeX output ------------------------------------------------
 
-latex_elements = {
+latex_elements: Dict[str, str] = {
     # The paper size ('letterpaper' or 'a4paper').
     #
     # 'papersize': 'letterpaper',
@@ -266,6 +267,7 @@ texinfo_documents = [
 ]
 
 sphinxemoji_style = "twemoji"
+
 
 def setup(app):
     app.add_css_file("style.css")

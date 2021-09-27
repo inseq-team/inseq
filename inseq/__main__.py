@@ -1,4 +1,3 @@
-# type: ignore[attr-defined]
 from typing import List, NoReturn, Optional, Union
 
 import logging

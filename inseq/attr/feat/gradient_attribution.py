@@ -1,11 +1,9 @@
 import logging
-from collections import OrderedDict
 
-from captum.attr import LRP, GradientShap, InputXGradient, IntegratedGradients, Saliency
-from torch import long
+from captum.attr import InputXGradient, IntegratedGradients, Saliency
 from torchtyping import TensorType
 
-from ...data import EncoderDecoderBatch, FeatureAttributionOutput
+from ...data import EncoderDecoderBatch, FeatureAttributionStepOutput
 from ...utils import Registry, pretty_tensor, sum_normalize
 from ..attribution_decorators import set_hook, unset_hook
 from .feature_attribution import FeatureAttribution
@@ -27,9 +25,9 @@ class GradientAttribution(FeatureAttribution, Registry):
     def attribute_step(
         self,
         batch: EncoderDecoderBatch,
-        target_ids: TensorType["batch_size", long],
+        target_ids: TensorType["batch_size", int],
         **kwargs,
-    ) -> FeatureAttributionOutput:
+    ) -> FeatureAttributionStepOutput:
         """Attribute a single step."""
         logger.debug(f"batch: {batch},\ntarget_ids: {pretty_tensor(target_ids)}")
         delta = kwargs.get("return_convergence_delta", None)
@@ -52,7 +50,7 @@ class GradientAttribution(FeatureAttribution, Registry):
             attr, delta = attr
         attr = sum_normalize(attr, dim_sum=-1)
         logger.debug(f"attributions: {pretty_tensor(attr)}")
-        return FeatureAttributionOutput(attributions=attr, delta=delta)
+        return (attr, delta) if delta is not None else attr
 
 
 class IntegratedGradientsAttribution(GradientAttribution):
@@ -64,6 +62,7 @@ class IntegratedGradientsAttribution(GradientAttribution):
         super().__init__(attribution_model)
         self.method = IntegratedGradients(self.attribution_model.score_func, **kwargs)
         self.use_baseline = True
+        self.skip_eos = True
 
 
 class InputXGradientAttribution(GradientAttribution):

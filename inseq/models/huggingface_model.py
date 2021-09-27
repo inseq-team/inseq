@@ -97,6 +97,7 @@ class HuggingfaceModel(AttributionModel):
         self.pad_id = self.model.config.pad_token_id
         self.eos_id = self.model.config.eos_token_id
         self.bos_id = self.model.config.decoder_start_token_id
+        self.pad_token = self.tokenizer.convert_ids_to_tokens(self.pad_id)
         self.bos_token = self.tokenizer.convert_ids_to_tokens(self.bos_id)
         self.encoder_embed_scale = 1.0
         self.decoder_embed_scale = 1.0

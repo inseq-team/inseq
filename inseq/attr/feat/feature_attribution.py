@@ -1,11 +1,10 @@
-from typing import List, NoReturn, Optional, Tuple
+from typing import Any, Dict, List, NoReturn, Optional, Tuple
 
 import logging
 from abc import abstractmethod
 from inspect import signature
 
 from rich.progress import track
-from torch import long
 from torchtyping import TensorType
 
 from ...data import (
@@ -16,6 +15,7 @@ from ...data import (
     FeatureAttributionInput,
     FeatureAttributionOutput,
     FeatureAttributionSequenceOutput,
+    FeatureAttributionStepOutput,
     ModelIdentifier,
     OneOrMoreFeatureAttributionSequenceOutputs,
 )
@@ -39,6 +39,7 @@ class FeatureAttribution(Registry):
     def __init__(self, attribution_model, **kwargs):
         super().__init__()
         self.attribution_model = attribution_model
+        self.skip_eos = False
         self.hook()
 
     @classmethod
@@ -160,25 +161,27 @@ class FeatureAttribution(Registry):
     def get_attribution_output(
         self,
         batch: EncoderDecoderBatch,
-        target_ids: TensorType["batch_size", 1, long],
-        target_attention_mask: Optional[TensorType["batch_size", 1, long]] = None,
+        target_ids: TensorType["batch_size", 1, int],
+        target_attention_mask: Optional[TensorType["batch_size", 1, int]] = None,
         **kwargs,
     ) -> FeatureAttributionOutput:
         step_output = self.filtered_attribute_step(
             batch, target_ids, target_attention_mask, **kwargs
         )
-        step_output = self.add_token_information(step_output, batch, target_ids)
-        step_output.fix_attributions()
-        step_output.check_consistency()
-        return step_output
+        attribution_output = FeatureAttributionOutput()
+        attribution_output = self.add_token_information(
+            attribution_output, batch, target_ids
+        )
+        attribution_output.set_attributions(*step_output)
+        return attribution_output
 
     def filtered_attribute_step(
         self,
         batch: EncoderDecoderBatch,
-        target_ids: TensorType["batch_size", 1, long],
-        target_attention_mask: Optional[TensorType["batch_size", 1, long]] = None,
-        **kwargs,
-    ) -> FeatureAttributionOutput:
+        target_ids: TensorType["batch_size", 1, int],
+        target_attention_mask: Optional[TensorType["batch_size", 1, int]] = None,
+        **kwargs: Dict[str, Any],
+    ) -> FeatureAttributionStepOutput:
         logger.debug(
             f"target_ids: {pretty_tensor(target_ids)},\n"
             f"target_attention_mask: {pretty_tensor(target_attention_mask)}"
@@ -190,19 +193,24 @@ class FeatureAttribution(Registry):
             target_ids = target_ids.masked_select(target_attention_mask.bool())
             target_ids = target_ids.view(-1, 1)
         step_output = self.attribute_step(batch, target_ids.squeeze(), **kwargs)
+        attributions, deltas = (
+            step_output if isinstance(step_output, tuple) else (step_output, None)
+        )
         if target_attention_mask is not None and orig_target_ids.shape[0] > 1:
-            step_output.attributions = remap_from_filtered(
+            attributions = remap_from_filtered(
                 source=orig_batch.sources.input_ids,
                 mask=target_attention_mask,
-                filtered=step_output.attributions,
+                filtered=attributions,
             )
-            if step_output.delta is not None:
-                step_output.delta = remap_from_filtered(
+            if deltas is not None:
+                deltas = remap_from_filtered(
                     source=target_attention_mask.squeeze(),
                     mask=target_attention_mask,
-                    filtered=step_output.delta,
+                    filtered=deltas,
                 )
-        return step_output
+        if deltas is not None:
+            return (attributions, deltas)
+        return (attributions,)
 
     def get_attribution_args(self, **kwargs):
         if hasattr(self, "method") and hasattr(self.method, "attribute"):
@@ -218,15 +226,24 @@ class FeatureAttribution(Registry):
         self,
         attribution_output: FeatureAttributionOutput,
         batch: EncoderDecoderBatch,
-        target_ids: TensorType["batch_size", 1, long],
+        target_ids: TensorType["batch_size", 1, int],
     ) -> FeatureAttributionOutput:
         source_tokens = self.attribution_model.convert_ids_to_tokens(
-            batch.sources.input_ids
+            batch.sources.input_ids, skip_special_tokens=self.skip_eos
         )
-        source_ids = self.attribution_model.convert_tokens_to_ids(source_tokens)
         prefix_tokens = self.attribution_model.convert_ids_to_tokens(
-            batch.targets.input_ids
+            batch.targets.input_ids, skip_special_tokens=self.skip_eos
         )
+        if not self.skip_eos:
+            source_tokens = [
+                [tok for tok in seq if tok != self.attribution_model.pad_token]
+                for seq in source_tokens
+            ]
+            prefix_tokens = [
+                [tok for tok in seq if tok != self.attribution_model.pad_token]
+                for seq in prefix_tokens
+            ]
+        source_ids = self.attribution_model.convert_tokens_to_ids(source_tokens)
         prefix_ids = self.attribution_model.convert_tokens_to_ids(prefix_tokens)
         target_tokens = self.attribution_model.convert_ids_to_tokens(
             target_ids, skip_special_tokens=False
@@ -243,8 +260,8 @@ class FeatureAttribution(Registry):
     def attribute_step(
         self,
         batch: EncoderDecoderBatch,
-        target_ids: TensorType["batch_size", long],
-        **kwargs,
+        target_ids: TensorType["batch_size", int],
+        **kwargs: Dict[str, Any],
     ) -> FeatureAttributionOutput:
         pass
 

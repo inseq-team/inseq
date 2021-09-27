@@ -1,7 +1,7 @@
 """Tests for hello function."""
-import pytest
+# import pytest
 
-from inseq.data import FeatureAttributionOutput
+# from inseq.data import FeatureAttributionOutput
 
 # @pytest.mark.parametrize(
 #    ("source_tokens", "target_tokens", "attributions", "deltas", "expected"),

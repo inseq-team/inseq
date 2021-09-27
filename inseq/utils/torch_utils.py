@@ -1,15 +1,14 @@
 from typing import Any, Optional
 
 import torch
-from torch import Tensor, long
 from torchtyping import TensorType
 
 
 def remap_from_filtered(
     source: TensorType[..., Any],
-    mask: TensorType["batch_size", 1, long],
+    mask: TensorType["batch_size", 1, int],
     filtered: TensorType["filtered_batch_size", "seq_len", Any],
-) -> Tensor:
+) -> TensorType["batch_size", "seq_len", Any]:
     if len(filtered.shape) > 1:
         index = mask.squeeze().nonzero().expand_as(filtered)
     else:

@@ -1,4 +1,4 @@
-from typing import List, NoReturn, Optional, Sequence, Tuple, Union
+from typing import List, NoReturn, Optional, Sequence, Tuple, Type, Union
 
 import math
 from dataclasses import dataclass
@@ -7,8 +7,7 @@ from itertools import dropwhile
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
-
-from inseq import attr
+from torchtyping import TensorType
 
 from ..utils import pretty_list
 from .batch import Batch, BatchEncoding
@@ -20,15 +19,21 @@ OneOrMoreTokenSequences = Sequence[Sequence[str]]
 OneOrMoreAttributionSequences = Sequence[Sequence[float]]
 
 FeatureAttributionInput = Union[TextInput, BatchEncoding, Batch]
+DeltaOutput = Type[TensorType["batch_size", float]]
+AttributionOutput = Type[TensorType["batch_size", "seq_len", float]]
+FeatureAttributionStepOutput = Union[
+    AttributionOutput, Tuple[AttributionOutput], Tuple[AttributionOutput, DeltaOutput]
+]
 
 # For Huggingface it's a string identifier e.g. "t5-base", "Helsinki-NLP/opus-mt-en-it"
-# For Fairseq it's a tuple of strings containing repo and model name e.g. ("pytorch/fairseq", "transformer.wmt14.en-fr")
+# For Fairseq it's a tuple of strings containing repo and model name
+# e.g. ("pytorch/fairseq", "transformer.wmt14.en-fr")
 ModelIdentifier = Union[str, Tuple[str, str]]
 
 
 @dataclass
 class FeatureAttributionOutput:
-    attributions: OneOrMoreAttributionSequences
+    attributions: Optional[OneOrMoreAttributionSequences] = None
     delta: Optional[List[float]] = None
     source_ids: Optional[OneOrMoreIdSequences] = None
     prefix_ids: Optional[OneOrMoreIdSequences] = None
@@ -38,7 +43,11 @@ class FeatureAttributionOutput:
     target_tokens: Optional[OneOrMoreTokenSequences] = None
 
     def __str__(self):
-        pretty_attrs = [[round(v, 2) for v in a] for a in self.attributions]
+        pretty_attrs = (
+            [[round(v, 2) for v in a] for a in self.attributions]
+            if self.attributions is not None
+            else None
+        )
         return (
             f"{self.__class__.__name__}(\n"
             f"   source_tokens={pretty_list(self.source_tokens)},\n"
@@ -52,12 +61,16 @@ class FeatureAttributionOutput:
             ")"
         )
 
-    def fix_attributions(self):
-        attributions = self.attributions.detach().cpu().tolist()
-        if self.delta is not None:
-            self.delta = self.delta.detach().cpu().squeeze().tolist()
-        if isinstance(self.delta, float):
-            self.delta = [self.delta]
+    def set_attributions(
+        self,
+        attributions: AttributionOutput,
+        delta: Optional[DeltaOutput] = None,
+    ) -> None:
+        attributions = attributions.detach().cpu().tolist()
+        if delta is not None:
+            self.delta = delta.detach().cpu().squeeze().tolist()
+            if not isinstance(self.delta, list):
+                self.delta = [self.delta]
         self.attributions = [
             list(reversed(list(dropwhile(lambda x: x == 0, reversed(sequence)))))
             if not all([math.isnan(x) for x in sequence])
@@ -65,33 +78,7 @@ class FeatureAttributionOutput:
             for sequence in attributions
         ]
 
-    def check_consistency(self):
-        # No batch is missing
-        assert (
-            len(self.source_tokens)
-            == len(self.prefix_tokens)
-            == len(self.target_tokens)
-            == len(self.attributions)
-        )
-        # Number of in-batch elements is consistent
-        assert all(
-            len(t) == len(id) for t, id in zip(self.source_tokens, self.source_ids)
-        )
-        assert all(
-            len(t) == len(id) for t, id in zip(self.prefix_tokens, self.prefix_ids)
-        )
-        assert all(
-            len(t) == len(id) for t, id in zip(self.target_tokens, self.target_ids)
-        )
-        if self.delta is not None:
-            assert isinstance(self.delta, list) and all(
-                isinstance(x, float) for x in self.delta
-            )
-        # Attributions size match either the source or the prefix
-        # assert all(len(a) == len(t) for a, t in zip(self.attributions, self.source_tokens)) or \
-        #    all(len(a) == len(t) for a, t in zip(self.attributions, self.prefix_tokens)), (self.attributions, self.source_tokens)
-
-    def __getitem__(self, index: Union[int, slice]):
+    def __getitem__(self, index: Union[int, slice]) -> "FeatureAttributionOutput":
         return FeatureAttributionOutput(
             source_ids=self.source_ids[index] if self.source_ids is not None else None,
             prefix_ids=self.prefix_ids[index] if self.prefix_ids is not None else None,
@@ -119,12 +106,12 @@ class FeatureAttributionSequenceOutput:
         source_tokens (list[str]): Tokenized source sequence.
         target_tokens (list[str]): Tokenized target sequence.
         attributions (list[list[str]]): List of length len(target_tokens) containing
-            lists of attributions of length len(source_tokens) for each 
+            lists of attributions of length len(source_tokens) for each
             source-target token pair.
         deltas (list[float], optional): List of length len(target_tokens) containing
             the deltas for the approximate integration of the gradients for each
             target token.
-        
+
     Example:
         >> model = AttributionModel('Helsinki-NLP/opus-mt-en-it')
         >> attr_output = model.attribute( \
@@ -134,7 +121,7 @@ class FeatureAttributionSequenceOutput:
                 internal_batch_size=50 \
             )
         >> attr_output
-        # 0.42 is the attribution for the first target token '▁Mi' 
+        # 0.42 is the attribution for the first target token '▁Mi'
         # to the second source token '▁like'.
         # 0.01 is the convergence delta for the first target token.
         IntegratedGradientAttributionOutput(

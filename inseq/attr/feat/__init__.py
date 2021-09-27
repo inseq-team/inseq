@@ -1,2 +1,9 @@
 from .feature_attribution import FeatureAttribution
-from .integrated_gradients import IntegratedGradients
+from .gradient_attribution import (
+    GradientAttribution,
+    InputXGradientAttribution,
+    IntegratedGradientsAttribution,
+    SaliencyAttribution,
+)
+
+__all__ = ["FeatureAttribution"]

@@ -50,9 +50,9 @@ install-dev:
 check-style:
 	poetry run isort --diff --check-only --settings-path pyproject.toml ./
 	poetry run black --diff --check --config pyproject.toml ./
-	poetry run darglint --verbosity 2 inseq tests
+#   poetry run darglint --verbosity 2 inseq tests
 	poetry run flake8 --config setup.cfg ./
-	poetry run mypy --config-file pyproject.toml ./
+#	poetry run mypy --config-file pyproject.toml ./
 
 .PHONY: fix-style
 fix-style:

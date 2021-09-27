@@ -1,1 +1,3 @@
-from .feat import FeatureAttribution, IntegratedGradients
+from .feat import FeatureAttribution
+
+__all__ = ["FeatureAttribution"]

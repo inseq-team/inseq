@@ -1,9 +1,7 @@
 from typing import NoReturn, Optional, Union
 
-from copy import deepcopy
 from dataclasses import dataclass
 
-from torch import long
 from torchtyping import TensorType
 
 from ..utils import pretty_tensor
@@ -26,9 +24,9 @@ class BatchEncoding:
             methods requiring a reference input (e.g. integrated gradients).
     """
 
-    input_ids: TensorType["batch_size", "seq_len", long]
-    attention_mask: TensorType["batch_size", "seq_len", long]
-    baseline_ids: Optional[TensorType["batch_size", "seq_len", long]]
+    input_ids: TensorType["batch_size", "seq_len", int]
+    attention_mask: TensorType["batch_size", "seq_len", int]
+    baseline_ids: Optional[TensorType["batch_size", "seq_len", int]]
 
     def __getitem__(self, subscript: Union[slice, int]) -> "BatchEncoding":
         return BatchEncoding(
@@ -66,7 +64,7 @@ class BatchEmbedding:
     input_embeds: TensorType["batch_size", "seq_len", "hidden_size", float]
     baseline_embeds: Optional[TensorType["batch_size", "seq_len", "hidden_size", float]]
 
-    def __getitem__(self, subscript: Union[slice, int]):
+    def __getitem__(self, subscript: Union[slice, int]) -> "BatchEmbedding":
         return BatchEmbedding(
             self.input_embeds[:, subscript, :],
             self.baseline_embeds[:, subscript, :]
@@ -102,7 +100,9 @@ class BatchEmbedding:
 @dataclass
 class Batch(BatchEncoding, BatchEmbedding):
     @classmethod
-    def from_encoding_embeds(cls, encoding: BatchEncoding, embedding: BatchEmbedding):
+    def from_encoding_embeds(
+        cls, encoding: BatchEncoding, embedding: BatchEmbedding
+    ) -> "Batch":
         return cls(
             input_ids=encoding.input_ids,
             attention_mask=encoding.attention_mask,
@@ -115,9 +115,13 @@ class Batch(BatchEncoding, BatchEmbedding):
         return Batch(
             input_ids=self.input_ids[:, subscript],
             attention_mask=self.attention_mask[:, subscript],
-            baseline_ids=self.baseline_ids[:, subscript],
+            baseline_ids=self.baseline_ids[:, subscript]
+            if self.baseline_ids is not None
+            else None,
             input_embeds=self.input_embeds[:, subscript, :],
-            baseline_embeds=self.baseline_embeds[:, subscript, :],
+            baseline_embeds=self.baseline_embeds[:, subscript, :]
+            if self.baseline_embeds is not None
+            else None,
         )
 
     def to(
@@ -158,32 +162,42 @@ class Batch(BatchEncoding, BatchEmbedding):
         )
 
     def select_active(
-        self, mask: TensorType["batch_size", 1, long], inplace: Optional[bool] = False
+        self, mask: TensorType["batch_size", 1, int], inplace: Optional[bool] = False
     ) -> Union[NoReturn, "Batch"]:
         # Masked select of ids
         ids_shape = self.input_ids.shape[1:]
         active_mask = mask.bool()
         active_input_ids = self.input_ids.masked_select(active_mask)
         active_attention_mask = self.attention_mask.masked_select(active_mask)
-        active_baseline_ids = self.baseline_ids.masked_select(active_mask)
+        active_baseline_ids = (
+            self.baseline_ids.masked_select(active_mask).reshape(-1, *ids_shape)
+            if self.baseline_ids is not None
+            else None
+        )
         # Masked select of embeddings
         embeds_shape = self.input_embeds.shape[1:]
         active_mask_embeds = mask.unsqueeze(-1).bool()
         active_input_embeds = self.input_embeds.masked_select(active_mask_embeds)
-        active_baseline_embeds = self.baseline_embeds.masked_select(active_mask_embeds)
+        active_baseline_embeds = (
+            self.baseline_embeds.masked_select(active_mask_embeds).reshape(
+                -1, *embeds_shape
+            )
+            if self.baseline_embeds is not None
+            else None
+        )
         if inplace:
             self.input_ids = active_input_ids.reshape(-1, *ids_shape)
             self.attention_mask = active_attention_mask.reshape(-1, *ids_shape)
-            self.baseline_ids = active_baseline_ids.reshape(-1, *ids_shape)
+            self.baseline_ids = active_baseline_ids
             self.input_embeds = active_input_embeds.reshape(-1, *embeds_shape)
-            self.baseline_embeds = active_baseline_embeds.reshape(-1, *embeds_shape)
+            self.baseline_embeds = active_baseline_embeds
         else:
             return Batch(
                 input_ids=active_input_ids.reshape(-1, *ids_shape),
                 attention_mask=active_attention_mask.reshape(-1, *ids_shape),
-                baseline_ids=active_baseline_ids.reshape(-1, *ids_shape),
+                baseline_ids=active_baseline_ids,
                 input_embeds=active_input_embeds.reshape(-1, *embeds_shape),
-                baseline_embeds=active_baseline_embeds.reshape(-1, *embeds_shape),
+                baseline_embeds=active_baseline_embeds,
             )
 
     def __str__(self):
@@ -203,7 +217,7 @@ class EncoderDecoderBatch:
     sources: Batch
     targets: Batch
 
-    def __getitem__(self, subscript: Union[slice, int]):
+    def __getitem__(self, subscript: Union[slice, int]) -> "EncoderDecoderBatch":
         return EncoderDecoderBatch(
             sources=self.sources, targets=self.targets[subscript]
         )
@@ -220,7 +234,7 @@ class EncoderDecoderBatch:
             )
 
     def select_active(
-        self, mask: TensorType["batch_size", 1, long], inplace: Optional[bool] = False
+        self, mask: TensorType["batch_size", 1, int], inplace: Optional[bool] = False
     ) -> Union[NoReturn, "EncoderDecoderBatch"]:
         if inplace:
             self.sources.select_active(mask, inplace)

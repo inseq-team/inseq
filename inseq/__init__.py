@@ -1,4 +1,3 @@
-# type: ignore[attr-defined]
 """Interpretability for Sequence-to-sequence models 🔍"""
 
 import sys
@@ -15,3 +14,5 @@ def get_version() -> str:
 
 
 version: str = get_version()
+
+__all__ = ["AttributionModel", "load", "version"]

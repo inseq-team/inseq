@@ -1,7 +1,7 @@
-from typing import Callable
+from typing import Any, Callable
 
 
-def unhooked(f) -> Callable:
+def unhooked(f: Callable[[Any], Any]) -> Callable[[Any], Any]:
     def attribution_free_wrapper(self, *args, **kwargs):
         was_hooked = False
         if self.is_hooked:

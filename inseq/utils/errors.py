@@ -1,3 +1,5 @@
+from typing import Any, Tuple
+
 from .registry import get_available_methods
 
 
@@ -9,7 +11,12 @@ class UnknownAttributionMethodError(Exception):
         "Available methods: {available_methods}"
     )
 
-    def __init__(self, method_name: str, msg=UNKNOWN_ATTRIBUTION_METHOD_MSG, *args):
+    def __init__(
+        self,
+        method_name: str,
+        msg: str = UNKNOWN_ATTRIBUTION_METHOD_MSG,
+        *args: Tuple[Any],
+    ) -> None:
         from inseq.attr import FeatureAttribution
 
         msg = msg.format(
@@ -28,7 +35,9 @@ class MissingAttributionMethodError(Exception):
         "or pass it to the attribute method.\nAvailable methods: {available_methods}"
     )
 
-    def __init__(self, msg=MISSING_ATTRIBUTION_METHOD_MSG, *args):
+    def __init__(
+        self, msg: str = MISSING_ATTRIBUTION_METHOD_MSG, *args: Tuple[Any]
+    ) -> None:
         from inseq.attr import FeatureAttribution
 
         msg = msg.format(
