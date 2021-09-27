@@ -92,7 +92,9 @@ a {
   color: rgba(0, 0, 0, 0.65) !important;
   position: fixed;
   top: 16px;
+  left: 15px;
   font-size: 13px;
+  z-index: 100000;
 }
 
 .wy-nav-top a {
@@ -134,19 +136,19 @@ a {
 
 /*HEADER STYLES*/
 
-.ge_header {
-  background-color: #3e3f42;
+.inseq_header {
+  background-color: #efefef;
   position: fixed;
-  z-index: 10000;
   height: 64px;
   width: 100%;
   top: 0;
+  text-align: center;
+  display: none;
 }
 
 #header-logo {
   overflow: hidden;
-  padding-left: 24px;
-  float: left;
+  float: center;
   line-height: 64px;
   text-decoration: none;
   height: auto;
@@ -156,129 +158,30 @@ a {
   display: inline;
   vertical-align: middle;
   margin-right: 16px;
-  max-width: 224px;
+  max-width: 200px;
   width: 100%;
   margin-bottom: 0;
 }
 
-#header-actions {
-  float: right;
-  flex: 0 0 auto;
-  padding: 8px;
-  white-space: nowrap;
-  line-height: 46px;
-  font-size: 16px;
-}
-
-.header-item {
-  display: inline-block;
-  vertical-align: bottom;
-  padding: 0 20px;
-  display: block;
-  color: rgba(0, 0, 0, 0.65) !important;
-  float: left;
-  border-bottom: 2px solid transparent;
-  transition: border-bottom 0.3s cubic-bezier(0.645, 0.045, 0.355, 1),
-    background 0.3s cubic-bezier(0.645, 0.045, 0.355, 1),
-    padding 0.15s cubic-bezier(0.645, 0.045, 0.355, 1);
-}
-
-#header-actions a:hover {
-  color: #00bfa5 !important;
-  border-bottom: 2px solid #00bfa5;
-  transition: border-bottom 0.3s cubic-bezier(0.645, 0.045, 0.355, 1),
-    background 0.3s cubic-bezier(0.645, 0.045, 0.355, 1),
-    padding 0.15s cubic-bezier(0.645, 0.045, 0.355, 1);
-}
-
-#community-modal {
-  background: #fff;
-  min-width: 172px;
-  border-radius: 4px;
-  height: 0px;
-  transition: all 0.3s ease-in-out;
-  overflow: hidden;
-  position: relative;
-  margin-right: -24px;
-}
-
-#community-modal ul {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-#community-modal li {
-  margin-bottom: 8px;
-  padding: 0 16px 0 28px;
-  height: 40px;
-  border: none !important;
-  margin-top: 4px;
-  overflow: hidden;
-  font-size: 14px;
-  line-height: 40px;
-  text-overflow: ellipsis;
-}
-
-#community-modal a {
-  border-bottom: none !important;
-}
-
-#mobile-modal {
-  background: #fff;
-  border-radius: 4px;
-  height: 0px;
-  transition: all 0.3s ease-in-out;
-  overflow: hidden;
-  position: relative;
-  top: 37px;
-}
-
-#mobile-modal ul {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-#mobile-modal li {
-  margin-bottom: 8px;
-  padding: 0 0px 0 16px;
-  height: 40px;
-  border: none !important;
-  margin-top: 4px;
-  overflow: hidden;
-  font-size: 14px;
-  line-height: 40px;
-  text-overflow: ellipsis;
-  float: left;
-}
-
-#mobile-modal a {
-  border-bottom: none !important;
-}
-
-#header-mobile {
-  display: none;
-}
-
-#discourse-comments {
-  padding: 16px;
-  margin-bottom: 32px;
-  background-color: #fff;
-}
-
 @media only screen and (max-width: 768px) {
-  #header-actions {
-    display: none;
-  }
-
-  #header-mobile {
-    display: block;
-  }
-
   .wy-nav-side {
     width: 250px;
   }
+
+  .wy-nav-side.shift {
+    margin-top: 75px;
+    max-width: 340px;
+  }
+
+  .wy-nav-content-wrap.shift {
+    left: 340px;
+    top: 75px;
+  }
+
+  .inseq_header {
+    display: inline;
+  }
+
 }
 
 .rst-content .sidebar {
@@ -319,14 +222,13 @@ a.copybtn {
   margin: 3px;
 }
 
-
 /* To keep the logo centered */
 .wy-side-scroll {
   width: auto;
   font-size: 20px;
 }
 
-/* The div that holds the Hugging Face logo */
+/* The div that holds the logo */
 .HuggingFaceDiv {
   width: 100%
 }
@@ -366,11 +268,6 @@ a.copybtn {
 .rst-content dl:not(.docutils) dt{
   font-size: 15px;
 }
-
-.rst-content div[role="navigation"] {
-  padding-left: 30px;
-}
-
 
 /* Content bars */
 .rst-content dl:not(.docutils) dt {
