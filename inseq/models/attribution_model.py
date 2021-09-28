@@ -3,6 +3,7 @@ from typing import Any, List, NoReturn, Optional, Sequence, Tuple, Union, overlo
 from abc import ABC, abstractmethod
 
 import torch
+from torchtyping import TensorType
 
 from ..attr.feat.feature_attribution import FeatureAttribution
 from ..data import (
@@ -22,6 +23,7 @@ class AttributionModel(ABC):
     def __init__(self, attribution_method: Optional[str] = None, **kwargs) -> NoReturn:
         if not hasattr(self, "model"):
             self.model = None
+            self.model_name = None
         self.attribution_method = None
         self.is_hooked = False
         self.attribution_method = self.get_attribution_method(attribution_method)
@@ -170,6 +172,16 @@ class AttributionModel(ABC):
         self,
         tokens: Union[List[str], List[List[str]]],
     ) -> OneOrMoreIdSequences:
+        pass
+
+    @property
+    @abstractmethod
+    def special_tokens_ids(self) -> List[int]:
+        pass
+
+    @property
+    @abstractmethod
+    def token_embeddings(self) -> TensorType["vocabulary", "embedding_size", float]:
         pass
 
 

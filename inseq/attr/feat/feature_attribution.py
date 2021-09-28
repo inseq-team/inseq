@@ -2,7 +2,6 @@ from typing import Any, Dict, List, NoReturn, Optional, Tuple
 
 import logging
 from abc import abstractmethod
-from inspect import signature
 
 from rich.progress import track
 from torchtyping import TensorType
@@ -22,6 +21,7 @@ from ...data import (
 from ...utils import (
     Registry,
     UnknownAttributionMethodError,
+    extract_signature_args,
     pretty_tensor,
     remap_from_filtered,
 )
@@ -40,7 +40,7 @@ class FeatureAttribution(Registry):
         super().__init__()
         self.attribution_model = attribution_model
         self.skip_eos = False
-        self.hook()
+        self.hook(**kwargs)
 
     @classmethod
     def load(
@@ -214,12 +214,9 @@ class FeatureAttribution(Registry):
 
     def get_attribution_args(self, **kwargs):
         if hasattr(self, "method") and hasattr(self.method, "attribute"):
-            return {
-                k: v
-                for k, v in kwargs.items()
-                if k in signature(self.method.attribute).parameters
-                and k not in self.ignore_extra_args
-            }
+            return extract_signature_args(
+                kwargs, self.method.attribute, self.ignore_extra_args
+            )
         return {}
 
     def add_token_information(
@@ -267,10 +264,10 @@ class FeatureAttribution(Registry):
 
     @abstractmethod
     @set_hook
-    def hook(self) -> NoReturn:
+    def hook(self, **kwargs) -> NoReturn:
         pass
 
     @abstractmethod
     @unset_hook
-    def unhook(self) -> NoReturn:
+    def unhook(self, **kwargs) -> NoReturn:
         pass

@@ -1,0 +1,13 @@
+import os
+from pathlib import Path
+
+# Cache location
+DEFAULT_XDG_CACHE_HOME = "~/.cache"
+XDG_CACHE_HOME = os.getenv("XDG_CACHE_HOME", DEFAULT_XDG_CACHE_HOME)
+DEFAULT_INSEQ_CACHE_HOME = os.path.join(XDG_CACHE_HOME, "inseq")
+INSEQ_CACHE_HOME = os.path.expanduser(os.getenv("INSEQ_HOME", DEFAULT_INSEQ_CACHE_HOME))
+
+DEFAULT_INSEQ_ARTIFACTS_CACHE = os.path.join(INSEQ_CACHE_HOME, "artifacts")
+INSEQ_ARTIFACTS_CACHE = Path(
+    os.getenv("INSEQ_ARTIFACTS_CACHE", DEFAULT_INSEQ_ARTIFACTS_CACHE)
+)

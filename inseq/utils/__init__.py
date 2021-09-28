@@ -3,7 +3,7 @@ from .errors import (
     MissingAttributionMethodError,
     UnknownAttributionMethodError,
 )
-from .misc import optional, pretty_list
+from .misc import extract_signature_args, optional, pretty_list
 from .registry import Registry
 from .torch_utils import pretty_tensor, remap_from_filtered, sum_normalize
 
@@ -13,6 +13,7 @@ __all__ = [
     "UnknownAttributionMethodError",
     "optional",
     "pretty_list",
+    "extract_signature_args",
     "pretty_tensor",
     "remap_from_filtered",
     "sum_normalize",

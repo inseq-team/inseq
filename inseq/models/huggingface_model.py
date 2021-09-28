@@ -94,6 +94,7 @@ class HuggingfaceModel(AttributionModel):
         self.tokenizer = AutoTokenizer.from_pretrained(
             tokenizer_name_or_path, *tokenizer_inputs, **tokenizer_kwargs
         )
+        self.model_name = self.model.config.name_or_path
         self.pad_id = self.model.config.pad_token_id
         self.eos_id = self.model.config.eos_token_id
         self.bos_id = self.model.config.decoder_start_token_id
@@ -188,6 +189,16 @@ class HuggingfaceModel(AttributionModel):
         return [
             self.tokenizer.convert_tokens_to_ids(token_slice) for token_slice in tokens
         ]
+
+    @property
+    def special_tokens_ids(self) -> List[int]:
+        return self.convert_tokens_to_ids(
+            list(self.tokenizer.special_tokens_map.values())
+        )
+
+    @property
+    def token_embeddings(self) -> TensorType["vocabulary", "embedding_size", float]:
+        return self.model.get_encoder().embed_tokens.weight
 
     def encoder_embed(self, ids: TensorType["batch_size", "seq_len", long]):
         if self.encoder_int_embeds:
