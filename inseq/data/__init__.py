@@ -10,6 +10,7 @@ from .attribution import (
     TextInput,
 )
 from .batch import Batch, BatchEmbedding, BatchEncoding, EncoderDecoderBatch
+from .viz import show_attributions
 
 __all__ = [
     "Batch",
@@ -25,4 +26,5 @@ __all__ = [
     "OneOrMoreIdSequences",
     "OneOrMoreTokenSequences",
     "TextInput",
+    "show_attributions",
 ]

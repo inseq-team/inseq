@@ -205,6 +205,18 @@ class FeatureAttributionSequenceOutput:
             cmap=cmap,
         )
 
+    @property
+    def minimum(self) -> float:
+        return min(min(attr) for attr in self.attributions)
+
+    @property
+    def maximum(self) -> float:
+        return max(max(attr) for attr in self.attributions)
+
+    @property
+    def scores(self) -> np.ndarray:
+        return np.array(self.attributions).T
+
 
 OneOrMoreFeatureAttributionSequenceOutputs = Union[
     FeatureAttributionSequenceOutput, List[FeatureAttributionSequenceOutput]

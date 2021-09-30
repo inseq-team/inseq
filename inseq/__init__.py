@@ -3,6 +3,7 @@
 import sys
 from importlib import metadata as importlib_metadata
 
+from .data import show_attributions
 from .models import AttributionModel, load
 
 
@@ -15,4 +16,4 @@ def get_version() -> str:
 
 version: str = get_version()
 
-__all__ = ["AttributionModel", "load", "version"]
+__all__ = ["AttributionModel", "load", "show_attributions", "version"]
