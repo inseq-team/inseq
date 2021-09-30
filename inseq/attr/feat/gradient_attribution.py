@@ -77,7 +77,7 @@ class DiscretizedIntegratedGradientsAttribution(GradientAttribution):
         load_args = extract_signature_args(kwargs, MonotonicPathBuilder.load)
         self.path_builder = MonotonicPathBuilder.load(
             self.attribution_model.model_name,
-            self.attribution_model.token_embeddings.detach(),
+            token_embeddings=self.attribution_model.token_embeddings.detach(),
             **load_args,
         )
         super().hook()
