@@ -52,10 +52,10 @@ repos:
 
   - repo: local
     hooks:
-      - id: test
-        name: test
+      - id: fast-test
+        name: fast-test
         entry: make
-        args: ["test"]
+        args: ["fast-test"]
         language: system
         pass_filenames: false
       - id: clean

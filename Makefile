@@ -72,7 +72,11 @@ lint: check-style check-safety
 #* Linting
 .PHONY: test
 test:
-	poetry run pytest -c pyproject.toml
+	poetry run pytest -c pyproject.toml -v
+
+.PHONY: fast-test
+fast-test:
+	poetry run pytest -c pyproject.toml -v -m "not slow"
 
 .PHONY: codecov
 codecov:

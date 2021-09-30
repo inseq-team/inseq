@@ -69,7 +69,7 @@ recommonmark = "^0.7.1"
 safety = "^1.10.3"
 sphinx = "^4.2.0"
 sphinxemoji = "^0.1.9"
-sphinxext-opengraph = "^0.4.2" 
+sphinxext-opengraph = "^0.4.2"
 sphinx-copybutton = "^0.4.0"
 sphinx-gitstamp = "^0.3.1"
 sphinx-markdown-tables = "^0.0.15"
@@ -144,6 +144,10 @@ testpaths = "tests"
 python_files = "test_*.py"
 norecursedirs =["hooks", "*.egg", ".eggs", "dist", "build", "docs", ".tox", ".git", "__pycache__"]
 doctest_optionflags = ["NUMBER", "NORMALIZE_WHITESPACE", "IGNORE_EXCEPTION_DETAIL"]
+
+markers = [
+  "slow"
+]
 
 # Extra options:
 addopts = [
