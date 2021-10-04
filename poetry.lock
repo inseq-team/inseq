@@ -1150,7 +1150,7 @@ python-versions = "*"
 
 [[package]]
 name = "pyupgrade"
-version = "2.28.0"
+version = "2.29.0"
 description = "A tool to automatically upgrade syntax for newer versions."
 category = "dev"
 optional = false
@@ -1831,7 +1831,7 @@ python-versions = "*"
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "5371a52944db60f0bd185bf9a5634ab59936b7a854f092db74e85bffce216215"
+content-hash = "2897858e59fae0108c048c90edd6d4ee1ec65754db46789f3c9b1a12392d15d7"
 
 [metadata.files]
 alabaster = [
@@ -2575,8 +2575,8 @@ pytz = [
     {file = "pytz-2021.1.tar.gz", hash = "sha256:83a4a90894bf38e243cf052c8b58f381bfe9a7a483f6a9cab140bc7f702ac4da"},
 ]
 pyupgrade = [
-    {file = "pyupgrade-2.28.0-py2.py3-none-any.whl", hash = "sha256:abba50e2c0e8e27b5c5ce6d7f6b2e673df282ac9225a48bb643d9f18163274ff"},
-    {file = "pyupgrade-2.28.0.tar.gz", hash = "sha256:9695553761da2e9d06101fd0c0c97a216df9dbdd18d705568d313ddefcda0c2c"},
+    {file = "pyupgrade-2.29.0-py2.py3-none-any.whl", hash = "sha256:04938c7e8e4e8b476ae2b727306ecfaea95a83b707acbe6929864100dd6d9701"},
+    {file = "pyupgrade-2.29.0.tar.gz", hash = "sha256:27bfbc38854a40a70767ef6cbf3bf133c5472557905f0f9fe7ba5f58975701e4"},
 ]
 pywin32 = [
     {file = "pywin32-301-cp35-cp35m-win32.whl", hash = "sha256:93367c96e3a76dfe5003d8291ae16454ca7d84bb24d721e0b74a07610b7be4a7"},
