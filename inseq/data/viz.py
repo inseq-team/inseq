@@ -42,10 +42,11 @@ def show_attributions(
     max_val: Optional[int] = None,
     return_html: Optional[bool] = False,
 ) -> Optional[str]:
-    try:
-        from IPython.core.display import HTML, display
-    except ImportError:
-        raise ImportError("IPython should be installed to visualize attributions.")
+    if not return_html:
+        try:
+            from IPython.core.display import HTML, display
+        except ImportError:
+            raise ImportError("IPython should be installed to visualize attributions.")
     if isinstance(attributions, FeatureAttributionSequenceOutput):
         attributions = [attributions]
     if min_val is None:
