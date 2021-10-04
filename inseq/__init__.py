@@ -1,6 +1,5 @@
 """Interpretability for Sequence-to-sequence models 🔍"""
 
-import sys
 from importlib import metadata as importlib_metadata
 
 from .data import show_attributions
