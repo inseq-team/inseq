@@ -69,3 +69,10 @@ def cache_results(func: Callable[[Any], Any]) -> Callable[[Any], Any]:
         return cached
 
     return cache_results_wrapper
+ 
+
+def ordinal_str(n: int):
+    """Converts a number to and ordinal string."""
+    return str(n) + {1: "st", 2: "nd", 3: "rd"}.get(
+        4 if 10 <= n % 100 < 20 else n % 10, "th"
+    )
