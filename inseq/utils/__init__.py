@@ -11,6 +11,7 @@ __all__ = [
     "LengthMismatchError",
     "MissingAttributionMethodError",
     "UnknownAttributionMethodError",
+    "cache_results",
     "optional",
     "pretty_list",
     "pretty_tensor",
