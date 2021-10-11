@@ -43,7 +43,7 @@ typer = {extras = ["all"], version = "^0.4.0"}
 rich = "^10.10.0"
 transformers = "^4.11.3"
 sentencepiece = "^0.1.96"
-protobuf = "^3.18.0"
+protobuf = "^3.18.1"
 torch = "^1.9.1"
 captum = "^0.4.0"
 seaborn = "^0.11.2"
