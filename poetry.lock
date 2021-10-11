@@ -1516,7 +1516,7 @@ test = ["pytest"]
 
 [[package]]
 name = "sphinxemoji"
-version = "0.1.9"
+version = "0.2.0"
 description = "An extension to use emoji codes in your Sphinx documentation"
 category = "dev"
 optional = false
@@ -1833,7 +1833,7 @@ python-versions = "*"
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "27e6fab5827bd1df2c1da9ecbb541d77077a833478d0da0472e8c04e2dafe87c"
+content-hash = "470cdfa2e439d4abc24c82610423651c7aa5643751c1e9fd956626a36b36eca5"
 
 [metadata.files]
 alabaster = [
@@ -2865,7 +2865,7 @@ sphinxcontrib-serializinghtml = [
     {file = "sphinxcontrib_serializinghtml-1.1.5-py2.py3-none-any.whl", hash = "sha256:352a9a00ae864471d3a7ead8d7d79f5fc0b57e8b3f95e9867eb9eb28999b92fd"},
 ]
 sphinxemoji = [
-    {file = "sphinxemoji-0.1.9.tar.gz", hash = "sha256:faf788e5b33a4e309b721b9fa1dba4f12fec74193e5aa30040f9d4d36736444b"},
+    {file = "sphinxemoji-0.2.0.tar.gz", hash = "sha256:27861d1dd7c6570f5e63020dac9a687263f7481f6d5d6409eb31ecebcc804e4c"},
 ]
 sphinxext-opengraph = [
     {file = "sphinxext-opengraph-0.4.2.tar.gz", hash = "sha256:5da1a6eaab25e377b841f506ef7d7c44b539428f3d6094ccc16d1dfd3ef65501"},
