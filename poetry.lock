@@ -1669,7 +1669,7 @@ test = ["pytest"]
 
 [[package]]
 name = "transformers"
-version = "4.11.2"
+version = "4.11.3"
 description = "State-of-the-art Natural Language Processing for TensorFlow 2.0 and PyTorch"
 category = "main"
 optional = false
@@ -1833,7 +1833,7 @@ python-versions = "*"
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "67dd6c5b135d42bb7b7554830a2511c5c82717299f28d125946b52188ee306ef"
+content-hash = "44fc2cd5cd1eb56b9277c791d6c24461e77db0d3b0ec589e2c9392bbf050d847"
 
 [metadata.files]
 alabaster = [
@@ -2984,8 +2984,8 @@ traitlets = [
     {file = "traitlets-5.1.0.tar.gz", hash = "sha256:bd382d7ea181fbbcce157c133db9a829ce06edffe097bcf3ab945b435452b46d"},
 ]
 transformers = [
-    {file = "transformers-4.11.2-py3-none-any.whl", hash = "sha256:7d0e95da2d277a8f54583eec8d341642b32ceb5619cd35cafa261afb850d8466"},
-    {file = "transformers-4.11.2.tar.gz", hash = "sha256:187d22ad65bb2b0e881ad93bf55793c5ce2859a520727f96a55da096ed99efb9"},
+    {file = "transformers-4.11.3-py3-none-any.whl", hash = "sha256:9750b4e520b4a38a904834bce50d900208c650855e6f671e7718d0edba89f084"},
+    {file = "transformers-4.11.3.tar.gz", hash = "sha256:755b052df58906f122f7166c573c22531416eab8a9f59c44ff7148be12e62621"},
 ]
 typeguard = [
     {file = "typeguard-2.12.1-py3-none-any.whl", hash = "sha256:cc15ef2704c9909ef9c80e19c62fb8468c01f75aad12f651922acf4dbe822e02"},
