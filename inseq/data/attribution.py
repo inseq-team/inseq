@@ -22,7 +22,10 @@ FeatureAttributionInput = Union[TextInput, BatchEncoding, Batch]
 DeltaOutput = Type[TensorType["batch_size", float]]
 AttributionOutput = Type[TensorType["batch_size", "seq_len", float]]
 FeatureAttributionStepOutput = Union[
-    AttributionOutput, Tuple[AttributionOutput], Tuple[AttributionOutput, DeltaOutput]
+    Tuple[
+        AttributionOutput,
+    ],
+    Tuple[AttributionOutput, DeltaOutput],
 ]
 
 # For Huggingface it's a string identifier e.g. "t5-base", "Helsinki-NLP/opus-mt-en-it"

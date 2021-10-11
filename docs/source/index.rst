@@ -15,8 +15,8 @@
 Welcome to Inseq! |:bug:|
 ##############################
 
-Here is an example of using Inseq to attribute an English-to-Italian translation of the model ``Helsinki-NLP/opus-mt-en-it`` from the 
-|:hugging_face:| `Transformers <https://github.com/huggingface/transformers/>`__ using the ``IntegratedGradients`` method from the 
+Here is an example of using Inseq to attribute an English-to-Italian translation of the model ``Helsinki-NLP/opus-mt-en-it`` from the
+|:hugging_face:| `Transformers <https://github.com/huggingface/transformers/>`__ using the ``IntegratedGradients`` method from the
 `Captum library <https://captum.ai>`__.
 
 
@@ -31,3 +31,10 @@ Here is an example of using Inseq to attribute an English-to-Italian translation
 .. raw:: html
 
     <img alt="IntegratedGradients Example Attribution" src="_static/heatmap_helloworld_enit.png" style="max-width: 600px;">
+
+
+.. toctree::
+    :maxdepth: 2
+    :caption: Main Classes
+
+    main_classes/feature_attribution

@@ -4,7 +4,7 @@ import inseq
 from inseq.data import FeatureAttributionSequenceOutput
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def saliency_mt_model():
     return inseq.load("Helsinki-NLP/opus-mt-en-it", "saliency")
 
