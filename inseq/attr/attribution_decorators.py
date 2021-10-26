@@ -23,8 +23,8 @@ def set_hook(f: Callable[[Any], Any]) -> Callable[[Any], Any]:
     Required to decorate the hook functions in subclasses.
     """
 
-    def set_hook_wrapper(self):
-        f(self)
+    def set_hook_wrapper(self, **kwargs):
+        f(self, **kwargs)
         self.attribution_model.is_hooked = True
 
     return set_hook_wrapper
@@ -37,8 +37,8 @@ def unset_hook(f: Callable[[Any], Any]) -> Callable[[Any], Any]:
     Required to decorate the unhook functions in subclasses.
     """
 
-    def unset_hook_wrapper(self):
-        f(self)
+    def unset_hook_wrapper(self, **kwargs):
+        f(self, **kwargs)
         self.attribution_model.is_hooked = False
 
     return unset_hook_wrapper

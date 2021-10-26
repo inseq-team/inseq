@@ -31,7 +31,7 @@ class GradientAttribution(FeatureAttribution, Registry):
     r"""Gradient-based attribution method registry."""
 
     @set_hook
-    def hook(self):
+    def hook(self, **kwargs):
         r"""
         Hooks the attribution method to the model by replacing normal :obj:`nn.Embedding`
         with Captum's `InterpretableEmbeddingBase <https://captum.ai/api/utilities.html#captum.attr.InterpretableEmbeddingBase>`__.
@@ -39,7 +39,7 @@ class GradientAttribution(FeatureAttribution, Registry):
         self.attribution_model.configure_interpretable_embeddings()
 
     @unset_hook
-    def unhook(self):
+    def unhook(self, **kwargs):
         r"""
         Unhook the attribution method by restoring the model's original embeddings.
         """

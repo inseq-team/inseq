@@ -467,7 +467,7 @@ class FeatureAttribution(Registry):
 
     @abstractmethod
     @set_hook
-    def hook(self) -> NoReturn:
+    def hook(self, **kwargs) -> NoReturn:
         r"""
         Hooks the attribution method to the model. Useful to implement pre-attribution logic
         (e.g. freezing layers, replacing embeddings, raise warnings, etc.).
@@ -478,7 +478,7 @@ class FeatureAttribution(Registry):
 
     @abstractmethod
     @unset_hook
-    def unhook(self) -> NoReturn:
+    def unhook(self, **kwargs) -> NoReturn:
         r"""
         Unhooks the attribution method from the model. If the model was modified in any way, this
         should restore its initial state.
