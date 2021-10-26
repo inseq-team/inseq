@@ -38,3 +38,4 @@ Here is an example of using Inseq to attribute an English-to-Italian translation
     :caption: Main Classes
 
     main_classes/feature_attribution
+    main_classes/gradient_attribution

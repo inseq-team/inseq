@@ -224,7 +224,7 @@ ul.wy-breadcrumbs li code span.pre{
   color: #FB8D68;
 }
 
-/*** Huggingface Style ***/
+/*** Huggingface-inspired Style ***/
 
 /* Copy button */
 
@@ -245,17 +245,19 @@ a.copybtn {
 
 /* The selected items in the toc tree */
 .wy-menu-vertical li.current{
-  background-color: #A6B0FF;
+  background-color: #fcfcfc;
 }
 
 /* When a list item that does belong to the selected block from the toc tree is hovered */
 .wy-menu-vertical li.current a:hover{
   background-color: #9d9eaf;
+  color: #000000;
 }
 
 /* When a list item that does NOT belong to the selected block from the toc tree is hovered. */
 .wy-menu-vertical li a:hover{
   background-color: #9d9eaf;
+  color: #000000;
 }
 
 /* The color inside the selected toc tree block */
