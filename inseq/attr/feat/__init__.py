@@ -7,4 +7,10 @@ from .gradient_attribution import (
     SaliencyAttribution,
 )
 
-__all__ = ["FeatureAttribution"]
+__all__ = [
+    "FeatureAttribution",
+    "GradientAttribution",
+    "InputXGradientAttribution",
+    "IntegratedGradientsAttribution",
+    "SaliencyAttribution",
+]

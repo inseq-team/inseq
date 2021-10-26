@@ -28,28 +28,28 @@ a {
 
 @font-face {
   font-family: HKGroteskPro;
-  font-weight: 400;
+  font-weight: 300;
   src: url(hk-grotesk-pro/HKGroteskPro-Regular.woff2) format("woff2"),
     url(hk-grotesk-pro/HKGroteskPro-Regular.woff) format("woff");
 }
 
 @font-face {
   font-family: HKGroteskPro;
-  font-weight: 600;
+  font-weight: 500;
   src: url(hk-grotesk-pro/HKGroteskPro-Medium.woff2) format("woff2"),
     url(hk-grotesk-pro/HKGroteskPro-Medium.woff) format("woff");
 }
 
 @font-face {
   font-family: HKGroteskPro;
-  font-weight: 700;
+  font-weight: 600;
   src: url(hk-grotesk-pro/HKGroteskPro-SemiBold.woff2) format("woff2"),
     url(hk-grotesk-pro/HKGroteskPro-SemiBold.woff) format("woff");
 }
 
 @font-face {
   font-family: HKGroteskPro;
-  font-weight: 800;
+  font-weight: 700;
   src: url(hk-grotesk-pro/HKGroteskPro-Bold.woff2) format("woff2"),
     url(hk-grotesk-pro/HKGroteskPro-Bold.woff) format("woff");
 }
@@ -107,11 +107,6 @@ a {
 
 .wy-nav-content {
   color: #222222;
-  background: #efefef;
-}
-
-.wy-nav-content-wrap {
-  background: #efefef;
 }
 
 .wy-side-nav-search {
@@ -128,7 +123,7 @@ a {
 }
 
 .wy-menu-vertical a:hover {
-  color: #333333;
+  color: #666666;
   background: #00bfa5;
 }
 
@@ -168,6 +163,11 @@ a {
   width: 100%;
   margin-bottom: 0;
 }
+
+.wy-nav-content-wrap {
+  margin-left: 340px;
+}
+
 
 @media only screen and (max-width: 768px) {
   .wy-nav-side {
@@ -224,18 +224,12 @@ ul.wy-breadcrumbs li code span.pre{
   color: #FB8D68;
 }
 
-/*** Huggingface Style ***/
+/*** Huggingface-inspired Style ***/
 
 /* Copy button */
 
 a.copybtn {
   margin: 3px;
-}
-
-/* To keep the logo centered */
-.wy-side-scroll {
-  width: auto;
-  font-size: 20px;
 }
 
 /* The div that holds the logo */
@@ -245,33 +239,31 @@ a.copybtn {
 
 /* The section headers in the toc tree */
 .wy-menu-vertical p.caption{
-  background-color: #4d59ff;
   line-height: 40px;
+  padding-bottom: 40px;
 }
 
 /* The selected items in the toc tree */
 .wy-menu-vertical li.current{
-  background-color: #A6B0FF;
+  background-color: #fcfcfc;
 }
 
 /* When a list item that does belong to the selected block from the toc tree is hovered */
 .wy-menu-vertical li.current a:hover{
   background-color: #9d9eaf;
+  color: #000000;
 }
 
 /* When a list item that does NOT belong to the selected block from the toc tree is hovered. */
 .wy-menu-vertical li a:hover{
   background-color: #9d9eaf;
+  color: #000000;
 }
 
 /* The color inside the selected toc tree block */
 .wy-menu-vertical li.toctree-l2 a, .wy-menu-vertical li.toctree-l3 a, .wy-menu-vertical li.toctree-l4 a {
   color: black;
-}
-
-/* Inside code snippets */
-.rst-content dl:not(.docutils) dt{
-  font-size: 15px;
+  text-align: right;
 }
 
 /* Content bars */
@@ -280,9 +272,9 @@ a.copybtn {
   border-right: solid 2px #FB8D68;
   border-left: solid 2px #FB8D68;
   color: #FB8D68;
-  font-family: Calibre-Light, sans-serif;
   border-top: none;
   font-style: normal !important;
+  padding-right: 0.8rem;
 }
 
 /* Expand button */
