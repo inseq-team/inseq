@@ -65,7 +65,7 @@ class FeatureAttribution(Registry):
     attr = "method_name"
     ignore_extra_args = ["inputs", "baselines", "target", "additional_forward_args"]
 
-    def __init__(self, attribution_model):
+    def __init__(self, attribution_model, hook_to_model: bool = True, **kwargs):
         r"""
         Common instantiation steps for FeatureAttribution methods. Hooks the attribution method
         to the model calling the :meth:`~inseq.attr.feat.FeatureAttribution.hook` method of the child class.
@@ -73,16 +73,22 @@ class FeatureAttribution(Registry):
         Args:
             attribution_model (:class:`~inseq.models.AttributionModel`): The attribution model
                 that is used to obtain predictions and on which attribution is performed.
-
+            hook_to_model (:obj:`bool`, default `True`): Whether the attribution method should be
+                hooked to the attribution model during initialization.
+            **kwargs: Additional keyword arguments to pass to the hook method.
         Attributes:
             skip_eos (:obj:`bool`, default `False`): Whether the EOS token is considered as a
                 valid token during attribution.
+            skip_eos (:obj:`bool`, default `False`): Whether the full batch containing tokens, token
+                ids and embeddings should be passed to the attribution method. If false, only input
+                embeddings are passed to the attribution method.
         """
         super().__init__()
         self.attribution_model = attribution_model
-        if not hasattr(self, "skip_eos") or self.skip_eos is None:
-            self.skip_eos: bool = False
-        self.hook()
+        self.skip_eos: bool = False
+        self.use_full_batch: bool = False
+        if hook_to_model:
+            self.hook(**kwargs)
 
     @classmethod
     def load(

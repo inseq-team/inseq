@@ -143,14 +143,23 @@ class FeatureAttributionSequenceOutput:
     deltas: Optional[List[float]] = None
 
     def __str__(self):
+        pretty_attrs = [
+            " " * 6
+            + "[ "
+            + " ".join([f" {v:.2f}" if v > 0 else f"{v:.2f}" for v in src_attr])
+            + " ],\n"
+            for src_attr in self.attributions
+        ]
+        pretty_deltas = [f"{d:.2f}" if d > 0 else f"{d:.2f}" for d in self.deltas]
         return (
             f"{self.__class__.__name__}(\n"
             f"   source_tokens={pretty_list(self.source_tokens)},\n"
             f"   target_tokens={pretty_list(self.target_tokens)},\n"
             f"   source_ids={pretty_list(self.source_ids)},\n"
             f"   target_ids={pretty_list(self.target_ids)},\n"
-            f"   attributions={[[round(v, 2) for v in src_attr] for src_attr in self.attributions]},\n"
-            f"   deltas={self.deltas}\n"
+            f"   attributions=[\n"
+            f"{''.join(pretty_attrs)}],\n"
+            f"   deltas={pretty_deltas}\n"
             ")"
         )
 

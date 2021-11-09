@@ -22,7 +22,7 @@ from ...data import EncoderDecoderBatch, FeatureAttributionStepOutput
 from ...utils import Registry, extract_signature_args, pretty_tensor, sum_normalize
 from ..attribution_decorators import set_hook, unset_hook
 from .feature_attribution import FeatureAttribution
-from .ops import DiscretetizedIntegratedGradients, MonotonicPathBuilder
+from .ops import DiscretetizedIntegratedGradients
 
 logger = logging.getLogger(__name__)
 
@@ -69,7 +69,7 @@ class GradientAttribution(FeatureAttribution, Registry):
         logger.debug(f"batch: {batch},\ntarget_ids: {pretty_tensor(target_ids)}")
         delta = kwargs.get("return_convergence_delta", None)
         attribute_args = {
-            "inputs": batch.sources.input_embeds,
+            "inputs": batch.sources.input_embeds if not self.use_full_batch else batch,
             "target": target_ids,
             "additional_forward_args": (
                 batch.sources.attention_mask,
@@ -99,42 +99,32 @@ class DiscretizedIntegratedGradientsAttribution(GradientAttribution):
     method_name = "discretized_integrated_gradients"
 
     def __init__(self, attribution_model, **kwargs):
+        super().__init__(attribution_model, hook_to_model=False)
         multiply_by_inputs = kwargs.pop("multiply_by_inputs", True)
-        super().__init__(attribution_model, **kwargs)
+        self.attribution_model = attribution_model
         self.method = DiscretetizedIntegratedGradients(
-            self.attribution_model.score_func, multiply_by_inputs
+            self.attribution_model.score_func,
+            multiply_by_inputs,
         )
-        self.use_baseline = True
-        self.skip_eos = True
-        self.path_builder = None
+        self.use_baseline = False
+        self.skip_eos = False
+        self.use_full_batch = True
+        self.hook(**kwargs)
 
     @set_hook
     def hook(self, **kwargs):
-        load_args = extract_signature_args(kwargs, MonotonicPathBuilder.load)
-        self.path_builder = MonotonicPathBuilder.load(
+        load_kwargs, other_kwargs = extract_signature_args(
+            kwargs,
+            self.method.load_monotonic_path_builder,
+            return_remaining=True,
+        )
+        self.method.load_monotonic_path_builder(
             self.attribution_model.model_name,
             token_embeddings=self.attribution_model.token_embeddings.detach(),
-            **load_args,
+            special_tokens=self.attribution_model.special_tokens_ids,
+            **load_kwargs,
         )
-        super().hook()
-
-    def attribute_step(
-        self,
-        batch: EncoderDecoderBatch,
-        target_ids: TensorType["batch_size", int],
-        **kwargs,
-    ) -> FeatureAttributionStepOutput:
-        scale_inputs_args = extract_signature_args(
-            kwargs, self.path_builder.scale_inputs
-        )
-        batch.sources.input_embeds = self.path_builder.scale_inputs(
-            batch.sources.input_ids,
-            batch.sources.baseline_ids,
-            special_token_ids=self.attribution_model.special_tokens_ids,
-            **scale_inputs_args,
-        )
-        attribution_args = {k: kwargs[k] for k in set(kwargs) - set(scale_inputs_args)}
-        super().attribute_step(batch, target_ids, **attribution_args)
+        super().hook(**other_kwargs)
 
 
 class IntegratedGradientsAttribution(GradientAttribution):
@@ -147,8 +137,8 @@ class IntegratedGradientsAttribution(GradientAttribution):
     method_name = "integrated_gradients"
 
     def __init__(self, attribution_model, **kwargs):
-        multiply_by_inputs = kwargs.pop("multiply_by_inputs", True)
         super().__init__(attribution_model)
+        multiply_by_inputs = kwargs.pop("multiply_by_inputs", True)
         self.method = IntegratedGradients(
             self.attribution_model.score_func, multiply_by_inputs
         )

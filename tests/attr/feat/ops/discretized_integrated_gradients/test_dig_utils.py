@@ -4,6 +4,7 @@ import pytest
 import torch
 
 from inseq.attr.feat.ops import MonotonicPathBuilder
+from inseq.utils import euclidean_distance
 
 
 def original_monotonic(vec1, vec2, vec3):
@@ -53,8 +54,8 @@ def test_valid_distance_multidim_tensors() -> None:
     vec_b_multi = torch.stack([vec_b, vec_b, vec_b], dim=0)
     assert list(vec_a.shape) == list(vec_b.shape) == [512]
     assert list(vec_a_multi.shape) == list(vec_b_multi.shape) == [3, 512]
-    dist = MonotonicPathBuilder.euclidean_distance(vec_a, vec_b)
-    dist_multi = MonotonicPathBuilder.euclidean_distance(vec_a_multi, vec_b_multi)
+    dist = euclidean_distance(vec_a, vec_b)
+    dist_multi = euclidean_distance(vec_a_multi, vec_b_multi)
     assert not list(dist.shape)  # scalar
     assert list(dist_multi.shape)[0] == vec_a_multi.shape[0] == vec_b_multi.shape[0]
     assert (

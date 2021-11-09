@@ -38,3 +38,8 @@ def pretty_tensor(t: Optional[torch.Tensor]) -> str:
         return f"tensor of shape {list(t.shape)}"
     else:
         return f"tensor of shape {list(t.shape)}: {t.tolist()}"
+
+
+def euclidean_distance(vec_a: torch.Tensor, vec_b: torch.Tensor) -> float:
+    """Compute the Euclidean distance between two points."""
+    return (vec_a - vec_b).pow(2).sum(-1).sqrt()

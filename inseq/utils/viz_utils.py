@@ -79,13 +79,13 @@ final_plot_html = """
 
 # Saliency plot
 
-saliency_heatmap_html = """
+saliency_heatmap_table_header = """
 <table border="1" cellpadding="5" cellspacing="5"
     style="overflow-x:scroll;display:block;">
     <tr><th></th>
 """
 
-saliency_heatmap_table_header = """
+saliency_heatmap_html = """
 <div id="{uuid}_saliency_plot" class="{uuid}_viz_content">
     <div style="margin:5px;font-family:sans-serif;font-weight:bold;">
         <span style="font-size: 20px;"> Saliency Heatmap </span>

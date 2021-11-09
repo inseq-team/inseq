@@ -1,4 +1,4 @@
-from typing import Any, Callable, Dict, Optional, Sequence
+from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Union
 
 import logging
 import os
@@ -34,13 +34,19 @@ def extract_signature_args(
     full_args: Dict[str, Any],
     func: Callable[[Any], Any],
     exclude_args: Optional[Sequence[str]] = None,
-):
-    return {
+    return_remaining: bool = False,
+) -> Union[Dict[str, Any], Tuple[Dict[str, Any], Dict[str, Any]]]:
+    extracted_args = {
         k: v
         for k, v in full_args.items()
         if k in signature(func).parameters
         and (exclude_args is None or k not in exclude_args)
     }
+    if return_remaining:
+        return extracted_args, {
+            k: v for k, v in full_args.items() if k not in extracted_args
+        }
+    return extracted_args
 
 
 def cache_results(func: Callable[[Any], Any]) -> Callable[[Any], Any]:
@@ -69,7 +75,7 @@ def cache_results(func: Callable[[Any], Any]) -> Callable[[Any], Any]:
         return cached
 
     return cache_results_wrapper
- 
+
 
 def ordinal_str(n: int):
     """Converts a number to and ordinal string."""

@@ -1,5 +1,6 @@
 # Adapted from https://github.com/INK-USC/DIG/blob/main/monotonic_paths.py, licensed MIT:
-# Copyright © 2021 Intelligence and Knowledge Discovery (INK) Research Lab at University of Southern California
+# Copyright © 2021 Gabriele Sarti and the Intelligence and Knowledge Discovery (INK) Research Lab
+# at the University of Southern California
 
 # Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
 # associated documentation files (the “Software”), to deal in the Software without restriction,
@@ -21,6 +22,7 @@ from typing import Any, List, Optional, Tuple
 import logging
 import os
 from collections import defaultdict
+from enum import Enum
 from pathlib import Path
 
 import torch
@@ -28,16 +30,20 @@ from scipy.sparse import csr_matrix
 from sklearn.neighbors import kneighbors_graph
 from torchtyping import TensorType
 
-from .....utils.cache import INSEQ_ARTIFACTS_CACHE
-from .....utils.misc import cache_results
+from ....utils import INSEQ_ARTIFACTS_CACHE, cache_results, euclidean_distance
 
 logger = logging.getLogger(__name__)
 
 TokenEmbeddings = TensorType["vocab_size", "embed_size", float]
 
 
-class UnknownDIGStrategy(Exception):
-    """Raised when a strategy for DIG is not valid"""
+class PathBuildingStrategies(Enum):
+    GREEDY = "greedy"
+    MAXCOUNT = "maxcount"
+
+
+class UnknownPathBuildingStrategy(Exception):
+    """Raised when a strategy for pathbuilding is not valid"""
 
     def __init__(
         self,
@@ -45,7 +51,8 @@ class UnknownDIGStrategy(Exception):
         *args: Tuple[Any],
     ) -> None:
         super().__init__(
-            f"Unknown strategy: {strategy}.\nAvailable strategies: greedy, maxcount",
+            f"Unknown strategy: {strategy}.\nAvailable strategies: "
+            f"{','.join([s.value for s in PathBuildingStrategies])}",
             *args,
         )
 
@@ -55,9 +62,11 @@ class MonotonicPathBuilder:
         self,
         token_embeddings: TokenEmbeddings,
         knn_graph: csr_matrix,
+        special_tokens: List[int] = [],
     ) -> None:
         self.token_embeddings = token_embeddings
         self.knn_graph = knn_graph
+        self.special_tokens = special_tokens
 
     @staticmethod
     @cache_results
@@ -87,10 +96,9 @@ class MonotonicPathBuilder:
         n_jobs: int = -1,
         save_cache: bool = True,
         overwrite_cache: bool = False,
-        cache_dir: Path = INSEQ_ARTIFACTS_CACHE / "dig_knn",
-        token_embeddings: Optional[
-            TensorType["vocab_size", "embed_size", float]
-        ] = None,
+        cache_dir: Path = INSEQ_ARTIFACTS_CACHE / "path_knn",
+        token_embeddings: Optional[TokenEmbeddings] = None,
+        special_tokens: List[int] = [],
     ) -> "MonotonicPathBuilder":
         cache_filename = os.path.join(
             cache_dir, f"{model_name.replace('/', '__')}_{n_neighbors}.pkl"
@@ -111,7 +119,7 @@ class MonotonicPathBuilder:
             mode=mode,
             n_jobs=n_jobs,
         )
-        return cls(token_embeddings, knn_graph)
+        return cls(token_embeddings, knn_graph, special_tokens)
 
     @staticmethod
     def get_monotonic_dims(
@@ -155,11 +163,6 @@ class MonotonicPathBuilder:
         )
         return new_vec
 
-    @staticmethod
-    def euclidean_distance(vec_a: torch.Tensor, vec_b: torch.Tensor) -> float:
-        """Euclidean distance between two points."""
-        return (vec_a - vec_b).pow(2).sum(-1).sqrt()
-
     def get_next_word(
         self, word_idx, reference_idx, word_path, strategy="greedy", steps=5
     ):
@@ -174,7 +177,7 @@ class MonotonicPathBuilder:
             # unless forced to.
             if j == reference_idx:
                 continue
-            if strategy == "greedy":
+            if strategy == PathBuildingStrategies.GREEDY.value:
                 # calculate the distance of the monotonized vec from the anchor point
                 monotonic_vec = self.make_monotonic_vec(
                     self.token_embeddings[j],
@@ -183,9 +186,9 @@ class MonotonicPathBuilder:
                     steps,
                 )
                 anchor_map[j] = [
-                    self.euclidean_distance(self.token_embeddings[j], monotonic_vec)
+                    euclidean_distance(self.token_embeddings[j], monotonic_vec)
                 ]
-            elif strategy == "maxcount":
+            elif strategy == PathBuildingStrategies.MAXCOUNT.value:
                 # count the number of non-monotonic dimensions
                 # 10000 is an arbitrarily high to be agnostic
                 # of token_embeddings dimensionality
@@ -197,7 +200,7 @@ class MonotonicPathBuilder:
                 non_monotonic_count = 10000 - monotonic_dims.sum()
                 anchor_map[j] = [non_monotonic_count]
             else:
-                raise UnknownDIGStrategy(strategy)
+                raise UnknownPathBuildingStrategy(strategy)
         if len(anchor_map) == 0:
             return reference_idx
         sorted_dist_map = {
@@ -215,17 +218,16 @@ class MonotonicPathBuilder:
         self,
         word_idx,
         reference_idx,
-        steps=5,
-        strategy="greedy",
-        special_token_ids: List[int] = [],
+        steps: Optional[int] = 30,
+        strategy: Optional[str] = "greedy",
     ):
-        print(word_idx)
+        print("Word id:", word_idx)
         # if word_idx is a special token copy it and return
-        if word_idx in special_token_ids:
-            return [word_idx] * (steps + 1)
+        if word_idx in self.special_tokens:
+            return [word_idx] * steps
         word_path = [word_idx]
         last_idx = word_idx
-        for _ in range(steps):
+        for _ in range(steps - 1):
             next_idx = self.get_next_word(
                 word_idx=last_idx,
                 reference_idx=reference_idx,
@@ -238,9 +240,10 @@ class MonotonicPathBuilder:
         return word_path
 
     def make_monotonic_path(self, word_path_ids, reference_idx, steps: int = 5):
+        print("Word path ids:", word_path_ids)
         monotonic_embs = [self.token_embeddings[word_path_ids[0]]]
         baseline_vec = self.token_embeddings[reference_idx]
-        for idx in range(len(word_path_ids) - 1):
+        for idx in range(len(word_path_ids) - 2):
             input_vec = monotonic_embs[-1]
             anchor_vec = self.token_embeddings[word_path_ids[idx + 1]]
             monotonic_vec = self.make_monotonic_vec(
@@ -264,39 +267,43 @@ class MonotonicPathBuilder:
 
     def scale_inputs(
         self,
-        input_ids,
-        baseline_ids,
-        scale_steps=30,
-        strategy="greedy",
-        special_token_ids: List[int] = [],
+        input_ids: TensorType["batch_size", "seq_len", int],
+        baseline_ids: TensorType["batch_size", "seq_len", int],
+        scale_steps: Optional[int] = 30,
+        scale_strategy: Optional[str] = "greedy",
     ):
         """Generate paths required by DIG."""
         all_path_embs = []
-        for seq_idx in range(len(input_ids.squeeze().tolist())):
-            #    seq_path_embs = []
-            #    for tok_idx in range(len(input_ids[seq_idx])):
-            print("Find word path")
-            word_path = self.find_word_path(
-                input_ids.squeeze()[seq_idx],  # [tok_idx],
-                baseline_ids.squeeze()[seq_idx],  # [tok_idx],
-                steps=scale_steps,
-                strategy=strategy,
-                special_token_ids=special_token_ids,
+        for seq_idx in range(input_ids.shape[0]):
+            seq_path_embs = []
+            input_seq = input_ids[seq_idx, :].squeeze().tolist()
+            baseline_seq = baseline_ids[seq_idx, :].squeeze().tolist()
+            print("Sequence:", len(input_seq), len(baseline_seq))
+            for input_tok, base_tok in zip(input_seq, baseline_seq):
+                word_path = self.find_word_path(
+                    input_tok,
+                    base_tok,
+                    steps=scale_steps,
+                    strategy=scale_strategy,
+                )
+                monotonic_embs = self.make_monotonic_path(
+                    word_path,
+                    base_tok,
+                    steps=scale_steps,
+                )
+                monotonic_embs_pt = torch.stack(monotonic_embs)
+                print(f"monotonic_embs={monotonic_embs_pt.shape}")
+                seq_path_embs.append(monotonic_embs_pt)
+            stacked = torch.stack(seq_path_embs, axis=1)
+            print("Stacked shape", stacked.shape)
+            all_path_embs.append(
+                torch.tensor(
+                    stacked,
+                    dtype=torch.float,
+                    device=input_ids.device,
+                    requires_grad=True,
+                )
             )
-            print("Make monotonic path")
-            monotonic_embs = self.make_monotonic_path(
-                word_path,
-                baseline_ids.squeeze()[seq_idx],  # [tok_idx],
-                steps=scale_steps,
-            )
-            # seq_path_embs.append(monotonic_embs)
-            # all_path_embs.append(seq_path_embs)
-            all_path_embs.append(monotonic_embs)
-        # all_path_embs = torch.tensor(
-        #    np.stack(all_path_embs, axis=1),
-        #    dtype=torch.float,
-        #    device=input_ids.device,
-        #    requires_grad=True,
-        # )
-        # print(all_path_embs.shape)
-        return all_path_embs
+        all_path_embs_pt = torch.cat(all_path_embs, dim=0)
+        print("Full embeddings size", all_path_embs_pt.shape)
+        return all_path_embs_pt

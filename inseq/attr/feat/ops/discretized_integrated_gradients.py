@@ -16,7 +16,9 @@
 # WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
 # OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-from typing import Any, Callable, Tuple, Union
+from typing import Any, Callable, List, Tuple, Union
+
+from pathlib import Path
 
 import torch
 from captum._utils.common import (
@@ -27,43 +29,115 @@ from captum._utils.common import (
     _is_tuple,
 )
 from captum._utils.typing import TargetType, TensorOrTupleOfTensorsGeneric
-from captum.attr._utils.attribution import GradientAttribution
+from captum.attr._core.integrated_gradients import IntegratedGradients
+from captum.attr._utils.batching import _batch_attribution
 from captum.attr._utils.common import _format_input, _reshape_and_sum
 from captum.log import log_usage
 from torch import Tensor
 
+from ....data import BatchEmbedding
+from ....utils import INSEQ_ARTIFACTS_CACHE
+from .monotonic_path_builder import MonotonicPathBuilder, TokenEmbeddings
 
-class DiscretetizedIntegratedGradients(GradientAttribution):
-    def __init__(self, forward_func: Callable, multiply_by_inputs: bool = True) -> None:
-        super().__init__(forward_func)
-        self._multiply_by_inputs = multiply_by_inputs
+
+class DiscretetizedIntegratedGradients(IntegratedGradients):
+    def __init__(
+        self,
+        forward_func: Callable,
+        multiply_by_inputs: bool = True,
+    ) -> None:
+        super().__init__(forward_func, multiply_by_inputs)
+        self.path_builder = None
+
+    def load_monotonic_path_builder(
+        self,
+        model_name: str,
+        token_embeddings: TokenEmbeddings,
+        special_tokens: List[int],
+        cache_dir: Path = INSEQ_ARTIFACTS_CACHE / "dig_knn",
+        **kwargs,
+    ) -> None:
+        """Loads the Discretized Integrated Gradients (DIG) path builder."""
+        self.path_builder = MonotonicPathBuilder.load(
+            model_name,
+            token_embeddings=token_embeddings,
+            special_tokens=special_tokens,
+            cache_dir=cache_dir,
+            **kwargs,
+        )
 
     @log_usage()
-    def attribute(
+    def attribute(  # type: ignore
         self,
-        inputs: Tuple[Tensor, ...],
+        inputs: BatchEmbedding,
         target: TargetType = None,
         additional_forward_args: Any = None,
         n_steps: int = 50,
+        strategy: str = "greedy",
+        internal_batch_size: Union[None, int] = None,
         return_convergence_delta: bool = False,
     ) -> Union[
         TensorOrTupleOfTensorsGeneric, Tuple[TensorOrTupleOfTensorsGeneric, Tensor]
     ]:
-        is_inputs_tuple = _is_tuple(inputs)
-        scaled_features_tpl = _format_input(inputs)
-        attributions = self.calculate_dig_attributions(
-            scaled_features_tpl=scaled_features_tpl,
-            target=target,
-            additional_forward_args=additional_forward_args,
-            n_steps=n_steps,
+        scaled_features = self.path_builder.scale_inputs(
+            inputs.sources.input_ids,
+            inputs.sources.baseline_ids,
+            scale_steps=n_steps,
+            scale_strategy=strategy,
         )
+        is_inputs_tuple = _is_tuple(scaled_features)
+        scaled_features_tpl = _format_input(scaled_features)
+        for el in scaled_features_tpl:
+            if type(el) == torch.Tensor:
+                print(el.shape)
+            else:
+                print(el)
+        num_examples = inputs.sources.input_ids.shape[0]
+        if internal_batch_size is not None:
+            attributions = _batch_attribution(
+                self,
+                num_examples,
+                internal_batch_size,
+                n_steps,
+                scaled_features_tpl=scaled_features_tpl,
+                target=target,
+                additional_forward_args=additional_forward_args,
+            )
+        else:
+            attributions = self._attribute(
+                scaled_features_tpl=scaled_features_tpl,
+                target=target,
+                additional_forward_args=additional_forward_args,
+                n_steps=n_steps,
+            )
+
         if return_convergence_delta:
             assert (
                 len(scaled_features_tpl) == 1
             ), "More than one tuple not supported in this code!"
             # baselines, inputs (only works for one input, i.e. len(tuple) == 1)
-            start_point = _format_input(scaled_features_tpl[0][0].unsqueeze(0))
-            end_point = _format_input(scaled_features_tpl[0][-1].unsqueeze(0))
+            print("Scaled features tpl", scaled_features_tpl[0].shape)
+            start_point = _format_input(
+                torch.cat(
+                    [
+                        scaled_features_tpl[0][i, :, :].unsqueeze(0)
+                        for i in range(0, n_steps * num_examples, n_steps)
+                    ],
+                    dim=0,
+                )
+            )
+            end_point = _format_input(
+                torch.cat(
+                    [
+                        scaled_features_tpl[0][i, :, :].unsqueeze(0)
+                        for i in range(n_steps - 1, n_steps * num_examples, n_steps)
+                    ],
+                    dim=0,
+                )
+            )
+            print("Attributions", attributions[0].shape)
+            print("Start", start_point[0].shape)
+            print("End", end_point[0].shape)
             # computes approximation error based on the completeness axiom
             delta = self.compute_convergence_delta(
                 attributions,
@@ -75,7 +149,7 @@ class DiscretetizedIntegratedGradients(GradientAttribution):
             return _format_output(is_inputs_tuple, attributions), delta
         return _format_output(is_inputs_tuple, attributions)
 
-    def calculate_dig_attributions(
+    def _attribute(
         self,
         scaled_features_tpl: Tuple[Tensor, ...],
         target: TargetType = None,
@@ -103,12 +177,11 @@ class DiscretetizedIntegratedGradients(GradientAttribution):
             torch.cat([scaled_features[1:], scaled_features[-1].unsqueeze(0)])
             for scaled_features in scaled_features_tpl
         )
-        steps = tuple(
+        steps = list(
             shifted_inputs_tpl[i] - scaled_features_tpl[i]
             for i in range(len(shifted_inputs_tpl))
         )
         scaled_grads = tuple(grads[i] * steps[i] for i in range(len(grads)))
-
         # aggregates across all steps for each tensor in the input tuple
         attributions = tuple(
             _reshape_and_sum(
@@ -116,5 +189,4 @@ class DiscretetizedIntegratedGradients(GradientAttribution):
             )
             for (scaled_grad, grad) in zip(scaled_grads, grads)
         )
-
         return attributions
