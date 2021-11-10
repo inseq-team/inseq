@@ -1421,7 +1421,7 @@ rtd = ["sphinx", "ipython", "sphinx-book-theme"]
 
 [[package]]
 name = "sphinx-gitstamp"
-version = "0.3.1"
+version = "0.3.2"
 description = "git timestamp generator for Sphinx"
 category = "dev"
 optional = false
@@ -1860,7 +1860,7 @@ testing = ["pytest (>=4.6)", "pytest-checkdocs (>=2.4)", "pytest-flake8", "pytes
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "4e25b8f46949a87d253be6baf400b175919819c1889a2403e4833c44eca29771"
+content-hash = "263435db13b05b378a698ef0189935f4fc5e46f02fbe65c90ef0766deb9204ba"
 
 [metadata.files]
 alabaster = [
@@ -2903,7 +2903,7 @@ sphinx-copybutton = [
     {file = "sphinx_copybutton-0.4.0-py3-none-any.whl", hash = "sha256:4340d33c169dac6dd82dce2c83333412aa786a42dd01a81a8decac3b130dc8b0"},
 ]
 sphinx-gitstamp = [
-    {file = "sphinx-gitstamp-0.3.1.tar.gz", hash = "sha256:52a57a0071d3dc384fcac5ffc1af6f0b37757453bc69e73b205d07107a5ecf0a"},
+    {file = "sphinx-gitstamp-0.3.2.tar.gz", hash = "sha256:520c1edd7b84806e9480e80dc7f599d32ef8d2dcd6d95e60523f0fa36c110e4a"},
 ]
 sphinx-markdown-tables = [
     {file = "sphinx-markdown-tables-0.0.15.tar.gz", hash = "sha256:722b70a3a14156b6777cf04920d015215eb65b9dfde5cc72f430763ff5e84173"},
