@@ -56,7 +56,7 @@ bandit = "^1.7.0"
 black = {version = "^21.9b0", allow-prereleases = true}
 darglint = "^1.8.0"
 flake8 = "^4.0.0"
-ipykernel = "^6.4.1"
+ipykernel = "^6.5.0"
 isort = {extras = ["colors"], version = "^5.9.3"}
 mypy = "^0.910"
 mypy-extensions = "^0.4.3"
