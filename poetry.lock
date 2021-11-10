@@ -1654,7 +1654,7 @@ telegram = ["requests"]
 
 [[package]]
 name = "traitlets"
-version = "5.1.0"
+version = "5.1.1"
 description = "Traitlets Python configuration system"
 category = "main"
 optional = false
@@ -3013,8 +3013,8 @@ tqdm = [
     {file = "tqdm-4.62.3.tar.gz", hash = "sha256:d359de7217506c9851b7869f3708d8ee53ed70a1b8edbba4dbcb47442592920d"},
 ]
 traitlets = [
-    {file = "traitlets-5.1.0-py3-none-any.whl", hash = "sha256:03f172516916220b58c9f19d7f854734136dd9528103d04e9bf139a92c9f54c4"},
-    {file = "traitlets-5.1.0.tar.gz", hash = "sha256:bd382d7ea181fbbcce157c133db9a829ce06edffe097bcf3ab945b435452b46d"},
+    {file = "traitlets-5.1.1-py3-none-any.whl", hash = "sha256:2d313cc50a42cd6c277e7d7dc8d4d7fedd06a2c215f78766ae7b1a66277e0033"},
+    {file = "traitlets-5.1.1.tar.gz", hash = "sha256:059f456c5a7c1c82b98c2e8c799f39c9b8128f6d0d46941ee118daace9eb70c7"},
 ]
 transformers = [
     {file = "transformers-4.11.3-py3-none-any.whl", hash = "sha256:9750b4e520b4a38a904834bce50d900208c650855e6f671e7718d0edba89f084"},
