@@ -8,11 +8,11 @@ name = "inseq"
 version = "0.1.0"
 description = "Interpretability for Sequence-to-sequence models 🔍"
 readme = "README.md"
-authors = ["gsarti <gabriele.sarti996@gmail.com>"]
+authors = ["The Inseq Team"]
 maintainers = ["gsarti <gabriele.sarti996@gmail.com>"]
 license = "Apache Software License 2.0"
-repository = "https://github.com/gsarti/inseq"
-homepage = "https://github.com/gsarti/inseq"
+repository = "https://github.com/inseq-team/inseq"
+homepage = "https://github.com/inseq-team/inseq"
 
 # Keywords description https://python-poetry.org/docs/pyproject/#keywords
 keywords = ["seq2seq", "transformers", "natural language processing", "XAI", "explainable ai", "interpretability"]  #! Update me

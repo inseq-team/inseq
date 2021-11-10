@@ -20,10 +20,9 @@ function addCustomFooter() {
     social.classList.add("footer__Social");
 
     const imageDetails = [
-        { link: "https://gsarti.com", imageLink: "https://huggingface.co/landing/assets/transformers-docs/website.svg" },
-        { link: "https://twitter.com/gsarti_", imageLink: "https://huggingface.co/landing/assets/transformers-docs/twitter.svg" },
-        { link: "https://github.com/gsarti", imageLink: "https://huggingface.co/landing/assets/transformers-docs/github.svg" },
-        { link: "https://www.linkedin.com/gabrielesarti/", imageLink: "https://huggingface.co/landing/assets/transformers-docs/linkedin.svg" }
+        { link: "https://interpretingdl.github.io", imageLink: "https://huggingface.co/landing/assets/transformers-docs/website.svg" },
+        //{ link: "https://twitter.com/inseq", imageLink: "https://huggingface.co/landing/assets/transformers-docs/twitter.svg" },
+        { link: "https://github.com/inseq-team", imageLink: "https://huggingface.co/landing/assets/transformers-docs/github.svg" },
     ];
 
     imageDetails.forEach(imageLinks => {
