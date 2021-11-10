@@ -153,7 +153,7 @@ webencodings = "*"
 
 [[package]]
 name = "captum"
-version = "0.4.0"
+version = "0.4.1"
 description = "Model interpretability for PyTorch"
 category = "main"
 optional = false
@@ -165,7 +165,7 @@ numpy = "*"
 torch = ">=1.2"
 
 [package.extras]
-dev = ["flask", "ipython", "ipywidgets", "jupyter", "flask-compress", "pytest", "pytest-cov", "black", "flake8", "sphinx", "sphinx-autodoc-typehints", "mypy (>=0.760)", "isort", "scikit-learn"]
+dev = ["flask", "ipython", "ipywidgets", "jupyter", "flask-compress", "pytest", "pytest-cov", "black (==21.4b2)", "flake8", "sphinx", "sphinx-autodoc-typehints", "mypy (>=0.760)", "usort (==0.6.4)", "ufmt", "scikit-learn"]
 insights = ["flask", "ipython", "ipywidgets", "jupyter", "flask-compress"]
 test = ["pytest", "pytest-cov"]
 tutorials = ["flask", "ipython", "ipywidgets", "jupyter", "flask-compress", "torchtext", "torchvision"]
@@ -1860,7 +1860,7 @@ testing = ["pytest (>=4.6)", "pytest-checkdocs (>=2.4)", "pytest-flake8", "pytes
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "5d6d158d4e1156207174a51b17851bd854b6c921c2debd69b4071754a89f2eb4"
+content-hash = "4e25b8f46949a87d253be6baf400b175919819c1889a2403e4833c44eca29771"
 
 [metadata.files]
 alabaster = [
@@ -1921,8 +1921,8 @@ bleach = [
     {file = "bleach-4.1.0.tar.gz", hash = "sha256:0900d8b37eba61a802ee40ac0061f8c2b5dee29c1927dd1d233e075ebf5a71da"},
 ]
 captum = [
-    {file = "captum-0.4.0-py3-none-any.whl", hash = "sha256:2b849a2484b18e8533af5fb555aa1998374a7a03e91654603fb4e4c9be5caf89"},
-    {file = "captum-0.4.0.tar.gz", hash = "sha256:189d99c2934d41e3834d79afe6403de9a129b415a636038d874f5bf0e66d96d7"},
+    {file = "captum-0.4.1-py3-none-any.whl", hash = "sha256:b6b09b6a21fa0eff1b19d24bcc22626b04e7da446cfc6ee702f438a7bbd9579f"},
+    {file = "captum-0.4.1.tar.gz", hash = "sha256:1e458921f8810ee6689b56c01e678b28afcaba72648241f0f9ef14583ab54993"},
 ]
 certifi = [
     {file = "certifi-2021.10.8-py2.py3-none-any.whl", hash = "sha256:d62a0163eb4c2344ac042ab2bdf75399a71a2d8c7d47eac2e2ee91b9d6339569"},
