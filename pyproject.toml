@@ -54,8 +54,8 @@ ipywidgets = "^7.6.5"
 [tool.poetry.dev-dependencies]
 bandit = "^1.7.0"
 black = {version = "^21.9b0", allow-prereleases = true}
-darglint = "^1.8.0"
-flake8 = "^4.0.0"
+darglint = "^1.8.1"
+flake8 = "^4.0.1"
 ipykernel = "^6.5.0"
 isort = {extras = ["colors"], version = "^5.10.0"}
 mypy = "^0.910"
