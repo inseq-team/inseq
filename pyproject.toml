@@ -40,12 +40,12 @@ classifiers = [  #! Update me
 python = "^3.8"
 
 typer = {extras = ["all"], version = "^0.4.0"}
-rich = "^10.12.0"
-transformers = "^4.11.3"
+rich = "^10.13.0"
+transformers = "^4.12.3"
 sentencepiece = "^0.1.96"
 protobuf = "^3.19.1"
-torch = "^1.9.1"
-captum = "^0.4.0"
+torch = "^1.10.0"
+captum = "^0.4.1"
 seaborn = "^0.11.2"
 numpy = "^1.21.0"
 torchtyping = "^0.1.4"
@@ -54,8 +54,8 @@ ipywidgets = "^7.6.5"
 [tool.poetry.dev-dependencies]
 bandit = "^1.7.0"
 black = {version = "^21.10b0", allow-prereleases = true}
-darglint = "^1.8.0"
-flake8 = "^4.0.0"
+darglint = "^1.8.1"
+flake8 = "^4.0.1"
 ipykernel = "^6.5.0"
 isort = {extras = ["colors"], version = "^5.10.0"}
 mypy = "^0.910"
@@ -71,7 +71,7 @@ sphinx = "^4.2.0"
 sphinxemoji = "^0.2.0"
 sphinxext-opengraph = "^0.4.2"
 sphinx-copybutton = "^0.4.0"
-sphinx-gitstamp = "^0.3.1"
+sphinx-gitstamp = "^0.3.2"
 sphinx-markdown-tables = "^0.0.15"
 sphinx-rtd-theme = "^1.0.0"
 
