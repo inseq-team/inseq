@@ -22,8 +22,8 @@ sys.path.insert(0, str(_PATH_SRC.absolute()))
 # -- Project information -----------------------------------------------------
 
 project = "inseq"
-copyright = "2021, Gabriele Sarti, Licensed under the Apache License, Version 2.0"
-author = "gsarti <gabriele.sarti996@gmail.com>"
+copyright = "2021, The Inseq Team, Licensed under the Apache License, Version 2.0"
+author = "The Inseq Team"
 
 # The short X.Y version
 version = "0.1"
@@ -32,7 +32,7 @@ release = "0.1.0"
 
 
 # Prefix link to point to master, comment this during version release and uncomment below line
-extlinks = {"prefix_link": ("https://github.com/gsarti/inseq/blob/master/%s", "")}
+extlinks = {"prefix_link": ("https://github.com/inseq-team/inseq/blob/master/%s", "")}
 
 # -- General configuration ---------------------------------------------------
 
@@ -238,7 +238,7 @@ latex_elements: Dict[str, str] = {
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
-    (master_doc, "inseq.tex", "inseq Documentation", "gsarti", "manual"),
+    (master_doc, "inseq.tex", "inseq Documentation", "The Inseq Team", "manual"),
 ]
 
 
