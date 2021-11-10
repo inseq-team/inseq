@@ -240,14 +240,11 @@ test = ["flake8 (==3.7.8)", "hypothesis (==3.55.3)"]
 
 [[package]]
 name = "cycler"
-version = "0.10.0"
+version = "0.11.0"
 description = "Composable style cycles"
 category = "main"
 optional = false
-python-versions = "*"
-
-[package.dependencies]
-six = "*"
+python-versions = ">=3.6"
 
 [[package]]
 name = "darglint"
@@ -348,14 +345,14 @@ pyflakes = ">=2.4.0,<2.5.0"
 
 [[package]]
 name = "gitdb"
-version = "4.0.7"
+version = "4.0.9"
 description = "Git Object Database"
 category = "dev"
 optional = false
-python-versions = ">=3.4"
+python-versions = ">=3.6"
 
 [package.dependencies]
-smmap = ">=3.0.1,<5"
+smmap = ">=3.0.1,<6"
 
 [[package]]
 name = "gitpython"
@@ -430,7 +427,7 @@ python-versions = "*"
 
 [[package]]
 name = "ipykernel"
-version = "6.4.1"
+version = "6.5.0"
 description = "IPython Kernel for Jupyter"
 category = "main"
 optional = false
@@ -440,11 +437,10 @@ python-versions = ">=3.7"
 appnope = {version = "*", markers = "platform_system == \"Darwin\""}
 debugpy = ">=1.0.0,<2.0"
 ipython = ">=7.23.1,<8.0"
-ipython-genutils = "*"
 jupyter-client = "<8.0"
 matplotlib-inline = ">=0.1.0,<0.2.0"
 tornado = ">=4.2,<7.0"
-traitlets = ">=4.1.0,<6.0"
+traitlets = ">=5.1.0,<6.0"
 
 [package.extras]
 test = ["pytest (!=5.3.4)", "pytest-cov", "flaky", "nose", "ipyparallel"]
@@ -1344,11 +1340,11 @@ python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*"
 
 [[package]]
 name = "smmap"
-version = "4.0.0"
+version = "5.0.0"
 description = "A pure Python implementation of a sliding window memory map manager"
 category = "dev"
 optional = false
-python-versions = ">=3.5"
+python-versions = ">=3.6"
 
 [[package]]
 name = "snowballstemmer"
@@ -1969,8 +1965,8 @@ commonmark = [
     {file = "commonmark-0.9.1.tar.gz", hash = "sha256:452f9dc859be7f06631ddcb328b6919c67984aca654e5fefb3914d54691aed60"},
 ]
 cycler = [
-    {file = "cycler-0.10.0-py2.py3-none-any.whl", hash = "sha256:1d8a5ae1ff6c5cf9b93e8811e581232ad8920aeec647c37316ceac982b08cb2d"},
-    {file = "cycler-0.10.0.tar.gz", hash = "sha256:cd7b2d1018258d7247a71425e9f26463dfb444d411c39569972f4ce586b0c9d8"},
+    {file = "cycler-0.11.0-py3-none-any.whl", hash = "sha256:3a27e95f763a428a739d2add979fa7494c912a32c17c4c38c4d5f082cad165a3"},
+    {file = "cycler-0.11.0.tar.gz", hash = "sha256:9c87405839a19696e837b3b818fed3f5f69f16f1eec1a1ad77e043dcea9c772f"},
 ]
 darglint = [
     {file = "darglint-1.8.0-py3-none-any.whl", hash = "sha256:ac6797bcc918cd8d8f14c168a4a364f54e1aeb4ced59db58e7e4c6dfec2fe15c"},
@@ -2032,8 +2028,8 @@ flake8 = [
     {file = "flake8-4.0.0.tar.gz", hash = "sha256:b52d27e627676b015340c3b1c72bc9259a6cacc9341712fb8f01ddfaaa2c651a"},
 ]
 gitdb = [
-    {file = "gitdb-4.0.7-py3-none-any.whl", hash = "sha256:6c4cc71933456991da20917998acbe6cf4fb41eeaab7d6d67fbc05ecd4c865b0"},
-    {file = "gitdb-4.0.7.tar.gz", hash = "sha256:96bf5c08b157a666fec41129e6d327235284cca4c81e92109260f353ba138005"},
+    {file = "gitdb-4.0.9-py3-none-any.whl", hash = "sha256:8033ad4e853066ba6ca92050b9df2f89301b8fc8bf7e9324d412a63f8bf1a8fd"},
+    {file = "gitdb-4.0.9.tar.gz", hash = "sha256:bac2fd45c0a1c9cf619e63a90d62bdc63892ef92387424b855792a6cabe789aa"},
 ]
 gitpython = [
     {file = "GitPython-3.1.24-py3-none-any.whl", hash = "sha256:dc0a7f2f697657acc8d7f89033e8b1ea94dd90356b2983bca89dc8d2ab3cc647"},
@@ -2060,8 +2056,8 @@ iniconfig = [
     {file = "iniconfig-1.1.1.tar.gz", hash = "sha256:bc3af051d7d14b2ee5ef9969666def0cd1a000e121eaea580d4a313df4b37f32"},
 ]
 ipykernel = [
-    {file = "ipykernel-6.4.1-py3-none-any.whl", hash = "sha256:a3f6c2dda2ecf63b37446808a70ed825fea04790779ca524889c596deae0def8"},
-    {file = "ipykernel-6.4.1.tar.gz", hash = "sha256:df3355e5eec23126bc89767a676c5f0abfc7f4c3497d118c592b83b316e8c0cd"},
+    {file = "ipykernel-6.5.0-py3-none-any.whl", hash = "sha256:f43de132feea90f86d68c51013afe9694f9415f440053ec9909dd656c75b04b5"},
+    {file = "ipykernel-6.5.0.tar.gz", hash = "sha256:299795cca2c4aed7e233e3ad5360e1c73627fd0dcec11a9e75d5b2df43629353"},
 ]
 ipython = [
     {file = "ipython-7.28.0-py3-none-any.whl", hash = "sha256:f16148f9163e1e526f1008d7c8d966d9c15600ca20d1a754287cf96d00ba6f1d"},
@@ -2851,8 +2847,8 @@ six = [
     {file = "six-1.16.0.tar.gz", hash = "sha256:1e61c37477a1626458e36f7b1d82aa5c9b094fa4802892072e49de9c60c4c926"},
 ]
 smmap = [
-    {file = "smmap-4.0.0-py2.py3-none-any.whl", hash = "sha256:a9a7479e4c572e2e775c404dcd3080c8dc49f39918c2cf74913d30c4c478e3c2"},
-    {file = "smmap-4.0.0.tar.gz", hash = "sha256:7e65386bd122d45405ddf795637b7f7d2b532e7e401d46bbe3fb49b9986d5182"},
+    {file = "smmap-5.0.0-py3-none-any.whl", hash = "sha256:2aba19d6a040e78d8b09de5c57e96207b09ed71d8e55ce0959eeee6c8e190d94"},
+    {file = "smmap-5.0.0.tar.gz", hash = "sha256:c840e62059cd3be204b0c9c9f74be2c09d5648eddd4580d9314c3ecde0b30936"},
 ]
 snowballstemmer = [
     {file = "snowballstemmer-2.1.0-py2.py3-none-any.whl", hash = "sha256:b51b447bea85f9968c13b650126a888aabd4cb4463fca868ec596826325dedc2"},
