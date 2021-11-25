@@ -328,12 +328,16 @@ class HuggingfaceModel(AttributionModel):
         logger.debug(f"logits: {pretty_tensor(logits)}")
         return logits
 
-    def get_embedding_layer(self, model: Optional[PreTrainedModel] = None) -> torch.nn.Module:
+    def get_embedding_layer(
+        self, model: Optional[PreTrainedModel] = None
+    ) -> torch.nn.Module:
         if model is not None:
             return model.get_encoder().embed_tokens
         return self.model.get_encoder().embed_tokens
 
-    def configure_interpretable_embeddings(self, do_encoder: bool = True, do_decoder: bool = True) -> None:
+    def configure_interpretable_embeddings(
+        self, do_encoder: bool = True, do_decoder: bool = True
+    ) -> None:
         """Configure the model with interpretable embeddings for gradient attribution."""
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=UserWarning)
@@ -353,7 +357,9 @@ class HuggingfaceModel(AttributionModel):
                     "Interpretable embeddings were already configured for layer embed_tokens"
                 )
 
-    def remove_interpretable_embeddings(self, do_encoder: bool = True, do_decoder: bool = True) -> None:
+    def remove_interpretable_embeddings(
+        self, do_encoder: bool = True, do_decoder: bool = True
+    ) -> None:
         warn_msg = (
             "Cannot remove interpretable embedding wrapper from {model}."
             "No interpretable embedding layer was configured."
@@ -366,7 +372,7 @@ class HuggingfaceModel(AttributionModel):
             self.encoder_int_embeds = None
         if do_decoder:
             if not self.decoder_int_embeds:
-                    logger.warn(warn_msg.format(model="decoder"))
+                logger.warn(warn_msg.format(model="decoder"))
             decoder = self.model.get_decoder()
             remove_interpretable_embedding_layer(decoder, self.decoder_int_embeds)
             self.decoder_int_embeds = None

@@ -13,15 +13,13 @@
 # limitations under the License.
 """ Gradient-based feature attribution methods. """
 
-from typing import Any, Dict
-
 import logging
 
 from captum.attr import (
     InputXGradient,
     IntegratedGradients,
-    LayerIntegratedGradients,
     LayerGradientXActivation,
+    LayerIntegratedGradients,
     Saliency,
 )
 
@@ -60,7 +58,9 @@ class GradientAttribution(FeatureAttribution, Registry):
                     self.attribution_model.model, self.target_layer
                 )
         # For now only encoder attribution is supported
-        self.attribution_model.configure_interpretable_embeddings(do_encoder=not self.is_layer_attribution)
+        self.attribution_model.configure_interpretable_embeddings(
+            do_encoder=not self.is_layer_attribution
+        )
 
     @unset_hook
     def unhook(self, **kwargs):
@@ -69,7 +69,9 @@ class GradientAttribution(FeatureAttribution, Registry):
         """
         if self.is_layer_attribution:
             self.target_layer = None
-        self.attribution_model.remove_interpretable_embeddings(do_encoder=not self.is_layer_attribution)
+        self.attribution_model.remove_interpretable_embeddings(
+            do_encoder=not self.is_layer_attribution
+        )
 
     def attribute_step(
         self,

@@ -3,8 +3,8 @@ from typing import Any, Optional
 import torch
 from torchtyping import TensorType
 
-from .typing import AttributionOutputTensor, EmbeddingsTensor
 from .misc import _pretty_list
+from .typing import AttributionOutputTensor, EmbeddingsTensor
 
 
 def remap_from_filtered(

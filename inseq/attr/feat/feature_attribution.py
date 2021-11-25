@@ -242,14 +242,12 @@ class FeatureAttribution(Registry):
         if isinstance(targets, BatchEncoding):
             baseline_embeds = None
             if not self.is_layer_attribution:
-                baseline_embeds=self.attribution_model.decoder_embed(
+                baseline_embeds = self.attribution_model.decoder_embed(
                     targets.baseline_ids
                 )
             target_embeds = BatchEmbedding(
-                input_embeds=self.attribution_model.decoder_embed(
-                    targets.input_ids
-                ),
-                baseline_embeds=baseline_embeds
+                input_embeds=self.attribution_model.decoder_embed(targets.input_ids),
+                baseline_embeds=baseline_embeds,
             )
             targets = Batch.from_encoding_embeds(targets, target_embeds)
         return EncoderDecoderBatch(sources, targets)
@@ -523,7 +521,7 @@ class FeatureAttribution(Registry):
             target_ids, skip_special_tokens=False
         )
         return attribution_output
-    
+
     def format_attribute_args(
         self,
         batch: EncoderDecoderBatch,

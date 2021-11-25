@@ -1,8 +1,8 @@
-from re import L
 from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Union
-import numbers
+
 import functools
 import logging
+import numbers
 from contextlib import contextmanager
 from inspect import signature
 
@@ -20,15 +20,27 @@ def optional(condition, context_manager):
 
 def _pretty_list_contents(l: Sequence[Any]) -> str:
     quote = f"""{"'" if isinstance(l[0], str) else ""}"""
-    return quote + f'{quote}, {quote}'.join([
-        f"{' ' if isinstance(v, numbers.Number) and v >= 0 else ''}" +
-        (f"{v:.2f}" if isinstance(v, float) else f"{v}") 
-        for v in l
-    ]) + quote
+    return (
+        quote
+        + f"{quote}, {quote}".join(
+            [
+                f"{' ' if isinstance(v, numbers.Number) and v >= 0 else ''}"
+                + (f"{v:.2f}" if isinstance(v, float) else f"{v}")
+                for v in l
+            ]
+        )
+        + quote
+    )
+
 
 def _pretty_list(l: Optional[Sequence[Any]], lpad: int = 8) -> str:
     if all([isinstance(x, list) for x in l]):
-        contents = ' ' * lpad + "[ " + f" ],\n{' ' * lpad}[ ".join([_pretty_list_contents(subl) for subl in l]) + " ]"
+        contents = (
+            " " * lpad
+            + "[ "
+            + f" ],\n{' ' * lpad}[ ".join([_pretty_list_contents(subl) for subl in l])
+            + " ]"
+        )
     else:
         contents = " " * lpad + _pretty_list_contents(l)
     return "[\n" + contents + f"\n{' ' * (lpad - 4)}]"
