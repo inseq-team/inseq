@@ -61,10 +61,10 @@ class BatchEncoding:
     def __str__(self):
         return (
             f"{self.__class__.__name__}(\n"
-            f"   input_ids={pretty_tensor(self.input_ids)},\n"
-            f"   input_tokens={pretty_list(self.input_tokens)},\n"
-            f"   attention_mask={pretty_tensor(self.attention_mask)},\n"
-            f"   baseline_ids={pretty_tensor(self.baseline_ids)},\n"
+            f"    input_ids={pretty_tensor(self.input_ids)},\n"
+            f"    input_tokens={pretty_list(self.input_tokens)},\n"
+            f"    attention_mask={pretty_tensor(self.attention_mask)},\n"
+            f"    baseline_ids={pretty_tensor(self.baseline_ids)},\n"
             ")"
         )
 
@@ -103,8 +103,8 @@ class BatchEmbedding:
     def __str__(self):
         return (
             f"{self.__class__.__name__}(\n"
-            f"   input_embeds={pretty_tensor(self.input_embeds)},\n"
-            f"   baseline_embeds={pretty_tensor(self.baseline_embeds)},\n"
+            f"    input_embeds={pretty_tensor(self.input_embeds)},\n"
+            f"    baseline_embeds={pretty_tensor(self.baseline_embeds)},\n"
             ")"
         )
 
@@ -238,12 +238,12 @@ class Batch(BatchEncoding, BatchEmbedding):
     def __str__(self):
         return (
             f"{self.__class__.__name__}(\n"
-            f"   input_ids={pretty_tensor(self.input_ids)},\n"
-            f"   input_tokens={pretty_list(self.input_tokens)},\n"
-            f"   attention_mask={pretty_tensor(self.attention_mask)},\n"
-            f"   baseline_ids={pretty_tensor(self.baseline_ids)},\n"
-            f"   input_embeds={pretty_tensor(self.input_embeds)},\n"
-            f"   baseline_embeds={pretty_tensor(self.baseline_embeds)},\n"
+            f"    input_ids={pretty_tensor(self.input_ids)},\n"
+            f"    input_tokens={pretty_list(self.input_tokens)},\n"
+            f"    attention_mask={pretty_tensor(self.attention_mask)},\n"
+            f"    baseline_ids={pretty_tensor(self.baseline_ids)},\n"
+            f"    input_embeds={pretty_tensor(self.input_embeds)},\n"
+            f"    baseline_embeds={pretty_tensor(self.baseline_embeds)},\n"
             ")"
         )
 
@@ -291,7 +291,7 @@ class EncoderDecoderBatch:
         target_str = str(self.targets).replace("\n", "\n    ")
         return (
             f"{self.__class__.__name__}(\n"
-            f"   sources={source_str},\n"
-            f"   targets={target_str}\n"
+            f"    sources={source_str},\n"
+            f"    targets={target_str}\n"
             ")"
         )

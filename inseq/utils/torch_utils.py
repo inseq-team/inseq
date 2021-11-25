@@ -4,6 +4,7 @@ import torch
 from torchtyping import TensorType
 
 from .typing import AttributionOutputTensor, EmbeddingsTensor
+from .misc import _pretty_list
 
 
 def remap_from_filtered(
@@ -39,7 +40,8 @@ def pretty_tensor(t: Optional[torch.Tensor] = None) -> str:
     if len(t.shape) > 3 or any([x > 20 for x in t.shape]):
         return f"tensor of shape {list(t.shape)}"
     else:
-        return f"tensor of shape {list(t.shape)}: {t.tolist()}"
+        out_list = t.tolist()
+        return f"tensor of shape {list(t.shape)}:{_pretty_list(out_list) if isinstance(out_list, list) else out_list}"
 
 
 def euclidean_distance(vec_a: torch.Tensor, vec_b: torch.Tensor) -> float:

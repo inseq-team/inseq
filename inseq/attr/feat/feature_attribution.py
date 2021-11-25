@@ -298,7 +298,7 @@ class FeatureAttribution(Registry):
             )
             # fmt: on
 
-        logger.debug(f"full batch: {batch}")
+        logger.debug("=" * 30 + f"\nfull batch: {batch}\n" + "=" * 30)
         source_sentences = tok2string(batch.sources.input_tokens, as_targets=False)
         target_sentences = tok2string(batch.targets.input_tokens)
         if isinstance(source_sentences, str):
@@ -446,7 +446,7 @@ class FeatureAttribution(Registry):
                 of size `(batch_size)`, if the attribution step supports deltas and they are requested.
         """
         logger.debug(
-            f"target_ids: {pretty_tensor(target_ids)},\n"
+            f"\ntarget_ids: {pretty_tensor(target_ids)},\n"
             f"target_attention_mask: {pretty_tensor(target_attention_mask)}"
         )
         orig_batch = batch.clone()

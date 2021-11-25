@@ -131,7 +131,7 @@ class GradientAttribution(FeatureAttribution, Registry):
         ):
             attr, delta = attr
         attr = sum_normalize(attr, dim_sum=-1)
-        logger.debug(f"attributions: {pretty_tensor(attr)}")
+        logger.debug(f"attributions: {pretty_tensor(attr)}\n" + "-" * 30)
         return (attr, delta) if delta is not None else attr
 
 

@@ -40,21 +40,16 @@ class FeatureAttributionOutput:
     target_tokens: Optional[OneOrMoreTokenSequences] = None
 
     def __str__(self):
-        pretty_attrs = (
-            [[round(v, 2) for v in a] for a in self.attributions]
-            if self.attributions is not None
-            else None
-        )
         return (
             f"{self.__class__.__name__}(\n"
-            f"   source_tokens={pretty_list(self.source_tokens)},\n"
-            f"   prefix_tokens={pretty_list(self.prefix_tokens)},\n"
-            f"   target_tokens={pretty_list(self.target_tokens)},\n"
-            f"   source_ids={pretty_list(self.source_ids)},\n"
-            f"   prefix_ids={pretty_list(self.prefix_ids)},\n"
-            f"   target_ids={pretty_list(self.target_ids)},\n"
-            f"   attributions={pretty_list(pretty_attrs)},\n"
-            f"   delta={self.delta},\n"
+            f"    source_tokens={pretty_list(self.source_tokens)},\n"
+            f"    prefix_tokens={pretty_list(self.prefix_tokens)},\n"
+            f"    target_tokens={pretty_list(self.target_tokens)},\n"
+            f"    source_ids={pretty_list(self.source_ids)},\n"
+            f"    prefix_ids={pretty_list(self.prefix_ids)},\n"
+            f"    target_ids={pretty_list(self.target_ids)},\n"
+            f"    attributions={pretty_list(self.attributions)},\n"
+            f"    delta={self.delta},\n"
             ")"
         )
 
@@ -137,27 +132,14 @@ class FeatureAttributionSequenceOutput:
     deltas: Optional[List[float]] = None
 
     def __str__(self):
-        pretty_attrs = [
-            " " * 6
-            + "[ "
-            + " ".join([f" {v:.2f}" if v > 0 else f"{v:.2f}" for v in src_attr])
-            + " ],\n"
-            for src_attr in self.attributions
-        ]
-        pretty_deltas = (
-            [f"{d:.2f}" if d > 0 else f"{d:.2f}" for d in self.deltas]
-            if self.deltas
-            else []
-        )
         return (
             f"{self.__class__.__name__}(\n"
-            f"   source_tokens={pretty_list(self.source_tokens)},\n"
-            f"   target_tokens={pretty_list(self.target_tokens)},\n"
-            f"   source_ids={pretty_list(self.source_ids)},\n"
-            f"   target_ids={pretty_list(self.target_ids)},\n"
-            f"   attributions=[\n"
-            f"{''.join(pretty_attrs)}],\n"
-            f"   deltas={pretty_deltas}\n"
+            f"    source_tokens={pretty_list(self.source_tokens)},\n"
+            f"    target_tokens={pretty_list(self.target_tokens)},\n"
+            f"    source_ids={pretty_list(self.source_ids)},\n"
+            f"    target_ids={pretty_list(self.target_ids)},\n"
+            f"    attributions={pretty_list(self.attributions)},\n"
+            f"    deltas={pretty_list(self.deltas)},\n"
             ")"
         )
 

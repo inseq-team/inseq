@@ -1,5 +1,6 @@
+from re import L
 from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Union
-
+import numbers
 import functools
 import logging
 from contextlib import contextmanager
@@ -17,15 +18,33 @@ def optional(condition, context_manager):
         yield
 
 
-def pretty_list(l: Optional[Sequence[Any]]) -> str:
+def _pretty_list_contents(l: Sequence[Any]) -> str:
+    quote = f"""{"'" if isinstance(l[0], str) else ""}"""
+    return quote + f'{quote}, {quote}'.join([
+        f"{' ' if isinstance(v, numbers.Number) and v >= 0 else ''}" +
+        (f"{v:.2f}" if isinstance(v, float) else f"{v}") 
+        for v in l
+    ]) + quote
+
+def _pretty_list(l: Optional[Sequence[Any]], lpad: int = 8) -> str:
+    if all([isinstance(x, list) for x in l]):
+        contents = ' ' * lpad + "[ " + f" ],\n{' ' * lpad}[ ".join([_pretty_list_contents(subl) for subl in l]) + " ]"
+    else:
+        contents = " " * lpad + _pretty_list_contents(l)
+    return "[\n" + contents + f"\n{' ' * (lpad - 4)}]"
+
+
+def pretty_list(l: Optional[Sequence[Any]], lpad: int = 8) -> str:
     if l is None:
         return "None"
-    elif (
-        all([isinstance(x, list) for x in l])
-        and (len(l) > 4 or any([len(sl) > 20 for sl in l]))
-    ) or len(l) > 20:
-        return f"list with {len(l)} elements"
-    return f"list with {len(l)} elements: {l}"
+    out_txt = f"list with {len(l)} elements"
+    if all([isinstance(x, list) for x in l]):
+        out_txt = f"list with {len(l)} sub-lists"
+        if any([len(sl) > 20 for sl in l]) or len(l) > 15:
+            return out_txt
+    if len(l) > 20:
+        return out_txt
+    return f"{out_txt}:{_pretty_list(l, lpad)}"
 
 
 def extract_signature_args(
