@@ -361,7 +361,7 @@ class FeatureAttribution(Registry):
     @staticmethod
     def check_attribute_positions(
         max_length: int,
-        attr_pos_start: Optional[int] = 1,
+        attr_pos_start: Optional[int] = None,
         attr_pos_end: Optional[int] = None,
     ) -> Tuple[int, int]:
         r"""
@@ -380,6 +380,8 @@ class FeatureAttribution(Registry):
         Returns:
             `tuple[int, int]`: The start and end positions for attribution.
         """
+        if attr_pos_start is None:
+            attr_pos_start = 1
         if attr_pos_end is None or attr_pos_end > max_length:
             attr_pos_end = max_length
         if attr_pos_start > attr_pos_end or attr_pos_start < 1:

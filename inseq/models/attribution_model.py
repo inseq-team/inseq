@@ -5,15 +5,14 @@ from abc import ABC, abstractmethod
 
 import torch
 
-from inseq.utils.misc import isnotebook
-
 from ..attr.feat.feature_attribution import FeatureAttribution
 from ..data import (
     BatchEncoding,
     FeatureAttributionSequenceOutput,
     OneOrMoreFeatureAttributionSequenceOutputs,
 )
-from ..utils import LengthMismatchError, MissingAttributionMethodError
+from ..data.viz import LoadingMessage
+from ..utils import LengthMismatchError, MissingAttributionMethodError, isnotebook
 from ..utils.typing import (
     ModelIdentifier,
     OneOrMoreIdSequences,
@@ -236,7 +235,19 @@ def load(
     from .huggingface_model import HuggingfaceModel
 
     from_hf = kwargs.pop("from_hf", None)
-    if from_hf:
-        return HuggingfaceModel(model_name_or_path, attribution_method, **kwargs)
-    else:  # Default behavior is using Huggingface
-        return HuggingfaceModel(model_name_or_path, attribution_method, **kwargs)
+    verbose = kwargs.get("verbose", True)
+    desc_id = (
+        ", ".join(model_name_or_path)
+        if isinstance(model_name_or_path, tuple)
+        else model_name_or_path
+    )
+    desc = f"Loading {desc_id}" + (
+        f" with {attribution_method} method..."
+        if attribution_method
+        else " without methods..."
+    )
+    with LoadingMessage(desc, verbose=verbose):
+        if from_hf:
+            return HuggingfaceModel(model_name_or_path, attribution_method, **kwargs)
+        else:  # Default behavior is using Huggingface
+            return HuggingfaceModel(model_name_or_path, attribution_method, **kwargs)

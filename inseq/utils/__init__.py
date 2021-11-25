@@ -7,6 +7,7 @@ from .errors import (
 from .misc import (
     extract_signature_args,
     find_char_indexes,
+    isnotebook,
     optional,
     pretty_list,
     rgetattr,
@@ -27,6 +28,7 @@ __all__ = [
     "optional",
     "pretty_list",
     "rgetattr",
+    "isnotebook",
     "find_char_indexes",
     "extract_signature_args",
     "pretty_tensor",

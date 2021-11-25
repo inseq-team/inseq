@@ -21,12 +21,17 @@ from typing import List, Optional, Tuple, Union
 import random
 import string
 
+from rich import print as rprint
 from rich.live import Live
+from rich.padding import Padding
 from rich.panel import Panel
 from rich.progress import BarColumn, Progress, TextColumn
+from rich.spinner import Spinner
 from rich.table import Table
+from rich.text import Text
 from tqdm.std import tqdm
 
+from ..utils import isnotebook
 from ..utils.viz_utils import (
     final_plot_html,
     get_colors,
@@ -150,7 +155,7 @@ def get_progress_bar(
                 padding=(1, 2),
             ),
         )
-        live = Live(progress_table, refresh_per_second=10)
+        live = Live(Padding(progress_table, (1, 0, 1, 0)), refresh_per_second=10)
         live.start(refresh=live._renderable is not None)
         return job_progress, live
 
@@ -203,3 +208,30 @@ def close_progress_bar(
     else:
         _, live = pbar
         live.stop()
+
+
+class LoadingMessage:
+    def __init__(self, msg, spinner="dots", style="green", padding=1, verbose=True):
+        self.msg = msg
+        self.spinner = spinner
+        self.style = style
+        self.padding = padding
+        self.live = None
+        self.verbose = verbose
+
+    def __enter__(self):
+        if self.verbose:
+            if isnotebook():
+                rprint(Padding(Text(self.msg, style=self.style), self.padding))
+            else:
+                self.live = Live(
+                    Padding(
+                        Spinner("dots", text=Text(self.msg, style=self.style)),
+                        self.padding,
+                    )
+                )
+                self.live.start(refresh=self.live._renderable is not None)
+
+    def __exit__(self, exc_type, exc_value, exc_traceback):
+        if not isnotebook() and self.verbose and self.live is not None:
+            self.live.stop()
