@@ -245,7 +245,7 @@ class LayerIntegratedGradientsAttribution(GradientAttribution):
 
     Reference implementation:
     `https://captum.ai/api/layer.html#layer-integrated-gradients <https://captum.ai/api/layer.html#layer-integrated-gradients>`__.
-    """
+    """  # noqa E501
 
     method_name = "layer_integrated_gradients"
 

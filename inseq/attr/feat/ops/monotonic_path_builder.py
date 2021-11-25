@@ -134,32 +134,23 @@ class MonotonicPathBuilder:
         if scale_strategy is None:
             scale_strategy = "greedy"
         get_word = lambda ids, seq, tok: int(ids[seq, tok])
-        return (
-            torch.cat(
-                [  # concat sequences on batch dimension
-                    torch.stack(
-                        [  # out shape: n_steps x seq_len x hidden_size
-                            self.build_monotonic_path_embedding(
-                                word_path=self.find_path(
-                                    get_word(input_ids, seq_idx, tok_idx),
-                                    get_word(baseline_ids, seq_idx, tok_idx),
-                                    n_steps=n_steps,
-                                    strategy=scale_strategy,
-                                ),
-                                baseline_idx=get_word(baseline_ids, seq_idx, tok_idx),
-                                n_steps=n_steps,
-                            )
-                            for tok_idx in range(input_ids.shape[1])
-                        ],
-                        axis=1,
-                    ).float()
-                    for seq_idx in range(input_ids.shape[0])
-                ],
-                dim=0,
-            )
-            .to(input_ids.device)
-            .requires_grad_()
-        )
+        # fmt: off
+        return torch.cat([  # concat sequences on batch dimension
+            torch.stack([  # out shape: n_steps x seq_len x hidden_size
+                self.build_monotonic_path_embedding(
+                    word_path=self.find_path(
+                        get_word(input_ids, seq_idx, tok_idx),
+                        get_word(baseline_ids, seq_idx, tok_idx),
+                        n_steps=n_steps,
+                        strategy=scale_strategy,
+                    ),
+                    baseline_idx=get_word(baseline_ids, seq_idx, tok_idx),
+                    n_steps=n_steps,
+                ) for tok_idx in range(input_ids.shape[1])
+            ], axis=1,).float()
+            for seq_idx in range(input_ids.shape[0])
+        ], dim=0,).to(input_ids.device).requires_grad_()
+        # fmt: on
 
     def find_path(
         self,
@@ -305,8 +296,8 @@ class MonotonicPathBuilder:
         """
         # fmt: off
         return torch.where(
-            (baseline > input)  * (baseline >= anchor) * (anchor >= input) +
-            (baseline < input)  * (baseline <= anchor) * (anchor <= input) +
+            (baseline > input)  * (baseline >= anchor) * (anchor >= input) + # noqa E211 W504
+            (baseline < input)  * (baseline <= anchor) * (anchor <= input) + # noqa E211 W504
             (baseline == input) * (baseline == anchor) * (anchor == input),
             1, 0
         ).bool()

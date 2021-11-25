@@ -1,4 +1,4 @@
-from typing import List, NoReturn, Optional, Sequence, Tuple, Type, Union
+from typing import List, NoReturn, Optional, Tuple, Union
 
 import math
 from dataclasses import dataclass

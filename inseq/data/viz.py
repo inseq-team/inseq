@@ -21,10 +21,9 @@ from typing import List, Optional, Tuple, Union
 import random
 import string
 
-# from rich import print
 from rich.live import Live
 from rich.panel import Panel
-from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn
+from rich.progress import BarColumn, Progress, TextColumn
 from rich.table import Table
 from tqdm.std import tqdm
 
@@ -41,7 +40,6 @@ from .attribution import (
     FeatureAttributionSequenceOutput,
     OneOrMoreFeatureAttributionSequenceOutputs,
 )
-from .batch import EncoderDecoderBatch
 
 
 def show_attributions(
@@ -115,7 +113,7 @@ def saliency_heatmap(
 
 
 def get_progress_bar(
-    target_sentences: List[Tuple[str, int]],
+    target_sentences: List[Tuple[str, str, int]],
     method_name: str,
     show: bool,
     pretty: bool,
@@ -141,7 +139,7 @@ def get_progress_bar(
         progress_table.add_row(
             Panel.fit(
                 "\n".join([src for src, _, _ in target_sentences]),
-                title=f"Source sentences",
+                title="Source sentences",
                 border_style="red",
                 padding=(1, 2),
             ),

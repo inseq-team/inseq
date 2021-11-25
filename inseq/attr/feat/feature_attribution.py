@@ -17,7 +17,7 @@ Todo:
     * 🟡: Allow custom arguments for model loading in the :class:`FeatureAttribution` :meth:`load` method.
 """
 
-from typing import Any, Dict, List, NoReturn, Optional, Tuple
+from typing import Any, Dict, NoReturn, Optional, Tuple
 
 import logging
 from abc import abstractmethod
@@ -83,8 +83,8 @@ class FeatureAttribution(Registry):
                 interpretable embeddings unless intermediate features before the embedding layer are attributed.
             skip_eos (:obj:`bool`, default `False`): Whether the EOS token is considered as a
                 valid token during attribution.
-            target_layer (:obj:`torch.nn.Module`, default `None`): The layer on which attribution should be performed if
-                is_layer_attribution is True.
+            target_layer (:obj:`torch.nn.Module`, default `None`): The layer on which attribution should be
+                performed if is_layer_attribution is True.
             use_baseline (:obj:`bool`, default `False`): Whether a baseline should be used for the attribution method.
         """
         super().__init__()
@@ -287,13 +287,20 @@ class FeatureAttribution(Registry):
             attr_pos_start,
             attr_pos_end,
         )
+
+        def tok2string(token_lists, start=None, end=None, as_targets=True):
+            start = [0 if start is None else start for tokens in token_lists]
+            end = [len(tokens) if end is None else end for tokens in token_lists]
+            # fmt: off
+            return self.attribution_model.convert_tokens_to_string(
+                [tokens[start[i]:end[i]] for i, tokens in enumerate(token_lists)],
+                as_targets=as_targets,
+            )
+            # fmt: on
+
         logger.debug(f"full batch: {batch}")
-        source_sentences = self.attribution_model.convert_tokens_to_string(
-            batch.sources.input_tokens, as_targets=False
-        )
-        target_sentences = self.attribution_model.convert_tokens_to_string(
-            batch.targets.input_tokens
-        )
+        source_sentences = tok2string(batch.sources.input_tokens, as_targets=False)
+        target_sentences = tok2string(batch.targets.input_tokens)
         if isinstance(source_sentences, str):
             source_sentences = [source_sentences]
             target_sentences = [target_sentences]
@@ -302,17 +309,13 @@ class FeatureAttribution(Registry):
             self.attribution_model.convert_string_to_tokens(sent, as_targets=True)
             for sent in target_sentences
         ]
+        lengths = [
+            min(attr_pos_end, len(tts) + 1) - attr_pos_start
+            for tts in tokenized_target_sentences
+        ]
+        targets = zip(source_sentences, target_sentences, lengths)
         pbar = get_progress_bar(
-            target_sentences=list(
-                zip(
-                    source_sentences,
-                    target_sentences,
-                    [
-                        min(attr_pos_end, len(tts) + 1) - attr_pos_start
-                        for tts in tokenized_target_sentences
-                    ],
-                )
-            ),
+            target_sentences=list(targets),
             method_name=self.method_name,
             show=show_progress,
             pretty=pretty_progress,
@@ -327,36 +330,31 @@ class FeatureAttribution(Registry):
                     **kwargs,
                 )
             )
-            skipped_prefixes = [
-                self.attribution_model.convert_tokens_to_string(t[0:attr_pos_start])
-                for t in batch.targets.input_tokens
-            ]
-            attributed_sentences = [
-                self.attribution_model.convert_tokens_to_string(
-                    t[attr_pos_start : step + 1]
+            if pretty_progress:
+                skipped_prefixes = tok2string(
+                    batch.targets.input_tokens, end=attr_pos_start
                 )
-                for t in batch.targets.input_tokens
-            ]
-            unattributed_suffixes = [
-                self.attribution_model.convert_tokens_to_string(
-                    t[step + 1 : attr_pos_end]
+                attributed_sentences = tok2string(
+                    batch.targets.input_tokens, attr_pos_start, step + 1
                 )
-                for t in batch.targets.input_tokens
-            ]
-            skipped_suffixes = [
-                self.attribution_model.convert_tokens_to_string(t[attr_pos_end:])
-                for t in batch.targets.input_tokens
-            ]
-            update_progress_bar(
-                pbar,
-                skipped_prefixes,
-                attributed_sentences,
-                unattributed_suffixes,
-                skipped_suffixes,
-                whitespace_indexes,
-                show=show_progress,
-                pretty=pretty_progress,
-            )
+                unattributed_suffixes = tok2string(
+                    batch.targets.input_tokens, step + 1, attr_pos_end
+                )
+                skipped_suffixes = tok2string(
+                    batch.targets.input_tokens, start=attr_pos_end
+                )
+                update_progress_bar(
+                    pbar,
+                    skipped_prefixes,
+                    attributed_sentences,
+                    unattributed_suffixes,
+                    skipped_suffixes,
+                    whitespace_indexes,
+                    show=show_progress,
+                    pretty=pretty_progress,
+                )
+            else:
+                update_progress_bar(pbar, show=show_progress, pretty=pretty_progress)
         close_progress_bar(pbar, show=show_progress, pretty=pretty_progress)
         return FeatureAttributionSequenceOutput.from_attributions(attribution_outputs)
 
@@ -504,32 +502,26 @@ class FeatureAttribution(Registry):
         Returns:
             :class:`~inseq.data.FeatureAttributionOutput`: The enriched attribution output.
         """
-        source_tokens = self.attribution_model.convert_ids_to_tokens(
-            batch.sources.input_ids, skip_special_tokens=self.skip_eos
+        source_tokens = [
+            [tok for tok in seq if tok != self.attribution_model.pad_token]
+            for seq in batch.sources.input_tokens
+        ]
+        prefix_tokens = [
+            [tok for tok in seq if tok != self.attribution_model.pad_token]
+            for seq in batch.targets.input_tokens
+        ]
+        attribution_output.source_ids = self.attribution_model.convert_tokens_to_ids(
+            source_tokens
         )
-        prefix_tokens = self.attribution_model.convert_ids_to_tokens(
-            batch.targets.input_ids, skip_special_tokens=self.skip_eos
-        )
-        if not self.skip_eos:
-            source_tokens = [
-                [tok for tok in seq if tok != self.attribution_model.pad_token]
-                for seq in source_tokens
-            ]
-            prefix_tokens = [
-                [tok for tok in seq if tok != self.attribution_model.pad_token]
-                for seq in prefix_tokens
-            ]
-        source_ids = self.attribution_model.convert_tokens_to_ids(source_tokens)
-        prefix_ids = self.attribution_model.convert_tokens_to_ids(prefix_tokens)
-        target_tokens = self.attribution_model.convert_ids_to_tokens(
-            target_ids, skip_special_tokens=False
-        )
-        attribution_output.source_ids = source_ids
         attribution_output.source_tokens = source_tokens
-        attribution_output.prefix_ids = prefix_ids
+        attribution_output.prefix_ids = self.attribution_model.convert_tokens_to_ids(
+            prefix_tokens
+        )
         attribution_output.prefix_tokens = prefix_tokens
         attribution_output.target_ids = target_ids.tolist()
-        attribution_output.target_tokens = target_tokens
+        attribution_output.target_tokens = self.attribution_model.convert_ids_to_tokens(
+            target_ids, skip_special_tokens=False
+        )
         return attribution_output
 
     @abstractmethod

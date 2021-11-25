@@ -5,6 +5,8 @@ from abc import ABC, abstractmethod
 
 import torch
 
+from inseq.utils.misc import isnotebook
+
 from ..attr.feat.feature_attribution import FeatureAttribution
 from ..data import (
     BatchEncoding,
@@ -147,6 +149,11 @@ class AttributionModel(ABC):
         )
         attribution_args = kwargs.pop("attribution_args", {})
         attribution_args.update(attribution_method.get_attribution_args(**kwargs))
+        if isnotebook():
+            logger.debug(
+                "Pretty progress currently not supported in notebooks, falling back to tqdm."
+            )
+            pretty_progress = False
         return attribution_method.prepare_and_attribute(
             texts,
             reference_texts,

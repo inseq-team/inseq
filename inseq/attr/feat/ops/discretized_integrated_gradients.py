@@ -28,7 +28,7 @@ from captum._utils.common import (
     _format_output,
     _is_tuple,
 )
-from captum._utils.typing import BaselineType, TargetType, TensorOrTupleOfTensorsGeneric
+from captum._utils.typing import TargetType, TensorOrTupleOfTensorsGeneric
 from captum.attr._core.integrated_gradients import IntegratedGradients
 from captum.attr._utils.batching import _batch_attribution
 from captum.attr._utils.common import _format_input, _reshape_and_sum
@@ -36,7 +36,6 @@ from captum.log import log_usage
 from torch import Tensor
 from torchtyping import TensorType
 
-from ....data import BatchEmbedding
 from ....utils import INSEQ_ARTIFACTS_CACHE
 from ....utils.typing import VocabularyEmbeddingsTensor
 from .monotonic_path_builder import MonotonicPathBuilder

@@ -10,7 +10,6 @@ from captum.attr import (
     remove_interpretable_embedding_layer,
 )
 from torch import long
-from torchtyping import TensorType
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 from transformers.generation_utils import (
     BeamSampleOutput,
@@ -146,7 +145,13 @@ class HuggingfaceModel(AttributionModel):
                 add_special_tokens=True,
                 padding=True,
                 truncation=True,
-                max_length=self.tokenizer.max_len_single_sentence,
+                max_length=(
+                    self.tokenizer.max_len_single_sentence
+                    if self.tokenizer.max_len_single_sentence < 1e6
+                    else max(
+                        [v for _, v in self.tokenizer.max_model_input_sizes.items()]
+                    )
+                ),
                 return_tensors="pt",
             )
         baseline_ids = None

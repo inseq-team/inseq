@@ -2,10 +2,7 @@ from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Union
 
 import functools
 import logging
-import os
-import pickle
 from contextlib import contextmanager
-from functools import wraps
 from inspect import signature
 
 logger = logging.getLogger(__name__)
@@ -50,34 +47,6 @@ def extract_signature_args(
     return extracted_args
 
 
-def cache_results(func: Callable[[Any], Any]) -> Callable[[Any], Any]:
-    @wraps(func)
-    def cache_results_wrapper(
-        cache_dir: str,
-        cache_filename: str,
-        save_cache: bool = True,
-        overwrite_cache: bool = False,
-        *args,
-        **kwargs,
-    ):
-        cache_dir = os.path.expanduser(cache_dir)
-        if not os.path.exists(cache_dir):
-            os.makedirs(cache_dir)
-        if os.path.exists(cache_filename) and not overwrite_cache:
-            logger.info(f"Loading cached objects from {cache_filename}")
-            with open(cache_filename, "rb") as f:
-                cached = pickle.load(f)
-        else:
-            logger.info(f"Cached objects not found in {cache_filename}. Computing...")
-            cached = func(*args, **kwargs)
-            if save_cache:
-                with open(cache_filename, "wb") as f:
-                    pickle.dump(cached, f)
-        return cached
-
-    return cache_results_wrapper
-
-
 def ordinal_str(n: int):
     """Converts a number to and ordinal string."""
     return str(n) + {1: "st", 2: "nd", 3: "rd"}.get(
@@ -86,6 +55,17 @@ def ordinal_str(n: int):
 
 
 def rgetattr(obj, attr, *args):
+    """Recursively access attributes from nested classes
+
+    E.g. rgetattr(attr_model, 'model.model.decoder.layers[4].self_attn')
+    >> MarianAttention(
+        (k_proj): Linear(in_features=512, out_features=512, bias=True)
+        (v_proj): Linear(in_features=512, out_features=512, bias=True)
+        (q_proj): Linear(in_features=512, out_features=512, bias=True)
+        (out_proj): Linear(in_features=512, out_features=512, bias=True)
+    )
+    """
+
     def _getattr(obj, attr):
         return getattr(obj, attr, *args)
 
@@ -105,3 +85,24 @@ def find_char_indexes(strings: Sequence[str], char: str = " "):
             idx += 1
         whitespace_indexes.append(curr_idxs)
     return whitespace_indexes
+
+
+def isnotebook():
+    """Returns true if code is being executed in a notebook, false otherwise
+
+    Currently supported: Jupyter Notebooks, Google Colab
+    To validate: Kaggle Notebooks, JupyterLab
+    """
+    try:
+        from IPython import get_ipython
+
+        shell = get_ipython().__class__.__name__
+        module = get_ipython().__class__.__module__
+        if shell == "ZMQInteractiveShell" or module == "google.colab._shell":
+            return True  # Jupyter notebook, Google Colab or qtconsole
+        elif shell == "TerminalInteractiveShell":
+            return False  # Terminal running IPython
+        else:
+            return False  # Other type (?)
+    except NameError:
+        return False  # Probably standard Python interpreter

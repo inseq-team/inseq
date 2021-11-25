@@ -1,11 +1,10 @@
-from .cache import INSEQ_ARTIFACTS_CACHE, INSEQ_HOME_CACHE
+from .cache import INSEQ_ARTIFACTS_CACHE, INSEQ_HOME_CACHE, cache_results
 from .errors import (
     LengthMismatchError,
     MissingAttributionMethodError,
     UnknownAttributionMethodError,
 )
 from .misc import (
-    cache_results,
     extract_signature_args,
     find_char_indexes,
     optional,
