@@ -21,6 +21,7 @@ from captum.attr import (
     InputXGradient,
     IntegratedGradients,
     LayerIntegratedGradients,
+    LayerGradientXActivation,
     Saliency,
 )
 
@@ -58,8 +59,8 @@ class GradientAttribution(FeatureAttribution, Registry):
                 self.target_layer = rgetattr(
                     self.attribution_model.model, self.target_layer
                 )
-        else:
-            self.attribution_model.configure_interpretable_embeddings()
+        # For now only encoder attribution is supported
+        self.attribution_model.configure_interpretable_embeddings(do_encoder=not self.is_layer_attribution)
 
     @unset_hook
     def unhook(self, **kwargs):
@@ -68,37 +69,7 @@ class GradientAttribution(FeatureAttribution, Registry):
         """
         if self.is_layer_attribution:
             self.target_layer = None
-        else:
-            self.attribution_model.remove_interpretable_embeddings()
-
-    def format_attribute_args(
-        self,
-        batch: EncoderDecoderBatch,
-        target_ids: TargetIdsTensor,
-        **kwargs,
-    ) -> Dict[str, Any]:
-        logger.debug(f"batch: {batch},\ntarget_ids: {pretty_tensor(target_ids)}")
-        attribute_args = {
-            "inputs": batch.sources.input_ids
-            if self.is_layer_attribution
-            else batch.sources.input_embeds,
-            "target": target_ids,
-            "additional_forward_args": (
-                batch.sources.attention_mask,
-                batch.targets.input_ids
-                if self.is_layer_attribution
-                else batch.targets.input_embeds,
-                batch.targets.attention_mask,
-                self.is_layer_attribution,  # Defines how to treat source and target tensors
-            ),
-        }
-        if self.use_baseline:
-            attribute_args["baselines"] = (
-                batch.sources.baseline_ids
-                if self.is_layer_attribution
-                else batch.sources.baseline_embeds
-            )
-        return {**attribute_args, **kwargs}
+        self.attribution_model.remove_interpretable_embeddings(do_encoder=not self.is_layer_attribution)
 
     def attribute_step(
         self,
@@ -122,6 +93,7 @@ class GradientAttribution(FeatureAttribution, Registry):
                 of size `(batch_size)`, if the attribution step supports deltas and they are requested.
         """
         attribute_args = self.format_attribute_args(batch, target_ids, **kwargs)
+        logger.debug(f"attribute_args={attribute_args}")
         attr = self.method.attribute(**attribute_args)
         delta = None
         if (
@@ -130,6 +102,7 @@ class GradientAttribution(FeatureAttribution, Registry):
             and self.method.has_convergence_delta()
         ):
             attr, delta = attr
+        logger.debug(f"attributions prenorm: {attr}\n")
         attr = sum_normalize(attr, dim_sum=-1)
         logger.debug(f"attributions: {pretty_tensor(attr)}\n" + "-" * 30)
         return (attr, delta) if delta is not None else attr
@@ -257,6 +230,29 @@ class LayerIntegratedGradientsAttribution(GradientAttribution):
         self.hook(**kwargs)
         multiply_by_inputs = kwargs.pop("multiply_by_inputs", True)
         self.method = LayerIntegratedGradients(
+            self.attribution_model.score_func,
+            self.target_layer,
+            multiply_by_inputs=multiply_by_inputs,
+        )
+
+
+class LayerGradientXActivationAttribution(GradientAttribution):
+    """Layer Integrated Gradients attribution method.
+
+    Reference implementation:
+    `https://captum.ai/api/layer.html#layer-integrated-gradients <https://captum.ai/api/layer.html#layer-integrated-gradients>`__.
+    """  # noqa E501
+
+    method_name = "layer_gradient_x_activation"
+
+    def __init__(self, attribution_model, **kwargs):
+        super().__init__(attribution_model, hook_to_model=False)
+        self.is_layer_attribution = True
+        self.skip_eos = False
+        self.use_baseline = False
+        self.hook(**kwargs)
+        multiply_by_inputs = kwargs.pop("multiply_by_inputs", True)
+        self.method = LayerGradientXActivation(
             self.attribution_model.score_func,
             self.target_layer,
             multiply_by_inputs=multiply_by_inputs,

@@ -10,7 +10,7 @@ from captum.attr import (
     remove_interpretable_embedding_layer,
 )
 from torch import long
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer, PreTrainedModel
 from transformers.generation_utils import (
     BeamSampleOutput,
     BeamSearchOutput,
@@ -239,11 +239,11 @@ class HuggingfaceModel(AttributionModel):
 
     @property
     def special_tokens(self) -> List[str]:
-        return list(self.tokenizer.special_tokens_map.values())
+        return self.tokenizer.all_special_tokens
 
     @property
     def special_tokens_ids(self) -> List[int]:
-        return self.convert_tokens_to_ids(self.special_tokens)
+        return self.tokenizer.all_special_ids
 
     @property
     def vocabulary_embeddings(self) -> VocabularyEmbeddingsTensor:
@@ -311,7 +311,7 @@ class HuggingfaceModel(AttributionModel):
         self,
         encoder_tensors: Optional[Union[IdsTensor, EmbeddingsTensor]] = None,
         encoder_attention_mask: Optional[IdsTensor] = None,
-        decoder_tensors: Optional[Union[IdsTensor, EmbeddingsTensor]] = None,
+        decoder_tensors: Optional[EmbeddingsTensor] = None,
         decoder_attention_mask: Optional[IdsTensor] = None,
         compute_embeddings: Optional[bool] = True,
     ) -> FullLogitsTensor:
@@ -319,8 +319,7 @@ class HuggingfaceModel(AttributionModel):
             input_ids=encoder_tensors if compute_embeddings else None,
             inputs_embeds=encoder_tensors if not compute_embeddings else None,
             attention_mask=encoder_attention_mask,
-            decoder_input_ids=decoder_tensors if compute_embeddings else None,
-            decoder_inputs_embeds=decoder_tensors if not compute_embeddings else None,
+            decoder_inputs_embeds=decoder_tensors,
             decoder_attention_mask=decoder_attention_mask,
         )
         # Full logits for last position of every sentence:
@@ -329,36 +328,45 @@ class HuggingfaceModel(AttributionModel):
         logger.debug(f"logits: {pretty_tensor(logits)}")
         return logits
 
-    def get_embedding_layer(self) -> torch.nn.Module:
-        return self.model.get_input_embeddings()
+    def get_embedding_layer(self, model: Optional[PreTrainedModel] = None) -> torch.nn.Module:
+        if model is not None:
+            return model.get_encoder().embed_tokens
+        return self.model.get_encoder().embed_tokens
 
-    def configure_interpretable_embeddings(self) -> None:
+    def configure_interpretable_embeddings(self, do_encoder: bool = True, do_decoder: bool = True) -> None:
         """Configure the model with interpretable embeddings for gradient attribution."""
-        encoder = self.model.get_encoder()
-        decoder = self.model.get_decoder()
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=UserWarning)
             try:
-                self.encoder_int_embeds = configure_interpretable_embedding_layer(
-                    encoder, "embed_tokens"
-                )
-                self.decoder_int_embeds = configure_interpretable_embedding_layer(
-                    decoder, "embed_tokens"
-                )
+                if do_encoder:
+                    encoder = self.model.get_encoder()
+                    self.encoder_int_embeds = configure_interpretable_embedding_layer(
+                        encoder, "embed_tokens"
+                    )
+                if do_decoder:
+                    decoder = self.model.get_decoder()
+                    self.decoder_int_embeds = configure_interpretable_embedding_layer(
+                        decoder, "embed_tokens"
+                    )
             except AssertionError:
                 logger.warn(
                     "Interpretable embeddings were already configured for layer embed_tokens"
                 )
 
-    def remove_interpretable_embeddings(self) -> None:
-        encoder = self.model.get_encoder()
-        decoder = self.model.get_decoder()
-        if not self.encoder_int_embeds or not self.encoder_int_embeds:
-            logger.warn(
-                "Cannot remove interpretable embedding wrapper."
-                " No interpretable embedding layer was configured."
-            )
-        else:
+    def remove_interpretable_embeddings(self, do_encoder: bool = True, do_decoder: bool = True) -> None:
+        warn_msg = (
+            "Cannot remove interpretable embedding wrapper from {model}."
+            "No interpretable embedding layer was configured."
+        )
+        if do_encoder:
+            if not self.encoder_int_embeds:
+                logger.warn(warn_msg.format(model="encoder"))
+            encoder = self.model.get_encoder()
             remove_interpretable_embedding_layer(encoder, self.encoder_int_embeds)
+            self.encoder_int_embeds = None
+        if do_decoder:
+            if not self.decoder_int_embeds:
+                    logger.warn(warn_msg.format(model="decoder"))
+            decoder = self.model.get_decoder()
             remove_interpretable_embedding_layer(decoder, self.decoder_int_embeds)
-            self.encoder_int_embeds, self.decoder_int_embeds = None, None
+            self.decoder_int_embeds = None

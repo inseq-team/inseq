@@ -44,7 +44,7 @@ from ...utils import (
     pretty_tensor,
     remap_from_filtered,
 )
-from ...utils.typing import ModelIdentifier
+from ...utils.typing import ModelIdentifier, TargetIdsTensor
 from ..attribution_decorators import set_hook, unset_hook
 
 logger = logging.getLogger(__name__)
@@ -220,10 +220,10 @@ class FeatureAttribution(Registry):
                 sources, return_baseline=True
             )
         if isinstance(sources, BatchEncoding):
-            embeds = (
-                BatchEmbedding(None, None)
-                if self.is_layer_attribution
-                else BatchEmbedding(
+            if self.is_layer_attribution:
+                embeds = BatchEmbedding(None, None)
+            else:
+                embeds = BatchEmbedding(
                     input_embeds=self.attribution_model.encoder_embed(
                         sources.input_ids
                     ),
@@ -231,7 +231,6 @@ class FeatureAttribution(Registry):
                         sources.baseline_ids
                     ),
                 )
-            )
             sources = Batch.from_encoding_embeds(sources, embeds)
         if isinstance(targets, str) or isinstance(targets, list):
             targets: BatchEncoding = self.attribution_model.encode_texts(
@@ -241,17 +240,16 @@ class FeatureAttribution(Registry):
                 return_baseline=True,
             )
         if isinstance(targets, BatchEncoding):
-            target_embeds = (
-                BatchEmbedding(None, None)
-                if self.is_layer_attribution
-                else BatchEmbedding(
-                    input_embeds=self.attribution_model.decoder_embed(
-                        targets.input_ids
-                    ),
-                    baseline_embeds=self.attribution_model.decoder_embed(
-                        targets.baseline_ids
-                    ),
+            baseline_embeds = None
+            if not self.is_layer_attribution:
+                baseline_embeds=self.attribution_model.decoder_embed(
+                    targets.baseline_ids
                 )
+            target_embeds = BatchEmbedding(
+                input_embeds=self.attribution_model.decoder_embed(
+                    targets.input_ids
+                ),
+                baseline_embeds=baseline_embeds
             )
             targets = Batch.from_encoding_embeds(targets, target_embeds)
         return EncoderDecoderBatch(sources, targets)
@@ -525,6 +523,34 @@ class FeatureAttribution(Registry):
             target_ids, skip_special_tokens=False
         )
         return attribution_output
+    
+    def format_attribute_args(
+        self,
+        batch: EncoderDecoderBatch,
+        target_ids: TargetIdsTensor,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        logger.debug(f"batch: {batch},\ntarget_ids: {pretty_tensor(target_ids)}")
+        # For now only encoder attribution is supported
+        if self.is_layer_attribution:
+            inputs = batch.sources.input_ids
+            baselines = batch.sources.baseline_ids
+        else:
+            inputs = batch.sources.input_embeds
+            baselines = batch.sources.baseline_embeds
+        attribute_args = {
+            "inputs": inputs,
+            "target": target_ids,
+            "additional_forward_args": (
+                batch.sources.attention_mask,
+                batch.targets.input_embeds,
+                batch.targets.attention_mask,
+                self.is_layer_attribution,  # Defines how to treat source and target tensors
+            ),
+        }
+        if self.use_baseline:
+            attribute_args["baselines"] = baselines
+        return {**attribute_args, **kwargs}
 
     @abstractmethod
     def attribute_step(
