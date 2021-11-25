@@ -26,6 +26,25 @@ def original_monotonic(vec1, vec2, vec3):
     return valid  # vec condition
 
 
+def original_dummy_find_word_path(wrd_idx: int, n_steps: int):
+    word_path = [wrd_idx]
+    last_idx = wrd_idx
+    for _ in range(n_steps):
+        # The original code finds the next word
+        # We only want to test the walrus operator variant, so any method is ok. We use hash.
+        next_idx = hash(last_idx + 0.01 + len(word_path) / 1000)
+        word_path.append(next_idx)
+        last_idx = next_idx
+    return word_path
+
+
+def walrus_operator_find_word_path(wrd_idx: int, n_steps: int):
+    word_path = [wrd_idx]
+    for _ in range(n_steps):
+        word_path.append((wrd_idx := hash(wrd_idx + 0.01 + len(word_path) / 1000)))
+    return word_path
+
+
 @pytest.mark.parametrize(
     ("input_dims"),
     [
@@ -63,3 +82,17 @@ def test_valid_distance_multidim_tensors() -> None:
         and torch.equal(dist_multi[1], dist)
         and torch.equal(dist_multi[2], dist)
     )
+
+
+@pytest.mark.parametrize(
+    ("wrd_idx", "n_steps"),
+    [
+        (0, 10),
+        (10, 100),
+        (100, 1000),
+    ],
+)
+def test_walrus_find_word_path(wrd_idx: int, n_steps: int) -> None:
+    assert original_dummy_find_word_path(
+        wrd_idx, n_steps
+    ) == walrus_operator_find_word_path(wrd_idx, n_steps)

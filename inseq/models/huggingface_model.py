@@ -19,13 +19,17 @@ from transformers.generation_utils import (
     SampleOutput,
 )
 
-from ..data import (
-    BatchEncoding,
+from ..data import BatchEncoding
+from ..utils import optional, pretty_tensor
+from ..utils.typing import (
+    EmbeddingsTensor,
+    FullLogitsTensor,
+    IdsTensor,
     OneOrMoreIdSequences,
     OneOrMoreTokenSequences,
     TextInput,
+    VocabularyEmbeddingsTensor,
 )
-from ..utils import optional, pretty_tensor
 from .attribution_model import AttributionModel
 from .model_decorators import unhooked
 
@@ -145,10 +149,9 @@ class HuggingfaceModel(AttributionModel):
                 max_length=self.tokenizer.max_len_single_sentence,
                 return_tensors="pt",
             )
+        baseline_ids = None
         if return_baseline:
             baseline_ids = batch["input_ids"].ne(self.eos_id).long() * self.pad_id
-        else:
-            baseline_ids = None
         # We prepend a BOS token only when tokenizing target texts.
         if as_targets and prepend_bos_token:
             ones_mask = torch.ones(
@@ -163,12 +166,15 @@ class HuggingfaceModel(AttributionModel):
                 baseline_ids = torch.cat((bos_ids, baseline_ids), dim=1)
         return BatchEncoding(
             input_ids=batch["input_ids"].to(self.device),
+            input_tokens=[
+                self.tokenizer.convert_ids_to_tokens(x) for x in batch["input_ids"]
+            ],
             attention_mask=batch["attention_mask"].to(self.device),
             baseline_ids=baseline_ids,
         )
 
     def convert_ids_to_tokens(
-        self, ids: torch.Tensor, skip_special_tokens: Optional[bool] = True
+        self, ids: IdsTensor, skip_special_tokens: Optional[bool] = True
     ) -> OneOrMoreTokenSequences:
         if len(ids.shape) < 2:
             return self.tokenizer.convert_ids_to_tokens(
@@ -181,26 +187,64 @@ class HuggingfaceModel(AttributionModel):
             for id_slice in ids
         ]
 
-    def convert_tokens_to_ids(
-        self, tokens: Union[List[str], List[List[str]]]
-    ) -> OneOrMoreIdSequences:
+    def convert_tokens_to_ids(self, tokens: TextInput) -> OneOrMoreIdSequences:
         if isinstance(tokens[0], str):
             return self.tokenizer.convert_tokens_to_ids(tokens)
         return [
             self.tokenizer.convert_tokens_to_ids(token_slice) for token_slice in tokens
         ]
 
+    def convert_tokens_to_string(
+        self,
+        tokens: OneOrMoreTokenSequences,
+        skip_special_tokens: bool = True,
+        as_targets: bool = True,
+    ) -> TextInput:
+        if isinstance(tokens, list) and len(tokens) == 0:
+            return ""
+        elif isinstance(tokens[0], str):
+            tmp_decode_state = self.tokenizer._decode_use_source_tokenizer
+            self.tokenizer._decode_use_source_tokenizer = not as_targets
+            out_strings = self.tokenizer.convert_tokens_to_string(
+                tokens
+                if not skip_special_tokens
+                else [t for t in tokens if t not in self.special_tokens]
+            )
+            self.tokenizer._decode_use_source_tokenizer = tmp_decode_state
+            return out_strings
+        return [
+            self.convert_tokens_to_string(token_slice, skip_special_tokens, as_targets)
+            for token_slice in tokens
+        ]
+
+    def convert_string_to_tokens(
+        self,
+        text: TextInput,
+        skip_special_tokens: bool = True,
+        as_targets: bool = False,
+    ) -> OneOrMoreTokenSequences:
+        if isinstance(text, str):
+            with optional(as_targets, self.tokenizer.as_target_tokenizer()):
+                ids = self.tokenizer(text)["input_ids"]
+            return self.tokenizer.convert_ids_to_tokens(ids, skip_special_tokens)
+        return [
+            self.convert_string_to_tokens(t, skip_special_tokens, as_targets)
+            for t in text
+        ]
+
+    @property
+    def special_tokens(self) -> List[str]:
+        return list(self.tokenizer.special_tokens_map.values())
+
     @property
     def special_tokens_ids(self) -> List[int]:
-        return self.convert_tokens_to_ids(
-            list(self.tokenizer.special_tokens_map.values())
-        )
+        return self.convert_tokens_to_ids(self.special_tokens)
 
     @property
-    def token_embeddings(self) -> TensorType["vocabulary", "embedding_size", float]:
+    def vocabulary_embeddings(self) -> VocabularyEmbeddingsTensor:
         return self.model.get_encoder().embed_tokens.weight
 
-    def encoder_embed(self, ids: TensorType["batch_size", "seq_len", long]):
+    def encoder_embed(self, ids: IdsTensor) -> EmbeddingsTensor:
         if self.encoder_int_embeds:
             embeddings = self.encoder_int_embeds.indices_to_embeddings(ids)
             return embeddings * self.encoder_embed_scale
@@ -208,7 +252,7 @@ class HuggingfaceModel(AttributionModel):
             embeddings = self.model.get_input_embeddings()
             return embeddings(ids) * self.encoder_embed_scale
 
-    def decoder_embed(self, ids: TensorType["batch_size", "seq_len", long]):
+    def decoder_embed(self, ids: IdsTensor) -> EmbeddingsTensor:
         if self.decoder_int_embeds:
             embeddings = self.decoder_int_embeds.indices_to_embeddings(ids)
             return embeddings * self.decoder_embed_scale
@@ -260,14 +304,19 @@ class HuggingfaceModel(AttributionModel):
 
     def score_func(
         self,
-        inputs_embeds: TensorType["batch_size", "seq_len", "embed_dim", float],
-        attention_mask: TensorType["batch_size", "seq_len", long],
-        decoder_inputs_embeds: TensorType["batch_size", "seq_len", "embed_dim", float],
-    ) -> TensorType["batch_size", "vocab_size", float]:
+        encoder_tensors: Optional[Union[IdsTensor, EmbeddingsTensor]] = None,
+        encoder_attention_mask: Optional[IdsTensor] = None,
+        decoder_tensors: Optional[Union[IdsTensor, EmbeddingsTensor]] = None,
+        decoder_attention_mask: Optional[IdsTensor] = None,
+        compute_embeddings: Optional[bool] = True,
+    ) -> FullLogitsTensor:
         output = self.model(
-            inputs_embeds=inputs_embeds,
-            attention_mask=attention_mask,
-            decoder_inputs_embeds=decoder_inputs_embeds,
+            input_ids=encoder_tensors if compute_embeddings else None,
+            inputs_embeds=encoder_tensors if not compute_embeddings else None,
+            attention_mask=encoder_attention_mask,
+            decoder_input_ids=decoder_tensors if compute_embeddings else None,
+            decoder_inputs_embeds=decoder_tensors if not compute_embeddings else None,
+            decoder_attention_mask=decoder_attention_mask,
         )
         # Full logits for last position of every sentence:
         # (batch_size, tgt_seq_len, vocab_size) => (batch_size, vocab_size)
@@ -275,7 +324,10 @@ class HuggingfaceModel(AttributionModel):
         logger.debug(f"logits: {pretty_tensor(logits)}")
         return logits
 
-    def configure_interpretable_embeddings(self):
+    def get_embedding_layer(self) -> torch.nn.Module:
+        return self.model.get_input_embeddings()
+
+    def configure_interpretable_embeddings(self) -> None:
         """Configure the model with interpretable embeddings for gradient attribution."""
         encoder = self.model.get_encoder()
         decoder = self.model.get_decoder()
@@ -293,7 +345,7 @@ class HuggingfaceModel(AttributionModel):
                     "Interpretable embeddings were already configured for layer embed_tokens"
                 )
 
-    def remove_interpretable_embeddings(self):
+    def remove_interpretable_embeddings(self) -> None:
         encoder = self.model.get_encoder()
         decoder = self.model.get_decoder()
         if not self.encoder_int_embeds or not self.encoder_int_embeds:

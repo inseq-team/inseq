@@ -13,13 +13,26 @@
 # limitations under the License.
 """ Gradient-based feature attribution methods. """
 
+from typing import Any, Dict
+
 import logging
 
-from captum.attr import InputXGradient, IntegratedGradients, Saliency
-from torchtyping import TensorType
+from captum.attr import (
+    InputXGradient,
+    IntegratedGradients,
+    LayerIntegratedGradients,
+    Saliency,
+)
 
 from ...data import EncoderDecoderBatch, FeatureAttributionStepOutput
-from ...utils import Registry, extract_signature_args, pretty_tensor, sum_normalize
+from ...utils import (
+    Registry,
+    extract_signature_args,
+    pretty_tensor,
+    rgetattr,
+    sum_normalize,
+)
+from ...utils.typing import TargetIdsTensor
 from ..attribution_decorators import set_hook, unset_hook
 from .feature_attribution import FeatureAttribution
 from .ops import DiscretetizedIntegratedGradients
@@ -36,19 +49,61 @@ class GradientAttribution(FeatureAttribution, Registry):
         Hooks the attribution method to the model by replacing normal :obj:`nn.Embedding`
         with Captum's `InterpretableEmbeddingBase <https://captum.ai/api/utilities.html#captum.attr.InterpretableEmbeddingBase>`__.
         """  # noqa: E501
-        self.attribution_model.configure_interpretable_embeddings()
+        if self.is_layer_attribution:
+            self.target_layer = kwargs.pop(
+                "target_layer", self.attribution_model.get_embedding_layer()
+            )
+            logger.debug(f"target_layer={self.target_layer}")
+            if isinstance(self.target_layer, str):
+                self.target_layer = rgetattr(
+                    self.attribution_model.model, self.target_layer
+                )
+        else:
+            self.attribution_model.configure_interpretable_embeddings()
 
     @unset_hook
     def unhook(self, **kwargs):
         r"""
         Unhook the attribution method by restoring the model's original embeddings.
         """
-        self.attribution_model.remove_interpretable_embeddings()
+        if self.is_layer_attribution:
+            self.target_layer = None
+        else:
+            self.attribution_model.remove_interpretable_embeddings()
+
+    def format_attribute_args(
+        self,
+        batch: EncoderDecoderBatch,
+        target_ids: TargetIdsTensor,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        logger.debug(f"batch: {batch},\ntarget_ids: {pretty_tensor(target_ids)}")
+        attribute_args = {
+            "inputs": batch.sources.input_ids
+            if self.is_layer_attribution
+            else batch.sources.input_embeds,
+            "target": target_ids,
+            "additional_forward_args": (
+                batch.sources.attention_mask,
+                batch.targets.input_ids
+                if self.is_layer_attribution
+                else batch.targets.input_embeds,
+                batch.targets.attention_mask,
+                self.is_layer_attribution,  # Defines how to treat source and target tensors
+            ),
+        }
+        if self.use_baseline:
+            attribute_args["baselines"] = (
+                batch.sources.baseline_ids
+                if self.is_layer_attribution
+                else batch.sources.baseline_embeds
+            )
+        return {**attribute_args, **kwargs}
 
     def attribute_step(
         self,
         batch: EncoderDecoderBatch,
-        target_ids: TensorType["batch_size", int],
+        target_ids: TargetIdsTensor,
         **kwargs,
     ) -> FeatureAttributionStepOutput:
         r"""
@@ -66,21 +121,11 @@ class GradientAttribution(FeatureAttribution, Registry):
                 of size `(batch_size, source_length)` and possibly a tensor of attribution deltas
                 of size `(batch_size)`, if the attribution step supports deltas and they are requested.
         """
-        logger.debug(f"batch: {batch},\ntarget_ids: {pretty_tensor(target_ids)}")
-        delta = kwargs.get("return_convergence_delta", None)
-        attribute_args = {
-            "inputs": batch.sources.input_embeds if not self.use_full_batch else batch,
-            "target": target_ids,
-            "additional_forward_args": (
-                batch.sources.attention_mask,
-                batch.targets.input_embeds,
-            ),
-        }
-        if self.use_baseline:
-            attribute_args["baselines"] = (batch.sources.baseline_embeds,)
-        attr = self.method.attribute(**attribute_args, **kwargs)
+        attribute_args = self.format_attribute_args(batch, target_ids, **kwargs)
+        attr = self.method.attribute(**attribute_args)
+        delta = None
         if (
-            delta
+            attribute_args.get("return_convergence_delta", False)
             and hasattr(self.method, "has_convergence_delta")
             and self.method.has_convergence_delta()
         ):
@@ -106,9 +151,6 @@ class DiscretizedIntegratedGradientsAttribution(GradientAttribution):
             self.attribution_model.score_func,
             multiply_by_inputs,
         )
-        self.use_baseline = False
-        self.skip_eos = False
-        self.use_full_batch = True
         self.hook(**kwargs)
 
     @set_hook
@@ -120,11 +162,35 @@ class DiscretizedIntegratedGradientsAttribution(GradientAttribution):
         )
         self.method.load_monotonic_path_builder(
             self.attribution_model.model_name,
-            token_embeddings=self.attribution_model.token_embeddings.detach(),
+            vocabulary_embeddings=self.attribution_model.vocabulary_embeddings.detach(),
             special_tokens=self.attribution_model.special_tokens_ids,
             **load_kwargs,
         )
         super().hook(**other_kwargs)
+
+    def format_attribute_args(
+        self,
+        batch: EncoderDecoderBatch,
+        target_ids: TargetIdsTensor,
+        **kwargs,
+    ) -> FeatureAttributionStepOutput:
+        scaled_inputs = self.method.path_builder.scale_inputs(
+            batch.sources.input_ids,
+            batch.sources.baseline_ids,
+            n_steps=kwargs.get("n_steps", None),
+            scale_strategy=kwargs.get("strategy", None),
+        )
+        attribute_args = {
+            "inputs": scaled_inputs,
+            "target": target_ids,
+            "additional_forward_args": (
+                batch.sources.attention_mask,
+                batch.targets.input_embeds,
+                batch.targets.attention_mask,
+                False,
+            ),
+        }
+        return {**attribute_args, **kwargs}
 
 
 class IntegratedGradientsAttribution(GradientAttribution):
@@ -142,8 +208,8 @@ class IntegratedGradientsAttribution(GradientAttribution):
         self.method = IntegratedGradients(
             self.attribution_model.score_func, multiply_by_inputs
         )
-        self.use_baseline = True
         self.skip_eos = True
+        self.use_baseline = True
 
 
 class InputXGradientAttribution(GradientAttribution):
@@ -158,7 +224,6 @@ class InputXGradientAttribution(GradientAttribution):
     def __init__(self, attribution_model):
         super().__init__(attribution_model)
         self.method = InputXGradient(self.attribution_model.score_func)
-        self.use_baseline = False
 
 
 class SaliencyAttribution(GradientAttribution):
@@ -173,4 +238,26 @@ class SaliencyAttribution(GradientAttribution):
     def __init__(self, attribution_model):
         super().__init__(attribution_model)
         self.method = Saliency(self.attribution_model.score_func)
-        self.use_baseline = False
+
+
+class LayerIntegratedGradientsAttribution(GradientAttribution):
+    """Layer Integrated Gradients attribution method.
+
+    Reference implementation:
+    `https://captum.ai/api/layer.html#layer-integrated-gradients <https://captum.ai/api/layer.html#layer-integrated-gradients>`__.
+    """
+
+    method_name = "layer_integrated_gradients"
+
+    def __init__(self, attribution_model, **kwargs):
+        super().__init__(attribution_model, hook_to_model=False)
+        self.is_layer_attribution = True
+        self.skip_eos = True
+        self.use_baseline = True
+        self.hook(**kwargs)
+        multiply_by_inputs = kwargs.pop("multiply_by_inputs", True)
+        self.method = LayerIntegratedGradients(
+            self.attribution_model.score_func,
+            self.target_layer,
+            multiply_by_inputs=multiply_by_inputs,
+        )

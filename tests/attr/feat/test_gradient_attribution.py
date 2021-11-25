@@ -18,5 +18,5 @@ def saliency_mt_model():
     ],
 )
 def test_gradient_attribution(texts, reference_texts, saliency_mt_model):
-    attribution = saliency_mt_model.attribute(texts, reference_texts)
+    attribution = saliency_mt_model.attribute(texts, reference_texts, show_progress=False)
     assert isinstance(attribution, FeatureAttributionSequenceOutput)

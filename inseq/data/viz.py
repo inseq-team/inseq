@@ -16,15 +16,18 @@
 # WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
 # OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-from typing import Optional
+from typing import List, Optional, Tuple, Union
 
 import random
 import string
 
-from ..data import (
-    FeatureAttributionSequenceOutput,
-    OneOrMoreFeatureAttributionSequenceOutputs,
-)
+# from rich import print
+from rich.live import Live
+from rich.panel import Panel
+from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn
+from rich.table import Table
+from tqdm.std import tqdm
+
 from ..utils.viz_utils import (
     final_plot_html,
     get_colors,
@@ -34,6 +37,11 @@ from ..utils.viz_utils import (
     saliency_heatmap_table_header,
     sanitize_html,
 )
+from .attribution import (
+    FeatureAttributionSequenceOutput,
+    OneOrMoreFeatureAttributionSequenceOutputs,
+)
+from .batch import EncoderDecoderBatch
 
 
 def show_attributions(
@@ -101,3 +109,99 @@ def saliency_heatmap(
         out += "</tr>"
     out += "</table>"
     return saliency_heatmap_html.format(uuid=uuid, content=out)
+
+
+# Progress bar utilities
+
+
+def get_progress_bar(
+    target_sentences: List[Tuple[str, int]],
+    method_name: str,
+    show: bool,
+    pretty: bool,
+) -> Union[tqdm, Tuple[Progress, Live], None]:
+    if not show:
+        return None
+    elif show and not pretty:
+        return tqdm(
+            total=max([tgt_len for _, _, tgt_len in target_sentences]),
+            desc=f"Attributing with {method_name}...",
+        )
+    elif show and pretty:
+        job_progress = Progress(
+            "{task.description}",
+            BarColumn(),
+            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+        )
+        _ = [
+            job_progress.add_task(tgt, total=tgt_len)
+            for _, tgt, tgt_len in target_sentences
+        ]
+        progress_table = Table.grid()
+        progress_table.add_row(
+            Panel.fit(
+                "\n".join([src for src, _, _ in target_sentences]),
+                title=f"Source sentences",
+                border_style="red",
+                padding=(1, 2),
+            ),
+            Panel.fit(
+                job_progress,
+                title=f"[b]Attributing with {method_name}",
+                border_style="green",
+                padding=(1, 2),
+            ),
+        )
+        live = Live(progress_table, refresh_per_second=10)
+        live.start(refresh=live._renderable is not None)
+        return job_progress, live
+
+
+def update_progress_bar(
+    pbar: Union[tqdm, Tuple[Progress, Live], None],
+    skipped_prefixes: List[str] = None,
+    attributed_sentences: List[str] = None,
+    unattributed_suffixes: List[str] = None,
+    skipped_suffixes: List[str] = None,
+    whitespace_indexes: List[List[int]] = None,
+    show: bool = False,
+    pretty: bool = False,
+) -> None:
+    if not show:
+        return
+    elif show and not pretty:
+        pbar.update(1)
+    else:
+        for job in pbar[0].tasks:
+            if not job.finished:
+                pbar[0].advance(job.id)
+                formatted_desc = ""
+                past_length = 0
+                splits = [
+                    skipped_prefixes,
+                    attributed_sentences,
+                    unattributed_suffixes,
+                    skipped_suffixes,
+                ]
+                for split, color in zip(
+                    splits, ["grey58", "green", "orange1", "grey58"]
+                ):
+                    if split[job.id]:
+                        formatted_desc += f"[{color}]" + split[job.id] + "[/]"
+                        past_length += len(split[job.id])
+                        if past_length in whitespace_indexes[job.id]:
+                            formatted_desc += " "
+                            past_length += 1
+                pbar[0].update(job.id, description=formatted_desc, refresh=True)
+
+
+def close_progress_bar(
+    pbar: Union[tqdm, Tuple[Progress, Live], None], show: bool, pretty: bool
+) -> None:
+    if not show:
+        return
+    elif show and not pretty:
+        pbar.close()
+    else:
+        _, live = pbar
+        live.stop()

@@ -3,6 +3,8 @@ from typing import Any, Optional
 import torch
 from torchtyping import TensorType
 
+from .typing import AttributionOutputTensor, EmbeddingsTensor
+
 
 def remap_from_filtered(
     source: TensorType[..., Any],
@@ -18,9 +20,9 @@ def remap_from_filtered(
 
 
 def sum_normalize(
-    attributions: TensorType["batch_size", "seq_len", "hidden_size", float],
+    attributions: EmbeddingsTensor,
     dim_sum: Optional[int] = -1,
-) -> TensorType["batch_size", "seq_len", float]:
+) -> AttributionOutputTensor:
     """
     Sum and normalize tensor across dim_sum.
     """
@@ -31,7 +33,7 @@ def sum_normalize(
     return attributions
 
 
-def pretty_tensor(t: Optional[torch.Tensor]) -> str:
+def pretty_tensor(t: Optional[torch.Tensor] = None) -> str:
     if t is None:
         return "None"
     if len(t.shape) > 3 or any([x > 20 for x in t.shape]):

@@ -7,31 +7,25 @@ from itertools import dropwhile
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
-from torchtyping import TensorType
 
 from ..utils import pretty_list
+from ..utils.typing import (
+    AttributionOutputTensor,
+    DeltaOutputTensor,
+    OneOrMoreAttributionSequences,
+    OneOrMoreIdSequences,
+    OneOrMoreTokenSequences,
+    TextInput,
+)
 from .batch import Batch, BatchEncoding
 
-TextInput = Union[str, Sequence[str]]
-
-OneOrMoreIdSequences = Sequence[Sequence[int]]
-OneOrMoreTokenSequences = Sequence[Sequence[str]]
-OneOrMoreAttributionSequences = Sequence[Sequence[float]]
-
 FeatureAttributionInput = Union[TextInput, BatchEncoding, Batch]
-DeltaOutput = Type[TensorType["batch_size", float]]
-AttributionOutput = Type[TensorType["batch_size", "seq_len", float]]
 FeatureAttributionStepOutput = Union[
     Tuple[
-        AttributionOutput,
+        AttributionOutputTensor,
     ],
-    Tuple[AttributionOutput, DeltaOutput],
+    Tuple[AttributionOutputTensor, DeltaOutputTensor],
 ]
-
-# For Huggingface it's a string identifier e.g. "t5-base", "Helsinki-NLP/opus-mt-en-it"
-# For Fairseq it's a tuple of strings containing repo and model name
-# e.g. ("pytorch/fairseq", "transformer.wmt14.en-fr")
-ModelIdentifier = Union[str, Tuple[str, str]]
 
 
 @dataclass
@@ -66,8 +60,8 @@ class FeatureAttributionOutput:
 
     def set_attributions(
         self,
-        attributions: AttributionOutput,
-        delta: Optional[DeltaOutput] = None,
+        attributions: AttributionOutputTensor,
+        delta: Optional[DeltaOutputTensor] = None,
     ) -> None:
         attributions = attributions.detach().cpu().tolist()
         if delta is not None:
@@ -150,7 +144,11 @@ class FeatureAttributionSequenceOutput:
             + " ],\n"
             for src_attr in self.attributions
         ]
-        pretty_deltas = [f"{d:.2f}" if d > 0 else f"{d:.2f}" for d in self.deltas]
+        pretty_deltas = (
+            [f"{d:.2f}" if d > 0 else f"{d:.2f}" for d in self.deltas]
+            if self.deltas
+            else []
+        )
         return (
             f"{self.__class__.__name__}(\n"
             f"   source_tokens={pretty_list(self.source_tokens)},\n"

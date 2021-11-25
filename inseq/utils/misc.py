@@ -1,5 +1,6 @@
 from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Union
 
+import functools
 import logging
 import os
 import pickle
@@ -24,7 +25,7 @@ def pretty_list(l: Optional[Sequence[Any]]) -> str:
         return "None"
     elif (
         all([isinstance(x, list) for x in l])
-        and (len(l) > 3 or any([len(sl) > 20 for sl in l]))
+        and (len(l) > 4 or any([len(sl) > 20 for sl in l]))
     ) or len(l) > 20:
         return f"list with {len(l)} elements"
     return f"list with {len(l)} elements: {l}"
@@ -82,3 +83,25 @@ def ordinal_str(n: int):
     return str(n) + {1: "st", 2: "nd", 3: "rd"}.get(
         4 if 10 <= n % 100 < 20 else n % 10, "th"
     )
+
+
+def rgetattr(obj, attr, *args):
+    def _getattr(obj, attr):
+        return getattr(obj, attr, *args)
+
+    attr = attr.replace("[", ".").replace("]", "")
+    return functools.reduce(_getattr, [obj] + attr.split("."))
+
+
+def find_char_indexes(strings: Sequence[str], char: str = " "):
+    """Finds the indexes of a character in a list of strings."""
+    whitespace_indexes = []
+    for sent in strings:
+        idx = 0
+        curr_idxs = []
+        for token in sent.split(char):
+            idx += len(token)
+            curr_idxs.append(idx)
+            idx += 1
+        whitespace_indexes.append(curr_idxs)
+    return whitespace_indexes

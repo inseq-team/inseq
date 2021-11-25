@@ -1,35 +1,40 @@
-from typing import Any, List, NoReturn, Optional, Sequence, Tuple, Union, overload
+from typing import Any, List, Optional, Sequence, Tuple, Union, overload
 
+import logging
 from abc import ABC, abstractmethod
 
 import torch
-from torchtyping import TensorType
 
 from ..attr.feat.feature_attribution import FeatureAttribution
 from ..data import (
     BatchEncoding,
     FeatureAttributionSequenceOutput,
-    ModelIdentifier,
     OneOrMoreFeatureAttributionSequenceOutputs,
+)
+from ..utils import LengthMismatchError, MissingAttributionMethodError
+from ..utils.typing import (
+    ModelIdentifier,
     OneOrMoreIdSequences,
     OneOrMoreTokenSequences,
     TextInput,
+    VocabularyEmbeddingsTensor,
 )
-from ..utils import LengthMismatchError, MissingAttributionMethodError
 from .model_decorators import unhooked
+
+logger = logging.getLogger(__name__)
 
 
 class AttributionModel(ABC):
-    def __init__(self, attribution_method: Optional[str] = None, **kwargs) -> NoReturn:
+    def __init__(self, attribution_method: Optional[str] = None, **kwargs) -> None:
         if not hasattr(self, "model"):
             self.model = None
             self.model_name = None
         self.attribution_method = None
         self.is_hooked = False
-        self.attribution_method = self.get_attribution_method(attribution_method)
         self.setup(**kwargs)
+        self.attribution_method = self.get_attribution_method(attribution_method)
 
-    def setup(self, **kwargs) -> NoReturn:
+    def setup(self, **kwargs) -> None:
         """Move the model to device and in eval mode."""
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         if self.model:
@@ -93,6 +98,8 @@ class AttributionModel(ABC):
         override_default_method: Optional[bool] = False,
         attr_pos_start: Optional[int] = 1,
         attr_pos_end: Optional[int] = None,
+        show_progress: bool = True,
+        pretty_progress: bool = True,
         **kwargs,
     ) -> FeatureAttributionSequenceOutput:
         ...
@@ -106,6 +113,8 @@ class AttributionModel(ABC):
         override_default_method: Optional[bool] = False,
         attr_pos_start: Optional[int] = 1,
         attr_pos_end: Optional[int] = None,
+        show_progress: bool = True,
+        pretty_progress: bool = True,
         **kwargs,
     ) -> List[FeatureAttributionSequenceOutput]:
         ...
@@ -118,6 +127,8 @@ class AttributionModel(ABC):
         override_default_attribution: Optional[bool] = False,
         attr_pos_start: Optional[int] = 1,
         attr_pos_end: Optional[int] = None,
+        show_progress: bool = True,
+        pretty_progress: bool = True,
         **kwargs,
     ) -> OneOrMoreFeatureAttributionSequenceOutputs:
         """Perform attribution for one or multiple texts."""
@@ -130,6 +141,7 @@ class AttributionModel(ABC):
             reference_texts = self.generate(
                 texts, return_generation_output=False, **generation_args
             )
+        logger.debug(f"reference_texts={reference_texts}")
         attribution_method = self.get_attribution_method(
             method, override_default_attribution
         )
@@ -140,6 +152,8 @@ class AttributionModel(ABC):
             reference_texts,
             attr_pos_start=attr_pos_start,
             attr_pos_end=attr_pos_end,
+            show_progress=show_progress,
+            pretty_progress=pretty_progress,
             **attribution_args,
         )
 
@@ -174,6 +188,24 @@ class AttributionModel(ABC):
     ) -> OneOrMoreIdSequences:
         pass
 
+    @abstractmethod
+    def convert_tokens_to_string(
+        self,
+        tokens: OneOrMoreTokenSequences,
+        skip_special_tokens: Optional[bool] = True,
+    ) -> TextInput:
+        pass
+
+    @abstractmethod
+    def convert_string_to_tokens(
+        self, text: TextInput, skip_special_tokens: Optional[bool] = True
+    ) -> OneOrMoreTokenSequences:
+        pass
+
+    @property
+    def special_tokens(self) -> List[str]:
+        pass
+
     @property
     @abstractmethod
     def special_tokens_ids(self) -> List[int]:
@@ -181,7 +213,11 @@ class AttributionModel(ABC):
 
     @property
     @abstractmethod
-    def token_embeddings(self) -> TensorType["vocabulary", "embedding_size", float]:
+    def vocabulary_embeddings(self) -> VocabularyEmbeddingsTensor:
+        pass
+
+    @abstractmethod
+    def get_embedding_layer(self) -> torch.nn.Module:
         pass
 
 

@@ -28,16 +28,18 @@ from captum._utils.common import (
     _format_output,
     _is_tuple,
 )
-from captum._utils.typing import TargetType, TensorOrTupleOfTensorsGeneric
+from captum._utils.typing import BaselineType, TargetType, TensorOrTupleOfTensorsGeneric
 from captum.attr._core.integrated_gradients import IntegratedGradients
 from captum.attr._utils.batching import _batch_attribution
 from captum.attr._utils.common import _format_input, _reshape_and_sum
 from captum.log import log_usage
 from torch import Tensor
+from torchtyping import TensorType
 
 from ....data import BatchEmbedding
 from ....utils import INSEQ_ARTIFACTS_CACHE
-from .monotonic_path_builder import MonotonicPathBuilder, TokenEmbeddings
+from ....utils.typing import VocabularyEmbeddingsTensor
+from .monotonic_path_builder import MonotonicPathBuilder
 
 
 class DiscretetizedIntegratedGradients(IntegratedGradients):
@@ -52,7 +54,7 @@ class DiscretetizedIntegratedGradients(IntegratedGradients):
     def load_monotonic_path_builder(
         self,
         model_name: str,
-        token_embeddings: TokenEmbeddings,
+        vocabulary_embeddings: VocabularyEmbeddingsTensor,
         special_tokens: List[int],
         cache_dir: Path = INSEQ_ARTIFACTS_CACHE / "dig_knn",
         **kwargs,
@@ -60,7 +62,7 @@ class DiscretetizedIntegratedGradients(IntegratedGradients):
         """Loads the Discretized Integrated Gradients (DIG) path builder."""
         self.path_builder = MonotonicPathBuilder.load(
             model_name,
-            token_embeddings=token_embeddings,
+            vocabulary_embeddings=vocabulary_embeddings,
             special_tokens=special_tokens,
             cache_dir=cache_dir,
             **kwargs,
@@ -69,31 +71,19 @@ class DiscretetizedIntegratedGradients(IntegratedGradients):
     @log_usage()
     def attribute(  # type: ignore
         self,
-        inputs: BatchEmbedding,
+        inputs: TensorType["batch_size_x_n_steps", "seq_len", float],
         target: TargetType = None,
         additional_forward_args: Any = None,
         n_steps: int = 50,
-        strategy: str = "greedy",
         internal_batch_size: Union[None, int] = None,
         return_convergence_delta: bool = False,
     ) -> Union[
         TensorOrTupleOfTensorsGeneric, Tuple[TensorOrTupleOfTensorsGeneric, Tensor]
     ]:
-        scaled_features = self.path_builder.scale_inputs(
-            inputs.sources.input_ids,
-            inputs.sources.baseline_ids,
-            scale_steps=n_steps,
-            scale_strategy=strategy,
-        )
-        is_inputs_tuple = _is_tuple(scaled_features)
-        scaled_features_tpl = _format_input(scaled_features)
-        for el in scaled_features_tpl:
-            if type(el) == torch.Tensor:
-                print(el.shape)
-            else:
-                print(el)
-        num_examples = inputs.sources.input_ids.shape[0]
+        is_inputs_tuple = _is_tuple(inputs)
+        scaled_features_tpl = _format_input(inputs)
         if internal_batch_size is not None:
+            num_examples = inputs[0].shape[0] // n_steps
             attributions = _batch_attribution(
                 self,
                 num_examples,
@@ -110,13 +100,10 @@ class DiscretetizedIntegratedGradients(IntegratedGradients):
                 additional_forward_args=additional_forward_args,
                 n_steps=n_steps,
             )
-
         if return_convergence_delta:
             assert (
                 len(scaled_features_tpl) == 1
             ), "More than one tuple not supported in this code!"
-            # baselines, inputs (only works for one input, i.e. len(tuple) == 1)
-            print("Scaled features tpl", scaled_features_tpl[0].shape)
             start_point = _format_input(
                 torch.cat(
                     [
@@ -135,6 +122,7 @@ class DiscretetizedIntegratedGradients(IntegratedGradients):
                     dim=0,
                 )
             )
+            # fmt: on
             print("Attributions", attributions[0].shape)
             print("Start", start_point[0].shape)
             print("End", end_point[0].shape)
@@ -177,7 +165,7 @@ class DiscretetizedIntegratedGradients(IntegratedGradients):
             torch.cat([scaled_features[1:], scaled_features[-1].unsqueeze(0)])
             for scaled_features in scaled_features_tpl
         )
-        steps = list(
+        steps = tuple(
             shifted_inputs_tpl[i] - scaled_features_tpl[i]
             for i in range(len(shifted_inputs_tpl))
         )
