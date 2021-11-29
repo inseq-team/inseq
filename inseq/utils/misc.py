@@ -6,6 +6,8 @@ import numbers
 from contextlib import contextmanager
 from inspect import signature
 
+from torch import Tensor
+
 logger = logging.getLogger(__name__)
 
 
@@ -57,6 +59,31 @@ def pretty_list(l: Optional[Sequence[Any]], lpad: int = 8) -> str:
     if len(l) > 20:
         return out_txt
     return f"{out_txt}:{_pretty_list(l, lpad)}"
+
+
+def pretty_tensor(t: Optional[Tensor] = None, lpad: int = 8) -> str:
+    if t is None:
+        return "None"
+    if len(t.shape) > 3 or any([x > 20 for x in t.shape]):
+        return f"tensor of shape {list(t.shape)}"
+    else:
+        out_list = t.tolist()
+        out_list = (
+            _pretty_list(out_list, lpad) if isinstance(out_list, list) else out_list
+        )
+        return f"tensor of shape {list(t.shape)} : {out_list}"
+
+
+def pretty_dict(d: Dict[str, Any], lpad: int = 4) -> str:
+    out_txt = "{\n"
+    for k, v in d.items():
+        out_txt += f"{' ' * lpad}{k}: "
+        if isinstance(v, list):
+            out_txt += pretty_list(v, lpad + 4)
+        elif isinstance(v, Tensor):
+            out_txt += pretty_tensor(v)
+        out_txt += ",\n"
+    return out_txt + "}"
 
 
 def extract_signature_args(

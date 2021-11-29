@@ -14,6 +14,8 @@ from ..data import (
 from ..data.viz import LoadingMessage
 from ..utils import LengthMismatchError, MissingAttributionMethodError, isnotebook
 from ..utils.typing import (
+    EmbeddingsTensor,
+    IdsTensor,
     ModelIdentifier,
     OneOrMoreIdSequences,
     OneOrMoreTokenSequences,
@@ -163,6 +165,14 @@ class AttributionModel(ABC):
             **attribution_args,
         )
 
+    def embed(self, inputs: Union[TextInput, IdsTensor], as_targets: bool = False):
+        if isinstance(inputs, str) or (isinstance(inputs, list) and inputs[0] == str):
+            batch = self.encode_texts(inputs, as_targets)
+            inputs = batch.input_ids
+        if as_targets:
+            return self.decoder_embed_ids(inputs)
+        return self.encoder_embed_ids(inputs)
+
     @abstractmethod
     def score_func(self, **kwargs) -> torch.Tensor:
         pass
@@ -178,7 +188,17 @@ class AttributionModel(ABC):
         pass
 
     @abstractmethod
-    def encode_texts(self, texts: TextInput, *args) -> BatchEncoding:
+    def encode_texts(
+        self, texts: TextInput, as_targets: Optional[bool] = False, *args
+    ) -> BatchEncoding:
+        pass
+
+    @abstractmethod
+    def encoder_embed_ids(self, ids: IdsTensor) -> EmbeddingsTensor:
+        pass
+
+    @abstractmethod
+    def decoder_embed_ids(self, ids: IdsTensor) -> EmbeddingsTensor:
         pass
 
     @abstractmethod

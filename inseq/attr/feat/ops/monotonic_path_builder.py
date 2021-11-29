@@ -22,24 +22,24 @@ from typing import Any, List, Optional, Tuple, Union
 import logging
 import os
 from enum import Enum
+from itertools import islice
 from pathlib import Path
 
 import torch
+from joblib import Parallel, delayed
 from scipy.sparse import csr_matrix
 from sklearn.neighbors import kneighbors_graph
 from torchtyping import TensorType
 
 from ....utils import INSEQ_ARTIFACTS_CACHE, cache_results, euclidean_distance
-from ....utils.typing import VocabularyEmbeddingsTensor
+from ....utils.typing import MultiStepEmbeddingsTensor, VocabularyEmbeddingsTensor
 
 logger = logging.getLogger(__name__)
 
 
 class PathBuildingStrategies(Enum):
     GREEDY = "greedy"  # Based on the Euclidean distance between embeddings.
-    MAXCOUNT = (
-        "maxcount"  # Based on the number of monotonic dimensions already present.
-    )
+    MAXCOUNT = "maxcount"  # Based on the number of monotonic dimensions
 
 
 class UnknownPathBuildingStrategy(Exception):
@@ -75,7 +75,7 @@ class MonotonicPathBuilder:
         n_neighbors: int = 50,
         mode: str = "distance",
         n_jobs: int = -1,
-    ) -> Tuple[VocabularyEmbeddingsTensor, csr_matrix]:
+    ) -> csr_matrix:
         """
         Etiher loads or computes the knn graph for token embeddings.
         """
@@ -85,7 +85,7 @@ class MonotonicPathBuilder:
             mode=mode,
             n_jobs=n_jobs,
         )
-        return [vocabulary_embeddings, knn_graph]
+        return knn_graph
 
     @classmethod
     def load(
@@ -99,6 +99,7 @@ class MonotonicPathBuilder:
         cache_dir: Path = INSEQ_ARTIFACTS_CACHE / "path_knn",
         vocabulary_embeddings: Optional[VocabularyEmbeddingsTensor] = None,
         special_tokens: List[int] = [],
+        embedding_scaling: int = 1,
     ) -> "MonotonicPathBuilder":
         cache_filename = os.path.join(
             cache_dir, f"{model_name.replace('/', '__')}_{n_neighbors}.pkl"
@@ -108,8 +109,9 @@ class MonotonicPathBuilder:
                 "Since no token embeddings are passed, a cached file is expected. "
                 "If the file is not found, an exception will be raised."
             )
+        vocabulary_embeddings = vocabulary_embeddings * embedding_scaling
         # Cache parameters are passed to the cache_results decorator
-        [vocabulary_embeddings, knn_graph] = cls.compute_embeddings_knn(
+        knn_graph = cls.compute_embeddings_knn(
             cache_dir,
             cache_filename,
             save_cache,
@@ -127,23 +129,34 @@ class MonotonicPathBuilder:
         baseline_ids: TensorType["batch_size", "seq_len", int],
         n_steps: Optional[int] = None,
         scale_strategy: Optional[str] = None,
-    ) -> TensorType["batch_size_x_n_steps", "seq_len", float]:
+    ) -> MultiStepEmbeddingsTensor:
         """Generate paths required by DIG."""
         if n_steps is None:
             n_steps = 30
         if scale_strategy is None:
             scale_strategy = "greedy"
         get_word = lambda ids, seq, tok: int(ids[seq, tok])
+        word_paths_flat = Parallel(n_jobs=3, prefer="threads")(
+            delayed(self.find_path)(
+                get_word(input_ids, seq_idx, tok_idx),
+                get_word(baseline_ids, seq_idx, tok_idx),
+                n_steps=n_steps,
+                strategy=scale_strategy,
+            )
+            for seq_idx in range(input_ids.shape[0])
+            for tok_idx in range(input_ids.shape[1])
+        )
+        # Unflatten word paths
+        word_paths_iter = iter(word_paths_flat)
+        word_paths = [
+            list(islice(word_paths_iter, input_ids.shape[1]))
+            for _ in range(input_ids.shape[0])
+        ]
         # fmt: off
         return torch.cat([  # concat sequences on batch dimension
             torch.stack([  # out shape: n_steps x seq_len x hidden_size
                 self.build_monotonic_path_embedding(
-                    word_path=self.find_path(
-                        get_word(input_ids, seq_idx, tok_idx),
-                        get_word(baseline_ids, seq_idx, tok_idx),
-                        n_steps=n_steps,
-                        strategy=scale_strategy,
-                    ),
+                    word_path=word_paths[seq_idx][tok_idx],
                     baseline_idx=get_word(baseline_ids, seq_idx, tok_idx),
                     n_steps=n_steps,
                 ) for tok_idx in range(input_ids.shape[1])
@@ -159,11 +172,11 @@ class MonotonicPathBuilder:
         n_steps: Optional[int] = 30,
         strategy: Optional[str] = "greedy",
     ) -> List[int]:
-        word_path = [word_idx]
         # if word_idx is a special token copy it and return
         if word_idx in self.special_tokens:
-            return word_path * n_steps
-        for _ in range(n_steps - 1):
+            return [word_idx] * (n_steps - 1)
+        word_path = [word_idx]
+        for _ in range(n_steps - 2):
             word_path.append(
                 word_idx := self.get_closest_word(
                     word_idx=word_idx,
@@ -177,11 +190,10 @@ class MonotonicPathBuilder:
 
     def build_monotonic_path_embedding(
         self, word_path: List[int], baseline_idx: int, n_steps: int = 30
-    ) -> TensorType["batch_size_x_n_steps", "seq_len", float]:
-        print("Word path ids:", word_path)
+    ) -> TensorType["n_steps", "embed_size", float]:
         baseline_vec = self.vocabulary_embeddings[baseline_idx]
         monotonic_embs = [self.vocabulary_embeddings[word_path[0]]]
-        for idx in range(len(word_path) - 2):
+        for idx in range(len(word_path) - 1):
             monotonic_embs.append(
                 self.make_monotonic_vec(
                     anchor=self.vocabulary_embeddings[word_path[idx + 1]],

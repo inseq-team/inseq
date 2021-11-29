@@ -105,6 +105,8 @@ class HuggingfaceModel(AttributionModel):
         self.bos_token = self.tokenizer.convert_ids_to_tokens(self.bos_id)
         self.encoder_embed_scale = 1.0
         self.decoder_embed_scale = 1.0
+        self.encoder_int_embeds = None
+        self.decoder_int_embeds = None
         super().__init__(attribution_method, **kwargs)
 
     @classmethod
@@ -140,18 +142,19 @@ class HuggingfaceModel(AttributionModel):
             BatchEncoding: contains ids and attention masks.
         """
         with optional(as_targets, self.tokenizer.as_target_tokenizer()):
+            max_length = self.tokenizer.max_len_single_sentence
+            # Some tokenizer have weird values for max_len_single_sentence
+            # Cap length with max_model_input_sizes instead
+            if max_length > 1e6:
+                max_length = max(
+                    [v for _, v in self.tokenizer.max_model_input_sizes.items()]
+                )
             batch = self.tokenizer(
                 texts,
                 add_special_tokens=True,
                 padding=True,
                 truncation=True,
-                max_length=(
-                    self.tokenizer.max_len_single_sentence
-                    if self.tokenizer.max_len_single_sentence < 1e6
-                    else max(
-                        [v for _, v in self.tokenizer.max_model_input_sizes.items()]
-                    )
-                ),
+                max_length=max_length,
                 return_tensors="pt",
             )
         baseline_ids = None
@@ -249,7 +252,7 @@ class HuggingfaceModel(AttributionModel):
     def vocabulary_embeddings(self) -> VocabularyEmbeddingsTensor:
         return self.model.get_encoder().embed_tokens.weight
 
-    def encoder_embed(self, ids: IdsTensor) -> EmbeddingsTensor:
+    def encoder_embed_ids(self, ids: IdsTensor) -> EmbeddingsTensor:
         if self.encoder_int_embeds:
             embeddings = self.encoder_int_embeds.indices_to_embeddings(ids)
             return embeddings * self.encoder_embed_scale
@@ -257,12 +260,12 @@ class HuggingfaceModel(AttributionModel):
             embeddings = self.model.get_input_embeddings()
             return embeddings(ids) * self.encoder_embed_scale
 
-    def decoder_embed(self, ids: IdsTensor) -> EmbeddingsTensor:
+    def decoder_embed_ids(self, ids: IdsTensor) -> EmbeddingsTensor:
         if self.decoder_int_embeds:
             embeddings = self.decoder_int_embeds.indices_to_embeddings(ids)
             return embeddings * self.decoder_embed_scale
         else:
-            embeddings = self.model.get_decoder().get_input_embeddings()
+            embeddings = self.model.get_input_embeddings()
             return embeddings(ids) * self.encoder_embed_scale
 
     @overload

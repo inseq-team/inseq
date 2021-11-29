@@ -3,7 +3,6 @@ from typing import Any, Optional
 import torch
 from torchtyping import TensorType
 
-from .misc import _pretty_list
 from .typing import AttributionOutputTensor, EmbeddingsTensor
 
 
@@ -32,16 +31,6 @@ def sum_normalize(
     if len(attributions.shape) == 1:
         return attributions.unsqueeze(0)
     return attributions
-
-
-def pretty_tensor(t: Optional[torch.Tensor] = None) -> str:
-    if t is None:
-        return "None"
-    if len(t.shape) > 3 or any([x > 20 for x in t.shape]):
-        return f"tensor of shape {list(t.shape)}"
-    else:
-        out_list = t.tolist()
-        return f"tensor of shape {list(t.shape)}:{_pretty_list(out_list) if isinstance(out_list, list) else out_list}"
 
 
 def euclidean_distance(vec_a: torch.Tensor, vec_b: torch.Tensor) -> float:

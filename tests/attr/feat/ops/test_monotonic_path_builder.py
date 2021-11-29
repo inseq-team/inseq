@@ -1,10 +1,19 @@
-from typing import Tuple
+from typing import List, Tuple
+
+from itertools import islice
 
 import pytest
 import torch
+from joblib import Parallel, delayed
 
+import inseq
 from inseq.attr.feat.ops import MonotonicPathBuilder
 from inseq.utils import euclidean_distance
+
+
+@pytest.fixture(scope="session")
+def dig_model():
+    return inseq.load("Helsinki-NLP/opus-mt-de-en", "discretized_integrated_gradients")
 
 
 def original_monotonic(vec1, vec2, vec3):
@@ -96,3 +105,49 @@ def test_walrus_find_word_path(wrd_idx: int, n_steps: int) -> None:
     assert original_dummy_find_word_path(
         wrd_idx, n_steps
     ) == walrus_operator_find_word_path(wrd_idx, n_steps)
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize(
+    ("word_idx"),
+    [(0), (1), (735), (111), (10296)],
+)
+def test_scaled_monotonic_path_embeddings(word_idx: int, dig_model) -> None:
+    assert torch.allclose(
+        dig_model.embed(torch.tensor([word_idx])),
+        dig_model.attribution_method.method.path_builder.vocabulary_embeddings[
+            word_idx
+        ],
+    )
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize(
+    ("ids"),
+    [
+        (
+            [
+                [226, 1127, 499, 3, 1046, 24, 9, 387, 513, 49, 0],
+                [975, 444, 53, 360, 471, 4, 308, 19, 0, 58100, 58100],
+            ]
+        )
+    ],
+)
+def test_parallel_find_word(ids: List[List[int]], dig_model) -> None:
+    pathsa = []
+    for seq in ids:
+        tok_paths = []
+        for tok in seq:
+            tok_paths.append(
+                dig_model.attribution_method.method.path_builder.find_path(tok, 58100)
+            )
+        pathsa.append(tok_paths)
+
+    tmp_all = Parallel(n_jobs=3, prefer="threads")(
+        delayed(dig_model.attribution_method.method.path_builder.find_path)(tok, 58100)
+        for seq in ids
+        for tok in seq
+    )
+    elems = iter(tmp_all)
+    pathsb = [list(islice(elems, len(seq))) for seq in ids]
+    assert pathsa == pathsb

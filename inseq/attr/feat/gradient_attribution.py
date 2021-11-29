@@ -95,7 +95,6 @@ class GradientAttribution(FeatureAttribution, Registry):
                 of size `(batch_size)`, if the attribution step supports deltas and they are requested.
         """
         attribute_args = self.format_attribute_args(batch, target_ids, **kwargs)
-        logger.debug(f"attribute_args={attribute_args}")
         attr = self.method.attribute(**attribute_args)
         delta = None
         if (
@@ -104,7 +103,7 @@ class GradientAttribution(FeatureAttribution, Registry):
             and self.method.has_convergence_delta()
         ):
             attr, delta = attr
-        logger.debug(f"attributions prenorm: {attr}\n")
+        logger.debug(f"attributions prenorm: {pretty_tensor(attr)}\n")
         attr = sum_normalize(attr, dim_sum=-1)
         logger.debug(f"attributions: {pretty_tensor(attr)}\n" + "-" * 30)
         return (attr, delta) if delta is not None else attr
@@ -139,6 +138,7 @@ class DiscretizedIntegratedGradientsAttribution(GradientAttribution):
             self.attribution_model.model_name,
             vocabulary_embeddings=self.attribution_model.vocabulary_embeddings.detach(),
             special_tokens=self.attribution_model.special_tokens_ids,
+            embedding_scaling=self.attribution_model.encoder_embed_scale,
             **load_kwargs,
         )
         super().hook(**other_kwargs)

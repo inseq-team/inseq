@@ -224,14 +224,10 @@ class FeatureAttribution(Registry):
                 embeds = BatchEmbedding(None, None)
             else:
                 embeds = BatchEmbedding(
-                    input_embeds=self.attribution_model.encoder_embed(
-                        sources.input_ids
-                    ),
-                    baseline_embeds=self.attribution_model.encoder_embed(
-                        sources.baseline_ids
-                    ),
+                    input_embeds=self.attribution_model.embed(sources.input_ids),
+                    baseline_embeds=self.attribution_model.embed(sources.baseline_ids),
                 )
-            sources = Batch.from_encoding_embeds(sources, embeds)
+            sources = Batch(sources, embeds)
         if isinstance(targets, str) or isinstance(targets, list):
             targets: BatchEncoding = self.attribution_model.encode_texts(
                 targets,
@@ -242,14 +238,16 @@ class FeatureAttribution(Registry):
         if isinstance(targets, BatchEncoding):
             baseline_embeds = None
             if not self.is_layer_attribution:
-                baseline_embeds = self.attribution_model.decoder_embed(
-                    targets.baseline_ids
+                baseline_embeds = self.attribution_model.embed(
+                    targets.baseline_ids, as_targets=True
                 )
             target_embeds = BatchEmbedding(
-                input_embeds=self.attribution_model.decoder_embed(targets.input_ids),
+                input_embeds=self.attribution_model.embed(
+                    targets.input_ids, as_targets=True
+                ),
                 baseline_embeds=baseline_embeds,
             )
-            targets = Batch.from_encoding_embeds(targets, target_embeds)
+            targets = Batch(targets, target_embeds)
         return EncoderDecoderBatch(sources, targets)
 
     def attribute(
@@ -528,7 +526,9 @@ class FeatureAttribution(Registry):
         target_ids: TargetIdsTensor,
         **kwargs,
     ) -> Dict[str, Any]:
-        logger.debug(f"batch: {batch},\ntarget_ids: {pretty_tensor(target_ids)}")
+        logger.debug(
+            f"batch: {batch},\ntarget_ids: {pretty_tensor(target_ids, lpad=4)}"
+        )
         # For now only encoder attribution is supported
         if self.is_layer_attribution:
             inputs = batch.sources.input_ids

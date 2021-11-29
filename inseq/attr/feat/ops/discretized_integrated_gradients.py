@@ -34,10 +34,9 @@ from captum.attr._utils.batching import _batch_attribution
 from captum.attr._utils.common import _format_input, _reshape_and_sum
 from captum.log import log_usage
 from torch import Tensor
-from torchtyping import TensorType
 
 from ....utils import INSEQ_ARTIFACTS_CACHE
-from ....utils.typing import VocabularyEmbeddingsTensor
+from ....utils.typing import MultiStepEmbeddingsTensor, VocabularyEmbeddingsTensor
 from .monotonic_path_builder import MonotonicPathBuilder
 
 
@@ -56,6 +55,7 @@ class DiscretetizedIntegratedGradients(IntegratedGradients):
         vocabulary_embeddings: VocabularyEmbeddingsTensor,
         special_tokens: List[int],
         cache_dir: Path = INSEQ_ARTIFACTS_CACHE / "dig_knn",
+        embedding_scaling: int = 1,
         **kwargs,
     ) -> None:
         """Loads the Discretized Integrated Gradients (DIG) path builder."""
@@ -64,13 +64,14 @@ class DiscretetizedIntegratedGradients(IntegratedGradients):
             vocabulary_embeddings=vocabulary_embeddings,
             special_tokens=special_tokens,
             cache_dir=cache_dir,
+            embedding_scaling=embedding_scaling,
             **kwargs,
         )
 
     @log_usage()
     def attribute(  # type: ignore
         self,
-        inputs: TensorType["batch_size_x_n_steps", "seq_len", float],
+        inputs: MultiStepEmbeddingsTensor,
         target: TargetType = None,
         additional_forward_args: Any = None,
         n_steps: int = 50,
@@ -79,10 +80,10 @@ class DiscretetizedIntegratedGradients(IntegratedGradients):
     ) -> Union[
         TensorOrTupleOfTensorsGeneric, Tuple[TensorOrTupleOfTensorsGeneric, Tensor]
     ]:
+        num_examples = inputs.shape[0] // n_steps
         is_inputs_tuple = _is_tuple(inputs)
         scaled_features_tpl = _format_input(inputs)
         if internal_batch_size is not None:
-            num_examples = inputs[0].shape[0] // n_steps
             attributions = _batch_attribution(
                 self,
                 num_examples,
@@ -122,9 +123,6 @@ class DiscretetizedIntegratedGradients(IntegratedGradients):
                 )
             )
             # fmt: on
-            print("Attributions", attributions[0].shape)
-            print("Start", start_point[0].shape)
-            print("End", end_point[0].shape)
             # computes approximation error based on the completeness axiom
             delta = self.compute_convergence_delta(
                 attributions,

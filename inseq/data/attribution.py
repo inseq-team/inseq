@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
 
-from ..utils import pretty_list
+from ..utils import pretty_dict
 from ..utils.typing import (
     AttributionOutputTensor,
     DeltaOutputTensor,
@@ -40,18 +40,7 @@ class FeatureAttributionOutput:
     target_tokens: Optional[OneOrMoreTokenSequences] = None
 
     def __str__(self):
-        return (
-            f"{self.__class__.__name__}(\n"
-            f"    source_tokens={pretty_list(self.source_tokens)},\n"
-            f"    prefix_tokens={pretty_list(self.prefix_tokens)},\n"
-            f"    target_tokens={pretty_list(self.target_tokens)},\n"
-            f"    source_ids={pretty_list(self.source_ids)},\n"
-            f"    prefix_ids={pretty_list(self.prefix_ids)},\n"
-            f"    target_ids={pretty_list(self.target_ids)},\n"
-            f"    attributions={pretty_list(self.attributions)},\n"
-            f"    delta={self.delta},\n"
-            ")"
-        )
+        return f"{self.__class__.__name__}({pretty_dict(self.__dict__)}"
 
     def set_attributions(
         self,
@@ -132,16 +121,7 @@ class FeatureAttributionSequenceOutput:
     deltas: Optional[List[float]] = None
 
     def __str__(self):
-        return (
-            f"{self.__class__.__name__}(\n"
-            f"    source_tokens={pretty_list(self.source_tokens)},\n"
-            f"    target_tokens={pretty_list(self.target_tokens)},\n"
-            f"    source_ids={pretty_list(self.source_ids)},\n"
-            f"    target_ids={pretty_list(self.target_ids)},\n"
-            f"    attributions={pretty_list(self.attributions)},\n"
-            f"    deltas={pretty_list(self.deltas)},\n"
-            ")"
-        )
+        return f"{self.__class__.__name__}({pretty_dict(self.__dict__)})"
 
     @classmethod
     def from_attributions(

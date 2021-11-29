@@ -9,16 +9,13 @@ from .misc import (
     find_char_indexes,
     isnotebook,
     optional,
+    pretty_dict,
     pretty_list,
+    pretty_tensor,
     rgetattr,
 )
 from .registry import Registry
-from .torch_utils import (
-    euclidean_distance,
-    pretty_tensor,
-    remap_from_filtered,
-    sum_normalize,
-)
+from .torch_utils import euclidean_distance, remap_from_filtered, sum_normalize
 
 __all__ = [
     "LengthMismatchError",
@@ -27,11 +24,12 @@ __all__ = [
     "cache_results",
     "optional",
     "pretty_list",
+    "pretty_tensor",
+    "pretty_dict",
     "rgetattr",
     "isnotebook",
     "find_char_indexes",
     "extract_signature_args",
-    "pretty_tensor",
     "remap_from_filtered",
     "sum_normalize",
     "euclidean_distance",

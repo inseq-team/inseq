@@ -1,7 +1,7 @@
 import pytest
 import torch
 
-from inseq.utils.torch_utils import pretty_tensor
+from inseq.utils.misc import pretty_tensor
 
 
 @pytest.mark.parametrize(
