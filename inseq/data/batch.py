@@ -61,9 +61,7 @@ class BatchEncoding:
         ids_shape = self.input_ids.shape[1:]
         active_mask = mask.bool()
         active_input_ids = self.input_ids.masked_select(active_mask)
-        active_input_tokens = [
-            seq for i, seq in enumerate(self.input_tokens) if active_mask.tolist()[i]
-        ]
+        active_input_tokens = [seq for i, seq in enumerate(self.input_tokens) if active_mask.tolist()[i]]
         active_attention_mask = self.attention_mask.masked_select(active_mask)
         active_baseline_ids = None
         if self.baseline_ids is not None:
@@ -86,12 +84,8 @@ class BatchEmbedding:
 
     def __getitem__(self, subscript: Union[slice, int]) -> "BatchEmbedding":
         return BatchEmbedding(
-            self.input_embeds[:, subscript, :]
-            if self.input_embeds is not None
-            else None,
-            self.baseline_embeds[:, subscript, :]
-            if self.baseline_embeds is not None
-            else None,
+            self.input_embeds[:, subscript, :] if self.input_embeds is not None else None,
+            self.baseline_embeds[:, subscript, :] if self.baseline_embeds is not None else None,
         )
 
     def to(self, device: str) -> Union[NoReturn, "BatchEmbedding"]:
@@ -115,14 +109,10 @@ class BatchEmbedding:
         active_mask_embeds = mask.unsqueeze(-1).bool()
         if self.input_embeds is not None:
             embeds_shape = self.input_embeds.shape[1:]
-            active_input_embeds = self.input_embeds.masked_select(
-                active_mask_embeds
-            ).reshape(-1, *embeds_shape)
+            active_input_embeds = self.input_embeds.masked_select(active_mask_embeds).reshape(-1, *embeds_shape)
         if self.baseline_embeds is not None:
             embeds_shape = self.baseline_embeds.shape[1:]
-            active_baseline_embeds = self.baseline_embeds.masked_select(
-                active_mask_embeds
-            ).reshape(-1, *embeds_shape)
+            active_baseline_embeds = self.baseline_embeds.masked_select(active_mask_embeds).reshape(-1, *embeds_shape)
         return BatchEmbedding(active_input_embeds, active_baseline_embeds)
 
     def __str__(self):
@@ -135,13 +125,9 @@ class Batch:
     embedding: BatchEmbedding
 
     def __getitem__(self, subscript: Union[slice, int]) -> "Batch":
-        return Batch(
-            encoding=self.encoding[subscript], embedding=self.embedding[subscript]
-        )
+        return Batch(encoding=self.encoding[subscript], embedding=self.embedding[subscript])
 
-    def to(
-        self, device: str, inplace: Optional[bool] = False
-    ) -> Union[NoReturn, "Batch"]:
+    def to(self, device: str, inplace: Optional[bool] = False) -> Union[NoReturn, "Batch"]:
         if inplace:
             self.encoding.to(device),
             self.embedding.to(device)
@@ -236,20 +222,14 @@ class EncoderDecoderBatch:
     targets: Batch
 
     def __getitem__(self, subscript: Union[slice, int]) -> "EncoderDecoderBatch":
-        return EncoderDecoderBatch(
-            sources=self.sources, targets=self.targets[subscript]
-        )
+        return EncoderDecoderBatch(sources=self.sources, targets=self.targets[subscript])
 
-    def to(
-        self, device: str, inplace: Optional[bool] = False
-    ) -> Union[NoReturn, "EncoderDecoderBatch"]:
+    def to(self, device: str, inplace: Optional[bool] = False) -> Union[NoReturn, "EncoderDecoderBatch"]:
         if inplace:
             self.sources.to(device),
             self.targets.to(device)
         else:
-            return EncoderDecoderBatch(
-                sources=self.sources.to(device), targets=self.targets.to(device)
-            )
+            return EncoderDecoderBatch(sources=self.sources.to(device), targets=self.targets.to(device))
 
     def select_active(
         self, mask: TensorType["batch_size", 1, int], inplace: Optional[bool] = False
@@ -264,16 +244,9 @@ class EncoderDecoderBatch:
             )
 
     def clone(self) -> "EncoderDecoderBatch":
-        return EncoderDecoderBatch(
-            sources=self.sources.clone(), targets=self.targets.clone()
-        )
+        return EncoderDecoderBatch(sources=self.sources.clone(), targets=self.targets.clone())
 
     def __str__(self):
         source_str = str(self.sources).replace("\n", "\n    ")
         target_str = str(self.targets).replace("\n", "\n    ")
-        return (
-            f"{self.__class__.__name__}(\n"
-            f"    sources={source_str},\n"
-            f"    targets={target_str}\n"
-            ")"
-        )
+        return f"{self.__class__.__name__}(\n" f"    sources={source_str},\n" f"    targets={target_str}\n" ")"

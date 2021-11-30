@@ -34,6 +34,7 @@ from torchtyping import TensorType
 from ....utils import INSEQ_ARTIFACTS_CACHE, cache_results, euclidean_distance
 from ....utils.typing import MultiStepEmbeddingsTensor, VocabularyEmbeddingsTensor
 
+
 logger = logging.getLogger(__name__)
 
 
@@ -101,9 +102,7 @@ class MonotonicPathBuilder:
         special_tokens: List[int] = [],
         embedding_scaling: int = 1,
     ) -> "MonotonicPathBuilder":
-        cache_filename = os.path.join(
-            cache_dir, f"{model_name.replace('/', '__')}_{n_neighbors}.pkl"
-        )
+        cache_filename = os.path.join(cache_dir, f"{model_name.replace('/', '__')}_{n_neighbors}.pkl")
         if vocabulary_embeddings is None:
             logger.warning(
                 "Since no token embeddings are passed, a cached file is expected. "
@@ -148,10 +147,7 @@ class MonotonicPathBuilder:
         )
         # Unflatten word paths
         word_paths_iter = iter(word_paths_flat)
-        word_paths = [
-            list(islice(word_paths_iter, input_ids.shape[1]))
-            for _ in range(input_ids.shape[0])
-        ]
+        word_paths = [list(islice(word_paths_iter, input_ids.shape[1])) for _ in range(input_ids.shape[0])]
         # fmt: off
         return torch.cat([  # concat sequences on batch dimension
             torch.stack([  # out shape: n_steps x seq_len x hidden_size
@@ -224,18 +220,14 @@ class MonotonicPathBuilder:
         # ignore anchor word if equals the baseline (padding, special tokens)
         # remove words that are already selected in the path
         anchor_map = {
-            anchor_idx: self.get_word_distance(
-                strategy, anchor_idx, baseline_idx, word_idx, n_steps
-            )
+            anchor_idx: self.get_word_distance(strategy, anchor_idx, baseline_idx, word_idx, n_steps)
             for anchor_idx in cx.col
             if anchor_idx not in word_path + [baseline_idx]
         }
         if len(anchor_map) == 0:
             return baseline_idx
         # return the top key
-        return [k for k, _ in sorted(anchor_map.items(), key=lambda pair: pair[1])].pop(
-            0
-        )
+        return [k for k, _ in sorted(anchor_map.items(), key=lambda pair: pair[1])].pop(0)
 
     def get_word_distance(
         self,
@@ -253,9 +245,7 @@ class MonotonicPathBuilder:
                 self.vocabulary_embeddings[original_idx],
                 n_steps,
             )
-            return euclidean_distance(
-                self.vocabulary_embeddings[anchor_idx], monotonic_vec
-            )
+            return euclidean_distance(self.vocabulary_embeddings[anchor_idx], monotonic_vec)
         elif strategy == PathBuildingStrategies.MAXCOUNT.value:
             # count the number of non-monotonic dimensions
             monotonic_dims = self.get_monotonic_dims(
@@ -292,9 +282,9 @@ class MonotonicPathBuilder:
             return anchor
         # make the anchor monotonic
         monotonic_vec = anchor.clone()
-        monotonic_vec[non_monotonic_dims] = input[non_monotonic_dims] - (
-            1.0 / n_steps
-        ) * (input[non_monotonic_dims] - baseline[non_monotonic_dims])
+        monotonic_vec[non_monotonic_dims] = input[non_monotonic_dims] - (1.0 / n_steps) * (
+            input[non_monotonic_dims] - baseline[non_monotonic_dims]
+        )
         return monotonic_vec
 
     @staticmethod

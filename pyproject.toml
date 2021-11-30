@@ -80,7 +80,7 @@ sphinx-rtd-theme = "^1.0.0"
 [tool.black]
 # https://github.com/psf/black
 target-version = ["py38"]
-line-length = 88
+line-length = 119
 color = true
 
 exclude = '''
@@ -102,7 +102,7 @@ exclude = '''
 [tool.isort]
 # https://github.com/timothycrosley/isort/
 py_version = 38
-line_length = 88
+line_length = 119
 
 known_typing = ["typing", "types", "typing_extensions", "mypy", "mypy_extensions"]
 sections = ["FUTURE", "TYPING", "STDLIB", "THIRDPARTY", "FIRSTPARTY", "LOCALFOLDER"]
@@ -111,6 +111,11 @@ profile = "black"
 multi_line_output = 3
 indent = 4
 color_output = true
+lines_after_imports = 2
+use_parentheses = true
+known_first_party = "inseq"
+force_grid_wrap = 0
+ensure_newline_before_comments = true
 
 [tool.mypy]
 # https://mypy.readthedocs.io/en/latest/config_file.html#using-a-pyproject-toml-file

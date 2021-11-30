@@ -48,6 +48,7 @@ from ...utils import (
 from ...utils.typing import ModelIdentifier, TargetIdsTensor
 from ..attribution_decorators import set_hook, unset_hook
 
+
 logger = logging.getLogger(__name__)
 
 
@@ -216,9 +217,7 @@ class FeatureAttribution(Registry):
                 depending on the number of inputs.
         """
         if isinstance(sources, str) or isinstance(sources, list):
-            sources: BatchEncoding = self.attribution_model.encode_texts(
-                sources, return_baseline=True
-            )
+            sources: BatchEncoding = self.attribution_model.encode_texts(sources, return_baseline=True)
         if isinstance(sources, BatchEncoding):
             if self.is_layer_attribution:
                 embeds = BatchEmbedding(None, None)
@@ -238,13 +237,9 @@ class FeatureAttribution(Registry):
         if isinstance(targets, BatchEncoding):
             baseline_embeds = None
             if not self.is_layer_attribution:
-                baseline_embeds = self.attribution_model.embed(
-                    targets.baseline_ids, as_targets=True
-                )
+                baseline_embeds = self.attribution_model.embed(targets.baseline_ids, as_targets=True)
             target_embeds = BatchEmbedding(
-                input_embeds=self.attribution_model.embed(
-                    targets.input_ids, as_targets=True
-                ),
+                input_embeds=self.attribution_model.embed(targets.input_ids, as_targets=True),
                 baseline_embeds=baseline_embeds,
             )
             targets = Batch(targets, target_embeds)
@@ -301,13 +296,9 @@ class FeatureAttribution(Registry):
             target_sentences = [target_sentences]
         whitespace_indexes = find_char_indexes(target_sentences, " ")
         tokenized_target_sentences = [
-            self.attribution_model.convert_string_to_tokens(sent, as_targets=True)
-            for sent in target_sentences
+            self.attribution_model.convert_string_to_tokens(sent, as_targets=True) for sent in target_sentences
         ]
-        lengths = [
-            min(attr_pos_end, len(tts) + 1) - attr_pos_start
-            for tts in tokenized_target_sentences
-        ]
+        lengths = [min(attr_pos_end, len(tts) + 1) - attr_pos_start for tts in tokenized_target_sentences]
         targets = zip(source_sentences, target_sentences, lengths)
         pbar = get_progress_bar(
             target_sentences=list(targets),
@@ -331,18 +322,10 @@ class FeatureAttribution(Registry):
                 )
             )
             if pretty_progress:
-                skipped_prefixes = tok2string(
-                    batch.targets.input_tokens, end=attr_pos_start
-                )
-                attributed_sentences = tok2string(
-                    batch.targets.input_tokens, attr_pos_start, step + 1
-                )
-                unattributed_suffixes = tok2string(
-                    batch.targets.input_tokens, step + 1, attr_pos_end
-                )
-                skipped_suffixes = tok2string(
-                    batch.targets.input_tokens, start=attr_pos_end
-                )
+                skipped_prefixes = tok2string(batch.targets.input_tokens, end=attr_pos_start)
+                attributed_sentences = tok2string(batch.targets.input_tokens, attr_pos_start, step + 1)
+                unattributed_suffixes = tok2string(batch.targets.input_tokens, step + 1, attr_pos_end)
+                skipped_suffixes = tok2string(batch.targets.input_tokens, start=attr_pos_end)
                 update_progress_bar(
                     pbar,
                     skipped_prefixes,
@@ -356,9 +339,7 @@ class FeatureAttribution(Registry):
             else:
                 update_progress_bar(pbar, show=show_progress, pretty=pretty_progress)
         close_progress_bar(pbar, show=show_progress, pretty=pretty_progress)
-        sequence_attribution = FeatureAttributionSequenceOutput.from_attributions(
-            attribution_outputs
-        )
+        sequence_attribution = FeatureAttributionSequenceOutput.from_attributions(attribution_outputs)
         if output_step_attributions:
             return sequence_attribution, attribution_outputs
         return sequence_attribution
@@ -434,9 +415,7 @@ class FeatureAttribution(Registry):
         )
         # Perform attribution step
         step_output = self.attribute_step(batch, target_ids.squeeze(), **kwargs)
-        attributions, deltas = (
-            step_output if isinstance(step_output, tuple) else (step_output, None)
-        )
+        attributions, deltas = step_output if isinstance(step_output, tuple) else (step_output, None)
         # Reinsert finished sentences
         if target_attention_mask is not None and orig_target_ids.shape[0] > 1:
             attributions = remap_from_filtered(
@@ -456,9 +435,7 @@ class FeatureAttribution(Registry):
 
     def get_attribution_args(self, **kwargs):
         if hasattr(self, "method") and hasattr(self.method, "attribute"):
-            return extract_signature_args(
-                kwargs, self.method.attribute, self.ignore_extra_args
-            )
+            return extract_signature_args(kwargs, self.method.attribute, self.ignore_extra_args)
         return {}
 
     def make_attribution_output(
@@ -482,16 +459,12 @@ class FeatureAttribution(Registry):
             :class:`~inseq.data.FeatureAttributionOutput`: The enriched attribution output.
         """
         source_tokens = [
-            [tok for tok in seq if tok != self.attribution_model.pad_token]
-            for seq in batch.sources.input_tokens
+            [tok for tok in seq if tok != self.attribution_model.pad_token] for seq in batch.sources.input_tokens
         ]
         prefix_tokens = [
-            [tok for tok in seq if tok != self.attribution_model.pad_token]
-            for seq in batch.targets.input_tokens
+            [tok for tok in seq if tok != self.attribution_model.pad_token] for seq in batch.targets.input_tokens
         ]
-        target_tokens = self.attribution_model.convert_ids_to_tokens(
-            target_ids, skip_special_tokens=False
-        )
+        target_tokens = self.attribution_model.convert_ids_to_tokens(target_ids, skip_special_tokens=False)
         source_ids = self.attribution_model.convert_tokens_to_ids(source_tokens)
         prefix_ids = self.attribution_model.convert_tokens_to_ids(prefix_tokens)
         attributions = step_output[0].detach().cpu().tolist()
@@ -524,9 +497,7 @@ class FeatureAttribution(Registry):
         target_ids: TargetIdsTensor,
         **kwargs,
     ) -> Dict[str, Any]:
-        logger.debug(
-            f"batch: {batch},\ntarget_ids: {pretty_tensor(target_ids, lpad=4)}"
-        )
+        logger.debug(f"batch: {batch},\ntarget_ids: {pretty_tensor(target_ids, lpad=4)}")
         # For now only encoder attribution is supported
         if self.is_layer_attribution:
             inputs = batch.sources.input_ids

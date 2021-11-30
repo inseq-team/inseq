@@ -1,9 +1,5 @@
 from .cache import INSEQ_ARTIFACTS_CACHE, INSEQ_HOME_CACHE, cache_results
-from .errors import (
-    LengthMismatchError,
-    MissingAttributionMethodError,
-    UnknownAttributionMethodError,
-)
+from .errors import LengthMismatchError, MissingAttributionMethodError, UnknownAttributionMethodError
 from .misc import (
     extract_signature_args,
     find_char_indexes,
@@ -16,6 +12,7 @@ from .misc import (
 )
 from .registry import Registry
 from .torch_utils import euclidean_distance, remap_from_filtered, sum_normalize
+
 
 __all__ = [
     "LengthMismatchError",

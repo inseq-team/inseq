@@ -41,10 +41,7 @@ from ..utils.viz_utils import (
     saliency_heatmap_table_header,
     sanitize_html,
 )
-from .attribution import (
-    FeatureAttributionSequenceOutput,
-    OneOrMoreFeatureAttributionSequenceOutputs,
-)
+from .attribution import FeatureAttributionSequenceOutput, OneOrMoreFeatureAttributionSequenceOutputs
 
 
 def show_attributions(
@@ -136,10 +133,7 @@ def get_progress_bar(
             BarColumn(),
             TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
         )
-        _ = [
-            job_progress.add_task(tgt, total=tgt_len)
-            for _, tgt, tgt_len in target_sentences
-        ]
+        _ = [job_progress.add_task(tgt, total=tgt_len) for _, tgt, tgt_len in target_sentences]
         progress_table = Table.grid()
         progress_table.add_row(
             Panel.fit(
@@ -186,9 +180,7 @@ def update_progress_bar(
                     unattributed_suffixes,
                     skipped_suffixes,
                 ]
-                for split, color in zip(
-                    splits, ["grey58", "green", "orange1", "grey58"]
-                ):
+                for split, color in zip(splits, ["grey58", "green", "orange1", "grey58"]):
                     if split[job.id]:
                         formatted_desc += f"[{color}]" + split[job.id] + "[/]"
                         past_length += len(split[job.id])
@@ -198,9 +190,7 @@ def update_progress_bar(
                 pbar[0].update(job.id, description=formatted_desc, refresh=True)
 
 
-def close_progress_bar(
-    pbar: Union[tqdm, Tuple[Progress, Live], None], show: bool, pretty: bool
-) -> None:
+def close_progress_bar(pbar: Union[tqdm, Tuple[Progress, Live], None], show: bool, pretty: bool) -> None:
     if not show:
         return
     elif show and not pretty:
@@ -211,9 +201,7 @@ def close_progress_bar(
 
 
 class LoadingMessage:
-    def __init__(
-        self, msg, spinner="dots", style="green", padding=(1, 0, 1, 0), verbose=True
-    ):
+    def __init__(self, msg, spinner="dots", style="green", padding=(1, 0, 1, 0), verbose=True):
         self.msg = msg
         self.spinner = spinner
         self.style = style

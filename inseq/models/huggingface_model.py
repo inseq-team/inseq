@@ -5,18 +5,10 @@ import logging
 import warnings
 
 import torch
-from captum.attr import (
-    configure_interpretable_embedding_layer,
-    remove_interpretable_embedding_layer,
-)
+from captum.attr import configure_interpretable_embedding_layer, remove_interpretable_embedding_layer
 from torch import long
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
-from transformers.generation_utils import (
-    BeamSampleOutput,
-    BeamSearchOutput,
-    GreedySearchOutput,
-    SampleOutput,
-)
+from transformers.generation_utils import BeamSampleOutput, BeamSearchOutput, GreedySearchOutput, SampleOutput
 
 from ..data import BatchEncoding
 from ..utils import optional, pretty_tensor
@@ -31,6 +23,7 @@ from ..utils.typing import (
 )
 from .attribution_model import AttributionModel
 from .model_decorators import unhooked
+
 
 logger = logging.getLogger(__name__)
 logging.getLogger("urllib3").setLevel(logging.WARNING)
@@ -91,12 +84,8 @@ class HuggingfaceModel(AttributionModel):
         model_kwargs = kwargs.pop("model_kwargs", {})
         tokenizer_inputs = kwargs.pop("tokenizer_inputs", {})
         tokenizer_kwargs = kwargs.pop("tokenizer_kwargs", {})
-        self.model = AutoModelForSeq2SeqLM.from_pretrained(
-            model_name_or_path, *model_args, **model_kwargs
-        )
-        self.tokenizer = AutoTokenizer.from_pretrained(
-            tokenizer_name_or_path, *tokenizer_inputs, **tokenizer_kwargs
-        )
+        self.model = AutoModelForSeq2SeqLM.from_pretrained(model_name_or_path, *model_args, **model_kwargs)
+        self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_name_or_path, *tokenizer_inputs, **tokenizer_kwargs)
         self.model_name = self.model.config.name_or_path
         self.pad_id = self.model.config.pad_token_id
         self.eos_id = self.model.config.eos_token_id
@@ -209,9 +198,7 @@ class HuggingfaceModel(AttributionModel):
             # Some tokenizer have weird values for max_len_single_sentence
             # Cap length with max_model_input_sizes instead
             if max_length > 1e6:
-                max_length = max(
-                    [v for _, v in self.tokenizer.max_model_input_sizes.items()]
-                )
+                max_length = max([v for _, v in self.tokenizer.max_model_input_sizes.items()])
             batch = self.tokenizer(
                 texts,
                 add_special_tokens=True,
@@ -225,21 +212,15 @@ class HuggingfaceModel(AttributionModel):
             baseline_ids = batch["input_ids"].ne(self.eos_id).long() * self.pad_id
         # We prepend a BOS token only when tokenizing target texts.
         if as_targets and prepend_bos_token:
-            ones_mask = torch.ones(
-                (batch["input_ids"].shape[0], 1), device=self.device, dtype=long
-            )
-            batch["attention_mask"] = torch.cat(
-                (ones_mask, batch["attention_mask"]), dim=1
-            )
+            ones_mask = torch.ones((batch["input_ids"].shape[0], 1), device=self.device, dtype=long)
+            batch["attention_mask"] = torch.cat((ones_mask, batch["attention_mask"]), dim=1)
             bos_ids = ones_mask * self.bos_id
             batch["input_ids"] = torch.cat((bos_ids, batch["input_ids"]), dim=1)
             if return_baseline:
                 baseline_ids = torch.cat((bos_ids, baseline_ids), dim=1)
         return BatchEncoding(
             input_ids=batch["input_ids"].to(self.device),
-            input_tokens=[
-                self.tokenizer.convert_ids_to_tokens(x) for x in batch["input_ids"]
-            ],
+            input_tokens=[self.tokenizer.convert_ids_to_tokens(x) for x in batch["input_ids"]],
             attention_mask=batch["attention_mask"].to(self.device),
             baseline_ids=baseline_ids,
         )
@@ -264,22 +245,15 @@ class HuggingfaceModel(AttributionModel):
         self, ids: IdsTensor, skip_special_tokens: Optional[bool] = True
     ) -> OneOrMoreTokenSequences:
         if len(ids.shape) < 2:
-            return self.tokenizer.convert_ids_to_tokens(
-                ids, skip_special_tokens=skip_special_tokens
-            )
+            return self.tokenizer.convert_ids_to_tokens(ids, skip_special_tokens=skip_special_tokens)
         return [
-            self.tokenizer.convert_ids_to_tokens(
-                id_slice, skip_special_tokens=skip_special_tokens
-            )
-            for id_slice in ids
+            self.tokenizer.convert_ids_to_tokens(id_slice, skip_special_tokens=skip_special_tokens) for id_slice in ids
         ]
 
     def convert_tokens_to_ids(self, tokens: TextInput) -> OneOrMoreIdSequences:
         if isinstance(tokens[0], str):
             return self.tokenizer.convert_tokens_to_ids(tokens)
-        return [
-            self.tokenizer.convert_tokens_to_ids(token_slice) for token_slice in tokens
-        ]
+        return [self.tokenizer.convert_tokens_to_ids(token_slice) for token_slice in tokens]
 
     def convert_tokens_to_string(
         self,
@@ -293,16 +267,11 @@ class HuggingfaceModel(AttributionModel):
             tmp_decode_state = self.tokenizer._decode_use_source_tokenizer
             self.tokenizer._decode_use_source_tokenizer = not as_targets
             out_strings = self.tokenizer.convert_tokens_to_string(
-                tokens
-                if not skip_special_tokens
-                else [t for t in tokens if t not in self.special_tokens]
+                tokens if not skip_special_tokens else [t for t in tokens if t not in self.special_tokens]
             )
             self.tokenizer._decode_use_source_tokenizer = tmp_decode_state
             return out_strings
-        return [
-            self.convert_tokens_to_string(token_slice, skip_special_tokens, as_targets)
-            for token_slice in tokens
-        ]
+        return [self.convert_tokens_to_string(token_slice, skip_special_tokens, as_targets) for token_slice in tokens]
 
     def convert_string_to_tokens(
         self,
@@ -314,10 +283,7 @@ class HuggingfaceModel(AttributionModel):
             with optional(as_targets, self.tokenizer.as_target_tokenizer()):
                 ids = self.tokenizer(text)["input_ids"]
             return self.tokenizer.convert_ids_to_tokens(ids, skip_special_tokens)
-        return [
-            self.convert_string_to_tokens(t, skip_special_tokens, as_targets)
-            for t in text
-        ]
+        return [self.convert_string_to_tokens(t, skip_special_tokens, as_targets) for t in text]
 
     @property
     def special_tokens(self) -> List[str]:
@@ -334,31 +300,21 @@ class HuggingfaceModel(AttributionModel):
     def get_embedding_layer(self) -> torch.nn.Module:
         return self.model.get_encoder().embed_tokens
 
-    def configure_interpretable_embeddings(
-        self, do_encoder: bool = True, do_decoder: bool = True
-    ) -> None:
+    def configure_interpretable_embeddings(self, do_encoder: bool = True, do_decoder: bool = True) -> None:
         """Configure the model with interpretable embeddings for gradient attribution."""
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=UserWarning)
             try:
                 if do_encoder:
                     encoder = self.model.get_encoder()
-                    self.encoder_int_embeds = configure_interpretable_embedding_layer(
-                        encoder, "embed_tokens"
-                    )
+                    self.encoder_int_embeds = configure_interpretable_embedding_layer(encoder, "embed_tokens")
                 if do_decoder:
                     decoder = self.model.get_decoder()
-                    self.decoder_int_embeds = configure_interpretable_embedding_layer(
-                        decoder, "embed_tokens"
-                    )
+                    self.decoder_int_embeds = configure_interpretable_embedding_layer(decoder, "embed_tokens")
             except AssertionError:
-                logger.warn(
-                    "Interpretable embeddings were already configured for layer embed_tokens"
-                )
+                logger.warn("Interpretable embeddings were already configured for layer embed_tokens")
 
-    def remove_interpretable_embeddings(
-        self, do_encoder: bool = True, do_decoder: bool = True
-    ) -> None:
+    def remove_interpretable_embeddings(self, do_encoder: bool = True, do_decoder: bool = True) -> None:
         warn_msg = (
             "Cannot remove interpretable embedding wrapper from {model}."
             "No interpretable embedding layer was configured."

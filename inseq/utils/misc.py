@@ -8,6 +8,7 @@ from inspect import signature
 
 from torch import Tensor
 
+
 logger = logging.getLogger(__name__)
 
 
@@ -37,12 +38,7 @@ def _pretty_list_contents(l: Sequence[Any]) -> str:
 
 def _pretty_list(l: Optional[Sequence[Any]], lpad: int = 8) -> str:
     if all([isinstance(x, list) for x in l]):
-        contents = (
-            " " * lpad
-            + "[ "
-            + f" ],\n{' ' * lpad}[ ".join([_pretty_list_contents(subl) for subl in l])
-            + " ]"
-        )
+        contents = " " * lpad + "[ " + f" ],\n{' ' * lpad}[ ".join([_pretty_list_contents(subl) for subl in l]) + " ]"
     else:
         contents = " " * lpad + _pretty_list_contents(l)
     return "[\n" + contents + f"\n{' ' * (lpad - 4)}]"
@@ -68,9 +64,7 @@ def pretty_tensor(t: Optional[Tensor] = None, lpad: int = 8) -> str:
         return f"{t.dtype} tensor of shape {list(t.shape)}"
     else:
         out_list = t.tolist()
-        out_list = (
-            _pretty_list(out_list, lpad) if isinstance(out_list, list) else out_list
-        )
+        out_list = _pretty_list(out_list, lpad) if isinstance(out_list, list) else out_list
         return f"{t.dtype} tensor of shape {list(t.shape)} : {out_list}"
 
 
@@ -95,21 +89,16 @@ def extract_signature_args(
     extracted_args = {
         k: v
         for k, v in full_args.items()
-        if k in signature(func).parameters
-        and (exclude_args is None or k not in exclude_args)
+        if k in signature(func).parameters and (exclude_args is None or k not in exclude_args)
     }
     if return_remaining:
-        return extracted_args, {
-            k: v for k, v in full_args.items() if k not in extracted_args
-        }
+        return extracted_args, {k: v for k, v in full_args.items() if k not in extracted_args}
     return extracted_args
 
 
 def ordinal_str(n: int):
     """Converts a number to and ordinal string."""
-    return str(n) + {1: "st", 2: "nd", 3: "rd"}.get(
-        4 if 10 <= n % 100 < 20 else n % 10, "th"
-    )
+    return str(n) + {1: "st", 2: "nd", 3: "rd"}.get(4 if 10 <= n % 100 < 20 else n % 10, "th")
 
 
 def rgetattr(obj, attr, *args):

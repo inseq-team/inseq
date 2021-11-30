@@ -8,6 +8,7 @@ from .attribution import (
 from .batch import Batch, BatchEmbedding, BatchEncoding, EncoderDecoderBatch
 from .viz import show_attributions
 
+
 __all__ = [
     "Batch",
     "BatchEmbedding",

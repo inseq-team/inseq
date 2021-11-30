@@ -27,17 +27,12 @@ from captum.attr import (
 )
 
 from ...data import EncoderDecoderBatch, FeatureAttributionStepOutput
-from ...utils import (
-    Registry,
-    extract_signature_args,
-    pretty_tensor,
-    rgetattr,
-    sum_normalize,
-)
+from ...utils import Registry, extract_signature_args, pretty_tensor, rgetattr, sum_normalize
 from ...utils.typing import TargetIdsTensor
 from ..attribution_decorators import set_hook, unset_hook
 from .feature_attribution import FeatureAttribution
 from .ops import DiscretetizedIntegratedGradients
+
 
 logger = logging.getLogger(__name__)
 
@@ -52,18 +47,12 @@ class GradientAttribution(FeatureAttribution, Registry):
         with Captum's `InterpretableEmbeddingBase <https://captum.ai/api/utilities.html#captum.attr.InterpretableEmbeddingBase>`__.
         """  # noqa: E501
         if self.is_layer_attribution:
-            self.target_layer = kwargs.pop(
-                "target_layer", self.attribution_model.get_embedding_layer()
-            )
+            self.target_layer = kwargs.pop("target_layer", self.attribution_model.get_embedding_layer())
             logger.debug(f"target_layer={self.target_layer}")
             if isinstance(self.target_layer, str):
-                self.target_layer = rgetattr(
-                    self.attribution_model.model, self.target_layer
-                )
+                self.target_layer = rgetattr(self.attribution_model.model, self.target_layer)
         # For now only encoder attribution is supported
-        self.attribution_model.configure_interpretable_embeddings(
-            do_encoder=not self.is_layer_attribution
-        )
+        self.attribution_model.configure_interpretable_embeddings(do_encoder=not self.is_layer_attribution)
 
     @unset_hook
     def unhook(self, **kwargs):
@@ -72,9 +61,7 @@ class GradientAttribution(FeatureAttribution, Registry):
         """
         if self.is_layer_attribution:
             self.target_layer = None
-        self.attribution_model.remove_interpretable_embeddings(
-            do_encoder=not self.is_layer_attribution
-        )
+        self.attribution_model.remove_interpretable_embeddings(do_encoder=not self.is_layer_attribution)
 
     def attribute_step(
         self,
@@ -126,9 +113,7 @@ class DeepLiftAttribution(GradientAttribution):
 
         super().__init__(attribution_model)
         multiply_by_inputs = kwargs.pop("multiply_by_inputs", True)
-        self.method = DeepLift(
-            HookableModelWrapper(self.attribution_model), multiply_by_inputs
-        )
+        self.method = DeepLift(HookableModelWrapper(self.attribution_model), multiply_by_inputs)
         self.use_baseline = True
 
 
@@ -203,9 +188,7 @@ class IntegratedGradientsAttribution(GradientAttribution):
     def __init__(self, attribution_model, **kwargs):
         super().__init__(attribution_model)
         multiply_by_inputs = kwargs.pop("multiply_by_inputs", True)
-        self.method = IntegratedGradients(
-            self.attribution_model.score_func, multiply_by_inputs
-        )
+        self.method = IntegratedGradients(self.attribution_model.score_func, multiply_by_inputs)
         self.use_baseline = True
 
 
@@ -250,9 +233,7 @@ class GradientShapAttribution(GradientAttribution):
         super().__init__(attribution_model)
         super().__init__(attribution_model)
         multiply_by_inputs = kwargs.pop("multiply_by_inputs", True)
-        self.method = GradientShap(
-            self.attribution_model.score_func, multiply_by_inputs
-        )
+        self.method = GradientShap(self.attribution_model.score_func, multiply_by_inputs)
         self.use_baseline = True
 
 

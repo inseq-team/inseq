@@ -6,11 +6,7 @@ from abc import ABC, abstractmethod
 import torch
 
 from ..attr.feat.feature_attribution import FeatureAttribution
-from ..data import (
-    BatchEncoding,
-    FeatureAttributionSequenceOutput,
-    OneOrMoreFeatureAttributionSequenceOutputs,
-)
+from ..data import BatchEncoding, FeatureAttributionSequenceOutput, OneOrMoreFeatureAttributionSequenceOutputs
 from ..data.viz import LoadingMessage
 from ..utils import LengthMismatchError, MissingAttributionMethodError, isnotebook
 from ..utils.typing import (
@@ -23,6 +19,7 @@ from ..utils.typing import (
     VocabularyEmbeddingsTensor,
 )
 from .model_decorators import unhooked
+
 
 logger = logging.getLogger(__name__)
 
@@ -68,9 +65,7 @@ class AttributionModel(ABC):
             # If either the default method is missing or the override is set,
             # set the default method to the given method
             if override_default_attribution or not self.attribution_method:
-                self.attribution_method = FeatureAttribution.load(
-                    method, attribution_model=self
-                )
+                self.attribution_method = FeatureAttribution.load(method, attribution_model=self)
             # Temporarily use the current method without overriding the default
             else:
                 return FeatureAttribution.load(method, attribution_model=self)
@@ -86,9 +81,7 @@ class AttributionModel(ABC):
         if reference_texts and len(texts) != len(reference_texts):
             raise LengthMismatchError(
                 "Length mismatch for texts and reference_texts."
-                "Input length: {}, reference length: {} ".format(
-                    len(texts), len(reference_texts)
-                )
+                "Input length: {}, reference length: {} ".format(len(texts), len(reference_texts))
             )
         return texts, reference_texts
 
@@ -142,19 +135,13 @@ class AttributionModel(ABC):
         if not reference_texts:
             texts = self.encode_texts(texts, return_baseline=True)
             generation_args = kwargs.pop("generation_args", {})
-            reference_texts = self.generate(
-                texts, return_generation_output=False, **generation_args
-            )
+            reference_texts = self.generate(texts, return_generation_output=False, **generation_args)
         logger.debug(f"reference_texts={reference_texts}")
-        attribution_method = self.get_attribution_method(
-            method, override_default_attribution
-        )
+        attribution_method = self.get_attribution_method(method, override_default_attribution)
         attribution_args = kwargs.pop("attribution_args", {})
         attribution_args.update(attribution_method.get_attribution_args(**kwargs))
         if isnotebook():
-            logger.debug(
-                "Pretty progress currently not supported in notebooks, falling back to tqdm."
-            )
+            logger.debug("Pretty progress currently not supported in notebooks, falling back to tqdm.")
             pretty_progress = False
         return attribution_method.prepare_and_attribute(
             texts,
@@ -190,9 +177,7 @@ class AttributionModel(ABC):
         pass
 
     @abstractmethod
-    def encode_texts(
-        self, texts: TextInput, as_targets: Optional[bool] = False, *args
-    ) -> BatchEncoding:
+    def encode_texts(self, texts: TextInput, as_targets: Optional[bool] = False, *args) -> BatchEncoding:
         pass
 
     @abstractmethod
@@ -270,15 +255,9 @@ def load(
 
     from_hf = kwargs.pop("from_hf", None)
     verbose = kwargs.get("verbose", True)
-    desc_id = (
-        ", ".join(model_name_or_path)
-        if isinstance(model_name_or_path, tuple)
-        else model_name_or_path
-    )
+    desc_id = ", ".join(model_name_or_path) if isinstance(model_name_or_path, tuple) else model_name_or_path
     desc = f"Loading {desc_id}" + (
-        f" with {attribution_method} method..."
-        if attribution_method
-        else " without methods..."
+        f" with {attribution_method} method..." if attribution_method else " without methods..."
     )
     with LoadingMessage(desc, verbose=verbose):
         if from_hf:

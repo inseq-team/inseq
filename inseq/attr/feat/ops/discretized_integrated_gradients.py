@@ -77,9 +77,7 @@ class DiscretetizedIntegratedGradients(IntegratedGradients):
         n_steps: int = 50,
         internal_batch_size: Union[None, int] = None,
         return_convergence_delta: bool = False,
-    ) -> Union[
-        TensorOrTupleOfTensorsGeneric, Tuple[TensorOrTupleOfTensorsGeneric, Tensor]
-    ]:
+    ) -> Union[TensorOrTupleOfTensorsGeneric, Tuple[TensorOrTupleOfTensorsGeneric, Tensor]]:
         num_examples = inputs.shape[0] // n_steps
         is_inputs_tuple = _is_tuple(inputs)
         scaled_features_tpl = _format_input(inputs)
@@ -101,18 +99,13 @@ class DiscretetizedIntegratedGradients(IntegratedGradients):
                 n_steps=n_steps,
             )
         if return_convergence_delta:
-            assert (
-                len(scaled_features_tpl) == 1
-            ), "More than one tuple not supported in this code!"
+            assert len(scaled_features_tpl) == 1, "More than one tuple not supported in this code!"
             # Baseline and inputs are reversed in the path builder
             # For every element in the batch, the first embedding of the sub-tensor
             # of shape (n_steps x embedding_dim) is the baseline, the last is the input.
             end_point = _format_input(
                 torch.cat(
-                    [
-                        scaled_features_tpl[0][i, :, :].unsqueeze(0)
-                        for i in range(0, n_steps * num_examples, n_steps)
-                    ],
+                    [scaled_features_tpl[0][i, :, :].unsqueeze(0) for i in range(0, n_steps * num_examples, n_steps)],
                     dim=0,
                 )
             )
@@ -143,9 +136,7 @@ class DiscretetizedIntegratedGradients(IntegratedGradients):
         additional_forward_args: Any = None,
         n_steps: int = 50,
     ) -> Tuple[Tensor, ...]:
-        additional_forward_args = _format_additional_forward_args(
-            additional_forward_args
-        )
+        additional_forward_args = _format_additional_forward_args(additional_forward_args)
         input_additional_args = (
             _expand_additional_forward_args(additional_forward_args, n_steps)
             if additional_forward_args is not None
@@ -164,16 +155,11 @@ class DiscretetizedIntegratedGradients(IntegratedGradients):
             torch.cat([scaled_features[1:], scaled_features[-1].unsqueeze(0)])
             for scaled_features in scaled_features_tpl
         )
-        steps = tuple(
-            shifted_inputs_tpl[i] - scaled_features_tpl[i]
-            for i in range(len(shifted_inputs_tpl))
-        )
+        steps = tuple(shifted_inputs_tpl[i] - scaled_features_tpl[i] for i in range(len(shifted_inputs_tpl)))
         scaled_grads = tuple(grads[i] * steps[i] for i in range(len(grads)))
         # aggregates across all steps for each tensor in the input tuple
         attributions = tuple(
-            _reshape_and_sum(
-                scaled_grad, n_steps, grad.shape[0] // n_steps, grad.shape[1:]
-            )
+            _reshape_and_sum(scaled_grad, n_steps, grad.shape[0] // n_steps, grad.shape[1:])
             for (scaled_grad, grad) in zip(scaled_grads, grads)
         )
         return attributions

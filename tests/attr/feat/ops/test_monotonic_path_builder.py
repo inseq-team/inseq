@@ -67,9 +67,7 @@ def test_equivalent_monotonic_method(input_dims: Tuple[int, ...]) -> None:
     baseline_embeds = torch.randn(input_dims)
     input_embeds = torch.randn(input_dims)
     interpolated_embeds = torch.randn(input_dims)
-    out = MonotonicPathBuilder.get_monotonic_dims(
-        interpolated_embeds, baseline_embeds, input_embeds
-    )
+    out = MonotonicPathBuilder.get_monotonic_dims(interpolated_embeds, baseline_embeds, input_embeds)
     orig_out = original_monotonic(baseline_embeds, input_embeds, interpolated_embeds)
     assert torch.equal(out.int(), orig_out.int())
 
@@ -86,11 +84,7 @@ def test_valid_distance_multidim_tensors() -> None:
     dist_multi = euclidean_distance(vec_a_multi, vec_b_multi)
     assert not list(dist.shape)  # scalar
     assert list(dist_multi.shape)[0] == vec_a_multi.shape[0] == vec_b_multi.shape[0]
-    assert (
-        torch.equal(dist_multi[0], dist)
-        and torch.equal(dist_multi[1], dist)
-        and torch.equal(dist_multi[2], dist)
-    )
+    assert torch.equal(dist_multi[0], dist) and torch.equal(dist_multi[1], dist) and torch.equal(dist_multi[2], dist)
 
 
 @pytest.mark.parametrize(
@@ -102,9 +96,7 @@ def test_valid_distance_multidim_tensors() -> None:
     ],
 )
 def test_walrus_find_word_path(wrd_idx: int, n_steps: int) -> None:
-    assert original_dummy_find_word_path(
-        wrd_idx, n_steps
-    ) == walrus_operator_find_word_path(wrd_idx, n_steps)
+    assert original_dummy_find_word_path(wrd_idx, n_steps) == walrus_operator_find_word_path(wrd_idx, n_steps)
 
 
 @pytest.mark.slow
@@ -115,9 +107,7 @@ def test_walrus_find_word_path(wrd_idx: int, n_steps: int) -> None:
 def test_scaled_monotonic_path_embeddings(word_idx: int, dig_model) -> None:
     assert torch.allclose(
         dig_model.embed(torch.tensor([word_idx])),
-        dig_model.attribution_method.method.path_builder.vocabulary_embeddings[
-            word_idx
-        ],
+        dig_model.attribution_method.method.path_builder.vocabulary_embeddings[word_idx],
     )
 
 
@@ -138,15 +128,11 @@ def test_parallel_find_word(ids: List[List[int]], dig_model) -> None:
     for seq in ids:
         tok_paths = []
         for tok in seq:
-            tok_paths.append(
-                dig_model.attribution_method.method.path_builder.find_path(tok, 58100)
-            )
+            tok_paths.append(dig_model.attribution_method.method.path_builder.find_path(tok, 58100))
         pathsa.append(tok_paths)
 
     tmp_all = Parallel(n_jobs=3, prefer="threads")(
-        delayed(dig_model.attribution_method.method.path_builder.find_path)(tok, 58100)
-        for seq in ids
-        for tok in seq
+        delayed(dig_model.attribution_method.method.path_builder.find_path)(tok, 58100) for seq in ids for tok in seq
     )
     elems = iter(tmp_all)
     pathsb = [list(islice(elems, len(seq))) for seq in ids]

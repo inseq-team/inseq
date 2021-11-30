@@ -15,6 +15,7 @@ from typing import Dict
 import sys
 from pathlib import Path
 
+
 _PATH_ROOT = Path(__file__).parent.parent.parent.absolute()
 _PATH_SRC = Path(_PATH_ROOT, "inseq")
 sys.path.insert(0, str(_PATH_SRC.absolute()))

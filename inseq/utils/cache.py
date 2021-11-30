@@ -6,6 +6,7 @@ import pickle
 from functools import wraps
 from pathlib import Path
 
+
 logger = logging.getLogger(__name__)
 
 # Cache location
@@ -15,9 +16,7 @@ DEFAULT_INSEQ_HOME_CACHE = os.path.join(XDG_CACHE_HOME, "inseq")
 INSEQ_HOME_CACHE = os.path.expanduser(os.getenv("INSEQ_HOME", DEFAULT_INSEQ_HOME_CACHE))
 
 DEFAULT_INSEQ_ARTIFACTS_CACHE = os.path.join(INSEQ_HOME_CACHE, "artifacts")
-INSEQ_ARTIFACTS_CACHE = Path(
-    os.getenv("INSEQ_ARTIFACTS_CACHE", DEFAULT_INSEQ_ARTIFACTS_CACHE)
-)
+INSEQ_ARTIFACTS_CACHE = Path(os.getenv("INSEQ_ARTIFACTS_CACHE", DEFAULT_INSEQ_ARTIFACTS_CACHE))
 
 
 def cache_results(func: Callable[[Any], Any]) -> Callable[[Any], Any]:

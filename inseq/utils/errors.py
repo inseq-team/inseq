@@ -7,8 +7,7 @@ class UnknownAttributionMethodError(Exception):
     """Raised when an attribution method is not valid"""
 
     UNKNOWN_ATTRIBUTION_METHOD_MSG = (
-        "Unknown attribution method: {attribution_method}.\n"
-        "Available methods: {available_methods}"
+        "Unknown attribution method: {attribution_method}.\n" "Available methods: {available_methods}"
     )
 
     def __init__(
@@ -35,14 +34,10 @@ class MissingAttributionMethodError(Exception):
         "or pass it to the attribute method.\nAvailable methods: {available_methods}"
     )
 
-    def __init__(
-        self, msg: str = MISSING_ATTRIBUTION_METHOD_MSG, *args: Tuple[Any]
-    ) -> None:
+    def __init__(self, msg: str = MISSING_ATTRIBUTION_METHOD_MSG, *args: Tuple[Any]) -> None:
         from inseq.attr import FeatureAttribution
 
-        msg = msg.format(
-            available_methods=", ".join(get_available_methods(FeatureAttribution))
-        )
+        msg = msg.format(available_methods=", ".join(get_available_methods(FeatureAttribution)))
         super().__init__(msg, *args)
 
 

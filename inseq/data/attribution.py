@@ -17,6 +17,7 @@ from ..utils.typing import (
 )
 from .batch import Batch, BatchEncoding
 
+
 FeatureAttributionInput = Union[TextInput, BatchEncoding, Batch]
 FeatureAttributionStepOutput = Union[
     Tuple[
@@ -45,15 +46,9 @@ class FeatureAttributionOutput:
             source_ids=self.source_ids[index] if self.source_ids is not None else None,
             prefix_ids=self.prefix_ids[index] if self.prefix_ids is not None else None,
             target_ids=self.target_ids[index] if self.target_ids is not None else None,
-            source_tokens=self.source_tokens[index]
-            if self.source_tokens is not None
-            else None,
-            prefix_tokens=self.prefix_tokens[index]
-            if self.prefix_tokens is not None
-            else None,
-            target_tokens=self.target_tokens[index]
-            if self.target_tokens is not None
-            else None,
+            source_tokens=self.source_tokens[index] if self.source_tokens is not None else None,
+            prefix_tokens=self.prefix_tokens[index] if self.prefix_tokens is not None else None,
+            target_tokens=self.target_tokens[index] if self.target_tokens is not None else None,
             attributions=self.attributions[index],
             delta=self.delta[index] if self.delta is not None else None,
         )
@@ -110,35 +105,19 @@ class FeatureAttributionSequenceOutput:
     ) -> "OneOrMoreFeatureAttributionSequenceOutputs":
         num_sequences = len(attributions[0].attributions)
         if not all([len(curr.attributions) == num_sequences for curr in attributions]):
-            raise ValueError(
-                "All the attributions must include the same number of sequences."
-            )
+            raise ValueError("All the attributions must include the same number of sequences.")
         feat_attr_seq = []
         for seq_id in range(num_sequences):
             feat_attr_seq_args = {
                 "source_ids": attributions[0].source_ids[seq_id],
                 "source_tokens": attributions[0].source_tokens[seq_id],
-                "target_ids": [
-                    attr.target_ids[seq_id][0]
-                    for attr in attributions
-                    if attr.attributions[seq_id]
-                ],
-                "target_tokens": [
-                    attr.target_tokens[seq_id][0]
-                    for attr in attributions
-                    if attr.attributions[seq_id]
-                ],
-                "attributions": [
-                    attr.attributions[seq_id]
-                    for attr in attributions
-                    if attr.attributions[seq_id]
-                ],
+                "target_ids": [attr.target_ids[seq_id][0] for attr in attributions if attr.attributions[seq_id]],
+                "target_tokens": [attr.target_tokens[seq_id][0] for attr in attributions if attr.attributions[seq_id]],
+                "attributions": [attr.attributions[seq_id] for attr in attributions if attr.attributions[seq_id]],
             }
             if all(a.delta is not None for a in attributions):
                 feat_attr_seq_args["deltas"] = [
-                    attr.delta[seq_id]
-                    for attr in attributions
-                    if attr.attributions[seq_id]
+                    attr.delta[seq_id] for attr in attributions if attr.attributions[seq_id]
                 ]
             feat_attr_seq.append(cls(**feat_attr_seq_args))
         if len(feat_attr_seq) == 1:

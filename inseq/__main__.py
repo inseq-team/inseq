@@ -7,6 +7,7 @@ import typer
 import inseq
 from inseq.utils.misc import isnotebook
 
+
 app = typer.Typer(
     name="inseq",
     help="Interpretability for Sequence-to-sequence models 🔍",
@@ -61,9 +62,7 @@ def attribute(
 ) -> NoReturn:
     """Perform attribution for the given text using the given model."""
     model = inseq.load(model, attribution_method=attribution)
-    out = model.attribute(
-        texts, references, attr_pos_start=start_index, attr_pos_end=end_index
-    )
+    out = model.attribute(texts, references, attr_pos_start=start_index, attr_pos_end=end_index)
     if isnotebook():
         inseq.show_attributions(out)
     else:
