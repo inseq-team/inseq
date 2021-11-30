@@ -1,37 +1,29 @@
-from typing import List, NoReturn, Optional, Sequence, Tuple, Type, Union
+from typing import List, NoReturn, Optional, Tuple, Union
 
-import math
 from dataclasses import dataclass
-from itertools import dropwhile
 
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
-from torchtyping import TensorType
 
-from ..utils import pretty_list
+from ..utils import pretty_dict
+from ..utils.typing import (
+    AttributionOutputTensor,
+    DeltaOutputTensor,
+    OneOrMoreAttributionSequences,
+    OneOrMoreIdSequences,
+    OneOrMoreTokenSequences,
+    TextInput,
+)
 from .batch import Batch, BatchEncoding
 
-TextInput = Union[str, Sequence[str]]
-
-OneOrMoreIdSequences = Sequence[Sequence[int]]
-OneOrMoreTokenSequences = Sequence[Sequence[str]]
-OneOrMoreAttributionSequences = Sequence[Sequence[float]]
-
 FeatureAttributionInput = Union[TextInput, BatchEncoding, Batch]
-DeltaOutput = Type[TensorType["batch_size", float]]
-AttributionOutput = Type[TensorType["batch_size", "seq_len", float]]
 FeatureAttributionStepOutput = Union[
     Tuple[
-        AttributionOutput,
+        AttributionOutputTensor,
     ],
-    Tuple[AttributionOutput, DeltaOutput],
+    Tuple[AttributionOutputTensor, DeltaOutputTensor],
 ]
-
-# For Huggingface it's a string identifier e.g. "t5-base", "Helsinki-NLP/opus-mt-en-it"
-# For Fairseq it's a tuple of strings containing repo and model name
-# e.g. ("pytorch/fairseq", "transformer.wmt14.en-fr")
-ModelIdentifier = Union[str, Tuple[str, str]]
 
 
 @dataclass
@@ -46,40 +38,7 @@ class FeatureAttributionOutput:
     target_tokens: Optional[OneOrMoreTokenSequences] = None
 
     def __str__(self):
-        pretty_attrs = (
-            [[round(v, 2) for v in a] for a in self.attributions]
-            if self.attributions is not None
-            else None
-        )
-        return (
-            f"{self.__class__.__name__}(\n"
-            f"   source_tokens={pretty_list(self.source_tokens)},\n"
-            f"   prefix_tokens={pretty_list(self.prefix_tokens)},\n"
-            f"   target_tokens={pretty_list(self.target_tokens)},\n"
-            f"   source_ids={pretty_list(self.source_ids)},\n"
-            f"   prefix_ids={pretty_list(self.prefix_ids)},\n"
-            f"   target_ids={pretty_list(self.target_ids)},\n"
-            f"   attributions={pretty_list(pretty_attrs)},\n"
-            f"   delta={self.delta},\n"
-            ")"
-        )
-
-    def set_attributions(
-        self,
-        attributions: AttributionOutput,
-        delta: Optional[DeltaOutput] = None,
-    ) -> None:
-        attributions = attributions.detach().cpu().tolist()
-        if delta is not None:
-            self.delta = delta.detach().cpu().squeeze().tolist()
-            if not isinstance(self.delta, list):
-                self.delta = [self.delta]
-        self.attributions = [
-            list(reversed(list(dropwhile(lambda x: x == 0, reversed(sequence)))))
-            if not all([math.isnan(x) for x in sequence])
-            else []
-            for sequence in attributions
-        ]
+        return f"{self.__class__.__name__}({pretty_dict(self.__dict__)}"
 
     def __getitem__(self, index: Union[int, slice]) -> "FeatureAttributionOutput":
         return FeatureAttributionOutput(
@@ -143,16 +102,7 @@ class FeatureAttributionSequenceOutput:
     deltas: Optional[List[float]] = None
 
     def __str__(self):
-        return (
-            f"{self.__class__.__name__}(\n"
-            f"   source_tokens={pretty_list(self.source_tokens)},\n"
-            f"   target_tokens={pretty_list(self.target_tokens)},\n"
-            f"   source_ids={pretty_list(self.source_ids)},\n"
-            f"   target_ids={pretty_list(self.target_ids)},\n"
-            f"   attributions={[[round(v, 2) for v in src_attr] for src_attr in self.attributions]},\n"
-            f"   deltas={self.deltas}\n"
-            ")"
-        )
+        return f"{self.__class__.__name__}({pretty_dict(self.__dict__)})"
 
     @classmethod
     def from_attributions(

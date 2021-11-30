@@ -1,11 +1,11 @@
-from typing import List, NoReturn, Optional, Union
+from typing import List, NoReturn, Optional
 
 import logging
 
 import typer
-from rich import print
 
 import inseq
+from inseq.utils.misc import isnotebook
 
 app = typer.Typer(
     name="inseq",
@@ -30,14 +30,14 @@ def attribute(
         case_sensitive=False,
         help="Attribution method to use.",
     ),
-    texts: Union[str, List[str]] = typer.Option(
+    texts: List[str] = typer.Option(
         ...,
         "-t",
         "--texts",
         case_sensitive=False,
         help="Text to process for performing attribution",
     ),
-    references: Optional[Union[str, List[str]]] = typer.Option(
+    references: Optional[List[str]] = typer.Option(
         None,
         "-r",
         "--references",
@@ -58,13 +58,19 @@ def attribute(
         case_sensitive=False,
         help="End index for computing attribution scores",
     ),
-    **kwargs,
 ) -> NoReturn:
     """Perform attribution for the given text using the given model."""
     model = inseq.load(model, attribution_method=attribution)
-    print(
-        f"\n{model.attribute(texts, references, attr_pos_start=start_index, attr_pos_end=end_index, **kwargs)}"
+    out = model.attribute(
+        texts, references, attr_pos_start=start_index, attr_pos_end=end_index
     )
+    if isnotebook():
+        inseq.show_attributions(out)
+    else:
+        if not isinstance(out, list):
+            out = [out]
+        for attributions in out:
+            print(attributions)
 
 
 if __name__ == "__main__":

@@ -3,6 +3,8 @@ from typing import Any, Optional
 import torch
 from torchtyping import TensorType
 
+from .typing import AttributionOutputTensor, EmbeddingsTensor
+
 
 def remap_from_filtered(
     source: TensorType[..., Any],
@@ -18,9 +20,9 @@ def remap_from_filtered(
 
 
 def sum_normalize(
-    attributions: TensorType["batch_size", "seq_len", "hidden_size", float],
+    attributions: EmbeddingsTensor,
     dim_sum: Optional[int] = -1,
-) -> TensorType["batch_size", "seq_len", float]:
+) -> AttributionOutputTensor:
     """
     Sum and normalize tensor across dim_sum.
     """
@@ -31,10 +33,6 @@ def sum_normalize(
     return attributions
 
 
-def pretty_tensor(t: Optional[torch.Tensor]) -> str:
-    if t is None:
-        return "None"
-    if len(t.shape) > 3 or any([x > 20 for x in t.shape]):
-        return f"tensor of shape {list(t.shape)}"
-    else:
-        return f"tensor of shape {list(t.shape)}: {t.tolist()}"
+def euclidean_distance(vec_a: torch.Tensor, vec_b: torch.Tensor) -> float:
+    """Compute the Euclidean distance between two points."""
+    return (vec_a - vec_b).pow(2).sum(-1).sqrt()

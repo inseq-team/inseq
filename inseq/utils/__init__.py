@@ -1,11 +1,21 @@
+from .cache import INSEQ_ARTIFACTS_CACHE, INSEQ_HOME_CACHE, cache_results
 from .errors import (
     LengthMismatchError,
     MissingAttributionMethodError,
     UnknownAttributionMethodError,
 )
-from .misc import optional, pretty_list
+from .misc import (
+    extract_signature_args,
+    find_char_indexes,
+    isnotebook,
+    optional,
+    pretty_dict,
+    pretty_list,
+    pretty_tensor,
+    rgetattr,
+)
 from .registry import Registry
-from .torch_utils import pretty_tensor, remap_from_filtered, sum_normalize
+from .torch_utils import euclidean_distance, remap_from_filtered, sum_normalize
 
 __all__ = [
     "LengthMismatchError",
@@ -15,7 +25,15 @@ __all__ = [
     "optional",
     "pretty_list",
     "pretty_tensor",
+    "pretty_dict",
+    "rgetattr",
+    "isnotebook",
+    "find_char_indexes",
+    "extract_signature_args",
     "remap_from_filtered",
     "sum_normalize",
+    "euclidean_distance",
     "Registry",
+    "INSEQ_HOME_CACHE",
+    "INSEQ_ARTIFACTS_CACHE",
 ]
