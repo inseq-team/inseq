@@ -22,7 +22,6 @@ from typing import Any, Dict, NoReturn, Optional, Tuple
 import logging
 import math
 from abc import abstractmethod
-from itertools import dropwhile
 
 from torchtyping import TensorType
 
@@ -357,7 +356,9 @@ class FeatureAttribution(Registry):
             else:
                 update_progress_bar(pbar, show=show_progress, pretty=pretty_progress)
         close_progress_bar(pbar, show=show_progress, pretty=pretty_progress)
-        sequence_attribution = FeatureAttributionSequenceOutput.from_attributions(attribution_outputs)
+        sequence_attribution = FeatureAttributionSequenceOutput.from_attributions(
+            attribution_outputs
+        )
         if output_step_attributions:
             return sequence_attribution, attribution_outputs
         return sequence_attribution
@@ -471,7 +472,7 @@ class FeatureAttribution(Registry):
         :class:`~inseq.data.FeatureAttributionOutput` object.
 
         Args:
-            attribution_output (:class:`~inseq.data.FeatureAttributionOutput`): The output produced 
+            attribution_output (:class:`~inseq.data.FeatureAttributionOutput`): The output produced
                 by the attribution step.
             batch (:class:`~inseq.data.EncoderDecoderBatch`): The batch on which attribution was performed.
             target_ids (:obj:`torch.Tensor`): Target token ids of size `(batch_size, 1)` corresponding to tokens
@@ -503,9 +504,7 @@ class FeatureAttribution(Registry):
         # i.e. list(reversed(list(dropwhile(lambda x: x == 0, reversed(attr)))))
         # is not used because it can generate incompatible sizes.
         attributions = [
-            attr[:len(tokens)]
-            if not all([math.isnan(x) for x in attr])
-            else []
+            attr[: len(tokens)] if not all([math.isnan(x) for x in attr]) else []
             for attr, tokens in zip(attributions, source_tokens)
         ]
         return FeatureAttributionOutput(

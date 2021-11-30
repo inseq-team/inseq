@@ -253,6 +253,7 @@ class HookableModelWrapper(torch.nn.Module):
     """Module to wrap the AttributionModel class
     Used in methods requiring a nn.Module instead of a forward_func (e.g. DeepLIFT)
     """
+
     def __init__(self, attribution_model: AttributionModel):
         super().__init__()
         self.model = attribution_model.model

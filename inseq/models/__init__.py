@@ -1,4 +1,4 @@
-from .attribution_model import AttributionModel, load, HookableModelWrapper
+from .attribution_model import AttributionModel, HookableModelWrapper, load
 from .huggingface_model import HuggingfaceModel
 
 __all__ = [

@@ -123,6 +123,7 @@ class DeepLiftAttribution(GradientAttribution):
 
     def __init__(self, attribution_model, **kwargs):
         from ...models import HookableModelWrapper
+
         super().__init__(attribution_model)
         multiply_by_inputs = kwargs.pop("multiply_by_inputs", True)
         self.method = DeepLift(
@@ -249,10 +250,14 @@ class GradientShapAttribution(GradientAttribution):
         super().__init__(attribution_model)
         super().__init__(attribution_model)
         multiply_by_inputs = kwargs.pop("multiply_by_inputs", True)
-        self.method = GradientShap(self.attribution_model.score_func, multiply_by_inputs)
+        self.method = GradientShap(
+            self.attribution_model.score_func, multiply_by_inputs
+        )
         self.use_baseline = True
 
+
 # Layer methods
+
 
 class LayerIntegratedGradientsAttribution(GradientAttribution):
     """Layer Integrated Gradients attribution method.
@@ -309,6 +314,7 @@ class LayerDeepLiftAttribution(GradientAttribution):
 
     def __init__(self, attribution_model, **kwargs):
         from ...models import HookableModelWrapper
+
         super().__init__(attribution_model, hook_to_model=False)
         self.is_layer_attribution = True
         self.use_baseline = True
