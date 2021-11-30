@@ -10,7 +10,7 @@ from captum.attr import (
     remove_interpretable_embedding_layer,
 )
 from torch import long
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer, PreTrainedModel
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 from transformers.generation_utils import (
     BeamSampleOutput,
     BeamSearchOutput,
@@ -109,13 +109,13 @@ class HuggingfaceModel(AttributionModel):
         self.decoder_int_embeds = None
         super().__init__(attribution_method, **kwargs)
 
-    @classmethod
-    def load(cls, model_name_or_path: str, **kwargs):
-        return HuggingfaceModel(model_name_or_path, **kwargs)
-
     def setup(self, **kwargs) -> NoReturn:
         super().setup(**kwargs)
         self.configure_embeddings_scale()
+
+    @classmethod
+    def load(cls, model_name_or_path: str, **kwargs):
+        return HuggingfaceModel(model_name_or_path, **kwargs)
 
     def configure_embeddings_scale(self):
         encoder = self.model.get_encoder()
@@ -124,6 +124,69 @@ class HuggingfaceModel(AttributionModel):
             self.encoder_embed_scale = encoder.embed_scale
         if hasattr(decoder, "embed_scale"):
             self.decoder_embed_scale = decoder.embed_scale
+
+    def score_func(
+        self,
+        encoder_tensors: Optional[Union[IdsTensor, EmbeddingsTensor]] = None,
+        encoder_attention_mask: Optional[IdsTensor] = None,
+        decoder_tensors: Optional[EmbeddingsTensor] = None,
+        decoder_attention_mask: Optional[IdsTensor] = None,
+        compute_embeddings: Optional[bool] = True,
+    ) -> FullLogitsTensor:
+        output = self.model(
+            input_ids=encoder_tensors if compute_embeddings else None,
+            inputs_embeds=encoder_tensors if not compute_embeddings else None,
+            attention_mask=encoder_attention_mask,
+            decoder_inputs_embeds=decoder_tensors,
+            decoder_attention_mask=decoder_attention_mask,
+        )
+        # Full logits for last position of every sentence:
+        # (batch_size, tgt_seq_len, vocab_size) => (batch_size, vocab_size)
+        logits = output.logits[:, -1, :].squeeze(1)
+        logger.debug(f"logits: {pretty_tensor(logits)}")
+        return logits
+
+    @overload
+    @unhooked
+    def generate(
+        self,
+        encodings: BatchEncoding,
+        return_generation_output: Literal[False] = False,
+        **kwargs,
+    ) -> List[str]:
+        ...
+
+    @overload
+    @unhooked
+    def generate(
+        self,
+        encodings: BatchEncoding,
+        return_generation_output: Literal[True],
+        **kwargs,
+    ) -> Tuple[List[str], GenerationOutput]:
+        ...
+
+    @unhooked
+    def generate(
+        self,
+        encodings: BatchEncoding,
+        return_generation_output: Optional[bool] = False,
+        **kwargs,
+    ) -> Union[List[str], Tuple[List[str], GenerationOutput]]:
+        generation_out = self.model.generate(
+            input_ids=encodings.input_ids,
+            attention_mask=encodings.attention_mask,
+            return_dict_in_generate=True,
+            **kwargs,
+        )
+        texts = self.tokenizer.batch_decode(
+            generation_out.sequences,
+            skip_special_tokens=True,
+        )
+        texts = texts[0] if len(texts) == 1 else texts
+        if return_generation_output:
+            return texts, generation_out
+        return texts
 
     def encode_texts(
         self,
@@ -180,6 +243,22 @@ class HuggingfaceModel(AttributionModel):
             attention_mask=batch["attention_mask"].to(self.device),
             baseline_ids=baseline_ids,
         )
+
+    def encoder_embed_ids(self, ids: IdsTensor) -> EmbeddingsTensor:
+        if self.encoder_int_embeds:
+            embeddings = self.encoder_int_embeds.indices_to_embeddings(ids)
+            return embeddings * self.encoder_embed_scale
+        else:
+            embeddings = self.model.get_input_embeddings()
+            return embeddings(ids) * self.encoder_embed_scale
+
+    def decoder_embed_ids(self, ids: IdsTensor) -> EmbeddingsTensor:
+        if self.decoder_int_embeds:
+            embeddings = self.decoder_int_embeds.indices_to_embeddings(ids)
+            return embeddings * self.decoder_embed_scale
+        else:
+            embeddings = self.model.get_input_embeddings()
+            return embeddings(ids) * self.decoder_embed_scale
 
     def convert_ids_to_tokens(
         self, ids: IdsTensor, skip_special_tokens: Optional[bool] = True
@@ -250,92 +329,9 @@ class HuggingfaceModel(AttributionModel):
 
     @property
     def vocabulary_embeddings(self) -> VocabularyEmbeddingsTensor:
-        return self.model.get_encoder().embed_tokens.weight
+        return self.get_embedding_layer().weight
 
-    def encoder_embed_ids(self, ids: IdsTensor) -> EmbeddingsTensor:
-        if self.encoder_int_embeds:
-            embeddings = self.encoder_int_embeds.indices_to_embeddings(ids)
-            return embeddings * self.encoder_embed_scale
-        else:
-            embeddings = self.model.get_input_embeddings()
-            return embeddings(ids) * self.encoder_embed_scale
-
-    def decoder_embed_ids(self, ids: IdsTensor) -> EmbeddingsTensor:
-        if self.decoder_int_embeds:
-            embeddings = self.decoder_int_embeds.indices_to_embeddings(ids)
-            return embeddings * self.decoder_embed_scale
-        else:
-            embeddings = self.model.get_input_embeddings()
-            return embeddings(ids) * self.encoder_embed_scale
-
-    @overload
-    @unhooked
-    def generate(
-        self,
-        encodings: BatchEncoding,
-        return_generation_output: Literal[False] = False,
-        **kwargs,
-    ) -> List[str]:
-        ...
-
-    @overload
-    @unhooked
-    def generate(
-        self,
-        encodings: BatchEncoding,
-        return_generation_output: Literal[True],
-        **kwargs,
-    ) -> Tuple[List[str], GenerationOutput]:
-        ...
-
-    @unhooked
-    def generate(
-        self,
-        encodings: BatchEncoding,
-        return_generation_output: Optional[bool] = False,
-        **kwargs,
-    ) -> Union[List[str], Tuple[List[str], GenerationOutput]]:
-        generation_out = self.model.generate(
-            input_ids=encodings.input_ids,
-            attention_mask=encodings.attention_mask,
-            return_dict_in_generate=True,
-            **kwargs,
-        )
-        texts = self.tokenizer.batch_decode(
-            generation_out.sequences,
-            skip_special_tokens=True,
-        )
-        texts = texts[0] if len(texts) == 1 else texts
-        if return_generation_output:
-            return texts, generation_out
-        return texts
-
-    def score_func(
-        self,
-        encoder_tensors: Optional[Union[IdsTensor, EmbeddingsTensor]] = None,
-        encoder_attention_mask: Optional[IdsTensor] = None,
-        decoder_tensors: Optional[EmbeddingsTensor] = None,
-        decoder_attention_mask: Optional[IdsTensor] = None,
-        compute_embeddings: Optional[bool] = True,
-    ) -> FullLogitsTensor:
-        output = self.model(
-            input_ids=encoder_tensors if compute_embeddings else None,
-            inputs_embeds=encoder_tensors if not compute_embeddings else None,
-            attention_mask=encoder_attention_mask,
-            decoder_inputs_embeds=decoder_tensors,
-            decoder_attention_mask=decoder_attention_mask,
-        )
-        # Full logits for last position of every sentence:
-        # (batch_size, tgt_seq_len, vocab_size) => (batch_size, vocab_size)
-        logits = output.logits[:, -1, :].squeeze(1)
-        logger.debug(f"logits: {pretty_tensor(logits)}")
-        return logits
-
-    def get_embedding_layer(
-        self, model: Optional[PreTrainedModel] = None
-    ) -> torch.nn.Module:
-        if model is not None:
-            return model.get_encoder().embed_tokens
+    def get_embedding_layer(self) -> torch.nn.Module:
         return self.model.get_encoder().embed_tokens
 
     def configure_interpretable_embeddings(

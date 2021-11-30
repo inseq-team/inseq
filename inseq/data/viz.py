@@ -211,7 +211,9 @@ def close_progress_bar(
 
 
 class LoadingMessage:
-    def __init__(self, msg, spinner="dots", style="green", padding=1, verbose=True):
+    def __init__(
+        self, msg, spinner="dots", style="green", padding=(1, 0, 1, 0), verbose=True
+    ):
         self.msg = msg
         self.spinner = spinner
         self.style = style

@@ -20,7 +20,9 @@ Todo:
 from typing import Any, Dict, NoReturn, Optional, Tuple
 
 import logging
+import math
 from abc import abstractmethod
+from itertools import dropwhile
 
 from torchtyping import TensorType
 
@@ -316,12 +318,17 @@ class FeatureAttribution(Registry):
         )
         attribution_outputs = []
         for step in range(attr_pos_start, attr_pos_end):
+            step_output = self.filtered_attribute_step(
+                batch[:step],
+                batch.targets.input_ids[:, step].unsqueeze(1),
+                batch.targets.attention_mask[:, step].unsqueeze(1),
+                **kwargs,
+            )
             attribution_outputs.append(
-                self.get_attribution_output(
+                self.make_attribution_output(
+                    step_output,
                     batch[:step],
                     batch.targets.input_ids[:, step].unsqueeze(1),
-                    batch.targets.attention_mask[:, step].unsqueeze(1),
-                    **kwargs,
                 )
             )
             if pretty_progress:
@@ -383,35 +390,6 @@ class FeatureAttribution(Registry):
         if attr_pos_start == attr_pos_end:
             raise ValueError("Start and end attribution positions cannot be the same.")
         return attr_pos_start, attr_pos_end
-
-    def get_attribution_output(
-        self,
-        batch: EncoderDecoderBatch,
-        target_ids: TensorType["batch_size", 1, int],
-        target_attention_mask: Optional[TensorType["batch_size", 1, int]] = None,
-        **kwargs,
-    ) -> FeatureAttributionOutput:
-        r"""
-        Performs a single attribution step for all sequences in the batch and fixes the
-        format of generated :class:`~inseq.data.FeatureAttributionOutput`.
-
-        Args:
-            batch (:class:`~inseq.data.EncoderDecoderBatch`): The batch of sequences to attribute.
-            target_ids (:obj:`torch.Tensor`): Target token ids of size `(batch_size, 1)` corresponding to tokens
-                for which the attribution step must be performed.
-            target_attention_mask (:obj:`torch.Tensor`, `optional`): Boolean attention mask of size `(batch_size, 1)`
-                specifying which target_ids are valid for attribution and which are padding.
-            kwargs: Additional keyword arguments to pass to the attribution step.
-        """
-        step_output = self.filtered_attribute_step(
-            batch, target_ids, target_attention_mask, **kwargs
-        )
-        attribution_output = FeatureAttributionOutput()
-        attribution_output = self.add_token_information(
-            attribution_output, batch, target_ids
-        )
-        attribution_output.set_attributions(*step_output)
-        return attribution_output
 
     def filtered_attribute_step(
         self,
@@ -479,9 +457,9 @@ class FeatureAttribution(Registry):
             )
         return {}
 
-    def add_token_information(
+    def make_attribution_output(
         self,
-        attribution_output: FeatureAttributionOutput,
+        step_output: FeatureAttributionStepOutput,
         batch: EncoderDecoderBatch,
         target_ids: TensorType["batch_size", 1, int],
     ) -> FeatureAttributionOutput:
@@ -490,7 +468,8 @@ class FeatureAttribution(Registry):
         :class:`~inseq.data.FeatureAttributionOutput` object.
 
         Args:
-            attribution_output (:class:`~inseq.data.FeatureAttributionOutput`): The attribution output to enrich.
+            attribution_output (:class:`~inseq.data.FeatureAttributionOutput`): The output produced 
+                by the attribution step.
             batch (:class:`~inseq.data.EncoderDecoderBatch`): The batch on which attribution was performed.
             target_ids (:obj:`torch.Tensor`): Target token ids of size `(batch_size, 1)` corresponding to tokens
                 for which the attribution step was performed.
@@ -506,19 +485,33 @@ class FeatureAttribution(Registry):
             [tok for tok in seq if tok != self.attribution_model.pad_token]
             for seq in batch.targets.input_tokens
         ]
-        attribution_output.source_ids = self.attribution_model.convert_tokens_to_ids(
-            source_tokens
-        )
-        attribution_output.source_tokens = source_tokens
-        attribution_output.prefix_ids = self.attribution_model.convert_tokens_to_ids(
-            prefix_tokens
-        )
-        attribution_output.prefix_tokens = prefix_tokens
-        attribution_output.target_ids = target_ids.tolist()
-        attribution_output.target_tokens = self.attribution_model.convert_ids_to_tokens(
+        target_tokens = self.attribution_model.convert_ids_to_tokens(
             target_ids, skip_special_tokens=False
         )
-        return attribution_output
+        source_ids = self.attribution_model.convert_tokens_to_ids(source_tokens)
+        prefix_ids = self.attribution_model.convert_tokens_to_ids(prefix_tokens)
+        attributions = step_output[0].detach().cpu().tolist()
+        delta = None
+        if len(step_output) > 1:
+            delta = step_output[1].detach().cpu().squeeze().tolist()
+            if not isinstance(delta, list):
+                delta = [delta]
+        attributions = [
+            list(reversed(list(dropwhile(lambda x: x == 0, reversed(sequence)))))
+            if not all([math.isnan(x) for x in sequence])
+            else []
+            for sequence in attributions
+        ]
+        return FeatureAttributionOutput(
+            attributions=attributions,
+            delta=delta,
+            source_ids=source_ids,
+            prefix_ids=prefix_ids,
+            target_ids=target_ids.tolist(),
+            source_tokens=source_tokens,
+            prefix_tokens=prefix_tokens,
+            target_tokens=target_tokens,
+        )
 
     def format_attribute_args(
         self,

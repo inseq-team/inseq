@@ -104,7 +104,10 @@ class DiscretetizedIntegratedGradients(IntegratedGradients):
             assert (
                 len(scaled_features_tpl) == 1
             ), "More than one tuple not supported in this code!"
-            start_point = _format_input(
+            # Baseline and inputs are reversed in the path builder
+            # For every element in the batch, the first embedding of the sub-tensor
+            # of shape (n_steps x embedding_dim) is the baseline, the last is the input.
+            end_point = _format_input(
                 torch.cat(
                     [
                         scaled_features_tpl[0][i, :, :].unsqueeze(0)
@@ -113,7 +116,7 @@ class DiscretetizedIntegratedGradients(IntegratedGradients):
                     dim=0,
                 )
             )
-            end_point = _format_input(
+            start_point = _format_input(
                 torch.cat(
                     [
                         scaled_features_tpl[0][i, :, :].unsqueeze(0)
@@ -122,7 +125,6 @@ class DiscretetizedIntegratedGradients(IntegratedGradients):
                     dim=0,
                 )
             )
-            # fmt: on
             # computes approximation error based on the completeness axiom
             delta = self.compute_convergence_delta(
                 attributions,

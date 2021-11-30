@@ -1,8 +1,6 @@
 from typing import List, NoReturn, Optional, Tuple, Union
 
-import math
 from dataclasses import dataclass
-from itertools import dropwhile
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -41,23 +39,6 @@ class FeatureAttributionOutput:
 
     def __str__(self):
         return f"{self.__class__.__name__}({pretty_dict(self.__dict__)}"
-
-    def set_attributions(
-        self,
-        attributions: AttributionOutputTensor,
-        delta: Optional[DeltaOutputTensor] = None,
-    ) -> None:
-        attributions = attributions.detach().cpu().tolist()
-        if delta is not None:
-            self.delta = delta.detach().cpu().squeeze().tolist()
-            if not isinstance(self.delta, list):
-                self.delta = [self.delta]
-        self.attributions = [
-            list(reversed(list(dropwhile(lambda x: x == 0, reversed(sequence)))))
-            if not all([math.isnan(x) for x in sequence])
-            else []
-            for sequence in attributions
-        ]
 
     def __getitem__(self, index: Union[int, slice]) -> "FeatureAttributionOutput":
         return FeatureAttributionOutput(
