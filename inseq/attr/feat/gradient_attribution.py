@@ -16,8 +16,11 @@
 import logging
 
 from captum.attr import (
+    DeepLift,
+    GradientShap,
     InputXGradient,
     IntegratedGradients,
+    LayerDeepLift,
     LayerGradientXActivation,
     LayerIntegratedGradients,
     Saliency,
@@ -109,6 +112,25 @@ class GradientAttribution(FeatureAttribution, Registry):
         return (attr, delta) if delta is not None else attr
 
 
+class DeepLiftAttribution(GradientAttribution):
+    """DeepLIFT attribution method.
+
+    Reference implementation:
+    `https://captum.ai/api/deep_lift.html <https://captum.ai/api/deep_lift.html>`__.
+    """
+
+    method_name = "deeplift"
+
+    def __init__(self, attribution_model, **kwargs):
+        from ...models import HookableModelWrapper
+        super().__init__(attribution_model)
+        multiply_by_inputs = kwargs.pop("multiply_by_inputs", True)
+        self.method = DeepLift(
+            HookableModelWrapper(self.attribution_model), multiply_by_inputs
+        )
+        self.use_baseline = True
+
+
 class DiscretizedIntegratedGradientsAttribution(GradientAttribution):
     """Discretized Integrated Gradients attribution method
     Reference: https://arxiv.org/abs/2108.13654
@@ -183,7 +205,6 @@ class IntegratedGradientsAttribution(GradientAttribution):
         self.method = IntegratedGradients(
             self.attribution_model.score_func, multiply_by_inputs
         )
-        self.skip_eos = True
         self.use_baseline = True
 
 
@@ -215,6 +236,24 @@ class SaliencyAttribution(GradientAttribution):
         self.method = Saliency(self.attribution_model.score_func)
 
 
+class GradientShapAttribution(GradientAttribution):
+    """GradientShap attribution method.
+
+    Reference implementation:
+    `https://captum.ai/api/gradient_shap.html <https://captum.ai/api/gradient_shap.html>`__.
+    """
+
+    method_name = "gradient_shap"
+
+    def __init__(self, attribution_model, **kwargs):
+        super().__init__(attribution_model)
+        super().__init__(attribution_model)
+        multiply_by_inputs = kwargs.pop("multiply_by_inputs", True)
+        self.method = GradientShap(self.attribution_model.score_func, multiply_by_inputs)
+        self.use_baseline = True
+
+# Layer methods
+
 class LayerIntegratedGradientsAttribution(GradientAttribution):
     """Layer Integrated Gradients attribution method.
 
@@ -227,7 +266,6 @@ class LayerIntegratedGradientsAttribution(GradientAttribution):
     def __init__(self, attribution_model, **kwargs):
         super().__init__(attribution_model, hook_to_model=False)
         self.is_layer_attribution = True
-        self.skip_eos = True
         self.use_baseline = True
         self.hook(**kwargs)
         multiply_by_inputs = kwargs.pop("multiply_by_inputs", True)
@@ -250,12 +288,34 @@ class LayerGradientXActivationAttribution(GradientAttribution):
     def __init__(self, attribution_model, **kwargs):
         super().__init__(attribution_model, hook_to_model=False)
         self.is_layer_attribution = True
-        self.skip_eos = False
         self.use_baseline = False
         self.hook(**kwargs)
         multiply_by_inputs = kwargs.pop("multiply_by_inputs", True)
         self.method = LayerGradientXActivation(
             self.attribution_model.score_func,
+            self.target_layer,
+            multiply_by_inputs=multiply_by_inputs,
+        )
+
+
+class LayerDeepLiftAttribution(GradientAttribution):
+    """Layer DeepLIFT attribution method.
+
+    Reference implementation:
+    `https://captum.ai/api/layer.html#layer-deeplift <https://captum.ai/api/layer.html#layer-deeplift>`__.
+    """  # noqa E501
+
+    method_name = "layer_deeplift"
+
+    def __init__(self, attribution_model, **kwargs):
+        from ...models import HookableModelWrapper
+        super().__init__(attribution_model, hook_to_model=False)
+        self.is_layer_attribution = True
+        self.use_baseline = True
+        self.hook(**kwargs)
+        multiply_by_inputs = kwargs.pop("multiply_by_inputs", True)
+        self.method = LayerDeepLift(
+            HookableModelWrapper(self.attribution_model),
             self.target_layer,
             multiply_by_inputs=multiply_by_inputs,
         )

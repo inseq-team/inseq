@@ -21,7 +21,7 @@ def optional(condition, context_manager):
 
 
 def _pretty_list_contents(l: Sequence[Any]) -> str:
-    quote = f"""{"'" if isinstance(l[0], str) else ""}"""
+    quote = f"""{"'" if l and isinstance(l[0], str) else ""}"""
     return (
         quote
         + f"{quote}, {quote}".join(
@@ -65,13 +65,13 @@ def pretty_tensor(t: Optional[Tensor] = None, lpad: int = 8) -> str:
     if t is None:
         return "None"
     if len(t.shape) > 3 or any([x > 20 for x in t.shape]):
-        return f"tensor of shape {list(t.shape)}"
+        return f"{t.dtype} tensor of shape {list(t.shape)}"
     else:
         out_list = t.tolist()
         out_list = (
             _pretty_list(out_list, lpad) if isinstance(out_list, list) else out_list
         )
-        return f"tensor of shape {list(t.shape)} : {out_list}"
+        return f"{t.dtype} tensor of shape {list(t.shape)} : {out_list}"
 
 
 def pretty_dict(d: Dict[str, Any], lpad: int = 4) -> str:

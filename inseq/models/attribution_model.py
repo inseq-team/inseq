@@ -132,6 +132,7 @@ class AttributionModel(ABC):
         attr_pos_end: Optional[int] = None,
         show_progress: bool = True,
         pretty_progress: bool = True,
+        output_step_attributions: bool = False,
         **kwargs,
     ) -> OneOrMoreFeatureAttributionSequenceOutputs:
         """Perform attribution for one or multiple texts."""
@@ -162,6 +163,7 @@ class AttributionModel(ABC):
             attr_pos_end=attr_pos_end,
             show_progress=show_progress,
             pretty_progress=pretty_progress,
+            output_step_attributions=output_step_attributions,
             **attribution_args,
         )
 
@@ -245,6 +247,17 @@ class AttributionModel(ABC):
     @abstractmethod
     def get_embedding_layer(self) -> torch.nn.Module:
         pass
+
+
+class HookableModelWrapper(torch.nn.Module):
+    """Module to wrap the AttributionModel class
+    Used in methods requiring a nn.Module instead of a forward_func (e.g. DeepLIFT)
+    """
+    def __init__(self, attribution_model: AttributionModel):
+        super().__init__()
+        self.model = attribution_model.model
+        self.model.zero_grad()
+        self.forward = attribution_model.score_func
 
 
 def load(

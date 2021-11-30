@@ -67,14 +67,12 @@ class BatchEncoding:
         active_attention_mask = self.attention_mask.masked_select(active_mask)
         active_baseline_ids = None
         if self.baseline_ids is not None:
-            active_baseline_ids = self.baseline_ids.masked_select(active_mask).reshape(
-                -1, *ids_shape
-            )
+            active_baseline_ids = self.baseline_ids.masked_select(active_mask)
         return BatchEncoding(
-            active_input_ids,
+            active_input_ids.reshape(-1, *ids_shape),
             active_input_tokens,
-            active_attention_mask,
-            active_baseline_ids,
+            active_attention_mask.reshape(-1, *ids_shape),
+            active_baseline_ids.reshape(-1, *ids_shape),
         )
 
     def __str__(self):

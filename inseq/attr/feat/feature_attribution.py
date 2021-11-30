@@ -83,8 +83,6 @@ class FeatureAttribution(Registry):
             is_layer_attribution (:obj:`bool`, default `False`): If True, the attribution method maps saliency
                 scores to the output of a layer instead of model inputs. Layer attribution methods do not require
                 interpretable embeddings unless intermediate features before the embedding layer are attributed.
-            skip_eos (:obj:`bool`, default `False`): Whether the EOS token is considered as a
-                valid token during attribution.
             target_layer (:obj:`torch.nn.Module`, default `None`): The layer on which attribution should be
                 performed if is_layer_attribution is True.
             use_baseline (:obj:`bool`, default `False`): Whether a baseline should be used for the attribution method.
@@ -92,7 +90,6 @@ class FeatureAttribution(Registry):
         super().__init__()
         self.attribution_model = attribution_model
         self.is_layer_attribution: bool = False
-        self.skip_eos: bool = False
         self.target_layer = None
         self.use_baseline: bool = False
         if hook_to_model:
@@ -150,6 +147,7 @@ class FeatureAttribution(Registry):
         attr_pos_end: Optional[int] = None,
         show_progress: bool = True,
         pretty_progress: bool = True,
+        output_step_attributions: bool = False,
         **kwargs,
     ) -> OneOrMoreFeatureAttributionSequenceOutputs:
         r"""
@@ -182,6 +180,7 @@ class FeatureAttribution(Registry):
             attr_pos_end=attr_pos_end,
             show_progress=show_progress,
             pretty_progress=pretty_progress,
+            output_step_attributions=output_step_attributions,
             **kwargs,
         )
 
@@ -259,6 +258,7 @@ class FeatureAttribution(Registry):
         attr_pos_end: Optional[int] = None,
         show_progress: bool = True,
         pretty_progress: bool = True,
+        output_step_attributions: bool = False,
         **kwargs,
     ) -> OneOrMoreFeatureAttributionSequenceOutputs:
         r"""
@@ -357,7 +357,10 @@ class FeatureAttribution(Registry):
             else:
                 update_progress_bar(pbar, show=show_progress, pretty=pretty_progress)
         close_progress_bar(pbar, show=show_progress, pretty=pretty_progress)
-        return FeatureAttributionSequenceOutput.from_attributions(attribution_outputs)
+        sequence_attribution = FeatureAttributionSequenceOutput.from_attributions(attribution_outputs)
+        if output_step_attributions:
+            return sequence_attribution, attribution_outputs
+        return sequence_attribution
 
     @staticmethod
     def check_attribute_positions(
@@ -417,10 +420,6 @@ class FeatureAttribution(Registry):
                 of size `(batch_size, source_length)` and possibly a tensor of attribution deltas
                 of size `(batch_size)`, if the attribution step supports deltas and they are requested.
         """
-        logger.debug(
-            f"\ntarget_ids: {pretty_tensor(target_ids)},\n"
-            f"target_attention_mask: {pretty_tensor(target_attention_mask)}"
-        )
         orig_batch = batch.clone()
         orig_target_ids = target_ids
         # Filter out finished sentences
@@ -428,6 +427,10 @@ class FeatureAttribution(Registry):
             batch = batch.select_active(target_attention_mask)
             target_ids = target_ids.masked_select(target_attention_mask.bool())
             target_ids = target_ids.view(-1, 1)
+        logger.debug(
+            f"\ntarget_ids: {pretty_tensor(target_ids)},\n"
+            f"target_attention_mask: {pretty_tensor(target_attention_mask)}"
+        )
         # Perform attribution step
         step_output = self.attribute_step(batch, target_ids.squeeze(), **kwargs)
         attributions, deltas = (
@@ -496,11 +499,14 @@ class FeatureAttribution(Registry):
             delta = step_output[1].detach().cpu().squeeze().tolist()
             if not isinstance(delta, list):
                 delta = [delta]
+        # The method to drop all attributions != 0
+        # i.e. list(reversed(list(dropwhile(lambda x: x == 0, reversed(attr)))))
+        # is not used because it can generate incompatible sizes.
         attributions = [
-            list(reversed(list(dropwhile(lambda x: x == 0, reversed(sequence)))))
-            if not all([math.isnan(x) for x in sequence])
+            attr[:len(tokens)]
+            if not all([math.isnan(x) for x in attr])
             else []
-            for sequence in attributions
+            for attr, tokens in zip(attributions, source_tokens)
         ]
         return FeatureAttributionOutput(
             attributions=attributions,
