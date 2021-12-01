@@ -35,8 +35,9 @@ def red_transparent_blue_colormap():
     return LinearSegmentedColormap.from_list("red_transparent_blue", colors)
 
 
-def get_color(score, cmax, cmap):
-    scaled_value = 0.5 + 0.5 * score / cmax
+def get_color(score, min_value, max_value, cmap):
+    # Normalize between 0-1 for the color scale
+    scaled_value = (score - min_value) / (max_value - min_value)
     color = cmap(scaled_value)
     color = "rgba" + str((color[0] * 255, color[1] * 255, color[2] * 255, color[3]))
     return color
@@ -53,11 +54,10 @@ def get_colors(
     cmap,
 ):
     input_colors = []
-    cmax = max(abs(min_value), abs(max_value))
     for row_index in range(scores.shape[0]):
         input_colors_row = []
         for col_index in range(scores.shape[1]):
-            color = get_color(scores[row_index, col_index], cmax, cmap)
+            color = get_color(scores[row_index, col_index], min_value, max_value, cmap)
             input_colors_row.append(color)
         input_colors.append(input_colors_row)
     return input_colors

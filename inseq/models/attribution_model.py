@@ -133,7 +133,7 @@ class AttributionModel(ABC):
             return []
         texts, reference_texts = self.format_input_texts(texts, reference_texts)
         if not reference_texts:
-            texts = self.encode_texts(texts, return_baseline=True)
+            texts = self.encode(texts, return_baseline=True)
             generation_args = kwargs.pop("generation_args", {})
             reference_texts = self.generate(texts, return_generation_output=False, **generation_args)
         logger.debug(f"reference_texts={reference_texts}")
@@ -155,8 +155,10 @@ class AttributionModel(ABC):
         )
 
     def embed(self, inputs: Union[TextInput, IdsTensor], as_targets: bool = False):
-        if isinstance(inputs, str) or (isinstance(inputs, list) and inputs[0] == str):
-            batch = self.encode_texts(inputs, as_targets)
+        if isinstance(inputs, str) or (
+            isinstance(inputs, list) and len(inputs) > 0 and all([isinstance(x, str) for x in inputs])
+        ):
+            batch = self.encode(inputs, as_targets)
             inputs = batch.input_ids
         if as_targets:
             return self.decoder_embed_ids(inputs)
@@ -170,14 +172,14 @@ class AttributionModel(ABC):
     @abstractmethod
     def generate(
         self,
-        encodings: BatchEncoding,
+        encodings: Union[TextInput, BatchEncoding],
         return_generation_output: Optional[bool] = False,
         **kwargs,
     ) -> Union[List[str], Tuple[List[str], Any]]:
         pass
 
     @abstractmethod
-    def encode_texts(self, texts: TextInput, as_targets: Optional[bool] = False, *args) -> BatchEncoding:
+    def encode(self, texts: TextInput, as_targets: Optional[bool] = False, *args) -> BatchEncoding:
         pass
 
     @abstractmethod

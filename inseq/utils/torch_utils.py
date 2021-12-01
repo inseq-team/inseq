@@ -25,9 +25,10 @@ def sum_normalize(
 ) -> AttributionOutputTensor:
     """
     Sum and normalize tensor across dim_sum.
+    The outcome is a matrix of unit row vectors.
     """
     attributions = attributions.sum(dim=dim_sum).squeeze(0)
-    attributions = attributions / torch.norm(attributions)
+    attributions = attributions.T.div(torch.norm(attributions, dim=dim_sum)).T
     if len(attributions.shape) == 1:
         return attributions.unsqueeze(0)
     return attributions

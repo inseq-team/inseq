@@ -48,9 +48,10 @@ def show_attributions(
     attributions: OneOrMoreFeatureAttributionSequenceOutputs,
     min_val: Optional[int] = None,
     max_val: Optional[int] = None,
+    display_html: bool = True,
     return_html: Optional[bool] = False,
 ) -> Optional[str]:
-    if not return_html:
+    if display_html:
         try:
             from IPython.core.display import HTML, display
         except ImportError:
@@ -63,12 +64,12 @@ def show_attributions(
         max_val = max(attribution.maximum for attribution in attributions)
     html_out = ""
     for i, attribution in enumerate(attributions):
-        if not return_html:
-            display(HTML(get_instance_html(i)))
-            display(HTML(seq2seq_plots(attribution, min_val, max_val)))
-        else:
-            html_out += get_instance_html(i)
-            html_out += seq2seq_plots(attribution, min_val, max_val)
+        curr_html = ""
+        curr_html += get_instance_html(i)
+        curr_html += seq2seq_plots(attribution, min_val, max_val)
+        if display_html:
+            display(HTML(curr_html))
+        html_out += curr_html
     if return_html:
         return html_out
 
@@ -124,7 +125,7 @@ def get_progress_bar(
         return None
     elif show and not pretty:
         return tqdm(
-            total=max([tgt_len for _, _, tgt_len in target_sentences]),
+            total=max(tgt_len for _, _, tgt_len in target_sentences),
             desc=f"Attributing with {method_name}...",
         )
     elif show and pretty:

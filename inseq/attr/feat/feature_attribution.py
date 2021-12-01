@@ -217,7 +217,7 @@ class FeatureAttribution(Registry):
                 depending on the number of inputs.
         """
         if isinstance(sources, str) or isinstance(sources, list):
-            sources: BatchEncoding = self.attribution_model.encode_texts(sources, return_baseline=True)
+            sources: BatchEncoding = self.attribution_model.encode(sources, return_baseline=True)
         if isinstance(sources, BatchEncoding):
             if self.is_layer_attribution:
                 embeds = BatchEmbedding(None, None)
@@ -228,7 +228,7 @@ class FeatureAttribution(Registry):
                 )
             sources = Batch(sources, embeds)
         if isinstance(targets, str) or isinstance(targets, list):
-            targets: BatchEncoding = self.attribution_model.encode_texts(
+            targets: BatchEncoding = self.attribution_model.encode(
                 targets,
                 as_targets=True,
                 prepend_bos_token=prepend_bos_token,
@@ -497,7 +497,6 @@ class FeatureAttribution(Registry):
         target_ids: TargetIdsTensor,
         **kwargs,
     ) -> Dict[str, Any]:
-        logger.debug(f"batch: {batch},\ntarget_ids: {pretty_tensor(target_ids, lpad=4)}")
         # For now only encoder attribution is supported
         if self.is_layer_attribution:
             inputs = batch.sources.input_ids

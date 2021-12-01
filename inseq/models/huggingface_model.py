@@ -139,7 +139,7 @@ class HuggingfaceModel(AttributionModel):
     @unhooked
     def generate(
         self,
-        encodings: BatchEncoding,
+        encodings: Union[TextInput, BatchEncoding],
         return_generation_output: Literal[False] = False,
         **kwargs,
     ) -> List[str]:
@@ -149,7 +149,7 @@ class HuggingfaceModel(AttributionModel):
     @unhooked
     def generate(
         self,
-        encodings: BatchEncoding,
+        encodings: Union[TextInput, BatchEncoding],
         return_generation_output: Literal[True],
         **kwargs,
     ) -> Tuple[List[str], GenerationOutput]:
@@ -158,13 +158,17 @@ class HuggingfaceModel(AttributionModel):
     @unhooked
     def generate(
         self,
-        encodings: BatchEncoding,
+        inputs: Union[TextInput, BatchEncoding],
         return_generation_output: Optional[bool] = False,
         **kwargs,
     ) -> Union[List[str], Tuple[List[str], GenerationOutput]]:
+        if isinstance(inputs, str) or (
+            isinstance(inputs, list) and len(inputs) > 0 and all([isinstance(x, str) for x in inputs])
+        ):
+            inputs = self.encode(inputs)
         generation_out = self.model.generate(
-            input_ids=encodings.input_ids,
-            attention_mask=encodings.attention_mask,
+            input_ids=inputs.input_ids,
+            attention_mask=inputs.attention_mask,
             return_dict_in_generate=True,
             **kwargs,
         )
@@ -177,7 +181,7 @@ class HuggingfaceModel(AttributionModel):
             return texts, generation_out
         return texts
 
-    def encode_texts(
+    def encode(
         self,
         texts: TextInput,
         as_targets: Optional[bool] = False,
@@ -198,7 +202,7 @@ class HuggingfaceModel(AttributionModel):
             # Some tokenizer have weird values for max_len_single_sentence
             # Cap length with max_model_input_sizes instead
             if max_length > 1e6:
-                max_length = max([v for _, v in self.tokenizer.max_model_input_sizes.items()])
+                max_length = max(v for _, v in self.tokenizer.max_model_input_sizes.items())
             batch = self.tokenizer(
                 texts,
                 add_special_tokens=True,
