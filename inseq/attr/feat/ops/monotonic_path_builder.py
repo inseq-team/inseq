@@ -134,11 +134,10 @@ class MonotonicPathBuilder:
             n_steps = 30
         if scale_strategy is None:
             scale_strategy = "greedy"
-        get_word = lambda ids, seq, tok: int(ids[seq, tok])
         word_paths_flat = Parallel(n_jobs=3, prefer="threads")(
             delayed(self.find_path)(
-                get_word(input_ids, seq_idx, tok_idx),
-                get_word(baseline_ids, seq_idx, tok_idx),
+                int(input_ids[seq_idx, tok_idx]),
+                int(baseline_ids[seq_idx, tok_idx]),
                 n_steps=n_steps,
                 strategy=scale_strategy,
             )
@@ -148,18 +147,24 @@ class MonotonicPathBuilder:
         # Unflatten word paths
         word_paths_iter = iter(word_paths_flat)
         word_paths = [list(islice(word_paths_iter, input_ids.shape[1])) for _ in range(input_ids.shape[0])]
-        # fmt: off
-        return torch.cat([  # concat sequences on batch dimension
-            torch.stack([  # out shape: n_steps x seq_len x hidden_size
-                self.build_monotonic_path_embedding(
-                    word_path=word_paths[seq_idx][tok_idx],
-                    baseline_idx=get_word(baseline_ids, seq_idx, tok_idx),
-                    n_steps=n_steps,
-                ) for tok_idx in range(input_ids.shape[1])
-            ], axis=1,).float()
-            for seq_idx in range(input_ids.shape[0])
-        ], dim=0,).to(input_ids.device).requires_grad_()
-        # fmt: on
+        # Fill embeddings list
+        lst_all_seq_embeds = []
+        for seq_idx in range(input_ids.shape[0]):
+            lst_curr_seq_embeds = []
+            for tok_idx in range(input_ids.shape[1]):
+                lst_curr_seq_embeds.append(
+                    self.build_monotonic_path_embedding(
+                        word_path=word_paths[seq_idx][tok_idx],
+                        baseline_idx=int(baseline_ids[seq_idx, tok_idx]),
+                        n_steps=n_steps,
+                    )
+                )
+            # out shape: n_steps x seq_len x hidden_size
+            t_curr_seq_embeds = torch.stack(lst_curr_seq_embeds, axis=1).float()
+            lst_all_seq_embeds.append(t_curr_seq_embeds)
+        # concat sequences on batch dimension
+        t_all_seq_embeds = torch.cat(lst_all_seq_embeds).to(input_ids.device).requires_grad_()
+        return t_all_seq_embeds
 
     def find_path(
         self,

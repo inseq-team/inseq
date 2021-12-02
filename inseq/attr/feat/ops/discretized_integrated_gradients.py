@@ -44,7 +44,7 @@ class DiscretetizedIntegratedGradients(IntegratedGradients):
     def __init__(
         self,
         forward_func: Callable,
-        multiply_by_inputs: bool = True,
+        multiply_by_inputs: bool = False,
     ) -> None:
         super().__init__(forward_func, multiply_by_inputs)
         self.path_builder = None
@@ -68,6 +68,26 @@ class DiscretetizedIntegratedGradients(IntegratedGradients):
             **kwargs,
         )
 
+    @staticmethod
+    def get_inputs_baselines(scaled_features_tpl: Tuple[Tensor, ...], n_steps: int) -> Tuple[Tensor, ...]:
+        # Baseline and inputs are reversed in the path builder
+        # For every element in the batch, the first embedding of the sub-tensor
+        # of shape (n_steps x embedding_dim) is the baseline, the last is the input.
+        n_examples = scaled_features_tpl[0].shape[0] // n_steps
+        baselines = tuple(
+            torch.cat(
+                [features[i, :, :].unsqueeze(0) for i in range(0, n_steps * n_examples, n_steps)],
+            )
+            for features in scaled_features_tpl
+        )
+        inputs = tuple(
+            torch.cat(
+                [features[i, :, :].unsqueeze(0) for i in range(n_steps - 1, n_steps * n_examples, n_steps)],
+            )
+            for features in scaled_features_tpl
+        )
+        return inputs, baselines
+
     @log_usage()
     def attribute(  # type: ignore
         self,
@@ -78,13 +98,13 @@ class DiscretetizedIntegratedGradients(IntegratedGradients):
         internal_batch_size: Union[None, int] = None,
         return_convergence_delta: bool = False,
     ) -> Union[TensorOrTupleOfTensorsGeneric, Tuple[TensorOrTupleOfTensorsGeneric, Tensor]]:
-        num_examples = inputs.shape[0] // n_steps
+        n_examples = inputs.shape[0] // n_steps
         is_inputs_tuple = _is_tuple(inputs)
         scaled_features_tpl = _format_input(inputs)
         if internal_batch_size is not None:
             attributions = _batch_attribution(
                 self,
-                num_examples,
+                n_examples,
                 internal_batch_size,
                 n_steps,
                 scaled_features_tpl=scaled_features_tpl,
@@ -99,25 +119,7 @@ class DiscretetizedIntegratedGradients(IntegratedGradients):
                 n_steps=n_steps,
             )
         if return_convergence_delta:
-            assert len(scaled_features_tpl) == 1, "More than one tuple not supported in this code!"
-            # Baseline and inputs are reversed in the path builder
-            # For every element in the batch, the first embedding of the sub-tensor
-            # of shape (n_steps x embedding_dim) is the baseline, the last is the input.
-            end_point = _format_input(
-                torch.cat(
-                    [scaled_features_tpl[0][i, :, :].unsqueeze(0) for i in range(0, n_steps * num_examples, n_steps)],
-                    dim=0,
-                )
-            )
-            start_point = _format_input(
-                torch.cat(
-                    [
-                        scaled_features_tpl[0][i, :, :].unsqueeze(0)
-                        for i in range(n_steps - 1, n_steps * num_examples, n_steps)
-                    ],
-                    dim=0,
-                )
-            )
+            start_point, end_point = self.get_inputs_baselines(scaled_features_tpl, n_steps)
             # computes approximation error based on the completeness axiom
             delta = self.compute_convergence_delta(
                 attributions,
@@ -152,14 +154,29 @@ class DiscretetizedIntegratedGradients(IntegratedGradients):
         )
         # calculate (x - x') for each interpolated point
         shifted_inputs_tpl = tuple(
-            torch.cat([scaled_features[1:], scaled_features[-1].unsqueeze(0)])
-            for scaled_features in scaled_features_tpl
+            torch.cat(
+                [
+                    torch.cat([features[idx + 1 : idx + n_steps], features[idx + n_steps - 1].unsqueeze(0)])
+                    for idx in range(0, scaled_features_tpl[0].shape[0], n_steps)
+                ]
+            )
+            for features in scaled_features_tpl
         )
         steps = tuple(shifted_inputs_tpl[i] - scaled_features_tpl[i] for i in range(len(shifted_inputs_tpl)))
         scaled_grads = tuple(grads[i] * steps[i] for i in range(len(grads)))
         # aggregates across all steps for each tensor in the input tuple
-        attributions = tuple(
+        # total_grads has the same dimensionality as the original inputs
+        total_grads = tuple(
             _reshape_and_sum(scaled_grad, n_steps, grad.shape[0] // n_steps, grad.shape[1:])
             for (scaled_grad, grad) in zip(scaled_grads, grads)
         )
-        return attributions
+        # computes attribution for each tensor in input_tuple
+        # attributions has the same dimensionality as the original inputs
+        if not self.multiplies_by_inputs:
+            return total_grads
+        else:
+            inputs, baselines = self.get_inputs_baselines(scaled_features_tpl, n_steps)
+            return tuple(
+                total_grad * (input - baseline)
+                for (total_grad, input, baseline) in zip(total_grads, inputs, baselines)
+            )

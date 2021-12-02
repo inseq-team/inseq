@@ -94,7 +94,9 @@ class GradientAttribution(FeatureAttribution, Registry):
             and self.method.has_convergence_delta()
         ):
             attr, delta = attr
-        logger.debug(f"attributions prenorm: {pretty_tensor(attr)}, summed: {attr.sum(dim=-1).squeeze(0)}\n")
+        logger.debug(
+            f"attributions prenorm: {pretty_tensor(attr)}, summed: {pretty_tensor(attr.sum(dim=-1).squeeze(0))}\n"
+        )
         attr = sum_normalize(attr, dim_sum=-1)
         logger.debug(f"attributions: {pretty_tensor(attr)}\n" + "-" * 30)
         return (attr, delta) if delta is not None else attr
@@ -128,7 +130,7 @@ class DiscretizedIntegratedGradientsAttribution(GradientAttribution):
 
     def __init__(self, attribution_model, **kwargs):
         super().__init__(attribution_model, hook_to_model=False)
-        multiply_by_inputs = kwargs.pop("multiply_by_inputs", True)
+        multiply_by_inputs = kwargs.pop("multiply_by_inputs", False)
         self.attribution_model = attribution_model
         self.method = DiscretetizedIntegratedGradients(
             self.attribution_model.score_func,
