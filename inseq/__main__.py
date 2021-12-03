@@ -5,7 +5,6 @@ import logging
 import typer
 
 import inseq
-from inseq.utils.misc import isnotebook
 
 
 app = typer.Typer(
@@ -62,14 +61,8 @@ def attribute(
 ) -> NoReturn:
     """Perform attribution for the given text using the given model."""
     model = inseq.load(model, attribution_method=attribution)
-    out = model.attribute(texts, references, attr_pos_start=start_index, attr_pos_end=end_index)
-    if isnotebook():
-        inseq.show_attributions(out)
-    else:
-        if not isinstance(out, list):
-            out = [out]
-        for attributions in out:
-            print(attributions)
+    out = model.attribute(list(texts), references, attr_pos_start=start_index, attr_pos_end=end_index)
+    inseq.show_attributions(out)
 
 
 if __name__ == "__main__":
