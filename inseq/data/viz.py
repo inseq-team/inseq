@@ -29,7 +29,6 @@ from rich.live import Live
 from rich.padding import Padding
 from rich.panel import Panel
 from rich.progress import BarColumn, Progress, TextColumn
-from rich.spinner import Spinner
 from rich.style import Style
 from rich.table import Column, Table
 from rich.text import Text
@@ -253,30 +252,3 @@ def close_progress_bar(pbar: Union[tqdm, Tuple[Progress, Live], None], show: boo
     else:
         _, live = pbar
         live.stop()
-
-
-class LoadingMessage:
-    def __init__(self, msg, spinner="dots", style="green", padding=(1, 0, 1, 0), verbose=True):
-        self.msg = msg
-        self.spinner = spinner
-        self.style = style
-        self.padding = padding
-        self.live = None
-        self.verbose = verbose
-
-    def __enter__(self):
-        if self.verbose:
-            if isnotebook():
-                rprint(Padding(Text(self.msg, style=self.style), self.padding))
-            else:
-                self.live = Live(
-                    Padding(
-                        Spinner("dots", text=Text(self.msg, style=self.style)),
-                        self.padding,
-                    )
-                )
-                self.live.start(refresh=self.live._renderable is not None)
-
-    def __exit__(self, exc_type, exc_value, exc_traceback):
-        if not isnotebook() and self.verbose and self.live is not None:
-            self.live.stop()

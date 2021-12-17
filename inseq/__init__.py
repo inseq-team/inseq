@@ -2,8 +2,8 @@
 
 from importlib import metadata as importlib_metadata
 
-from .data import show_attributions
-from .models import AttributionModel, load
+from .data import load_attributions, save_attributions, show_attributions
+from .models import AttributionModel, load_model
 
 
 def get_version() -> str:
@@ -15,4 +15,4 @@ def get_version() -> str:
 
 version: str = get_version()
 
-__all__ = ["AttributionModel", "load", "show_attributions", "version"]
+__all__ = ["AttributionModel", "load_model", "show_attributions", "save_attributions", "load_attributions" "version"]

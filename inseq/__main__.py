@@ -58,11 +58,21 @@ def attribute(
         case_sensitive=False,
         help="End index for computing attribution scores",
     ),
+    output_attributions_path: Optional[str] = typer.Option(
+        None,
+        "-o",
+        "--output",
+        case_sensitive=False,
+        help="Output attribution scores to file",
+    ),
 ) -> NoReturn:
     """Perform attribution for the given text using the given model."""
-    model = inseq.load(model, attribution_method=attribution)
+    model = inseq.load_model(model, attribution_method=attribution)
     out = model.attribute(list(texts), references, attr_pos_start=start_index, attr_pos_end=end_index)
     inseq.show_attributions(out)
+    if output_attributions_path:
+        print(f"Saving attributions to {output_attributions_path}")
+        inseq.save_attributions(out, output_attributions_path)
 
 
 if __name__ == "__main__":
