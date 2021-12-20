@@ -21,6 +21,7 @@
 
 ## Example usage
 
+This example uses the Integrated Gradients attribution method to attribute the English-French translation of a sentence taken from the WinoMT corpus:
 ```python
 from inseq import load_model
 
