@@ -13,7 +13,7 @@ from inseq.utils import euclidean_distance
 
 @pytest.fixture(scope="session")
 def dig_model():
-    return inseq.load("Helsinki-NLP/opus-mt-de-en", "discretized_integrated_gradients")
+    return inseq.load_model("Helsinki-NLP/opus-mt-de-en", "discretized_integrated_gradients")
 
 
 def original_monotonic(vec1, vec2, vec3):
@@ -50,7 +50,7 @@ def original_dummy_find_word_path(wrd_idx: int, n_steps: int):
 def walrus_operator_find_word_path(wrd_idx: int, n_steps: int):
     word_path = [wrd_idx]
     for _ in range(n_steps):
-        word_path.append((wrd_idx := hash(wrd_idx + 0.01 + len(word_path) / 1000)))
+        word_path.append(wrd_idx := hash(wrd_idx + 0.01 + len(word_path) / 1000))
     return word_path
 
 

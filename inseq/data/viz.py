@@ -169,16 +169,17 @@ def get_saliency_heatmap_rich(
 
 
 def get_progress_bar(
-    target_sentences: List[Tuple[str, str, int]],
+    all_sentences: Tuple[List[str], List[str], List[int]],
     method_name: str,
     show: bool,
     pretty: bool,
 ) -> Union[tqdm, Tuple[Progress, Live], None]:
+    sources, targets, lengths = all_sentences
     if not show:
         return None
     elif show and not pretty:
         return tqdm(
-            total=max(tgt_len for _, _, tgt_len in target_sentences),
+            total=max(tgt_len for tgt_len in lengths),
             desc=f"Attributing with {method_name}...",
         )
     elif show and pretty:
@@ -187,11 +188,12 @@ def get_progress_bar(
             BarColumn(),
             TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
         )
-        _ = [job_progress.add_task(tgt, total=tgt_len) for _, tgt, tgt_len in target_sentences]
+        for idx, (tgt, tgt_len) in enumerate(zip(targets, lengths)):
+            job_progress.add_task(f"{idx}. {tgt}", total=tgt_len)
         progress_table = Table.grid()
         progress_table.add_row(
             Panel.fit(
-                "\n".join([src for src, _, _ in target_sentences]),
+                "\n".join([f"{idx}. {src}" for idx, src in enumerate(sources)]),
                 title="Source sentences",
                 border_style="red",
                 padding=(1, 2),
@@ -210,10 +212,7 @@ def get_progress_bar(
 
 def update_progress_bar(
     pbar: Union[tqdm, Tuple[Progress, Live], None],
-    skipped_prefixes: List[str] = None,
-    attributed_sentences: List[str] = None,
-    unattributed_suffixes: List[str] = None,
-    skipped_suffixes: List[str] = None,
+    split_targets: Tuple[List[str], List[str], List[str], List[str]] = None,
     whitespace_indexes: List[List[int]] = None,
     show: bool = False,
     pretty: bool = False,
@@ -226,15 +225,9 @@ def update_progress_bar(
         for job in pbar[0].tasks:
             if not job.finished:
                 pbar[0].advance(job.id)
-                formatted_desc = ""
+                formatted_desc = f"{job.id}. "
                 past_length = 0
-                splits = [
-                    skipped_prefixes,
-                    attributed_sentences,
-                    unattributed_suffixes,
-                    skipped_suffixes,
-                ]
-                for split, color in zip(splits, ["grey58", "green", "orange1", "grey58"]):
+                for split, color in zip(split_targets, ["grey58", "green", "orange1", "grey58"]):
                     if split[job.id]:
                         formatted_desc += f"[{color}]" + split[job.id] + "[/]"
                         past_length += len(split[job.id])

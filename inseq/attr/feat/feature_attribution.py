@@ -282,9 +282,8 @@ class FeatureAttribution(Registry):
         sources, targets, lengths = get_attribution_sentences(
             self.attribution_model, batch, attr_pos_start, attr_pos_end
         )
-        all_sentences = zip(sources, targets, lengths)
         pbar = get_progress_bar(
-            all_sentences=list(all_sentences),
+            all_sentences=(sources, targets, lengths),
             method_name=self.method_name,
             show=show_progress,
             pretty=pretty_progress,
