@@ -319,6 +319,7 @@ class FeatureAttribution(Registry):
             else:
                 update_progress_bar(pbar, show=show_progress, pretty=pretty_progress)
         close_progress_bar(pbar, show=show_progress, pretty=pretty_progress)
+        batch.to("cpu")
         sequence_attribution = FeatureAttributionSequenceOutput.from_attributions(attribution_outputs)
         if output_step_attributions:
             return sequence_attribution, attribution_outputs
@@ -394,8 +395,7 @@ class FeatureAttribution(Registry):
             f"target_attention_mask: {pretty_tensor(target_attention_mask)}"
         )
         # Perform attribution step
-        step_output = self.attribute_step(batch, target_ids.squeeze(), **kwargs)
-        attributions, deltas = step_output if isinstance(step_output, tuple) else (step_output, None)
+        attributions, deltas = self.attribute_step(batch, target_ids.squeeze(), **kwargs)
         # Reinsert finished sentences
         if target_attention_mask is not None and orig_target_ids.shape[0] > 1:
             attributions = remap_from_filtered(
@@ -447,10 +447,10 @@ class FeatureAttribution(Registry):
         target_tokens = self.attribution_model.convert_ids_to_tokens(target_ids, skip_special_tokens=False)
         source_ids = self.attribution_model.convert_tokens_to_ids(source_tokens)
         prefix_ids = self.attribution_model.convert_tokens_to_ids(prefix_tokens)
-        attributions = step_output[0].detach().cpu().tolist()
+        attributions = step_output[0].tolist()
         delta = None
         if len(step_output) > 1:
-            delta = step_output[1].detach().cpu().squeeze().tolist()
+            delta = step_output[1].squeeze().tolist()
             if not isinstance(delta, list):
                 delta = [delta]
         # The method to drop all attributions != 0

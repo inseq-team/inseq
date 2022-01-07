@@ -166,6 +166,7 @@ class HuggingfaceModel(AttributionModel):
             isinstance(inputs, list) and len(inputs) > 0 and all([isinstance(x, str) for x in inputs])
         ):
             inputs = self.encode(inputs)
+        inputs = inputs.to(self.device)
         generation_out = self.model.generate(
             input_ids=inputs.input_ids,
             attention_mask=inputs.attention_mask,
@@ -210,7 +211,7 @@ class HuggingfaceModel(AttributionModel):
                 truncation=True,
                 max_length=max_length,
                 return_tensors="pt",
-            )
+            ).to(self.device)
         baseline_ids = None
         if return_baseline:
             baseline_ids = batch["input_ids"].ne(self.eos_id).long() * self.pad_id

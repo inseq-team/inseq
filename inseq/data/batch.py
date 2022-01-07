@@ -42,12 +42,10 @@ class BatchEncoding:
         )
 
     def to(self, device: str) -> "BatchEncoding":
-        return BatchEncoding(
-            input_ids=self.input_ids.to(device),
-            input_tokens=self.input_tokens,
-            attention_mask=self.attention_mask.to(device),
-            baseline_ids=self.baseline_ids.to(device) if self.baseline_ids is not None else None,
-        )
+        self.input_ids.to(device)
+        self.attention_mask.to(device)
+        self.baseline_ids.to(device) if self.baseline_ids is not None else None
+        return self
 
     def clone(self) -> "BatchEncoding":
         cloned_baseline_ids = None
@@ -92,10 +90,9 @@ class BatchEmbedding:
         )
 
     def to(self, device: str) -> "BatchEmbedding":
-        return BatchEmbedding(
-            input_embeds=self.input_embeds.to(device) if self.input_embeds is not None else None,
-            baseline_embeds=self.baseline_embeds.to(device) if self.baseline_embeds is not None else None,
-        )
+        self.input_embeds.to(device) if self.input_embeds is not None else None
+        self.baseline_embeds.to(device) if self.baseline_embeds is not None else None
+        return self
 
     def clone(self) -> "BatchEmbedding":
         cloned_input_embeds = None
@@ -131,10 +128,9 @@ class Batch:
         return Batch(encoding=self.encoding[subscript], embedding=self.embedding[subscript])
 
     def to(self, device: str) -> "Batch":
-        return Batch(
-            encoding=self.encoding.to(device),
-            embedding=self.embedding.to(device),
-        )
+        self.encoding.to(device)
+        self.embedding.to(device)
+        return self
 
     def clone(self) -> "Batch":
         return Batch(
@@ -224,7 +220,9 @@ class EncoderDecoderBatch:
         return EncoderDecoderBatch(sources=self.sources, targets=self.targets[subscript])
 
     def to(self, device: str) -> "EncoderDecoderBatch":
-        return EncoderDecoderBatch(sources=self.sources.to(device), targets=self.targets.to(device))
+        self.sources.to(device)
+        self.targets.to(device)
+        return self
 
     def select_active(
         self, mask: TensorType["batch_size", 1, int], inplace: Optional[bool] = False
