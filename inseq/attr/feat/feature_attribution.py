@@ -47,6 +47,7 @@ from ...utils import (
 )
 from ...utils.typing import ModelIdentifier, TargetIdsTensor
 from ..attribution_decorators import set_hook, unset_hook
+from .attribution_utils import get_attribution_sentences, get_split_targets
 
 
 logger = logging.getLogger(__name__)
@@ -277,35 +278,17 @@ class FeatureAttribution(Registry):
             attr_pos_start,
             attr_pos_end,
         )
-
-        def tok2string(token_lists, start=None, end=None, as_targets=True):
-            start = [0 if start is None else start for tokens in token_lists]
-            end = [len(tokens) if end is None else end for tokens in token_lists]
-            # fmt: off
-            return self.attribution_model.convert_tokens_to_string(
-                [tokens[start[i]:end[i]] for i, tokens in enumerate(token_lists)],
-                as_targets=as_targets,
-            )
-            # fmt: on
-
         logger.debug("=" * 30 + f"\nfull batch: {batch}\n" + "=" * 30)
-        source_sentences = tok2string(batch.sources.input_tokens, as_targets=False)
-        target_sentences = tok2string(batch.targets.input_tokens)
-        if isinstance(source_sentences, str):
-            source_sentences = [source_sentences]
-            target_sentences = [target_sentences]
-        whitespace_indexes = find_char_indexes(target_sentences, " ")
-        tokenized_target_sentences = [
-            self.attribution_model.convert_string_to_tokens(sent, as_targets=True) for sent in target_sentences
-        ]
-        lengths = [min(attr_pos_end, len(tts) + 1) - attr_pos_start for tts in tokenized_target_sentences]
-        targets = zip(source_sentences, target_sentences, lengths)
+        sources, targets, lengths = get_attribution_sentences(
+            self.attribution_model, batch, attr_pos_start, attr_pos_end
+        )
         pbar = get_progress_bar(
-            target_sentences=list(targets),
+            all_sentences=(sources, targets, lengths),
             method_name=self.method_name,
             show=show_progress,
             pretty=pretty_progress,
         )
+        whitespace_indexes = find_char_indexes(targets, " ")
         attribution_outputs = []
         for step in range(attr_pos_start, attr_pos_end):
             step_output = self.filtered_attribute_step(
@@ -322,16 +305,12 @@ class FeatureAttribution(Registry):
                 )
             )
             if pretty_progress:
-                skipped_prefixes = tok2string(batch.targets.input_tokens, end=attr_pos_start)
-                attributed_sentences = tok2string(batch.targets.input_tokens, attr_pos_start, step + 1)
-                unattributed_suffixes = tok2string(batch.targets.input_tokens, step + 1, attr_pos_end)
-                skipped_suffixes = tok2string(batch.targets.input_tokens, start=attr_pos_end)
+                split_targets = get_split_targets(
+                    self.attribution_model, batch.targets.input_tokens, attr_pos_start, attr_pos_end, step
+                )
                 update_progress_bar(
                     pbar,
-                    skipped_prefixes,
-                    attributed_sentences,
-                    unattributed_suffixes,
-                    skipped_suffixes,
+                    split_targets,
                     whitespace_indexes,
                     show=show_progress,
                     pretty=pretty_progress,

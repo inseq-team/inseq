@@ -16,8 +16,11 @@
 # WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
 # OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+from typing import Union
+
+import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib.colors import LinearSegmentedColormap
+from matplotlib.colors import Colormap, LinearSegmentedColormap
 
 from .misc import ordinal_str
 
@@ -35,11 +38,18 @@ def red_transparent_blue_colormap():
     return LinearSegmentedColormap.from_list("red_transparent_blue", colors)
 
 
-def get_color(score, min_value, max_value, cmap):
+def get_color(score, min_value, max_value, cmap, return_alpha: bool = True, return_string: bool = True):
     # Normalize between 0-1 for the color scale
     scaled_value = (score - min_value) / (max_value - min_value)
     color = cmap(scaled_value)
-    color = "rgba" + str((color[0] * 255, color[1] * 255, color[2] * 255, color[3]))
+    if return_alpha:
+        color = (color[0] * 255, color[1] * 255, color[2] * 255, color[3])
+        if return_string:
+            color = "rgba" + str(color)
+    else:
+        color = (color[0] * 255, color[1] * 255, color[2] * 255)
+        if return_string:
+            color = "rgba" + str(color)
     return color
 
 
@@ -48,16 +58,20 @@ def sanitize_html(txt: str) -> str:
 
 
 def get_colors(
+    scores,
     min_value,
     max_value,
-    scores,
-    cmap,
+    cmap: Union[str, Colormap, None] = None,
+    return_alpha: bool = True,
+    return_strings: bool = True,
 ):
+    if cmap is None:
+        cmap = plt.get_cmap(cmap if isinstance(cmap, str) else "coolwarm", 200)
     input_colors = []
     for row_index in range(scores.shape[0]):
         input_colors_row = []
         for col_index in range(scores.shape[1]):
-            color = get_color(scores[row_index, col_index], min_value, max_value, cmap)
+            color = get_color(scores[row_index, col_index], min_value, max_value, cmap, return_alpha, return_strings)
             input_colors_row.append(color)
         input_colors.append(input_colors_row)
     return input_colors

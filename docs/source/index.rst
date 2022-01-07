@@ -24,14 +24,13 @@ Here is an example of using Inseq to attribute an English-to-Italian translation
 
     import inseq
 
-    model = inseq.load("Helsinki-NLP/opus-mt-en-it", "integrated_gradients")
-    text = "Hello world, today is a good day!"
-    out = model.attribute(txt)
-
-.. raw:: html
-
-    <img alt="IntegratedGradients Example Attribution" src="_static/heatmap_helloworld_enit.png" style="max-width: 600px;">
-
+    model = inseq.load_model("Helsinki-NLP/opus-mt-en-it", "integrated_gradients")
+    out = model.attribute(
+    "The developer argued with the designer because she did not like the design.",
+    return_convergence_delta=True,
+    n_steps=100
+    )
+    out.show()
 
 .. toctree::
     :maxdepth: 2

@@ -1,10 +1,9 @@
-from typing import List, NoReturn, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
+import json
 from dataclasses import dataclass
 
-import matplotlib.pyplot as plt
 import numpy as np
-import seaborn as sns
 
 from ..utils import pretty_dict
 from ..utils.typing import (
@@ -124,18 +123,16 @@ class FeatureAttributionSequenceOutput:
             return feat_attr_seq[0]
         return feat_attr_seq
 
-    def heatmap(self, cmap=None, figsize=None) -> NoReturn:
-        if not cmap:
-            cmap = sns.diverging_palette(220, 20, as_cmap=True)
-        if not figsize:
-            figsize = (1.5 * len(self.source_tokens), 0.7 * len(self.target_tokens))
-        plt.subplots(figsize=figsize)
-        sns.heatmap(
-            np.array(self.attributions).T,
-            xticklabels=self.target_tokens,
-            yticklabels=self.source_tokens,
-            cmap=cmap,
-        )
+    def show(
+        self,
+        min_val: Optional[int] = None,
+        max_val: Optional[int] = None,
+        display: bool = True,
+        return_html: Optional[bool] = False,
+    ) -> Optional[str]:
+        from inseq import show_attributions
+
+        return show_attributions(self, min_val, max_val, display, return_html)
 
     @property
     def minimum(self) -> float:
@@ -149,7 +146,48 @@ class FeatureAttributionSequenceOutput:
     def scores(self) -> np.ndarray:
         return np.array(self.attributions).T
 
+    def as_dict(self) -> Dict[str, List[Any]]:
+        return self.__dict__
+
 
 OneOrMoreFeatureAttributionSequenceOutputs = Union[
     FeatureAttributionSequenceOutput, List[FeatureAttributionSequenceOutput]
 ]
+
+
+def save_attributions(
+    attributions: OneOrMoreFeatureAttributionSequenceOutputs,
+    path: str,
+    overwrite: bool = False,
+) -> None:
+    """
+    Save attributions to a file.
+
+    Args:
+        attributions: Attributions to save.
+        path: Path to save the attributions to.
+        overwrite: If True, overwrite the file if it exists.
+    """
+    if isinstance(attributions, FeatureAttributionSequenceOutput):
+        attributions = [attributions]
+    with open(path, "w" if overwrite else "a") as f:
+        for attribution in attributions:
+            f.write(f"{json.dumps(attribution.as_dict())}\n")
+
+
+def load_attributions(
+    path: str,
+) -> OneOrMoreFeatureAttributionSequenceOutputs:
+    """
+    Load attributions from a file.
+
+    Args:
+        path: Path to a JSONlines file containing one serialized FeatureAttributionSequenceOutput
+            object per line.
+
+    Returns:
+        A list of FeatureAttributionSequenceOutput loaded from the file.
+    """
+    with open(path) as f:
+        attributions = [json.loads(line) for line in f]
+    return [FeatureAttributionSequenceOutput(**attribution) for attribution in attributions]

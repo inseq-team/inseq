@@ -4,10 +4,10 @@ import logging
 from abc import ABC, abstractmethod
 
 import torch
+from rich.status import Status
 
 from ..attr.feat.feature_attribution import FeatureAttribution
 from ..data import BatchEncoding, FeatureAttributionSequenceOutput, OneOrMoreFeatureAttributionSequenceOutputs
-from ..data.viz import LoadingMessage
 from ..utils import LengthMismatchError, MissingAttributionMethodError, isnotebook
 from ..utils.typing import (
     EmbeddingsTensor,
@@ -48,7 +48,7 @@ class AttributionModel(ABC):
         attribution_method: Optional[str] = None,
         **kwargs,
     ):
-        return load(model_name_or_path, attribution_method, **kwargs)
+        return load_model(model_name_or_path, attribution_method, **kwargs)
 
     def get_attribution_method(
         self,
@@ -248,7 +248,7 @@ class HookableModelWrapper(torch.nn.Module):
         self.forward = attribution_model.score_func
 
 
-def load(
+def load_model(
     model_name_or_path: ModelIdentifier,
     attribution_method: Optional[str] = None,
     **kwargs,
@@ -256,12 +256,11 @@ def load(
     from .huggingface_model import HuggingfaceModel
 
     from_hf = kwargs.pop("from_hf", None)
-    verbose = kwargs.get("verbose", True)
     desc_id = ", ".join(model_name_or_path) if isinstance(model_name_or_path, tuple) else model_name_or_path
     desc = f"Loading {desc_id}" + (
         f" with {attribution_method} method..." if attribution_method else " without methods..."
     )
-    with LoadingMessage(desc, verbose=verbose):
+    with Status(desc):
         if from_hf:
             return HuggingfaceModel(model_name_or_path, attribution_method, **kwargs)
         else:  # Default behavior is using Huggingface
