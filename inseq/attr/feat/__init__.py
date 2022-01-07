@@ -13,5 +13,6 @@ __all__ = [
     "GradientAttribution",
     "InputXGradientAttribution",
     "IntegratedGradientsAttribution",
+    "DiscretizedIntegratedGradientsAttribution",
     "SaliencyAttribution",
 ]
