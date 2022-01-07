@@ -61,11 +61,11 @@ def pretty_tensor(t: Optional[Tensor] = None, lpad: int = 8) -> str:
     if t is None:
         return "None"
     if len(t.shape) > 3 or any([x > 20 for x in t.shape]):
-        return f"{t.dtype} tensor of shape {list(t.shape)}"
+        return f"{t.dtype} tensor of shape {list(t.shape)} on {t.device}"
     else:
         out_list = t.tolist()
         out_list = _pretty_list(out_list, lpad) if isinstance(out_list, list) else out_list
-        return f"{t.dtype} tensor of shape {list(t.shape)} : {out_list}"
+        return f"{t.dtype} tensor of shape {list(t.shape)} on {t.device}: {out_list}"
 
 
 def pretty_dict(d: Dict[str, Any], lpad: int = 4) -> str:

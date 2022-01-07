@@ -244,7 +244,8 @@ class FeatureAttribution(Registry):
                 baseline_embeds=baseline_embeds,
             )
             targets = Batch(targets, target_embeds)
-        return EncoderDecoderBatch(sources, targets)
+        sources_targets = EncoderDecoderBatch(sources, targets)
+        return sources_targets.to(self.attribution_model.device)
 
     def attribute(
         self,

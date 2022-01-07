@@ -223,9 +223,9 @@ class HuggingfaceModel(AttributionModel):
             if return_baseline:
                 baseline_ids = torch.cat((bos_ids, baseline_ids), dim=1)
         return BatchEncoding(
-            input_ids=batch["input_ids"].to(self.device),
+            input_ids=batch["input_ids"],
             input_tokens=[self.tokenizer.convert_ids_to_tokens(x) for x in batch["input_ids"]],
-            attention_mask=batch["attention_mask"].to(self.device),
+            attention_mask=batch["attention_mask"],
             baseline_ids=baseline_ids,
         )
 
