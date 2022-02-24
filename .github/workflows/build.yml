@@ -34,9 +34,9 @@ jobs:
       run: |
         make check-style
 
-    - name: Run tests
+    - name: Run fast tests
       run: |
-        make test
+        make fast-test
 
     - name: Run safety checks
       run: |

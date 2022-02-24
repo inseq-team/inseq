@@ -97,7 +97,7 @@ class GradientAttribution(FeatureAttribution, Registry):
         logger.debug(f"attributions prenorm: {pretty_tensor(attr)}, summed: {attr.sum(dim=-1).squeeze(0)}\n")
         attr = sum_normalize(attr, dim_sum=-1)
         logger.debug(f"attributions: {pretty_tensor(attr)}\n" + "-" * 30)
-        return (attr, delta) if delta is not None else attr
+        return (attr.detach().cpu(), delta.detach().cpu() if delta is not None else None)
 
 
 class DeepLiftAttribution(GradientAttribution):

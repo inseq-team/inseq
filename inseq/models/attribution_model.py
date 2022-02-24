@@ -25,20 +25,35 @@ logger = logging.getLogger(__name__)
 
 
 class AttributionModel(ABC):
-    def __init__(self, attribution_method: Optional[str] = None, **kwargs) -> None:
+    def __init__(self, attribution_method: Optional[str] = None, device: str = None, **kwargs) -> None:
         if not hasattr(self, "model"):
             self.model = None
             self.model_name = None
+        self._device = None
         self.attribution_method = None
         self.is_hooked = False
-        self.setup(**kwargs)
+        self.setup(device, **kwargs)
         self.attribution_method = self.get_attribution_method(attribution_method)
 
-    def setup(self, **kwargs) -> None:
-        """Move the model to device and in eval mode."""
-        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    @property
+    def device(self) -> str:
+        return self._device
+
+    @device.setter
+    def device(self, new_device: str) -> None:
+        if "cuda" in new_device and not torch.cuda.is_available():
+            raise torch.cuda.CudaError("Cannot use CUDA device, CUDA is not available.")
+        self._device = new_device
         if self.model:
-            self.model.to(self.device)
+            self.model.to(self._device)
+
+    def setup(self, device: str = None, **kwargs) -> None:
+        """Move the model to device and in eval mode."""
+        if device is not None:
+            self.device = device
+        else:
+            self.device = "cuda:0" if torch.cuda.is_available() else "cpu"
+        if self.model:
             self.model.eval()
             self.model.zero_grad()
 
@@ -126,11 +141,15 @@ class AttributionModel(ABC):
         show_progress: bool = True,
         pretty_progress: bool = True,
         output_step_attributions: bool = False,
+        device: Optional[str] = None,
         **kwargs,
     ) -> OneOrMoreFeatureAttributionSequenceOutputs:
         """Perform attribution for one or multiple texts."""
         if not texts:
             return []
+        if device is not None:
+            original_device = self.device
+            self.device = device
         texts, reference_texts = self.format_input_texts(texts, reference_texts)
         if not reference_texts:
             texts = self.encode(texts, return_baseline=True)
@@ -143,7 +162,7 @@ class AttributionModel(ABC):
         if isnotebook():
             logger.debug("Pretty progress currently not supported in notebooks, falling back to tqdm.")
             pretty_progress = False
-        return attribution_method.prepare_and_attribute(
+        attribution_outputs = attribution_method.prepare_and_attribute(
             texts,
             reference_texts,
             attr_pos_start=attr_pos_start,
@@ -153,6 +172,9 @@ class AttributionModel(ABC):
             output_step_attributions=output_step_attributions,
             **attribution_args,
         )
+        if device is not None:
+            self.device = original_device
+        return attribution_outputs
 
     def embed(self, inputs: Union[TextInput, IdsTensor], as_targets: bool = False):
         if isinstance(inputs, str) or (

@@ -44,7 +44,7 @@ class HuggingfaceModel(AttributionModel):
         model (AutoModelForSeq2SeqLM): the seq2seq model on which
             attribution is performed.
         tokenizer (AutoTokenizer): the tokenizer associated to the model.
-        device (torch.device): the device on which the model is run (CPU or GPU).
+        device (str): the device on which the model is run (CPU or GPU).
         pad_id (int): the id of the pad token.
         eos_id (int): the id of the end of sequence token.
         bos_id (int): the id of the beginning of sequence token.
@@ -98,8 +98,8 @@ class HuggingfaceModel(AttributionModel):
         self.decoder_int_embeds = None
         super().__init__(attribution_method, **kwargs)
 
-    def setup(self, **kwargs) -> NoReturn:
-        super().setup(**kwargs)
+    def setup(self, device: str = None, **kwargs) -> NoReturn:
+        super().setup(device, **kwargs)
         self.configure_embeddings_scale()
 
     @classmethod
@@ -166,6 +166,7 @@ class HuggingfaceModel(AttributionModel):
             isinstance(inputs, list) and len(inputs) > 0 and all([isinstance(x, str) for x in inputs])
         ):
             inputs = self.encode(inputs)
+        inputs = inputs.to(self.device)
         generation_out = self.model.generate(
             input_ids=inputs.input_ids,
             attention_mask=inputs.attention_mask,
@@ -210,7 +211,7 @@ class HuggingfaceModel(AttributionModel):
                 truncation=True,
                 max_length=max_length,
                 return_tensors="pt",
-            )
+            ).to(self.device)
         baseline_ids = None
         if return_baseline:
             baseline_ids = batch["input_ids"].ne(self.eos_id).long() * self.pad_id
@@ -223,9 +224,9 @@ class HuggingfaceModel(AttributionModel):
             if return_baseline:
                 baseline_ids = torch.cat((bos_ids, baseline_ids), dim=1)
         return BatchEncoding(
-            input_ids=batch["input_ids"].to(self.device),
+            input_ids=batch["input_ids"],
             input_tokens=[self.tokenizer.convert_ids_to_tokens(x) for x in batch["input_ids"]],
-            attention_mask=batch["attention_mask"].to(self.device),
+            attention_mask=batch["attention_mask"],
             baseline_ids=baseline_ids,
         )
 

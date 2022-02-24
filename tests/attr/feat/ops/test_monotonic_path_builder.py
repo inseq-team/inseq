@@ -13,7 +13,7 @@ from inseq.utils import euclidean_distance
 
 @pytest.fixture(scope="session")
 def dig_model():
-    return inseq.load_model("Helsinki-NLP/opus-mt-de-en", "discretized_integrated_gradients")
+    return inseq.load_model("Helsinki-NLP/opus-mt-de-en", "discretized_integrated_gradients", device="cpu")
 
 
 def original_monotonic(vec1, vec2, vec3):
