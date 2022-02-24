@@ -44,7 +44,7 @@ class HuggingfaceModel(AttributionModel):
         model (AutoModelForSeq2SeqLM): the seq2seq model on which
             attribution is performed.
         tokenizer (AutoTokenizer): the tokenizer associated to the model.
-        device (torch.device): the device on which the model is run (CPU or GPU).
+        device (str): the device on which the model is run (CPU or GPU).
         pad_id (int): the id of the pad token.
         eos_id (int): the id of the end of sequence token.
         bos_id (int): the id of the beginning of sequence token.
@@ -98,8 +98,8 @@ class HuggingfaceModel(AttributionModel):
         self.decoder_int_embeds = None
         super().__init__(attribution_method, **kwargs)
 
-    def setup(self, **kwargs) -> NoReturn:
-        super().setup(**kwargs)
+    def setup(self, device: str = None, **kwargs) -> NoReturn:
+        super().setup(device, **kwargs)
         self.configure_embeddings_scale()
 
     @classmethod
