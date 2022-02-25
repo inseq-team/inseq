@@ -67,6 +67,7 @@ class GradientAttribution(FeatureAttribution, Registry):
         self,
         batch: EncoderDecoderBatch,
         target_ids: TargetIdsTensor,
+        attribute_target: bool = False,
         **kwargs,
     ) -> FeatureAttributionStepOutput:
         r"""
@@ -77,27 +78,40 @@ class GradientAttribution(FeatureAttribution, Registry):
             batch (:class:`~inseq.data.EncoderDecoderBatch`): The batch of sequences on which attribution is performed.
             target_ids (:obj:`torch.Tensor`): Target token ids of size `(batch_size)` corresponding to tokens
                 for which the attribution step must be performed.
+            attribute_target (:obj:`bool`, optional): Whether to attribute the target prefix or not. Defaults to False.
             kwargs: Additional keyword arguments to pass to the attribution step.
 
         Returns:
-            :obj:`FeatureAttributionStepOutput`: A tuple containing a tensor of attributions
-                of size `(batch_size, source_length)` and possibly a tensor of attribution deltas
-                of size `(batch_size)`, if the attribution step supports deltas and they are requested.
+            :class:`~inseq.data.FeatureAttributionStepOutput`: A dataclass containing a tensor of source-side
+                attributions of size `(batch_size, source_length)`, possibly a tensor of target attributions of size
+                `(batch_size, prefix length) if attribute_target=True and possibly a tensor of deltas of size
+                `(batch_size)` if the attribution step supports deltas and they are requested.
         """
-        attribute_args = self.format_attribute_args(batch, target_ids, **kwargs)
+        attribute_args = self.format_attribute_args(batch, target_ids, attribute_target, **kwargs)
         logger.debug(f"batch: {batch},\ntarget_ids: {pretty_tensor(target_ids, lpad=4)}")
         attr = self.method.attribute(**attribute_args)
-        delta = None
+        deltas = None
         if (
             attribute_args.get("return_convergence_delta", False)
             and hasattr(self.method, "has_convergence_delta")
             and self.method.has_convergence_delta()
         ):
-            attr, delta = attr
-        logger.debug(f"attributions prenorm: {pretty_tensor(attr)}, summed: {attr.sum(dim=-1).squeeze(0)}\n")
-        attr = sum_normalize(attr, dim_sum=-1)
-        logger.debug(f"attributions: {pretty_tensor(attr)}\n" + "-" * 30)
-        return (attr.detach().cpu(), delta.detach().cpu() if delta is not None else None)
+            attr, deltas = attr
+        if isinstance(attr, tuple):
+            step_output = FeatureAttributionStepOutput(source_attributions=attr[0])
+            if attribute_target:
+                assert len(attr) > 1, "Expected target attributions to be present"
+                step_output.target_attributions = attr[1]
+                logger.debug(f"target attributions prenorm: {pretty_tensor(step_output.target_attributions)}")
+        else:
+            step_output = FeatureAttributionStepOutput(source_attributions=attr)
+        logger.debug(f"source attributions prenorm: {pretty_tensor(step_output.source_attributions)}\n")
+        step_output.source_attributions = sum_normalize(step_output.source_attributions, dim_sum=-1)
+        step_output.target_attributions = sum_normalize(step_output.target_attributions, dim_sum=-1)
+        logger.debug(f"target attributions postnorm: {pretty_tensor(step_output.target_attributions)}")
+        logger.debug(f"source attributions postnorm: {pretty_tensor(step_output.source_attributions)}\n" + "-" * 30)
+        step_output.deltas = deltas
+        return step_output
 
 
 class DeepLiftAttribution(GradientAttribution):
@@ -156,24 +170,39 @@ class DiscretizedIntegratedGradientsAttribution(GradientAttribution):
         self,
         batch: EncoderDecoderBatch,
         target_ids: TargetIdsTensor,
+        attribute_target: bool = False,
         **kwargs,
     ) -> FeatureAttributionStepOutput:
-        scaled_inputs = self.method.path_builder.scale_inputs(
-            batch.sources.input_ids,
-            batch.sources.baseline_ids,
-            n_steps=kwargs.get("n_steps", None),
-            scale_strategy=kwargs.get("strategy", None),
+        scaled_inputs = (
+            self.method.path_builder.scale_inputs(
+                batch.sources.input_ids,
+                batch.sources.baseline_ids,
+                n_steps=kwargs.get("n_steps", None),
+                scale_strategy=kwargs.get("strategy", None),
+            ),
         )
+        if attribute_target:
+            scaled_decoder_inputs = self.method.path_builder.scale_inputs(
+                batch.targets.input_ids,
+                batch.targets.baseline_ids,
+                n_steps=kwargs.get("n_steps", None),
+                scale_strategy=kwargs.get("strategy", None),
+            )
+            scaled_inputs = scaled_inputs + (scaled_decoder_inputs,)
         attribute_args = {
             "inputs": scaled_inputs,
             "target": target_ids,
             "additional_forward_args": (
                 batch.sources.attention_mask,
-                batch.targets.input_embeds,
                 batch.targets.attention_mask,
-                False,
+                True,
+                attribute_target,
             ),
         }
+        if not attribute_target:
+            attribute_args["additional_forward_args"] = (batch.targets.input_embeds,) + attribute_args[
+                "additional_forward_args"
+            ]
         return {**attribute_args, **kwargs}
 
 

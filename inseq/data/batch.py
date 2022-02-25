@@ -80,8 +80,8 @@ class BatchEncoding:
 
 @dataclass
 class BatchEmbedding:
-    input_embeds: Optional[EmbeddingsTensor]
-    baseline_embeds: Optional[EmbeddingsTensor]
+    input_embeds: Optional[EmbeddingsTensor] = None
+    baseline_embeds: Optional[EmbeddingsTensor] = None
 
     def __getitem__(self, subscript: Union[slice, int]) -> "BatchEmbedding":
         return BatchEmbedding(

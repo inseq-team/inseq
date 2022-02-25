@@ -13,6 +13,7 @@ from transformers.generation_utils import BeamSampleOutput, BeamSearchOutput, Gr
 from ..data import BatchEncoding
 from ..utils import optional, pretty_tensor
 from ..utils.typing import (
+    AttributionForwardInputs,
     EmbeddingsTensor,
     FullLogitsTensor,
     IdsTensor,
@@ -116,17 +117,33 @@ class HuggingfaceModel(AttributionModel):
 
     def score_func(
         self,
-        encoder_tensors: Optional[Union[IdsTensor, EmbeddingsTensor]] = None,
+        encoder_tensors: AttributionForwardInputs,
+        decoder_tensors: AttributionForwardInputs,
         encoder_attention_mask: Optional[IdsTensor] = None,
-        decoder_tensors: Optional[EmbeddingsTensor] = None,
         decoder_attention_mask: Optional[IdsTensor] = None,
-        compute_embeddings: Optional[bool] = True,
+        use_embeddings: bool = True,
+        attribute_target: bool = False,
     ) -> FullLogitsTensor:
+        if not attribute_target and decoder_tensors is None:
+            raise ValueError(
+                "Decoder tensors must be explicit arguments when target-side" "attribution is not performed."
+            )
+        if use_embeddings:
+            encoder_embeds = encoder_tensors
+            decoder_embeds = decoder_tensors
+            encoder_ids = None
+            decoder_ids = None
+        else:
+            encoder_embeds = None
+            decoder_embeds = None
+            encoder_ids = encoder_tensors
+            decoder_ids = encoder_tensors
         output = self.model(
-            input_ids=encoder_tensors if compute_embeddings else None,
-            inputs_embeds=encoder_tensors if not compute_embeddings else None,
+            input_ids=encoder_ids,
+            inputs_embeds=encoder_embeds,
             attention_mask=encoder_attention_mask,
-            decoder_inputs_embeds=decoder_tensors,
+            decoder_input_ids=decoder_ids,
+            decoder_inputs_embeds=decoder_embeds,
             decoder_attention_mask=decoder_attention_mask,
         )
         # Full logits for last position of every sentence:

@@ -18,17 +18,35 @@ from .batch import Batch, BatchEncoding
 
 
 FeatureAttributionInput = Union[TextInput, BatchEncoding, Batch]
-FeatureAttributionStepOutput = Union[
-    Tuple[
-        AttributionOutputTensor,
-    ],
-    Tuple[AttributionOutputTensor, DeltaOutputTensor],
-]
+
+
+@dataclass
+class FeatureAttributionStepOutput:
+    """
+    Raw output of a single step of feature attribution
+    """
+
+    source_attributions: AttributionOutputTensor
+    target_attributions: Optional[AttributionOutputTensor] = None
+    deltas: Optional[DeltaOutputTensor] = None
+
+    def detach(self) -> "FeatureAttributionStepOutput":
+        self.source_attributions.detach()
+        self.target_attributions.detach()
+        self.deltas.detach()
+        return self
+
+    def to(self, device: str) -> "FeatureAttributionStepOutput":
+        self.source_attributions.to(device)
+        self.target_attributions.to(device) if self.target_attributions is not None else None
+        self.deltas.to(device) if self.deltas is not None else None
+        return self
 
 
 @dataclass
 class FeatureAttributionOutput:
-    attributions: Optional[OneOrMoreAttributionSequences] = None
+    source_attributions: Optional[OneOrMoreAttributionSequences] = None
+    target_attributions: Optional[OneOrMoreAttributionSequences] = None
     delta: Optional[List[float]] = None
     source_ids: Optional[OneOrMoreIdSequences] = None
     prefix_ids: Optional[OneOrMoreIdSequences] = None
@@ -48,7 +66,8 @@ class FeatureAttributionOutput:
             source_tokens=self.source_tokens[index] if self.source_tokens is not None else None,
             prefix_tokens=self.prefix_tokens[index] if self.prefix_tokens is not None else None,
             target_tokens=self.target_tokens[index] if self.target_tokens is not None else None,
-            attributions=self.attributions[index],
+            source_attributions=self.source_attributions[index],
+            target_attributions=self.target_attributions[index],
             delta=self.delta[index] if self.delta is not None else None,
         )
 
@@ -61,9 +80,12 @@ class FeatureAttributionSequenceOutput:
     Attributes:
         source_tokens (list[str]): Tokenized source sequence.
         target_tokens (list[str]): Tokenized target sequence.
-        attributions (list[list[str]]): List of length len(target_tokens) containing
+        source_attributions (list[list[str]]): List of length len(target_tokens) containing
             lists of attributions of length len(source_tokens) for each
-            source-target token pair.
+            source-target token pair (full matrix).
+        target_attributions (list[list[str]]): List of length len(source_tokens) containing
+            lists of attributions of length len(target_tokens) for each
+            target-target token pair (triangular matrix).
         deltas (list[float], optional): List of length len(target_tokens) containing
             the deltas for the approximate integration of the gradients for each
             target token.
@@ -83,7 +105,8 @@ class FeatureAttributionSequenceOutput:
         IntegratedGradientAttributionOutput(
             source_tokens=['▁I', '▁like', '▁to', '▁eat', '▁cake', '.', '</s>'],
             target_tokens=['▁Mi', '▁piace', '▁mangiare', '▁la', '▁tor', 'ta', '.' '</s>'],
-            attributions=[ [ 0.85, ... ], [ 0.42, ... ], ... ],
+            source_attributions=[ [ 0.85, ... ], [ 0.42, ... ], ... ],
+            target_attributions=[ [ 0.85, ... ], [ 0.42, ... ], ... ],
             deltas=[ 0.01, ... ]
         )
     """
@@ -92,7 +115,8 @@ class FeatureAttributionSequenceOutput:
     source_tokens: List[str]
     target_ids: List[int]
     target_tokens: List[str]
-    attributions: OneOrMoreAttributionSequences
+    source_attributions: OneOrMoreAttributionSequences
+    target_attributions: OneOrMoreAttributionSequences
     deltas: Optional[List[float]] = None
 
     def __str__(self):
@@ -102,21 +126,30 @@ class FeatureAttributionSequenceOutput:
     def from_attributions(
         cls, attributions: List[FeatureAttributionOutput]
     ) -> "OneOrMoreFeatureAttributionSequenceOutputs":
-        num_sequences = len(attributions[0].attributions)
-        if not all([len(curr.attributions) == num_sequences for curr in attributions]):
+        num_sequences = len(attributions[0].source_attributions)
+        if not all([len(curr.source_attributions) == num_sequences for curr in attributions]):
             raise ValueError("All the attributions must include the same number of sequences.")
         feat_attr_seq = []
         for seq_id in range(num_sequences):
             feat_attr_seq_args = {
                 "source_ids": attributions[0].source_ids[seq_id],
                 "source_tokens": attributions[0].source_tokens[seq_id],
-                "target_ids": [attr.target_ids[seq_id][0] for attr in attributions if attr.attributions[seq_id]],
-                "target_tokens": [attr.target_tokens[seq_id][0] for attr in attributions if attr.attributions[seq_id]],
-                "attributions": [attr.attributions[seq_id] for attr in attributions if attr.attributions[seq_id]],
+                "target_ids": [
+                    attr.target_ids[seq_id][0] for attr in attributions if attr.source_attributions[seq_id]
+                ],
+                "target_tokens": [
+                    attr.target_tokens[seq_id][0] for attr in attributions if attr.source_attributions[seq_id]
+                ],
+                "source_attributions": [
+                    attr.source_attributions[seq_id] for attr in attributions if attr.source_attributions[seq_id]
+                ],
+                "target_attributions": [
+                    attr.target_attributions[seq_id] for attr in attributions if attr.source_attributions[seq_id]
+                ],
             }
             if all(a.delta is not None for a in attributions):
                 feat_attr_seq_args["deltas"] = [
-                    attr.delta[seq_id] for attr in attributions if attr.attributions[seq_id]
+                    attr.delta[seq_id] for attr in attributions if attr.source_attributions[seq_id]
                 ]
             feat_attr_seq.append(cls(**feat_attr_seq_args))
         if len(feat_attr_seq) == 1:
@@ -136,15 +169,29 @@ class FeatureAttributionSequenceOutput:
 
     @property
     def minimum(self) -> float:
-        return min(min(attr) for attr in self.attributions)
+        return min(
+            [
+                min(min(attr) for attr in self.source_attributions),
+                min(min(attr) for attr in self.target_attributions),
+            ]
+        )
 
     @property
     def maximum(self) -> float:
-        return max(max(attr) for attr in self.attributions)
+        return max(
+            [
+                max(max(attr) for attr in self.source_attributions),
+                max(max(attr) for attr in self.target_attributions),
+            ]
+        )
 
     @property
-    def scores(self) -> np.ndarray:
-        return np.array(self.attributions).T
+    def source_scores(self) -> np.ndarray:
+        return np.array(self.source_attributions).T
+
+    @property
+    def target_scores(self) -> np.ndarray:
+        return np.array(self.target_attributions).T
 
     def as_dict(self) -> Dict[str, List[Any]]:
         return self.__dict__
@@ -152,6 +199,12 @@ class FeatureAttributionSequenceOutput:
 
 OneOrMoreFeatureAttributionSequenceOutputs = Union[
     FeatureAttributionSequenceOutput, List[FeatureAttributionSequenceOutput]
+]
+# One or more FeatureAttributionSequenceOutput, with an optional added list
+# of single FeatureAttributionOutputs for each step.
+OneOrMoreFeatureAttributionSequenceOutputsWithStepOutputs = Union[
+    OneOrMoreFeatureAttributionSequenceOutputs,
+    Tuple[OneOrMoreFeatureAttributionSequenceOutputs, List[FeatureAttributionOutput]],
 ]
 
 

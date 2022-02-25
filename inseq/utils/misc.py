@@ -5,6 +5,7 @@ import logging
 import numbers
 from contextlib import contextmanager
 from inspect import signature
+from itertools import dropwhile
 
 from torch import Tensor
 
@@ -72,7 +73,7 @@ def pretty_dict(d: Dict[str, Any], lpad: int = 4) -> str:
     out_txt = "{\n"
     for k, v in d.items():
         out_txt += f"{' ' * lpad}{k}: "
-        if isinstance(v, list):
+        if isinstance(v, list) or isinstance(v, tuple):
             out_txt += pretty_list(v, lpad + 4)
         elif isinstance(v, Tensor):
             out_txt += pretty_tensor(v)
@@ -132,6 +133,10 @@ def find_char_indexes(strings: Sequence[str], char: str = " "):
             idx += 1
         whitespace_indexes.append(curr_idxs)
     return whitespace_indexes
+
+
+def drop_padding(seq: Sequence[Any], pad_id: Any):
+    return list(reversed(list(dropwhile(lambda x: x == pad_id, reversed(seq)))))
 
 
 def isnotebook():

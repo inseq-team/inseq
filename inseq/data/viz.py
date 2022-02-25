@@ -110,13 +110,13 @@ def get_saliency_heatmap_html(
     uuid = "".join(random.choices(string.ascii_lowercase, k=20))
     out = saliency_heatmap_table_header
     # add top row containing target tokens
-    for head_id in range(attribution.scores.shape[1]):
+    for head_id in range(attribution.source_scores.shape[1]):
         out += f"<th>{sanitize_html(attribution.target_tokens[head_id])}</th>"
     out += "</tr>"
-    for row_index in range(attribution.scores.shape[0]):
+    for row_index in range(attribution.source_scores.shape[0]):
         out += f"<tr><th>{sanitize_html(attribution.source_tokens[row_index])}</th>"
-        for col_index in range(attribution.scores.shape[1]):
-            score = str(round(attribution.scores[row_index][col_index], 3))
+        for col_index in range(attribution.source_scores.shape[1]):
+            score = str(round(attribution.source_scores[row_index][col_index], 3))
             out += f'<th style="background:{input_colors[row_index][col_index]}">{score}</th>'
         out += "</tr>"
     out += "</table>"

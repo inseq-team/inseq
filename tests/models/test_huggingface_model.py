@@ -26,7 +26,7 @@ def test_cuda_attribution_consistency(texts, reference_texts, ig_mt_model):
     assert all([tok_cpu == tok_gpu for tok_cpu, tok_gpu in zip(cpu_out.target_tokens, gpu_out.target_tokens)])
     attr_score_matches = [
         abs(el_cpu - el_gpu) < 5e-3
-        for cpu_attr, gpu_attr in zip(cpu_out.attributions, gpu_out.attributions)
+        for cpu_attr, gpu_attr in zip(cpu_out.source_attributions, gpu_out.source_attributions)
         for el_cpu, el_gpu in zip(cpu_attr, gpu_attr)
     ]
     assert all(attr_score_matches)
