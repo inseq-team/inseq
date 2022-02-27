@@ -21,6 +21,7 @@ from typing import List, Optional, Tuple, Union
 import random
 import string
 
+import numpy as np
 from matplotlib.colors import Colormap
 from rich import box
 from rich import print as rprint
@@ -63,20 +64,61 @@ def show_attributions(
         colors = get_attribution_colors(attributions, min_val, max_val, cmap=red_transparent_blue_colormap())
     else:
         colors = get_attribution_colors(attributions, min_val, max_val, return_alpha=False, return_strings=False)
-    for i, attribution in enumerate(attributions):
+    idx = 0
+    for attribution in attributions:
         if isnotebook():
             from IPython.core.display import HTML, display
 
+            instance_html = get_instance_html(idx)
             curr_html = ""
-            curr_html += get_instance_html(i)
-            curr_html += get_saliency_heatmap_html(attribution, colors[i])
+            curr_html += instance_html
+            curr_html += get_saliency_heatmap_html(
+                attribution.source_scores,
+                attribution.target_tokens,
+                attribution.source_tokens,
+                colors[idx],
+                label="Source",
+            )
+            idx += 1
+            if attribution.target_scores is not None:
+                curr_html += instance_html
+                curr_html += get_saliency_heatmap_html(
+                    attribution.target_scores,
+                    attribution.target_tokens,
+                    attribution.target_tokens,
+                    colors[idx],
+                    label="Target",
+                )
+                idx += 1
             if display:
                 display(HTML(curr_html))
             html_out += curr_html
         else:
             if not display:
                 raise AttributeError("display=False is not supported outside of an IPython environment.")
-            rprint(get_saliency_heatmap_rich(attribution, colors[i]))
+            rprint(
+                get_saliency_heatmap_rich(
+                    attribution.source_scores,
+                    attribution.target_tokens,
+                    attribution.source_tokens,
+                    colors[idx],
+                    attribution.deltas,
+                    label="Source",
+                )
+            )
+            idx += 1
+            if attribution.target_scores is not None:
+                rprint(
+                    get_saliency_heatmap_rich(
+                        attribution.target_scores,
+                        attribution.target_tokens,
+                        attribution.target_tokens,
+                        colors[idx],
+                        attribution.deltas,
+                        label="Target",
+                    )
+                )
+                idx += 1
     if return_html:
         return html_out
 
@@ -96,31 +138,38 @@ def get_attribution_colors(
         min_val = min(attribution.minimum for attribution in attributions)
     if max_val is None:
         max_val = max(attribution.maximum for attribution in attributions)
-    return [
-        get_colors(attribution.scores, min_val, max_val, cmap, return_alpha, return_strings)
-        for attribution in attributions
-    ]
+    colors = []
+    for attribution in attributions:
+        colors.append(get_colors(attribution.source_scores, min_val, max_val, cmap, return_alpha, return_strings))
+        if attribution.target_scores is not None:
+            colors.append(get_colors(attribution.target_scores, min_val, max_val, cmap, return_alpha, return_strings))
+    return colors
 
 
 def get_saliency_heatmap_html(
-    attribution: FeatureAttributionSequenceOutput,
+    scores: np.ndarray,
+    row_labels: List[str],
+    column_labels: List[str],
     input_colors: List[List[str]],
+    label: str = "",
 ):
     # unique ID added to HTML elements and function to avoid collision of differnent instances
     uuid = "".join(random.choices(string.ascii_lowercase, k=20))
     out = saliency_heatmap_table_header
     # add top row containing target tokens
-    for head_id in range(attribution.source_scores.shape[1]):
-        out += f"<th>{sanitize_html(attribution.target_tokens[head_id])}</th>"
+    for head_id in range(scores.shape[1]):
+        out += f"<th>{sanitize_html(row_labels[head_id])}</th>"
     out += "</tr>"
-    for row_index in range(attribution.source_scores.shape[0]):
-        out += f"<tr><th>{sanitize_html(attribution.source_tokens[row_index])}</th>"
-        for col_index in range(attribution.source_scores.shape[1]):
-            score = str(round(attribution.source_scores[row_index][col_index], 3))
+    for row_index in range(scores.shape[0]):
+        out += f"<tr><th>{sanitize_html(column_labels[row_index])}</th>"
+        for col_index in range(scores.shape[1]):
+            score = ""
+            if not np.isnan(scores[row_index, col_index]):
+                score = str(round(scores[row_index][col_index], 3))
             out += f'<th style="background:{input_colors[row_index][col_index]}">{score}</th>'
         out += "</tr>"
     out += "</table>"
-    saliency_heatmap_markup = saliency_heatmap_html.format(uuid=uuid, content=out)
+    saliency_heatmap_markup = saliency_heatmap_html.format(uuid=uuid, content=out, label=label)
     plot_uuid = "".join(random.choices(string.ascii_lowercase, k=20))
     return final_plot_html.format(
         uuid=plot_uuid,
@@ -129,37 +178,40 @@ def get_saliency_heatmap_html(
 
 
 def get_saliency_heatmap_rich(
-    attribution: FeatureAttributionSequenceOutput,
+    scores: np.ndarray,
+    row_labels: List[str],
+    column_labels: List[str],
     input_colors: List[List[Tuple[float, float, float]]],
+    deltas: Optional[List[float]] = None,
+    label: str = "",
 ):
-    deltas = attribution.deltas
     table = Table(
         *[Column(header="", justify="right", footer="δ")]
         + [
             Column(
-                header=attribution.target_tokens[head_id],
+                header=row_labels[head_id],
                 justify="center",
                 footer=f"{deltas[head_id]:.2f}" if deltas and len(deltas) > head_id else "",
             )
-            for head_id in range(attribution.scores.shape[1])
+            for head_id in range(scores.shape[1])
         ],
-        title="Saliency heatmap",
-        caption="x: Target, y: Source",
+        title=f"{label + ' ' if label else ''}Saliency Heatmap",
+        caption="x: Generated tokens, y: Attributed tokens",
         padding=(0, 1, 0, 1),
         show_lines=True,
         box=box.SIMPLE_HEAVY,
         show_footer=True,
     )
-    for row_index in range(attribution.scores.shape[0]):
+    for row_index in range(scores.shape[0]):
         table.add_row(
-            *[Text(attribution.source_tokens[row_index], style="bold")]
+            *[Text(column_labels[row_index], style="bold")]
             + [
                 Text(
-                    f"{attribution.scores[row_index][col_index]:.2f}",
+                    f"{round(scores[row_index][col_index], 2) if not np.isnan(scores[row_index][col_index]) else ''}",
                     justify="center",
                     style=Style(color=Color.from_rgb(*input_colors[row_index][col_index])),
                 )
-                for col_index in range(attribution.scores.shape[1])
+                for col_index in range(scores.shape[1])
             ]
         )
     return table

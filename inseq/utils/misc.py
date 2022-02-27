@@ -135,6 +135,13 @@ def find_char_indexes(strings: Sequence[str], char: str = " "):
     return whitespace_indexes
 
 
+def pad(seq: Sequence[Sequence[Any]], pad_id: Any):
+    """Pads a list of sequences to the same length."""
+    max_len = max(len(x) for x in seq)
+    seq = [x + [pad_id] * (max_len - len(x)) for x in seq]
+    return seq
+
+
 def drop_padding(seq: Sequence[Any], pad_id: Any):
     return list(reversed(list(dropwhile(lambda x: x == pad_id, reversed(seq)))))
 

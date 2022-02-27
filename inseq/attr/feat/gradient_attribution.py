@@ -97,19 +97,19 @@ class GradientAttribution(FeatureAttribution, Registry):
             and self.method.has_convergence_delta()
         ):
             attr, deltas = attr
+        step_output = FeatureAttributionStepOutput(source_attributions=attr)
         if isinstance(attr, tuple):
             step_output = FeatureAttributionStepOutput(source_attributions=attr[0])
-            if attribute_target:
-                assert len(attr) > 1, "Expected target attributions to be present"
-                step_output.target_attributions = attr[1]
-                logger.debug(f"target attributions prenorm: {pretty_tensor(step_output.target_attributions)}")
-        else:
-            step_output = FeatureAttributionStepOutput(source_attributions=attr)
         logger.debug(f"source attributions prenorm: {pretty_tensor(step_output.source_attributions)}\n")
         step_output.source_attributions = sum_normalize(step_output.source_attributions, dim_sum=-1)
-        step_output.target_attributions = sum_normalize(step_output.target_attributions, dim_sum=-1)
-        logger.debug(f"target attributions postnorm: {pretty_tensor(step_output.target_attributions)}")
-        logger.debug(f"source attributions postnorm: {pretty_tensor(step_output.source_attributions)}\n" + "-" * 30)
+        logger.debug(f"source attributions postnorm: {pretty_tensor(step_output.source_attributions)}\n")
+        if attribute_target:
+            assert len(attr) > 1, "Expected target attributions to be present"
+            step_output.target_attributions = attr[1]
+            logger.debug(f"target attributions prenorm: {pretty_tensor(step_output.target_attributions)}")
+            step_output.target_attributions = sum_normalize(step_output.target_attributions, dim_sum=-1)
+            logger.debug(f"target attributions postnorm: {pretty_tensor(step_output.target_attributions)}")
+        logger.debug("-" * 30)
         step_output.deltas = deltas
         return step_output
 

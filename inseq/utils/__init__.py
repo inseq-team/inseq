@@ -6,6 +6,7 @@ from .misc import (
     find_char_indexes,
     isnotebook,
     optional,
+    pad,
     pretty_dict,
     pretty_list,
     pretty_tensor,

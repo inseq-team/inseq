@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from ..utils import pretty_dict
+from ..utils import pad, pretty_dict
 from ..utils.typing import (
     AttributionOutputTensor,
     DeltaOutputTensor,
@@ -32,14 +32,18 @@ class FeatureAttributionStepOutput:
 
     def detach(self) -> "FeatureAttributionStepOutput":
         self.source_attributions.detach()
-        self.target_attributions.detach()
-        self.deltas.detach()
+        if self.target_attributions is not None:
+            self.target_attributions.detach()
+        if self.deltas is not None:
+            self.deltas.detach()
         return self
 
     def to(self, device: str) -> "FeatureAttributionStepOutput":
         self.source_attributions.to(device)
-        self.target_attributions.to(device) if self.target_attributions is not None else None
-        self.deltas.to(device) if self.deltas is not None else None
+        if self.target_attributions is not None:
+            self.target_attributions.to(device)
+        if self.deltas is not None:
+            self.deltas.to(device)
         return self
 
 
@@ -116,7 +120,7 @@ class FeatureAttributionSequenceOutput:
     target_ids: List[int]
     target_tokens: List[str]
     source_attributions: OneOrMoreAttributionSequences
-    target_attributions: OneOrMoreAttributionSequences
+    target_attributions: Optional[OneOrMoreAttributionSequences] = None
     deltas: Optional[List[float]] = None
 
     def __str__(self):
@@ -143,13 +147,14 @@ class FeatureAttributionSequenceOutput:
                 "source_attributions": [
                     attr.source_attributions[seq_id] for attr in attributions if attr.source_attributions[seq_id]
                 ],
-                "target_attributions": [
-                    attr.target_attributions[seq_id] for attr in attributions if attr.source_attributions[seq_id]
-                ],
             }
             if all(a.delta is not None for a in attributions):
                 feat_attr_seq_args["deltas"] = [
                     attr.delta[seq_id] for attr in attributions if attr.source_attributions[seq_id]
+                ]
+            if all(a.target_attributions is not None for a in attributions):
+                feat_attr_seq_args["target_attributions"] = [
+                    attr.target_attributions[seq_id] for attr in attributions if attr.source_attributions[seq_id]
                 ]
             feat_attr_seq.append(cls(**feat_attr_seq_args))
         if len(feat_attr_seq) == 1:
@@ -169,29 +174,30 @@ class FeatureAttributionSequenceOutput:
 
     @property
     def minimum(self) -> float:
-        return min(
-            [
-                min(min(attr) for attr in self.source_attributions),
-                min(min(attr) for attr in self.target_attributions),
-            ]
-        )
+        values = [np.amin(self.source_scores)]
+        if self.target_attributions is not None:
+            values.append(np.amin(self.target_scores))
+        return min(values)
 
     @property
     def maximum(self) -> float:
-        return max(
-            [
-                max(max(attr) for attr in self.source_attributions),
-                max(max(attr) for attr in self.target_attributions),
-            ]
-        )
+        values = [np.amax(self.source_scores)]
+        if self.target_attributions is not None:
+            values.append(np.amax(self.target_scores))
+        return min(values)
 
     @property
     def source_scores(self) -> np.ndarray:
         return np.array(self.source_attributions).T
 
     @property
-    def target_scores(self) -> np.ndarray:
-        return np.array(self.target_attributions).T
+    def target_scores(self) -> Optional[np.ndarray]:
+        if self.target_attributions is None:
+            return None
+        # Add an empty row to the target_attributions to make it a square matrix.
+        return np.vstack(
+            (np.array(pad(self.target_attributions, np.nan)).T, np.ones(len(self.target_attributions)) * np.nan)
+        )
 
     def as_dict(self) -> Dict[str, List[Any]]:
         return self.__dict__
