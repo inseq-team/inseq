@@ -65,11 +65,11 @@ def show_attributions(
     else:
         colors = get_attribution_colors(attributions, min_val, max_val, return_alpha=False, return_strings=False)
     idx = 0
-    for attribution in attributions:
+    for ex_id, attribution in enumerate(attributions):
         if isnotebook():
             from IPython.core.display import HTML, display
 
-            instance_html = get_instance_html(idx)
+            instance_html = get_instance_html(ex_id)
             curr_html = ""
             curr_html += instance_html
             curr_html += get_saliency_heatmap_html(
