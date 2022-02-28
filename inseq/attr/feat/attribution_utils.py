@@ -1,8 +1,10 @@
 from typing import List, Optional, Tuple
 
+import math
+
 from inseq.data.batch import EncoderDecoderBatch
 
-from ...utils.typing import OneOrMoreTokenSequences, TextInput
+from ...utils.typing import OneOrMoreAttributionSequences, OneOrMoreTokenSequences, TextInput
 
 
 def tok2string(
@@ -50,3 +52,12 @@ def get_split_targets(
     unattributed_suffixes = tok2string(attribution_model, targets, step + 1, end)
     skipped_suffixes = tok2string(attribution_model, targets, start=end)
     return skipped_prefixes, attributed_sentences, unattributed_suffixes, skipped_suffixes
+
+
+def rescale_attributions_to_tokens(
+    attributions: OneOrMoreAttributionSequences, tokens: OneOrMoreTokenSequences
+) -> OneOrMoreAttributionSequences:
+    return [
+        attr[: len(tokens)] if not all([math.isnan(x) for x in attr]) else []
+        for attr, tokens in zip(attributions, tokens)
+    ]

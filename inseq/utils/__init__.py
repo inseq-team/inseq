@@ -1,10 +1,12 @@
 from .cache import INSEQ_ARTIFACTS_CACHE, INSEQ_HOME_CACHE, cache_results
 from .errors import LengthMismatchError, MissingAttributionMethodError, UnknownAttributionMethodError
 from .misc import (
+    drop_padding,
     extract_signature_args,
     find_char_indexes,
     isnotebook,
     optional,
+    pad,
     pretty_dict,
     pretty_list,
     pretty_tensor,
@@ -28,6 +30,7 @@ __all__ = [
     "find_char_indexes",
     "extract_signature_args",
     "remap_from_filtered",
+    "drop_padding",
     "sum_normalize",
     "euclidean_distance",
     "Registry",

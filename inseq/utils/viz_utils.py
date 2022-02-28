@@ -38,7 +38,14 @@ def red_transparent_blue_colormap():
     return LinearSegmentedColormap.from_list("red_transparent_blue", colors)
 
 
-def get_color(score, min_value, max_value, cmap, return_alpha: bool = True, return_string: bool = True):
+def get_color(
+    score: float,
+    min_value: Union[float, int],
+    max_value: Union[float, int],
+    cmap: Union[str, Colormap, None] = None,
+    return_alpha: bool = True,
+    return_string: bool = True,
+):
     # Normalize between 0-1 for the color scale
     scaled_value = (score - min_value) / (max_value - min_value)
     color = cmap(scaled_value)
@@ -58,9 +65,9 @@ def sanitize_html(txt: str) -> str:
 
 
 def get_colors(
-    scores,
-    min_value,
-    max_value,
+    scores: np.array,
+    min_value: Union[float, int],
+    max_value: Union[float, int],
     cmap: Union[str, Colormap, None] = None,
     return_alpha: bool = True,
     return_strings: bool = True,
@@ -102,9 +109,9 @@ saliency_heatmap_table_header = """
 saliency_heatmap_html = """
 <div id="{uuid}_saliency_plot" class="{uuid}_viz_content">
     <div style="margin:5px;font-family:sans-serif;font-weight:bold;">
-        <span style="font-size: 20px;"> Saliency Heatmap </span>
+        <span style="font-size: 20px;">{label} Saliency Heatmap</span>
         <br>
-        x: Target, y: Source
+        x: Generated tokens, y: Attributed tokens
     </div>
     {content}
 </div>

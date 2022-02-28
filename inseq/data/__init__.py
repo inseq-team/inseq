@@ -4,6 +4,7 @@ from .attribution import (
     FeatureAttributionSequenceOutput,
     FeatureAttributionStepOutput,
     OneOrMoreFeatureAttributionSequenceOutputs,
+    OneOrMoreFeatureAttributionSequenceOutputsWithStepOutputs,
     load_attributions,
     save_attributions,
 )
@@ -22,6 +23,7 @@ __all__ = [
     "FeatureAttributionSequenceOutput",
     "ModelIdentifier",
     "OneOrMoreFeatureAttributionSequenceOutputs",
+    "OneOrMoreFeatureAttributionSequenceOutputsWithStepOutputs",
     "OneOrMoreIdSequences",
     "OneOrMoreTokenSequences",
     "TextInput",

@@ -24,3 +24,10 @@ AttributionOutputTensor = TensorType["batch_size", "seq_len", float]
 # For Fairseq it's a tuple of strings containing repo and model name
 # e.g. ("pytorch/fairseq", "transformer.wmt14.en-fr")
 ModelIdentifier = Union[str, Tuple[str, str]]
+
+AttributionForwardInputs = Union[IdsTensor, EmbeddingsTensor]
+AttributionForwardInputsPair = Union[
+    Tuple[IdsTensor, IdsTensor],
+    Tuple[EmbeddingsTensor, EmbeddingsTensor],
+]
+OneOrTwoAttributionForwardInputs = Union[AttributionForwardInputs, AttributionForwardInputsPair]

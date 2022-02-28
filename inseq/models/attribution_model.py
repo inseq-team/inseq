@@ -1,4 +1,4 @@
-from typing import Any, List, Optional, Sequence, Tuple, Union, overload
+from typing import Any, List, Optional, Tuple, Union
 
 import logging
 from abc import ABC, abstractmethod
@@ -7,7 +7,7 @@ import torch
 from rich.status import Status
 
 from ..attr.feat.feature_attribution import FeatureAttribution
-from ..data import BatchEncoding, FeatureAttributionSequenceOutput, OneOrMoreFeatureAttributionSequenceOutputs
+from ..data import BatchEncoding, OneOrMoreFeatureAttributionSequenceOutputsWithStepOutputs
 from ..utils import LengthMismatchError, MissingAttributionMethodError, isnotebook
 from ..utils.typing import (
     EmbeddingsTensor,
@@ -100,36 +100,6 @@ class AttributionModel(ABC):
             )
         return texts, reference_texts
 
-    @overload
-    def attribute(
-        self,
-        texts: str,
-        reference_texts: Optional[TextInput] = None,
-        method: Optional[str] = None,
-        override_default_method: Optional[bool] = False,
-        attr_pos_start: Optional[int] = 1,
-        attr_pos_end: Optional[int] = None,
-        show_progress: bool = True,
-        pretty_progress: bool = True,
-        **kwargs,
-    ) -> FeatureAttributionSequenceOutput:
-        ...
-
-    @overload
-    def attribute(
-        self,
-        texts: Sequence[str],
-        reference_texts: Optional[TextInput] = None,
-        method: Optional[str] = None,
-        override_default_method: Optional[bool] = False,
-        attr_pos_start: Optional[int] = 1,
-        attr_pos_end: Optional[int] = None,
-        show_progress: bool = True,
-        pretty_progress: bool = True,
-        **kwargs,
-    ) -> List[FeatureAttributionSequenceOutput]:
-        ...
-
     def attribute(
         self,
         texts: TextInput,
@@ -141,9 +111,10 @@ class AttributionModel(ABC):
         show_progress: bool = True,
         pretty_progress: bool = True,
         output_step_attributions: bool = False,
+        attribute_target: bool = False,
         device: Optional[str] = None,
         **kwargs,
-    ) -> OneOrMoreFeatureAttributionSequenceOutputs:
+    ) -> OneOrMoreFeatureAttributionSequenceOutputsWithStepOutputs:
         """Perform attribution for one or multiple texts."""
         if not texts:
             return []
@@ -170,6 +141,7 @@ class AttributionModel(ABC):
             show_progress=show_progress,
             pretty_progress=pretty_progress,
             output_step_attributions=output_step_attributions,
+            attribute_target=attribute_target,
             **attribution_args,
         )
         if device is not None:
