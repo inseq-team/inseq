@@ -1,4 +1,4 @@
-from typing import Any, List, Literal, Optional, Sequence, Tuple, Union, overload
+from typing import Any, List, Optional, Tuple, Union
 
 import logging
 from abc import ABC, abstractmethod
@@ -7,12 +7,7 @@ import torch
 from rich.status import Status
 
 from ..attr.feat.feature_attribution import FeatureAttribution
-from ..data import (
-    BatchEncoding,
-    FeatureAttributionOutput,
-    FeatureAttributionSequenceOutput,
-    OneOrMoreFeatureAttributionSequenceOutputsWithStepOutputs,
-)
+from ..data import BatchEncoding, OneOrMoreFeatureAttributionSequenceOutputsWithStepOutputs
 from ..utils import LengthMismatchError, MissingAttributionMethodError, isnotebook
 from ..utils.typing import (
     EmbeddingsTensor,
@@ -104,38 +99,6 @@ class AttributionModel(ABC):
                 "Input length: {}, reference length: {} ".format(len(texts), len(reference_texts))
             )
         return texts, reference_texts
-
-    @overload
-    def attribute(
-        self,
-        texts: str,
-        output_step_attributions: Literal[False],
-    ) -> FeatureAttributionSequenceOutput:
-        ...
-
-    @overload
-    def attribute(
-        self,
-        texts: Sequence[str],
-        output_step_attributions: Literal[False],
-    ) -> List[FeatureAttributionSequenceOutput]:
-        ...
-
-    @overload
-    def attribute(
-        self,
-        texts: str,
-        output_step_attributions: Literal[True],
-    ) -> Tuple[FeatureAttributionSequenceOutput, List[FeatureAttributionOutput]]:
-        ...
-
-    @overload
-    def attribute(
-        self,
-        texts: Sequence[str],
-        output_step_attributions: Literal[True],
-    ) -> Tuple[List[FeatureAttributionSequenceOutput], List[FeatureAttributionOutput]]:
-        ...
 
     def attribute(
         self,

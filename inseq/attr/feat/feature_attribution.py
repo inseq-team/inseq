@@ -17,7 +17,7 @@ Todo:
     * 🟡: Allow custom arguments for model loading in the :class:`FeatureAttribution` :meth:`load` method.
 """
 
-from typing import Any, Dict, List, Literal, NoReturn, Optional, Tuple, Union, overload
+from typing import Any, Dict, NoReturn, Optional, Tuple
 
 import logging
 from abc import abstractmethod
@@ -33,7 +33,6 @@ from ...data import (
     FeatureAttributionOutput,
     FeatureAttributionSequenceOutput,
     FeatureAttributionStepOutput,
-    OneOrMoreFeatureAttributionSequenceOutputs,
     OneOrMoreFeatureAttributionSequenceOutputsWithStepOutputs,
 )
 from ...data.viz import close_progress_bar, get_progress_bar, update_progress_bar
@@ -255,21 +254,6 @@ class FeatureAttribution(Registry):
             targets = Batch(targets, target_embeds)
         sources_targets = EncoderDecoderBatch(sources, targets)
         return sources_targets.to(self.attribution_model.device)
-
-    @overload
-    def attribute(
-        self,
-        texts: str,
-        output_step_attributions: Literal[False],
-    ) -> OneOrMoreFeatureAttributionSequenceOutputs:
-        ...
-
-    @overload
-    def attribute(
-        self,
-        output_step_attributions: Literal[True],
-    ) -> Union[OneOrMoreFeatureAttributionSequenceOutputs, List[FeatureAttributionOutput]]:
-        ...
 
     def attribute(
         self,
