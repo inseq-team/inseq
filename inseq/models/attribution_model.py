@@ -112,6 +112,7 @@ class AttributionModel(ABC):
         pretty_progress: bool = True,
         output_step_attributions: bool = False,
         attribute_target: bool = False,
+        output_step_probabilities: bool = False,
         device: Optional[str] = None,
         **kwargs,
     ) -> OneOrMoreFeatureAttributionSequenceOutputsWithStepOutputs:
@@ -142,6 +143,7 @@ class AttributionModel(ABC):
             pretty_progress=pretty_progress,
             output_step_attributions=output_step_attributions,
             attribute_target=attribute_target,
+            output_step_probabilities=output_step_probabilities,
             **attribution_args,
         )
         if device is not None:

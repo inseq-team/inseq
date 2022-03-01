@@ -42,8 +42,8 @@ from ...utils import (
     drop_padding,
     extract_signature_args,
     find_char_indexes,
+    logits2probs,
     pretty_tensor,
-    remap_from_filtered,
 )
 from ...utils.typing import ModelIdentifier, TargetIdsTensor
 from ..attribution_decorators import set_hook, unset_hook
@@ -150,6 +150,7 @@ class FeatureAttribution(Registry):
         pretty_progress: bool = True,
         output_step_attributions: bool = False,
         attribute_target: bool = False,
+        output_step_probabilities: bool = False,
         **kwargs,
     ) -> OneOrMoreFeatureAttributionSequenceOutputsWithStepOutputs:
         r"""
@@ -173,6 +174,8 @@ class FeatureAttribution(Registry):
                 objects for each step. Defaults to False.
             attribute_target (:obj:`bool`, `optional`): Whether to include target prefix for feature attribution.
                 Defaults to False.
+            output_step_probabilities (:obj:`bool`, optional): Whether to output the prediction probabilities for the
+                current generation step or not. Defaults to False.
 
         Returns:
             :obj:`OneOrMoreFeatureAttributionSequenceOutputsWithStepOutputs`: One or more
@@ -189,6 +192,7 @@ class FeatureAttribution(Registry):
             pretty_progress=pretty_progress,
             output_step_attributions=output_step_attributions,
             attribute_target=attribute_target,
+            output_step_probabilities=output_step_probabilities,
             **kwargs,
         )
 
@@ -264,6 +268,7 @@ class FeatureAttribution(Registry):
         pretty_progress: bool = True,
         output_step_attributions: bool = False,
         attribute_target: bool = False,
+        output_step_probabilities: bool = False,
         **kwargs,
     ) -> OneOrMoreFeatureAttributionSequenceOutputsWithStepOutputs:
         r"""
@@ -281,6 +286,8 @@ class FeatureAttribution(Registry):
                 objects for each step. Defaults to False.
             attribute_target (:obj:`bool`, `optional`): Whether to include target prefix for feature attribution.
                 Defaults to False.
+            output_step_probabilities (:obj:`bool`, optional): Whether to output the prediction probabilities for the
+                current generation step or not. Defaults to False.
             kwargs: Additional keyword arguments to pass to the attribution step.
 
         Returns:
@@ -312,6 +319,7 @@ class FeatureAttribution(Registry):
                 batch.targets.input_ids[:, step].unsqueeze(1),
                 batch.targets.attention_mask[:, step].unsqueeze(1),
                 attribute_target=attribute_target,
+                output_step_probabilities=output_step_probabilities,
                 **kwargs,
             )
             attribution_outputs.append(
@@ -380,6 +388,7 @@ class FeatureAttribution(Registry):
         target_ids: TensorType["batch_size", 1, int],
         target_attention_mask: Optional[TensorType["batch_size", 1, int]] = None,
         attribute_target: bool = False,
+        output_step_probabilities: bool = False,
         **kwargs: Dict[str, Any],
     ) -> FeatureAttributionStepOutput:
         r"""
@@ -396,6 +405,8 @@ class FeatureAttribution(Registry):
                 specifying which target_ids are valid for attribution and which are padding.
             attribute_target (:obj:`bool`, `optional`): Whether to include target prefix for feature attribution.
                 Defaults to False.
+            output_step_probabilities (:obj:`bool`, optional): Whether to output the prediction probabilities for the
+                current generation step or not. Defaults to False.
             kwargs: Additional keyword arguments to pass to the attribution step.
 
         Returns:
@@ -416,26 +427,16 @@ class FeatureAttribution(Registry):
             f"target_attention_mask: {pretty_tensor(target_attention_mask)}"
         )
         # Perform attribution step
-        step_output = self.attribute_step(batch, target_ids.squeeze(), attribute_target, **kwargs)
+        step_output = self.attribute_step(
+            batch, target_ids.squeeze(), attribute_target, output_step_probabilities, **kwargs
+        )
         # Reinsert finished sentences
         if target_attention_mask is not None and orig_target_ids.shape[0] > 1:
-            step_output.source_attributions = remap_from_filtered(
-                source=orig_batch.sources.input_ids,
-                mask=target_attention_mask,
-                filtered=step_output.source_attributions,
+            step_output.remap_from_filtered(
+                orig_batch.sources.input_ids,
+                orig_batch.targets.input_ids,
+                target_attention_mask,
             )
-            if step_output.target_attributions is not None:
-                step_output.target_attributions = remap_from_filtered(
-                    source=orig_batch.targets.input_ids,
-                    mask=target_attention_mask,
-                    filtered=step_output.target_attributions,
-                )
-            if step_output.deltas is not None:
-                step_output.deltas = remap_from_filtered(
-                    source=target_attention_mask.squeeze(),
-                    mask=target_attention_mask,
-                    filtered=step_output.deltas,
-                )
         return step_output.detach().to("cpu")
 
     def get_attribution_args(self, **kwargs):
@@ -485,6 +486,11 @@ class FeatureAttribution(Registry):
             delta = step_output.deltas.squeeze().tolist()
             if not isinstance(delta, list):
                 delta = [delta]
+        probs = None
+        if step_output.probabilities is not None:
+            probs = step_output.probabilities.squeeze().tolist()
+            if not isinstance(probs, list):
+                probs = [probs]
         return FeatureAttributionOutput(
             source_attributions=source_attributions,
             target_attributions=target_attributions,
@@ -495,6 +501,7 @@ class FeatureAttribution(Registry):
             source_tokens=source_tokens,
             prefix_tokens=prefix_tokens,
             target_tokens=target_tokens,
+            probabilities=probs,
         )
 
     def format_attribute_args(
@@ -525,7 +532,6 @@ class FeatureAttribution(Registry):
                 # Defines how to treat source and target tensors
                 # Maps on the use_embeddings argument of score_func
                 not self.is_layer_attribution,
-                attribute_target,
             ),
         }
         if not attribute_target:
@@ -536,12 +542,28 @@ class FeatureAttribution(Registry):
             attribute_args["baselines"] = baselines
         return {**attribute_args, **kwargs}
 
+    def get_step_prediction_probabilities(self, batch: EncoderDecoderBatch, target_ids: TargetIdsTensor) -> float:
+        """
+        Returns the probabilities of the target tokens.
+        """
+        if self.attribution_model is None:
+            raise ValueError("Attribution model is not set.")
+        logits = self.attribution_model.score_func(
+            encoder_tensors=batch.sources.input_embeds,
+            decoder_tensors=batch.targets.input_embeds,
+            encoder_attention_mask=batch.sources.attention_mask,
+            decoder_attention_mask=batch.targets.attention_mask,
+            use_embeddings=True,
+        )
+        return logits2probs(logits, target_ids)
+
     @abstractmethod
     def attribute_step(
         self,
         batch: EncoderDecoderBatch,
         target_ids: TensorType["batch_size", int],
         attribute_target: bool = False,
+        output_step_probabilities: bool = False,
         **kwargs: Dict[str, Any],
     ) -> FeatureAttributionStepOutput:
         r"""
