@@ -231,6 +231,25 @@ class AttributionModel(ABC):
     def get_embedding_layer(self) -> torch.nn.Module:
         pass
 
+    def configure_interpretable_embeddings(self, **kwargs) -> None:
+        """Configure the model with interpretable embeddings for gradient attribution.
+
+        This method needs to be defined for models that cannot receive embeddings directly from their
+        forward method parameters, to allow the usage of interpretable embeddings as surrogate for
+        feature attribution methods. Model that support precomputed embedding inputs by design can
+        skip this method.
+        """
+        pass
+
+    def remove_interpretable_embeddings(self, **kwargs) -> None:
+        """Removes interpretable embeddings used for gradient attribution.
+
+        If the configure_interpretable_embeddings method is defined, this method needs to be defined
+        to allow restoring original embeddings for the model. This is required for methods using the
+        decorator @unhooked since they require the original model capabilities.
+        """
+        pass
+
 
 class HookableModelWrapper(torch.nn.Module):
     """Module to wrap the AttributionModel class

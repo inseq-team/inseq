@@ -1,11 +1,9 @@
 """ HuggingFace Seq2seq model """
-from typing import List, Literal, NoReturn, Optional, Tuple, Union, overload
+from typing import List, NoReturn, Optional, Tuple, Union
 
 import logging
-import warnings
 
 import torch
-from captum.attr import configure_interpretable_embedding_layer, remove_interpretable_embedding_layer
 from torch import long
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 from transformers.generation_utils import BeamSampleOutput, BeamSearchOutput, GreedySearchOutput, SampleOutput
@@ -118,26 +116,21 @@ class HuggingfaceModel(AttributionModel):
     def score_func(
         self,
         encoder_tensors: AttributionForwardInputs,
-        decoder_tensors: AttributionForwardInputs,
+        decoder_embeds: AttributionForwardInputs,
         encoder_attention_mask: Optional[IdsTensor] = None,
         decoder_attention_mask: Optional[IdsTensor] = None,
         use_embeddings: bool = True,
     ) -> FullLogitsTensor:
         if use_embeddings:
             encoder_embeds = encoder_tensors
-            decoder_embeds = decoder_tensors
             encoder_ids = None
-            decoder_ids = None
         else:
             encoder_embeds = None
-            decoder_embeds = None
             encoder_ids = encoder_tensors
-            decoder_ids = encoder_tensors
         output = self.model(
             input_ids=encoder_ids,
             inputs_embeds=encoder_embeds,
             attention_mask=encoder_attention_mask,
-            decoder_input_ids=decoder_ids,
             decoder_inputs_embeds=decoder_embeds,
             decoder_attention_mask=decoder_attention_mask,
         )
@@ -146,26 +139,6 @@ class HuggingfaceModel(AttributionModel):
         logits = output.logits[:, -1, :].squeeze(1)
         logger.debug(f"logits: {pretty_tensor(logits)}")
         return logits
-
-    @overload
-    @unhooked
-    def generate(
-        self,
-        encodings: Union[TextInput, BatchEncoding],
-        return_generation_output: Literal[False] = False,
-        **kwargs,
-    ) -> List[str]:
-        ...
-
-    @overload
-    @unhooked
-    def generate(
-        self,
-        encodings: Union[TextInput, BatchEncoding],
-        return_generation_output: Literal[True],
-        **kwargs,
-    ) -> Tuple[List[str], GenerationOutput]:
-        ...
 
     @unhooked
     def generate(
@@ -316,35 +289,3 @@ class HuggingfaceModel(AttributionModel):
 
     def get_embedding_layer(self) -> torch.nn.Module:
         return self.model.get_encoder().embed_tokens
-
-    def configure_interpretable_embeddings(self, do_encoder: bool = True, do_decoder: bool = True) -> None:
-        """Configure the model with interpretable embeddings for gradient attribution."""
-        with warnings.catch_warnings():
-            warnings.filterwarnings("ignore", category=UserWarning)
-            try:
-                if do_encoder:
-                    encoder = self.model.get_encoder()
-                    self.encoder_int_embeds = configure_interpretable_embedding_layer(encoder, "embed_tokens")
-                if do_decoder:
-                    decoder = self.model.get_decoder()
-                    self.decoder_int_embeds = configure_interpretable_embedding_layer(decoder, "embed_tokens")
-            except AssertionError:
-                logger.warn("Interpretable embeddings were already configured for layer embed_tokens")
-
-    def remove_interpretable_embeddings(self, do_encoder: bool = True, do_decoder: bool = True) -> None:
-        warn_msg = (
-            "Cannot remove interpretable embedding wrapper from {model}."
-            "No interpretable embedding layer was configured."
-        )
-        if do_encoder:
-            if not self.encoder_int_embeds:
-                logger.warn(warn_msg.format(model="encoder"))
-            encoder = self.model.get_encoder()
-            remove_interpretable_embedding_layer(encoder, self.encoder_int_embeds)
-            self.encoder_int_embeds = None
-        if do_decoder:
-            if not self.decoder_int_embeds:
-                logger.warn(warn_msg.format(model="decoder"))
-            decoder = self.model.get_decoder()
-            remove_interpretable_embedding_layer(decoder, self.decoder_int_embeds)
-            self.decoder_int_embeds = None
