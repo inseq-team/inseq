@@ -68,6 +68,7 @@ class GradientAttribution(FeatureAttribution, Registry):
         batch: EncoderDecoderBatch,
         target_ids: TargetIdsTensor,
         attribute_target: bool = False,
+        output_step_probabilities: bool = False,
         **kwargs,
     ) -> FeatureAttributionStepOutput:
         r"""
@@ -79,6 +80,8 @@ class GradientAttribution(FeatureAttribution, Registry):
             target_ids (:obj:`torch.Tensor`): Target token ids of size `(batch_size)` corresponding to tokens
                 for which the attribution step must be performed.
             attribute_target (:obj:`bool`, optional): Whether to attribute the target prefix or not. Defaults to False.
+            output_step_probabilities (:obj:`bool`, optional): Whether to output the prediction probabilities for the
+                current generation step or not. Defaults to False.
             kwargs: Additional keyword arguments to pass to the attribution step.
 
         Returns:
@@ -90,16 +93,18 @@ class GradientAttribution(FeatureAttribution, Registry):
         attribute_args = self.format_attribute_args(batch, target_ids, attribute_target, **kwargs)
         logger.debug(f"batch: {batch},\ntarget_ids: {pretty_tensor(target_ids, lpad=4)}")
         attr = self.method.attribute(**attribute_args)
-        deltas = None
+        delta = None
         if (
             attribute_args.get("return_convergence_delta", False)
             and hasattr(self.method, "has_convergence_delta")
             and self.method.has_convergence_delta()
         ):
-            attr, deltas = attr
+            attr, delta = attr
         step_output = FeatureAttributionStepOutput(source_attributions=attr)
         if isinstance(attr, tuple):
             step_output = FeatureAttributionStepOutput(source_attributions=attr[0])
+        if output_step_probabilities:
+            step_output.probabilities = self.get_step_prediction_probabilities(batch, target_ids)
         logger.debug(f"source attributions prenorm: {pretty_tensor(step_output.source_attributions)}\n")
         step_output.source_attributions = sum_normalize(step_output.source_attributions, dim_sum=-1)
         logger.debug(f"source attributions postnorm: {pretty_tensor(step_output.source_attributions)}\n")
@@ -110,7 +115,7 @@ class GradientAttribution(FeatureAttribution, Registry):
             step_output.target_attributions = sum_normalize(step_output.target_attributions, dim_sum=-1)
             logger.debug(f"target attributions postnorm: {pretty_tensor(step_output.target_attributions)}")
         logger.debug("-" * 30)
-        step_output.deltas = deltas
+        step_output.deltas = delta
         return step_output
 
 
@@ -196,7 +201,6 @@ class DiscretizedIntegratedGradientsAttribution(GradientAttribution):
                 batch.sources.attention_mask,
                 batch.targets.attention_mask,
                 True,
-                attribute_target,
             ),
         }
         if not attribute_target:

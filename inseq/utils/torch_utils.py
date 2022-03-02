@@ -3,9 +3,16 @@ from typing import Any, Optional
 import torch
 from torchtyping import TensorType
 
-from .typing import AttributionOutputTensor, EmbeddingsTensor
+from .typing import (
+    AttributionOutputTensor,
+    EmbeddingsTensor,
+    FullLogitsTensor,
+    TargetIdsTensor,
+    TopProbabilitiesTensor,
+)
 
 
+@torch.no_grad()
 def remap_from_filtered(
     source: TensorType[..., Any],
     mask: TensorType["batch_size", 1, int],
@@ -37,3 +44,16 @@ def sum_normalize(
 def euclidean_distance(vec_a: torch.Tensor, vec_b: torch.Tensor) -> float:
     """Compute the Euclidean distance between two points."""
     return (vec_a - vec_b).pow(2).sum(-1).sqrt()
+
+
+@torch.no_grad()
+def logits2probs(logits: FullLogitsTensor, target_ids: TargetIdsTensor) -> TopProbabilitiesTensor:
+    """
+    Compute the scores of the target_ids from the logits.
+    The scores are computed as the probabilities of the target_ids after softmax.
+    """
+    softmax_out = torch.nn.functional.softmax(logits, dim=-1)
+    target_ids = target_ids.reshape(logits.shape[0], 1)
+    # Extracts the ith score from the softmax output over the vocabulary (dim -1 of the logits)
+    # where i is the value of the corresponding index in target_ids.
+    return softmax_out.gather(-1, target_ids).squeeze(-1)

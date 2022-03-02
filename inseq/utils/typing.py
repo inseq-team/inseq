@@ -16,6 +16,7 @@ EmbeddingsTensor = TensorType["batch_size", "seq_len", "embed_size", float]
 MultiStepEmbeddingsTensor = TensorType["batch_size_x_n_steps", "seq_len", "embed_size", float]
 VocabularyEmbeddingsTensor = TensorType["vocab_size", "embed_size", float]
 FullLogitsTensor = TensorType["batch_size", "seq_len", float]
+TopProbabilitiesTensor = TensorType["batch_size", float]
 
 DeltaOutputTensor = TensorType["batch_size", float]
 AttributionOutputTensor = TensorType["batch_size", "seq_len", float]

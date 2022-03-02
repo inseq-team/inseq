@@ -122,12 +122,7 @@ class HuggingfaceModel(AttributionModel):
         encoder_attention_mask: Optional[IdsTensor] = None,
         decoder_attention_mask: Optional[IdsTensor] = None,
         use_embeddings: bool = True,
-        attribute_target: bool = False,
     ) -> FullLogitsTensor:
-        if not attribute_target and decoder_tensors is None:
-            raise ValueError(
-                "Decoder tensors must be explicit arguments when target-side" "attribution is not performed."
-            )
         if use_embeddings:
             encoder_embeds = encoder_tensors
             decoder_embeds = decoder_tensors
