@@ -12,7 +12,7 @@ from .misc import (
     pretty_tensor,
     rgetattr,
 )
-from .registry import Registry
+from .registry import Registry, get_available_methods
 from .torch_utils import euclidean_distance, logits2probs, remap_from_filtered, sum_normalize
 
 
@@ -26,6 +26,7 @@ __all__ = [
     "pretty_tensor",
     "pretty_dict",
     "rgetattr",
+    "get_available_methods",
     "isnotebook",
     "find_char_indexes",
     "extract_signature_args",

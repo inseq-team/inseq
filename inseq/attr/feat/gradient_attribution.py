@@ -17,7 +17,6 @@ import logging
 
 from captum.attr import (
     DeepLift,
-    GradientShap,
     InputXGradient,
     IntegratedGradients,
     LayerDeepLift,
@@ -51,8 +50,8 @@ class GradientAttribution(FeatureAttribution, Registry):
             logger.debug(f"target_layer={self.target_layer}")
             if isinstance(self.target_layer, str):
                 self.target_layer = rgetattr(self.attribution_model.model, self.target_layer)
-        # For now only encoder attribution is supported
-        self.attribution_model.configure_interpretable_embeddings(do_encoder=not self.is_layer_attribution)
+        if not self.is_layer_attribution:
+            self.attribution_model.configure_interpretable_embeddings()
 
     @unset_hook
     def unhook(self, **kwargs):
@@ -61,7 +60,8 @@ class GradientAttribution(FeatureAttribution, Registry):
         """
         if self.is_layer_attribution:
             self.target_layer = None
-        self.attribution_model.remove_interpretable_embeddings(do_encoder=not self.is_layer_attribution)
+        else:
+            self.attribution_model.remove_interpretable_embeddings()
 
     def attribute_step(
         self,
@@ -252,23 +252,6 @@ class SaliencyAttribution(GradientAttribution):
     def __init__(self, attribution_model):
         super().__init__(attribution_model)
         self.method = Saliency(self.attribution_model.score_func)
-
-
-class GradientShapAttribution(GradientAttribution):
-    """GradientShap attribution method.
-
-    Reference implementation:
-    `https://captum.ai/api/gradient_shap.html <https://captum.ai/api/gradient_shap.html>`__.
-    """
-
-    method_name = "gradient_shap"
-
-    def __init__(self, attribution_model, **kwargs):
-        super().__init__(attribution_model)
-        super().__init__(attribution_model)
-        multiply_by_inputs = kwargs.pop("multiply_by_inputs", True)
-        self.method = GradientShap(self.attribution_model.score_func, multiply_by_inputs)
-        self.use_baseline = True
 
 
 # Layer methods

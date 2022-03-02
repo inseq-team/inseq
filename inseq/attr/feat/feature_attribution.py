@@ -42,6 +42,7 @@ from ...utils import (
     drop_padding,
     extract_signature_args,
     find_char_indexes,
+    get_available_methods,
     logits2probs,
     pretty_tensor,
 )
@@ -230,15 +231,12 @@ class FeatureAttribution(Registry):
         if isinstance(sources, str) or isinstance(sources, list):
             sources: BatchEncoding = self.attribution_model.encode(sources, return_baseline=True)
         if isinstance(sources, BatchEncoding):
-            # Layer attribution methods use token ids as inputs instead of embeddings since they
-            # don't need to attribute scores to embedding vectors.
-            if self.is_layer_attribution:
-                embeds = BatchEmbedding()
-            else:
-                embeds = BatchEmbedding(
-                    input_embeds=self.attribution_model.embed(sources.input_ids),
-                    baseline_embeds=self.attribution_model.embed(sources.baseline_ids),
-                )
+            # Even when we are performing layer attribution, we might need the embeddings
+            # to compute step probabilities.
+            embeds = BatchEmbedding(
+                input_embeds=self.attribution_model.embed(sources.input_ids),
+                baseline_embeds=self.attribution_model.embed(sources.baseline_ids),
+            )
             sources = Batch(sources, embeds)
         if isinstance(targets, str) or isinstance(targets, list):
             targets: BatchEncoding = self.attribution_model.encode(
@@ -295,6 +293,10 @@ class FeatureAttribution(Registry):
                 :class:`~inseq.data.FeatureAttributionSequenceOutput` depending on the number of inputs, with an
                 optional added list of single :class:`~inseq.data.FeatureAttributionOutput` for each step.
         """
+        if self.is_layer_attribution and attribute_target:
+            raise ValueError(
+                "Layer attribution methods do not support attribute_target=True. Use regular ones instead."
+            )
         max_generated_length = batch.targets.input_ids.shape[1]
         attr_pos_start, attr_pos_end = self.check_attribute_positions(
             max_generated_length,
@@ -514,15 +516,12 @@ class FeatureAttribution(Registry):
         if self.is_layer_attribution:
             inputs = (batch.sources.input_ids,)
             baselines = (batch.sources.baseline_ids,)
-            if attribute_target:
-                inputs = inputs + (batch.targets.input_ids,)
-                baselines = baselines + (batch.targets.baseline_ids,)
         else:
             inputs = (batch.sources.input_embeds,)
             baselines = (batch.sources.baseline_embeds,)
-            if attribute_target:
-                inputs = inputs + (batch.targets.input_embeds,)
-                baselines = baselines + (batch.targets.baseline_embeds,)
+        if attribute_target:
+            inputs = inputs + (batch.targets.input_embeds,)
+            baselines = baselines + (batch.targets.baseline_embeds,)
         attribute_args = {
             "inputs": inputs,
             "target": target_ids,
@@ -550,7 +549,7 @@ class FeatureAttribution(Registry):
             raise ValueError("Attribution model is not set.")
         logits = self.attribution_model.score_func(
             encoder_tensors=batch.sources.input_embeds,
-            decoder_tensors=batch.targets.input_embeds,
+            decoder_embeds=batch.targets.input_embeds,
             encoder_attention_mask=batch.sources.attention_mask,
             decoder_attention_mask=batch.targets.attention_mask,
             use_embeddings=True,
@@ -608,3 +607,10 @@ class FeatureAttribution(Registry):
         Abstract method, must be implemented by subclasses.
         """
         pass
+
+
+def list_feature_attribution_methods():
+    """
+    Lists all available feature attribution methods.
+    """
+    return get_available_methods(FeatureAttribution)
