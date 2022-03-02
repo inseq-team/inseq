@@ -16,7 +16,7 @@
 # WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
 # OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-from typing import List, Optional, Tuple, Union
+from typing import List, Literal, Optional, Tuple, Union
 
 import random
 import string
@@ -72,23 +72,11 @@ def show_attributions(
             instance_html = get_instance_html(ex_id)
             curr_html = ""
             curr_html += instance_html
-            curr_html += get_saliency_heatmap_html(
-                attribution.source_scores,
-                attribution.target_tokens,
-                attribution.source_tokens,
-                colors[idx],
-                label="Source",
-            )
+            curr_html += get_heatmap_type(attribution, colors[idx], "Source", isnotebook())
             idx += 1
             if attribution.target_scores is not None:
                 curr_html += instance_html
-                curr_html += get_saliency_heatmap_html(
-                    attribution.target_scores,
-                    attribution.target_tokens,
-                    attribution.target_tokens,
-                    colors[idx],
-                    label="Target",
-                )
+                curr_html += get_heatmap_type(attribution, colors[idx], "Target", isnotebook())
                 idx += 1
             if display:
                 display(HTML(curr_html))
@@ -96,28 +84,11 @@ def show_attributions(
         else:
             if not display:
                 raise AttributeError("display=False is not supported outside of an IPython environment.")
-            rprint(
-                get_saliency_heatmap_rich(
-                    attribution.source_scores,
-                    attribution.target_tokens,
-                    attribution.source_tokens,
-                    colors[idx],
-                    attribution.deltas,
-                    label="Source",
-                )
-            )
+            rprint(get_heatmap_type(attribution, colors[idx], "Source", isnotebook()))
             idx += 1
             if attribution.target_scores is not None:
-                rprint(
-                    get_saliency_heatmap_rich(
-                        attribution.target_scores,
-                        attribution.target_tokens,
-                        attribution.target_tokens,
-                        colors[idx],
-                        attribution.deltas,
-                        label="Target",
-                    )
-                )
+                print("\n\n")
+                rprint(get_heatmap_type(attribution, colors[idx], "Target", isnotebook()))
                 idx += 1
     if return_html:
         return html_out
@@ -146,28 +117,75 @@ def get_attribution_colors(
     return colors
 
 
+def get_heatmap_type(
+    attribution: FeatureAttributionSequenceOutput,
+    colors,
+    heatmap_type: Literal["Source", "Target"] = "Source",
+    use_html: bool = False,
+) -> str:
+    heatmap_func = get_saliency_heatmap_html if use_html else get_saliency_heatmap_rich
+    if heatmap_type == "Source":
+        return heatmap_func(
+            attribution.source_scores,
+            attribution.target_tokens,
+            attribution.source_tokens,
+            colors,
+            attribution.deltas,
+            attribution.probabilities,
+            label="Source",
+        )
+    elif heatmap_type == "Target":
+        return heatmap_func(
+            attribution.target_scores,
+            attribution.target_tokens,
+            attribution.target_tokens,
+            colors,
+            attribution.deltas,
+            attribution.probabilities,
+            label="Target",
+        )
+    else:
+        raise ValueError(f"Type {heatmap_type} is not supported.")
+
+
 def get_saliency_heatmap_html(
     scores: np.ndarray,
-    row_labels: List[str],
     column_labels: List[str],
+    row_labels: List[str],
     input_colors: List[List[str]],
+    deltas: Optional[List[float]] = None,
+    probabilities: Optional[List[float]] = None,
     label: str = "",
+    prob_highlight_threshold: float = 0.5,
+    delta_highlight_threshold: float = 0.5,
 ):
     # unique ID added to HTML elements and function to avoid collision of differnent instances
     uuid = "".join(random.choices(string.ascii_lowercase, k=20))
     out = saliency_heatmap_table_header
     # add top row containing target tokens
     for head_id in range(scores.shape[1]):
-        out += f"<th>{sanitize_html(row_labels[head_id])}</th>"
+        out += f"<th>{sanitize_html(column_labels[head_id])}</th>"
     out += "</tr>"
     for row_index in range(scores.shape[0]):
-        out += f"<tr><th>{sanitize_html(column_labels[row_index])}</th>"
+        out += f"<tr><th>{sanitize_html(row_labels[row_index])}</th>"
         for col_index in range(scores.shape[1]):
             score = ""
             if not np.isnan(scores[row_index, col_index]):
-                score = str(round(scores[row_index][col_index], 3))
+                score = round(scores[row_index][col_index], 3)
             out += f'<th style="background:{input_colors[row_index][col_index]}">{score}</th>'
         out += "</tr>"
+    if probabilities is not None:
+        out += '<tr style="outline: thin solid"><th><b>p(yt|x, y<t)</b></th>'
+        prob_style = lambda val: val >= prob_highlight_threshold
+        for col_index in range(scores.shape[1]):
+            score = round(probabilities[col_index], 3)
+            out += f'<th>{"<b>" if prob_style(score) else ""}{score}{"</b>" if prob_style(score) else ""}</th>'
+    if deltas is not None:
+        out += '<tr style="outline: thin solid"><th><b>δ</b></th>'
+        delta_style = lambda val: abs(val) >= delta_highlight_threshold
+        for col_index in range(scores.shape[1]):
+            score = round(deltas[col_index], 3)
+            out += f'<th>{"<b>" if delta_style(score) else ""}{score}{"</b>" if delta_style(score) else ""}</th>'
     out += "</table>"
     saliency_heatmap_markup = saliency_heatmap_html.format(uuid=uuid, content=out, label=label)
     plot_uuid = "".join(random.choices(string.ascii_lowercase, k=20))
@@ -179,41 +197,47 @@ def get_saliency_heatmap_html(
 
 def get_saliency_heatmap_rich(
     scores: np.ndarray,
-    row_labels: List[str],
     column_labels: List[str],
+    row_labels: List[str],
     input_colors: List[List[Tuple[float, float, float]]],
     deltas: Optional[List[float]] = None,
+    probabilities: Optional[List[float]] = None,
     label: str = "",
+    prob_highlight_threshold: float = 0.5,
+    delta_highlight_threshold: float = 0.5,
 ):
+    columns = [Column(header="", justify="right")]
+    for head_id in range(scores.shape[1]):
+        columns.append(Column(header=column_labels[head_id], justify="center"))
     table = Table(
-        *[Column(header="", justify="right", footer="δ")]
-        + [
-            Column(
-                header=row_labels[head_id],
-                justify="center",
-                footer=f"{deltas[head_id]:.2f}" if deltas and len(deltas) > head_id else "",
-            )
-            for head_id in range(scores.shape[1])
-        ],
+        *columns,
         title=f"{label + ' ' if label else ''}Saliency Heatmap",
         caption="x: Generated tokens, y: Attributed tokens",
         padding=(0, 1, 0, 1),
-        show_lines=True,
-        box=box.SIMPLE_HEAVY,
-        show_footer=True,
+        show_lines=False,
+        box=box.HEAVY_HEAD,
     )
     for row_index in range(scores.shape[0]):
-        table.add_row(
-            *[Text(column_labels[row_index], style="bold")]
-            + [
-                Text(
-                    f"{round(scores[row_index][col_index], 2) if not np.isnan(scores[row_index][col_index]) else ''}",
-                    justify="center",
-                    style=Style(color=Color.from_rgb(*input_colors[row_index][col_index])),
-                )
-                for col_index in range(scores.shape[1])
-            ]
-        )
+        row = [Text(row_labels[row_index], style="bold")]
+        for col_index in range(scores.shape[1]):
+            color = Color.from_rgb(*input_colors[row_index][col_index])
+            score = ""
+            if not np.isnan(scores[row_index][col_index]):
+                score = round(scores[row_index][col_index], 2)
+            row.append(Text(f"{score}", justify="center", style=Style(color=color)))
+        table.add_row(*row, end_section=row_index == scores.shape[0] - 1)
+    if probabilities:
+        prob_style = lambda val: "bold" if val >= prob_highlight_threshold else ""
+        prob_row = [[Text("p(yt|x, y<t)", style="bold")]]
+        for prob in probabilities:
+            prob_row.append([Text(f"{prob:.2f}", justify="center", style=prob_style(prob))])
+        table.add_row(*prob_row, end_section=True)
+    if deltas:
+        delta_style = lambda val: "bold" if abs(val) >= delta_highlight_threshold else ""
+        delta_row = [[Text("δ", style="bold")]]
+        for delta in deltas:
+            delta_row.append([Text(f"{delta:.2f}", justify="center", style=delta_style(delta))])
+        table.add_row(*delta_row, end_section=True)
     return table
 
 
