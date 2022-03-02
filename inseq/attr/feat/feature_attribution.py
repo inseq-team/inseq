@@ -42,6 +42,7 @@ from ...utils import (
     drop_padding,
     extract_signature_args,
     find_char_indexes,
+    get_available_methods,
     logits2probs,
     pretty_tensor,
 )
@@ -608,3 +609,10 @@ class FeatureAttribution(Registry):
         Abstract method, must be implemented by subclasses.
         """
         pass
+
+
+def list_feature_attribution_methods():
+    """
+    Lists all available feature attribution methods.
+    """
+    return get_available_methods(FeatureAttribution)
