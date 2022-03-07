@@ -87,8 +87,10 @@ class HuggingfaceModel(AttributionModel):
         self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_name_or_path, *tokenizer_inputs, **tokenizer_kwargs)
         self.model_name = self.model.config.name_or_path
         self.pad_id = self.model.config.pad_token_id
+        self.unk_id = self.tokenizer.unk_token_id
         self.eos_id = self.model.config.eos_token_id
         self.bos_id = self.model.config.decoder_start_token_id
+        self.unk_token = self.tokenizer.unk_token
         self.pad_token = self.tokenizer.convert_ids_to_tokens(self.pad_id)
         self.bos_token = self.tokenizer.convert_ids_to_tokens(self.bos_id)
         self.encoder_embed_scale = 1.0
@@ -173,7 +175,7 @@ class HuggingfaceModel(AttributionModel):
         as_targets: bool = False,
         prepend_bos_token: bool = True,
         return_baseline: bool = False,
-        include_eos_baseline: bool = True,
+        include_eos_baseline: bool = False,
     ) -> BatchEncoding:
         """Encode one or multiple texts, producing a BatchEncoding
 
@@ -201,9 +203,9 @@ class HuggingfaceModel(AttributionModel):
         baseline_ids = None
         if return_baseline:
             if include_eos_baseline:
-                baseline_ids = torch.ones_like(batch["input_ids"]).long() * self.pad_id
+                baseline_ids = torch.ones_like(batch["input_ids"]).long() * self.unk_id
             else:
-                baseline_ids = batch["input_ids"].ne(self.eos_id).long() * self.pad_id
+                baseline_ids = batch["input_ids"].ne(self.eos_id).long() * self.unk_id
         # We prepend a BOS token only when tokenizing target texts.
         if as_targets and prepend_bos_token:
             ones_mask = torch.ones((batch["input_ids"].shape[0], 1), device=self.device, dtype=long)

@@ -113,7 +113,7 @@ class AttributionModel(ABC):
         output_step_attributions: bool = False,
         attribute_target: bool = False,
         output_step_probabilities: bool = False,
-        include_eos_baseline: bool = True,
+        include_eos_baseline: bool = False,
         device: Optional[str] = None,
         **kwargs,
     ) -> OneOrMoreFeatureAttributionSequenceOutputsWithStepOutputs:
@@ -125,7 +125,7 @@ class AttributionModel(ABC):
             self.device = device
         texts, reference_texts = self.format_input_texts(texts, reference_texts)
         if not reference_texts:
-            texts = self.encode(texts, return_baseline=True)
+            texts = self.encode(texts, return_baseline=True, include_eos_baseline=include_eos_baseline)
             generation_args = kwargs.pop("generation_args", {})
             reference_texts = self.generate(texts, return_generation_output=False, **generation_args)
         logger.debug(f"reference_texts={reference_texts}")
