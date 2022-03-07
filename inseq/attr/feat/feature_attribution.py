@@ -152,7 +152,7 @@ class FeatureAttribution(Registry):
         output_step_attributions: bool = False,
         attribute_target: bool = False,
         output_step_probabilities: bool = False,
-        include_eos_baseline: bool = True,
+        include_eos_baseline: bool = False,
         **kwargs,
     ) -> OneOrMoreFeatureAttributionSequenceOutputsWithStepOutputs:
         r"""
@@ -179,7 +179,7 @@ class FeatureAttribution(Registry):
             output_step_probabilities (:obj:`bool`, optional): Whether to output the prediction probabilities for the
                 current generation step or not. Defaults to False.
             include_eos_baseline (:obj:`bool`, `optional`): Whether to include the EOS token in the baseline for
-                attribution. By default the EOS token is used for attribution. Defaults to True.
+                attribution. By default the EOS token is not used for attribution. Defaults to False.
 
         Returns:
             :obj:`OneOrMoreFeatureAttributionSequenceOutputsWithStepOutputs`: One or more
@@ -205,7 +205,7 @@ class FeatureAttribution(Registry):
         sources: FeatureAttributionInput,
         targets: FeatureAttributionInput,
         prepend_bos_token: bool = True,
-        include_eos_baseline: bool = True,
+        include_eos_baseline: bool = False,
     ) -> EncoderDecoderBatch:
         r"""
         Prepares sources and target to produce an :class:`~inseq.data.EncoderDecoderBatch`.
@@ -228,7 +228,7 @@ class FeatureAttribution(Registry):
             prepend_bos_token (:obj:`bool`, `optional`): Whether to prepend a BOS token to the
                 targets, if they are to be encoded. Defaults to True.
             include_eos_baseline (:obj:`bool`, `optional`): Whether to include the EOS token in the baseline for
-                attribution. By default the EOS token is used for attribution. Defaults to True.
+                attribution. By default the EOS token is not used for attribution. Defaults to False.
 
         Returns:
             :obj:`EncoderDecoderBatch`: An :class:`~inseq.data.EncoderDecoderBatch` object containing sources
