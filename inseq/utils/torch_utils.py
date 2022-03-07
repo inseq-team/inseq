@@ -1,8 +1,12 @@
-from typing import Any, Optional
+from typing import Any, Tuple, Union
+
+import logging
 
 import torch
+import torch.nn.functional as F
 from torchtyping import TensorType
 
+from .misc import pretty_tensor
 from .typing import (
     AttributionOutputTensor,
     EmbeddingsTensor,
@@ -10,6 +14,9 @@ from .typing import (
     TargetIdsTensor,
     TopProbabilitiesTensor,
 )
+
+
+logger = logging.getLogger(__name__)
 
 
 @torch.no_grad()
@@ -26,18 +33,25 @@ def remap_from_filtered(
     return new_source.scatter(0, index, filtered)
 
 
-def sum_normalize(
-    attributions: EmbeddingsTensor,
-    dim_sum: Optional[int] = -1,
+def sum_normalize_attributions(
+    attributions: Union[EmbeddingsTensor, Tuple[EmbeddingsTensor, EmbeddingsTensor]],
 ) -> AttributionOutputTensor:
     """
-    Sum and normalize tensor across dim_sum.
+    Sum and normalize tensors across dim_sum.
     The outcome is a matrix of unit row vectors.
     """
-    attributions = attributions.sum(dim=dim_sum).squeeze(0)
-    attributions = attributions.T.div(torch.norm(attributions, dim=dim_sum)).T
+    concat = False
+    if isinstance(attributions, tuple):
+        concat = True
+        orig_sizes = [a.shape[1] for a in attributions]
+        attributions = torch.cat(attributions, dim=1)
+    attributions = attributions.sum(dim=-1).squeeze(0)
+    logger.debug(f"pre-norm attributions: {pretty_tensor(attributions)}")
+    attributions = F.normalize(attributions, p=2, dim=-1)
     if len(attributions.shape) == 1:
-        return attributions.unsqueeze(0)
+        attributions = attributions.unsqueeze(0)
+    if concat:
+        return attributions.split(orig_sizes, dim=1)
     return attributions
 
 

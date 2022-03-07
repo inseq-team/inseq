@@ -26,7 +26,7 @@ from captum.attr import (
 )
 
 from ...data import EncoderDecoderBatch, FeatureAttributionStepOutput
-from ...utils import Registry, extract_signature_args, pretty_tensor, rgetattr, sum_normalize
+from ...utils import Registry, extract_signature_args, pretty_tensor, rgetattr, sum_normalize_attributions
 from ...utils.typing import TargetIdsTensor
 from ..attribution_decorators import set_hook, unset_hook
 from .feature_attribution import FeatureAttribution
@@ -100,21 +100,20 @@ class GradientAttribution(FeatureAttribution, Registry):
             and self.method.has_convergence_delta()
         ):
             attr, delta = attr
+        # If target size attribution is performed, attributions need to be renormalized
+        # by concatenating both source and target.
+        attr = sum_normalize_attributions(attr)
         step_output = FeatureAttributionStepOutput(source_attributions=attr)
         if isinstance(attr, tuple):
             step_output = FeatureAttributionStepOutput(source_attributions=attr[0])
-        if output_step_probabilities:
-            step_output.probabilities = self.get_step_prediction_probabilities(batch, target_ids)
-        logger.debug(f"source attributions prenorm: {pretty_tensor(step_output.source_attributions)}\n")
-        step_output.source_attributions = sum_normalize(step_output.source_attributions, dim_sum=-1)
         logger.debug(f"source attributions postnorm: {pretty_tensor(step_output.source_attributions)}\n")
         if attribute_target:
             assert len(attr) > 1, "Expected target attributions to be present"
             step_output.target_attributions = attr[1]
-            logger.debug(f"target attributions prenorm: {pretty_tensor(step_output.target_attributions)}")
-            step_output.target_attributions = sum_normalize(step_output.target_attributions, dim_sum=-1)
             logger.debug(f"target attributions postnorm: {pretty_tensor(step_output.target_attributions)}")
         logger.debug("-" * 30)
+        if output_step_probabilities:
+            step_output.probabilities = self.get_step_prediction_probabilities(batch, target_ids)
         step_output.deltas = delta
         return step_output
 

@@ -113,6 +113,7 @@ class AttributionModel(ABC):
         output_step_attributions: bool = False,
         attribute_target: bool = False,
         output_step_probabilities: bool = False,
+        include_eos_baseline: bool = True,
         device: Optional[str] = None,
         **kwargs,
     ) -> OneOrMoreFeatureAttributionSequenceOutputsWithStepOutputs:
@@ -144,6 +145,7 @@ class AttributionModel(ABC):
             output_step_attributions=output_step_attributions,
             attribute_target=attribute_target,
             output_step_probabilities=output_step_probabilities,
+            include_eos_baseline=include_eos_baseline,
             **attribution_args,
         )
         if device is not None:
