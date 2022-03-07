@@ -170,9 +170,10 @@ class HuggingfaceModel(AttributionModel):
     def encode(
         self,
         texts: TextInput,
-        as_targets: Optional[bool] = False,
-        prepend_bos_token: Optional[bool] = True,
-        return_baseline: Optional[bool] = False,
+        as_targets: bool = False,
+        prepend_bos_token: bool = True,
+        return_baseline: bool = False,
+        include_eos_baseline: bool = True,
     ) -> BatchEncoding:
         """Encode one or multiple texts, producing a BatchEncoding
 
@@ -199,7 +200,10 @@ class HuggingfaceModel(AttributionModel):
             ).to(self.device)
         baseline_ids = None
         if return_baseline:
-            baseline_ids = batch["input_ids"].ne(self.eos_id).long() * self.pad_id
+            if include_eos_baseline:
+                baseline_ids = torch.ones_like(batch["input_ids"]).long() * self.pad_id
+            else:
+                baseline_ids = batch["input_ids"].ne(self.eos_id).long() * self.pad_id
         # We prepend a BOS token only when tokenizing target texts.
         if as_targets and prepend_bos_token:
             ones_mask = torch.ones((batch["input_ids"].shape[0], 1), device=self.device, dtype=long)

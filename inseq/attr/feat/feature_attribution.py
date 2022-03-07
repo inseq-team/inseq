@@ -152,6 +152,7 @@ class FeatureAttribution(Registry):
         output_step_attributions: bool = False,
         attribute_target: bool = False,
         output_step_probabilities: bool = False,
+        include_eos_baseline: bool = True,
         **kwargs,
     ) -> OneOrMoreFeatureAttributionSequenceOutputsWithStepOutputs:
         r"""
@@ -177,6 +178,8 @@ class FeatureAttribution(Registry):
                 Defaults to False.
             output_step_probabilities (:obj:`bool`, optional): Whether to output the prediction probabilities for the
                 current generation step or not. Defaults to False.
+            include_eos_baseline (:obj:`bool`, `optional`): Whether to include the EOS token in the baseline for
+                attribution. By default the EOS token is used for attribution. Defaults to True.
 
         Returns:
             :obj:`OneOrMoreFeatureAttributionSequenceOutputsWithStepOutputs`: One or more
@@ -184,7 +187,7 @@ class FeatureAttribution(Registry):
                 optional added list of single :class:`~inseq.data.FeatureAttributionOutput` for each step.
         """
         prepend_bos_token = kwargs.get("prepend_bos_token", True)
-        batch = self.prepare(sources, targets, prepend_bos_token)
+        batch = self.prepare(sources, targets, prepend_bos_token, include_eos_baseline)
         return self.attribute(
             batch,
             attr_pos_start=attr_pos_start,
@@ -202,6 +205,7 @@ class FeatureAttribution(Registry):
         sources: FeatureAttributionInput,
         targets: FeatureAttributionInput,
         prepend_bos_token: bool = True,
+        include_eos_baseline: bool = True,
     ) -> EncoderDecoderBatch:
         r"""
         Prepares sources and target to produce an :class:`~inseq.data.EncoderDecoderBatch`.
@@ -223,13 +227,17 @@ class FeatureAttribution(Registry):
                 :meth:`~inseq.attr.feat.FeatureAttribution.prepare` method.
             prepend_bos_token (:obj:`bool`, `optional`): Whether to prepend a BOS token to the
                 targets, if they are to be encoded. Defaults to True.
+            include_eos_baseline (:obj:`bool`, `optional`): Whether to include the EOS token in the baseline for
+                attribution. By default the EOS token is used for attribution. Defaults to True.
 
         Returns:
             :obj:`EncoderDecoderBatch`: An :class:`~inseq.data.EncoderDecoderBatch` object containing sources
                 and targets in encoded and embedded formats for all inputs.
         """
         if isinstance(sources, str) or isinstance(sources, list):
-            sources: BatchEncoding = self.attribution_model.encode(sources, return_baseline=True)
+            sources: BatchEncoding = self.attribution_model.encode(
+                sources, return_baseline=True, include_eos_baseline=include_eos_baseline
+            )
         if isinstance(sources, BatchEncoding):
             # Even when we are performing layer attribution, we might need the embeddings
             # to compute step probabilities.
@@ -244,6 +252,7 @@ class FeatureAttribution(Registry):
                 as_targets=True,
                 prepend_bos_token=prepend_bos_token,
                 return_baseline=True,
+                include_eos_baseline=include_eos_baseline,
             )
         if isinstance(targets, BatchEncoding):
             baseline_embeds = None
