@@ -61,13 +61,12 @@ def euclidean_distance(vec_a: torch.Tensor, vec_b: torch.Tensor) -> float:
 
 
 @torch.no_grad()
-def logits2probs(logits: FullLogitsTensor, target_ids: TargetIdsTensor) -> TopProbabilitiesTensor:
+def probits2probs(probits: FullLogitsTensor, target_ids: TargetIdsTensor) -> TopProbabilitiesTensor:
     """
-    Compute the scores of the target_ids from the logits.
+    Compute the scores of the target_ids from the probits.
     The scores are computed as the probabilities of the target_ids after softmax.
     """
-    softmax_out = torch.nn.functional.softmax(logits, dim=-1)
-    target_ids = target_ids.reshape(logits.shape[0], 1)
-    # Extracts the ith score from the softmax output over the vocabulary (dim -1 of the logits)
+    target_ids = target_ids.reshape(probits.shape[0], 1)
+    # Extracts the ith score from the softmax output over the vocabulary (dim -1 of the probits)
     # where i is the value of the corresponding index in target_ids.
-    return softmax_out.gather(-1, target_ids).squeeze(-1)
+    return probits.gather(-1, target_ids).squeeze(-1)

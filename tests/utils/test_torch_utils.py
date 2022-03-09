@@ -21,9 +21,9 @@ def test_pretty_tensor(tensor: torch.Tensor, output: str) -> None:
     assert pretty_tensor(tensor).startswith(output)
 
 
-def test_logits2probs():
+def test_probits2probs():
     # Test with batch of size > 1
-    logits = torch.stack(
+    probits = torch.stack(
         [
             torch.arange(0, 30000, 1.0),
             torch.arange(30000, 60000, 1.0),
@@ -32,19 +32,17 @@ def test_logits2probs():
         ]
     )
     target_ids = torch.tensor([10, 77, 999, 1765]).unsqueeze(-1)
-    # We omit the softmax for the test to check the conformity of the outputs.
-    # In any case, the softmax only affects values and not shape.
-    probs = torch.gather(logits, -1, target_ids.T)
+    probs = torch.gather(probits, -1, target_ids.T)
     assert probs.shape == (1, 4)
     assert torch.eq(probs, torch.tensor([10.0, 77.0, 999.0, 1765.0])).all()
 
     # Test with batch of size 1
-    logits = torch.stack(
+    probits = torch.stack(
         [
             torch.arange(0, 30000, 1.0),
         ]
     )
     target_ids = torch.tensor([23456]).unsqueeze(-1)
-    probs = torch.gather(logits, -1, target_ids.T)
+    probs = torch.gather(probits, -1, target_ids.T)
     assert probs.shape == (1, 1)
     assert torch.eq(probs, torch.tensor([23456.0])).all()

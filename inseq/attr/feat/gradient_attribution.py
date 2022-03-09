@@ -128,11 +128,9 @@ class DeepLiftAttribution(GradientAttribution):
     method_name = "deeplift"
 
     def __init__(self, attribution_model, **kwargs):
-        from ...models import HookableModelWrapper
-
         super().__init__(attribution_model)
         multiply_by_inputs = kwargs.pop("multiply_by_inputs", True)
-        self.method = DeepLift(HookableModelWrapper(self.attribution_model), multiply_by_inputs)
+        self.method = DeepLift(self.attribution_model, multiply_by_inputs)
         self.use_baseline = True
 
 
@@ -149,7 +147,7 @@ class DiscretizedIntegratedGradientsAttribution(GradientAttribution):
         multiply_by_inputs = kwargs.pop("multiply_by_inputs", True)
         self.attribution_model = attribution_model
         self.method = DiscretetizedIntegratedGradients(
-            self.attribution_model.score_func,
+            self.attribution_model,
             multiply_by_inputs,
         )
         self.hook(**kwargs)
@@ -221,7 +219,7 @@ class IntegratedGradientsAttribution(GradientAttribution):
     def __init__(self, attribution_model, **kwargs):
         super().__init__(attribution_model)
         multiply_by_inputs = kwargs.pop("multiply_by_inputs", True)
-        self.method = IntegratedGradients(self.attribution_model.score_func, multiply_by_inputs)
+        self.method = IntegratedGradients(self.attribution_model, multiply_by_inputs)
         self.use_baseline = True
 
 
@@ -236,7 +234,7 @@ class InputXGradientAttribution(GradientAttribution):
 
     def __init__(self, attribution_model):
         super().__init__(attribution_model)
-        self.method = InputXGradient(self.attribution_model.score_func)
+        self.method = InputXGradient(self.attribution_model)
 
 
 class SaliencyAttribution(GradientAttribution):
@@ -250,7 +248,7 @@ class SaliencyAttribution(GradientAttribution):
 
     def __init__(self, attribution_model):
         super().__init__(attribution_model)
-        self.method = Saliency(self.attribution_model.score_func)
+        self.method = Saliency(self.attribution_model)
 
 
 # Layer methods
@@ -272,7 +270,7 @@ class LayerIntegratedGradientsAttribution(GradientAttribution):
         self.hook(**kwargs)
         multiply_by_inputs = kwargs.pop("multiply_by_inputs", True)
         self.method = LayerIntegratedGradients(
-            self.attribution_model.score_func,
+            self.attribution_model,
             self.target_layer,
             multiply_by_inputs=multiply_by_inputs,
         )
@@ -294,7 +292,7 @@ class LayerGradientXActivationAttribution(GradientAttribution):
         self.hook(**kwargs)
         multiply_by_inputs = kwargs.pop("multiply_by_inputs", True)
         self.method = LayerGradientXActivation(
-            self.attribution_model.score_func,
+            self.attribution_model,
             self.target_layer,
             multiply_by_inputs=multiply_by_inputs,
         )
@@ -310,15 +308,13 @@ class LayerDeepLiftAttribution(GradientAttribution):
     method_name = "layer_deeplift"
 
     def __init__(self, attribution_model, **kwargs):
-        from ...models import HookableModelWrapper
-
         super().__init__(attribution_model, hook_to_model=False)
         self.is_layer_attribution = True
         self.use_baseline = True
         self.hook(**kwargs)
         multiply_by_inputs = kwargs.pop("multiply_by_inputs", True)
         self.method = LayerDeepLift(
-            HookableModelWrapper(self.attribution_model),
+            self.attribution_model,
             self.target_layer,
             multiply_by_inputs=multiply_by_inputs,
         )

@@ -60,6 +60,7 @@ class HuggingfaceModel(AttributionModel):
         model_name_or_path: str,
         attribution_method: Optional[str] = None,
         tokenizer_name_or_path: Optional[str] = None,
+        device: str = None,
         **kwargs,
     ) -> NoReturn:
         """
@@ -77,6 +78,7 @@ class HuggingfaceModel(AttributionModel):
                 initialized.
             **kwargs: additional arguments for the model and the tokenizer.
         """
+        super().__init__(attribution_method, **kwargs)
         if not tokenizer_name_or_path:
             tokenizer_name_or_path = model_name_or_path
         model_args = kwargs.pop("model_args", {})
@@ -97,11 +99,8 @@ class HuggingfaceModel(AttributionModel):
         self.decoder_embed_scale = 1.0
         self.encoder_int_embeds = None
         self.decoder_int_embeds = None
-        super().__init__(attribution_method, **kwargs)
-
-    def setup(self, device: str = None, **kwargs) -> NoReturn:
-        super().setup(device, **kwargs)
         self.configure_embeddings_scale()
+        self.setup(device, attribution_method, **kwargs)
 
     @classmethod
     def load(cls, model_name_or_path: str, **kwargs):
@@ -115,7 +114,7 @@ class HuggingfaceModel(AttributionModel):
         if hasattr(decoder, "embed_scale"):
             self.decoder_embed_scale = decoder.embed_scale
 
-    def score_func(
+    def forward(
         self,
         encoder_tensors: AttributionForwardInputs,
         decoder_embeds: AttributionForwardInputs,
@@ -140,7 +139,7 @@ class HuggingfaceModel(AttributionModel):
         # (batch_size, tgt_seq_len, vocab_size) => (batch_size, vocab_size)
         logits = output.logits[:, -1, :].squeeze(1)
         logger.debug(f"logits: {pretty_tensor(logits)}")
-        return logits
+        return torch.softmax(logits, dim=-1)
 
     @unhooked
     def generate(

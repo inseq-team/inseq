@@ -13,7 +13,7 @@ from .misc import (
     rgetattr,
 )
 from .registry import Registry, get_available_methods
-from .torch_utils import euclidean_distance, logits2probs, remap_from_filtered, sum_normalize_attributions
+from .torch_utils import euclidean_distance, probits2probs, remap_from_filtered, sum_normalize_attributions
 
 
 __all__ = [
@@ -33,7 +33,7 @@ __all__ = [
     "remap_from_filtered",
     "drop_padding",
     "sum_normalize_attributions",
-    "logits2probs",
+    "probits2probs",
     "euclidean_distance",
     "Registry",
     "INSEQ_HOME_CACHE",

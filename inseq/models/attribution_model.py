@@ -24,16 +24,15 @@ from .model_decorators import unhooked
 logger = logging.getLogger(__name__)
 
 
-class AttributionModel(ABC):
+class AttributionModel(ABC, torch.nn.Module):
     def __init__(self, attribution_method: Optional[str] = None, device: str = None, **kwargs) -> None:
+        super().__init__()
         if not hasattr(self, "model"):
             self.model = None
             self.model_name = None
         self._device = None
         self.attribution_method = None
         self.is_hooked = False
-        self.setup(device, **kwargs)
-        self.attribution_method = self.get_attribution_method(attribution_method)
 
     @property
     def device(self) -> str:
@@ -47,7 +46,7 @@ class AttributionModel(ABC):
         if self.model:
             self.model.to(self._device)
 
-    def setup(self, device: str = None, **kwargs) -> None:
+    def setup(self, device: str = None, attribution_method: str = None) -> None:
         """Move the model to device and in eval mode."""
         if device is not None:
             self.device = device
@@ -56,6 +55,7 @@ class AttributionModel(ABC):
         if self.model:
             self.model.eval()
             self.model.zero_grad()
+            self.attribution_method = self.get_attribution_method(attribution_method)
 
     @staticmethod
     def load(
@@ -162,10 +162,6 @@ class AttributionModel(ABC):
             return self.decoder_embed_ids(inputs)
         return self.encoder_embed_ids(inputs)
 
-    @abstractmethod
-    def score_func(self, **kwargs) -> torch.Tensor:
-        pass
-
     @unhooked
     @abstractmethod
     def generate(
@@ -251,18 +247,6 @@ class AttributionModel(ABC):
         decorator @unhooked since they require the original model capabilities.
         """
         pass
-
-
-class HookableModelWrapper(torch.nn.Module):
-    """Module to wrap the AttributionModel class
-    Used in methods requiring a nn.Module instead of a forward_func (e.g. DeepLIFT)
-    """
-
-    def __init__(self, attribution_model: AttributionModel):
-        super().__init__()
-        self.model = attribution_model.model
-        self.model.zero_grad()
-        self.forward = attribution_model.score_func
 
 
 def load_model(
