@@ -43,8 +43,8 @@ from ...utils import (
     extract_signature_args,
     find_char_indexes,
     get_available_methods,
-    logits2probs,
     pretty_tensor,
+    probits2probs,
 )
 from ...utils.typing import ModelIdentifier, TargetIdsTensor
 from ..attribution_decorators import set_hook, unset_hook
@@ -538,7 +538,7 @@ class FeatureAttribution(Registry):
                 batch.sources.attention_mask,
                 batch.targets.attention_mask,
                 # Defines how to treat source and target tensors
-                # Maps on the use_embeddings argument of score_func
+                # Maps on the use_embeddings argument of forward
                 not self.is_layer_attribution,
             ),
         }
@@ -556,14 +556,14 @@ class FeatureAttribution(Registry):
         """
         if self.attribution_model is None:
             raise ValueError("Attribution model is not set.")
-        logits = self.attribution_model.score_func(
+        probits = self.attribution_model(
             encoder_tensors=batch.sources.input_embeds,
             decoder_embeds=batch.targets.input_embeds,
             encoder_attention_mask=batch.sources.attention_mask,
             decoder_attention_mask=batch.targets.attention_mask,
             use_embeddings=True,
         )
-        return logits2probs(logits, target_ids)
+        return probits2probs(probits, target_ids)
 
     @abstractmethod
     def attribute_step(
