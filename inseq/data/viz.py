@@ -45,11 +45,11 @@ from ..utils.viz_utils import (
     saliency_heatmap_table_header,
     sanitize_html,
 )
-from .attribution import FeatureAttributionSequenceOutput, OneOrMoreFeatureAttributionSequenceOutputs
+from .attribution import FeatureAttributionSequenceOutput
 
 
 def show_attributions(
-    attributions: OneOrMoreFeatureAttributionSequenceOutputs,
+    attributions: FeatureAttributionSequenceOutput,
     min_val: Optional[int] = None,
     max_val: Optional[int] = None,
     display: bool = True,

@@ -3,7 +3,7 @@
 from importlib import metadata as importlib_metadata
 
 from .attr import list_feature_attribution_methods
-from .data import load_attributions, save_attributions, show_attributions
+from .data import FeatureAttributionOutput, show_attributions
 from .models import AttributionModel, load_model
 
 
@@ -18,10 +18,9 @@ version: str = get_version()
 
 __all__ = [
     "AttributionModel",
+    "FeatureAttributionOutput",
     "load_model",
     "show_attributions",
-    "save_attributions",
-    "load_attributions",
     "list_feature_attribution_methods",
     "version",
 ]

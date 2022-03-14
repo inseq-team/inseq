@@ -12,7 +12,7 @@ from pytest import fixture, mark
 
 import inseq
 from inseq import list_feature_attribution_methods
-from inseq.data import FeatureAttributionSequenceOutput
+from inseq.data import FeatureAttributionOutput, FeatureAttributionSequenceOutput
 
 
 EX_TEXTS = [
@@ -84,10 +84,9 @@ def test_cuda_attribution_consistency(texts, reference_texts, attribute_target, 
         out[device] = saliency_mt_model.attribute(
             texts, reference_texts, show_progress=False, attribute_target=attribute_target, device=device
         )
-        if not isinstance(out[device], list):
-            out[device] = [out[device]]
-        assert isinstance(out[device][0], FeatureAttributionSequenceOutput)
-    for out_cpu, out_gpu in zip(out["cpu"], out["cuda:0"]):
+        assert isinstance(out[device], FeatureAttributionOutput)
+        assert isinstance(out[device].sequence_attributions[0], FeatureAttributionSequenceOutput)
+    for out_cpu, out_gpu in zip(out["cpu"].sequence_attributions, out["cuda:0"].sequence_attributions):
         assert all([tok_cpu == tok_gpu for tok_cpu, tok_gpu in zip(out_cpu.target_tokens, out_gpu.target_tokens)])
         attr_score_matches = [
             abs(el_cpu - el_gpu) < 1e-3
@@ -126,9 +125,16 @@ def test_batched_attribution_consistency(attribution_method, use_reference, attr
         device="cuda:0" if torch.cuda.is_available() else "cpu",
         method=attribution_method,
     )
-    assert np.allclose(out_single.source_scores, out_batch[0].source_scores, atol=8e-2)
+    assert np.allclose(
+        out_single.sequence_attributions[0].source_scores, out_batch.sequence_attributions[0].source_scores, atol=8e-2
+    )
     if attribute_target:
-        assert np.allclose(out_single.target_scores, out_batch[0].target_scores, atol=8e-2, equal_nan=True)
+        assert np.allclose(
+            out_single.sequence_attributions[0].target_scores,
+            out_batch.sequence_attributions[0].target_scores,
+            atol=8e-2,
+            equal_nan=True,
+        )
 
 
 @mark.slow
@@ -166,9 +172,19 @@ def test_attribute(
         n_steps=100,
         device="cuda:0" if torch.cuda.is_available() else "cpu",
     )
-    assert isinstance(out, FeatureAttributionSequenceOutput) or (
-        isinstance(out, list) and isinstance(out[0], FeatureAttributionSequenceOutput)
-    )
+    assert isinstance(out, FeatureAttributionOutput)
+    assert isinstance(out.sequence_attributions[0], FeatureAttributionSequenceOutput)
+    assert out.info["model_name"] == "Helsinki-NLP/opus-mt-en-it"
+    assert out.info["constrained_decoding"] == use_reference
+    assert out.info["attribution_method"] == attribution_method
+    assert out.info["attribute_target"] == attribute_target
+    assert out.info["output_step_probabilities"] == return_step_probabilities
+    if "return_convergence_delta" in out.info:
+        assert out.info["return_convergence_delta"] == return_convergence_delta
+    if "internal_batch_size" in out.info:
+        assert out.info["internal_batch_size"] == 50
+    if "n_steps" in out.info:
+        assert out.info["n_steps"] == 100
 
 
 @mark.slow
@@ -189,6 +205,5 @@ def test_attribute_long_text(texts, reference_texts, attribution_method, use_ref
         n_steps=100,
         device="cuda:0" if torch.cuda.is_available() else "cpu",
     )
-    assert isinstance(out, FeatureAttributionSequenceOutput) or (
-        isinstance(out, list) and isinstance(out[0], FeatureAttributionSequenceOutput)
-    )
+    assert isinstance(out, FeatureAttributionOutput)
+    assert isinstance(out.sequence_attributions[0], FeatureAttributionSequenceOutput)

@@ -31,9 +31,9 @@ from ...data import (
     EncoderDecoderBatch,
     FeatureAttributionInput,
     FeatureAttributionOutput,
+    FeatureAttributionRawStepOutput,
     FeatureAttributionSequenceOutput,
     FeatureAttributionStepOutput,
-    OneOrMoreFeatureAttributionSequenceOutputsWithStepOutputs,
 )
 from ...data.viz import close_progress_bar, get_progress_bar, update_progress_bar
 from ...utils import (
@@ -154,7 +154,7 @@ class FeatureAttribution(Registry):
         output_step_probabilities: bool = False,
         include_eos_baseline: bool = False,
         **kwargs,
-    ) -> OneOrMoreFeatureAttributionSequenceOutputsWithStepOutputs:
+    ) -> FeatureAttributionOutput:
         r"""
         Prepares inputs and performs attribution.
 
@@ -172,8 +172,8 @@ class FeatureAttribution(Registry):
                 attribution. Defaults to None (full string).
             show_progress (:obj:`bool`, `optional`): Whether to show a progress bar. Defaults to True.
             pretty_progress (:obj:`bool`, `optional`): Whether to use a pretty progress bar. Defaults to True.
-            output_step_attributions (:obj:`bool`, `optional`): Whether to output a list of FeatureAttributionOutput
-                objects for each step. Defaults to False.
+            output_step_attributions (:obj:`bool`, `optional`): Whether to output a list of
+                FeatureAttributionStepOutput objects for each step. Defaults to False.
             attribute_target (:obj:`bool`, `optional`): Whether to include target prefix for feature attribution.
                 Defaults to False.
             output_step_probabilities (:obj:`bool`, optional): Whether to output the prediction probabilities for the
@@ -182,13 +182,13 @@ class FeatureAttribution(Registry):
                 attribution. By default the EOS token is not used for attribution. Defaults to False.
 
         Returns:
-            :obj:`OneOrMoreFeatureAttributionSequenceOutputsWithStepOutputs`: One or more
-                :class:`~inseq.data.FeatureAttributionSequenceOutput` depending on the number of inputs, with an
-                optional added list of single :class:`~inseq.data.FeatureAttributionOutput` for each step.
+            :class:`~inseq.data.FeatureAttributionOutput`: An object containing a list of sequence attributions, with
+                an optional added list of single :class:`~inseq.data.FeatureAttributionStepOutput` for each step and
+                extra information regarding the attribution parameters.
         """
-        prepend_bos_token = kwargs.get("prepend_bos_token", True)
+        prepend_bos_token = kwargs.pop("prepend_bos_token", True)
         batch = self.prepare(sources, targets, prepend_bos_token, include_eos_baseline)
-        return self.attribute(
+        attribution_output = self.attribute(
             batch,
             attr_pos_start=attr_pos_start,
             attr_pos_end=attr_pos_end,
@@ -199,6 +199,9 @@ class FeatureAttribution(Registry):
             output_step_probabilities=output_step_probabilities,
             **kwargs,
         )
+        attribution_output.info["prepend_bos_token"] = prepend_bos_token
+        attribution_output.info["include_eos_baseline"] = include_eos_baseline
+        return attribution_output
 
     def prepare(
         self,
@@ -277,7 +280,7 @@ class FeatureAttribution(Registry):
         attribute_target: bool = False,
         output_step_probabilities: bool = False,
         **kwargs,
-    ) -> OneOrMoreFeatureAttributionSequenceOutputsWithStepOutputs:
+    ) -> FeatureAttributionOutput:
         r"""
         Attributes each target token to each source token for every sequence in the batch.
 
@@ -289,8 +292,8 @@ class FeatureAttribution(Registry):
                 attribution. Defaults to None (full string).
             show_progress (:obj:`bool`, `optional`): Whether to show a progress bar. Defaults to True.
             pretty_progress (:obj:`bool`, `optional`): Whether to use a pretty progress bar. Defaults to True.
-            output_step_attributions (:obj:`bool`, `optional`): Whether to output a list of FeatureAttributionOutput
-                objects for each step. Defaults to False.
+            output_step_attributions (:obj:`bool`, `optional`): Whether to output a list of
+                FeatureAttributionStepOutput objects for each step. Defaults to False.
             attribute_target (:obj:`bool`, `optional`): Whether to include target prefix for feature attribution.
                 Defaults to False.
             output_step_probabilities (:obj:`bool`, optional): Whether to output the prediction probabilities for the
@@ -298,9 +301,9 @@ class FeatureAttribution(Registry):
             kwargs: Additional keyword arguments to pass to the attribution step.
 
         Returns:
-            :obj:`OneOrMoreFeatureAttributionSequenceOutputsWithStepOutputs`: One or more
-                :class:`~inseq.data.FeatureAttributionSequenceOutput` depending on the number of inputs, with an
-                optional added list of single :class:`~inseq.data.FeatureAttributionOutput` for each step.
+            :class:`~inseq.data.FeatureAttributionOutput`: An object containing a list of sequence attributions, with
+                an optional added list of single :class:`~inseq.data.FeatureAttributionStepOutput` for each step and
+                extra information regarding the attribution parameters.
         """
         if self.is_layer_attribution and attribute_target:
             raise ValueError(
@@ -356,10 +359,25 @@ class FeatureAttribution(Registry):
                 update_progress_bar(pbar, show=show_progress, pretty=pretty_progress)
         close_progress_bar(pbar, show=show_progress, pretty=pretty_progress)
         batch.to("cpu")
-        sequence_attribution = FeatureAttributionSequenceOutput.from_attributions(attribution_outputs)
-        if output_step_attributions:
-            return sequence_attribution, attribution_outputs
-        return sequence_attribution
+        return FeatureAttributionOutput(
+            sequence_attributions=FeatureAttributionSequenceOutput.from_step_attributions(attribution_outputs),
+            step_attributions=attribution_outputs if output_step_attributions else None,
+            info={
+                **{
+                    "model_name": self.attribution_model.model_name,
+                    "model_class": self.attribution_model.model.__class__.__name__,
+                    "tokenizer_name": self.attribution_model.tokenizer_name,
+                    "tokenizer_class": self.attribution_model.tokenizer.__class__.__name__,
+                    "attribution_method": self.method_name,
+                    "attr_pos_start": attr_pos_start,
+                    "attr_pos_end": attr_pos_end,
+                    "output_step_attributions": output_step_attributions,
+                    "attribute_target": attribute_target,
+                    "output_step_probabilities": output_step_probabilities,
+                },
+                **kwargs,
+            },
+        )
 
     @staticmethod
     def check_attribute_positions(
@@ -401,7 +419,7 @@ class FeatureAttribution(Registry):
         attribute_target: bool = False,
         output_step_probabilities: bool = False,
         **kwargs: Dict[str, Any],
-    ) -> FeatureAttributionStepOutput:
+    ) -> FeatureAttributionRawStepOutput:
         r"""
         Performs a single attribution step for all the sequences in the batch that
         still have valid target_ids, as identified by the target_attention_mask.
@@ -421,7 +439,7 @@ class FeatureAttribution(Registry):
             kwargs: Additional keyword arguments to pass to the attribution step.
 
         Returns:
-            :class:`~inseq.data.FeatureAttributionStepOutput`: A dataclass containing a tensor of source-side
+            :class:`~inseq.data.FeatureAttributionRawStepOutput`: A dataclass containing a tensor of source-side
                 attributions of size `(batch_size, source_length)`, possibly a tensor of target attributions of size
                 `(batch_size, prefix length) if attribute_target=True and possibly a tensor of deltas of size
                 `(batch_size)` if the attribution step supports deltas and they are requested.
@@ -438,9 +456,9 @@ class FeatureAttribution(Registry):
             f"target_attention_mask: {pretty_tensor(target_attention_mask)}"
         )
         # Perform attribution step
-        step_output = self.attribute_step(
-            batch, target_ids.squeeze(), attribute_target, output_step_probabilities, **kwargs
-        )
+        step_output = self.attribute_step(batch, target_ids.squeeze(), attribute_target, **kwargs)
+        if output_step_probabilities:
+            step_output.probabilities = self.get_step_prediction_probabilities(batch, target_ids.squeeze())
         # Reinsert finished sentences
         if target_attention_mask is not None and orig_target_ids.shape[0] > 1:
             step_output.remap_from_filtered(
@@ -450,24 +468,24 @@ class FeatureAttribution(Registry):
             )
         return step_output.detach().to("cpu")
 
-    def get_attribution_args(self, **kwargs):
+    def get_attribution_args(self, **kwargs) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         if hasattr(self, "method") and hasattr(self.method, "attribute"):
-            return extract_signature_args(kwargs, self.method.attribute, self.ignore_extra_args)
+            return extract_signature_args(kwargs, self.method.attribute, self.ignore_extra_args, return_remaining=True)
         return {}
 
     def make_attribution_output(
         self,
-        step_output: FeatureAttributionStepOutput,
+        step_output: FeatureAttributionRawStepOutput,
         batch: EncoderDecoderBatch,
         target_ids: TensorType["batch_size", 1, int],
         has_bos_token: bool = True,
-    ) -> FeatureAttributionOutput:
+    ) -> FeatureAttributionStepOutput:
         r"""
         Enriches the attribution output with token information and builds the final
-        :class:`~inseq.data.FeatureAttributionOutput` object.
+        :class:`~inseq.data.FeatureAttributionStepOutput` object.
 
         Args:
-            step_output (:class:`~inseq.data.FeatureAttributionStepOutput`): The output produced
+            step_output (:class:`~inseq.data.FeatureAttributionRawStepOutput`): The output produced
                 by the attribution step.
             batch (:class:`~inseq.data.EncoderDecoderBatch`): The batch on which attribution was performed.
             target_ids (:obj:`torch.Tensor`): Target token ids of size `(batch_size, 1)` corresponding to tokens
@@ -475,7 +493,7 @@ class FeatureAttribution(Registry):
             has_bos_token (:obj:`bool`): Whether the target sequence contains a BOS token.
 
         Returns:
-            :class:`~inseq.data.FeatureAttributionOutput`: The enriched attribution output.
+            :class:`~inseq.data.FeatureAttributionStepOutput`: The enriched attribution output.
         """
         source_tokens = [drop_padding(seq, self.attribution_model.pad_token) for seq in batch.sources.input_tokens]
         prefix_tokens = [drop_padding(seq, self.attribution_model.pad_token) for seq in batch.targets.input_tokens]
@@ -502,7 +520,7 @@ class FeatureAttribution(Registry):
             probs = step_output.probabilities.squeeze().tolist()
             if not isinstance(probs, list):
                 probs = [probs]
-        return FeatureAttributionOutput(
+        return FeatureAttributionStepOutput(
             source_attributions=source_attributions,
             target_attributions=target_attributions,
             delta=delta,
@@ -573,7 +591,7 @@ class FeatureAttribution(Registry):
         attribute_target: bool = False,
         output_step_probabilities: bool = False,
         **kwargs: Dict[str, Any],
-    ) -> FeatureAttributionStepOutput:
+    ) -> FeatureAttributionRawStepOutput:
         r"""
         Performs a single attribution step for the specified target_ids,
         given sources and targets in the batch.
@@ -588,7 +606,7 @@ class FeatureAttribution(Registry):
             kwargs: Additional keyword arguments to pass to the attribution step.
 
         Returns:
-            :class:`~inseq.data.FeatureAttributionStepOutput`: A dataclass containing a tensor of source-side
+            :class:`~inseq.data.FeatureAttributionRawStepOutput`: A dataclass containing a tensor of source-side
                 attributions of size `(batch_size, source_length)`, possibly a tensor of target attributions of size
                 `(batch_size, prefix length) if attribute_target=True and possibly a tensor of deltas of size
                 `(batch_size)` if the attribution step supports deltas and they are requested.

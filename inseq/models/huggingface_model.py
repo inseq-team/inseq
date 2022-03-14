@@ -88,12 +88,14 @@ class HuggingfaceModel(AttributionModel):
         self.model = AutoModelForSeq2SeqLM.from_pretrained(model_name_or_path, *model_args, **model_kwargs)
         self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_name_or_path, *tokenizer_inputs, **tokenizer_kwargs)
         self.model_name = self.model.config.name_or_path
+        self.tokenizer_name = tokenizer_name_or_path
         self.pad_id = self.model.config.pad_token_id
         self.unk_id = self.tokenizer.unk_token_id
         self.eos_id = self.model.config.eos_token_id
         self.bos_id = self.model.config.decoder_start_token_id
         self.unk_token = self.tokenizer.unk_token
         self.pad_token = self.tokenizer.convert_ids_to_tokens(self.pad_id)
+        self.eos_token = self.tokenizer.convert_ids_to_tokens(self.eos_id)
         self.bos_token = self.tokenizer.convert_ids_to_tokens(self.bos_id)
         self.encoder_embed_scale = 1.0
         self.decoder_embed_scale = 1.0
