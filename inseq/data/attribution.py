@@ -1,7 +1,8 @@
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Union
 
 import json
-from dataclasses import dataclass
+import os
+from dataclasses import dataclass, field
 
 import numpy as np
 from torchtyping import TensorType
@@ -24,7 +25,7 @@ FeatureAttributionInput = Union[TextInput, BatchEncoding, Batch]
 
 
 @dataclass
-class FeatureAttributionStepOutput:
+class FeatureAttributionRawStepOutput:
     """
     Raw output of a single step of feature attribution
     """
@@ -34,7 +35,7 @@ class FeatureAttributionStepOutput:
     deltas: Optional[DeltaOutputTensor] = None
     probabilities: Optional[TopProbabilitiesTensor] = None
 
-    def detach(self) -> "FeatureAttributionStepOutput":
+    def detach(self) -> "FeatureAttributionRawStepOutput":
         self.source_attributions.detach()
         if self.target_attributions is not None:
             self.target_attributions.detach()
@@ -44,7 +45,7 @@ class FeatureAttributionStepOutput:
             self.probabilities.detach()
         return self
 
-    def to(self, device: str) -> "FeatureAttributionStepOutput":
+    def to(self, device: str) -> "FeatureAttributionRawStepOutput":
         self.source_attributions.to(device)
         if self.target_attributions is not None:
             self.target_attributions.to(device)
@@ -86,7 +87,7 @@ class FeatureAttributionStepOutput:
 
 
 @dataclass
-class FeatureAttributionOutput:
+class FeatureAttributionStepOutput:
     source_attributions: Optional[OneOrMoreAttributionSequences] = None
     target_attributions: Optional[OneOrMoreAttributionSequences] = None
     delta: Optional[List[float]] = None
@@ -101,8 +102,8 @@ class FeatureAttributionOutput:
     def __str__(self):
         return f"{self.__class__.__name__}({pretty_dict(self.__dict__)}"
 
-    def __getitem__(self, index: Union[int, slice]) -> "FeatureAttributionOutput":
-        return FeatureAttributionOutput(
+    def __getitem__(self, index: Union[int, slice]) -> "FeatureAttributionStepOutput":
+        return FeatureAttributionStepOutput(
             source_ids=self.source_ids[index] if self.source_ids is not None else None,
             prefix_ids=self.prefix_ids[index] if self.prefix_ids is not None else None,
             target_ids=self.target_ids[index] if self.target_ids is not None else None,
@@ -171,9 +172,9 @@ class FeatureAttributionSequenceOutput:
         return f"{self.__class__.__name__}({pretty_dict(self.__dict__)})"
 
     @classmethod
-    def from_attributions(
-        cls, attributions: List[FeatureAttributionOutput]
-    ) -> "OneOrMoreFeatureAttributionSequenceOutputs":
+    def from_step_attributions(
+        cls, attributions: List[FeatureAttributionStepOutput]
+    ) -> List["FeatureAttributionSequenceOutput"]:
         num_sequences = len(attributions[0].source_attributions)
         if not all([len(curr.source_attributions) == num_sequences for curr in attributions]):
             raise ValueError("All the attributions must include the same number of sequences.")
@@ -205,8 +206,6 @@ class FeatureAttributionSequenceOutput:
                     attr.target_attributions[seq_id] for attr in attributions if attr.source_attributions[seq_id]
                 ]
             feat_attr_seq.append(cls(**feat_attr_seq_args))
-        if len(feat_attr_seq) == 1:
-            return feat_attr_seq[0]
         return feat_attr_seq
 
     def show(
@@ -247,54 +246,90 @@ class FeatureAttributionSequenceOutput:
             (np.array(pad(self.target_attributions, np.nan)).T, np.ones(len(self.target_attributions)) * np.nan)
         )
 
-    def as_dict(self) -> Dict[str, List[Any]]:
-        return self.__dict__
 
-
-OneOrMoreFeatureAttributionSequenceOutputs = Union[
-    FeatureAttributionSequenceOutput, List[FeatureAttributionSequenceOutput]
-]
-# One or more FeatureAttributionSequenceOutput, with an optional added list
-# of single FeatureAttributionOutputs for each step.
-OneOrMoreFeatureAttributionSequenceOutputsWithStepOutputs = Union[
-    OneOrMoreFeatureAttributionSequenceOutputs,
-    Tuple[OneOrMoreFeatureAttributionSequenceOutputs, List[FeatureAttributionOutput]],
-]
-
-
-def save_attributions(
-    attributions: OneOrMoreFeatureAttributionSequenceOutputs,
-    path: str,
-    overwrite: bool = False,
-) -> None:
+@dataclass
+class FeatureAttributionOutput:
     """
-    Save attributions to a file.
+    Output produced by the `AttributionModel.attribute` method.
 
-    Args:
-        attributions: Attributions to save.
-        path: Path to save the attributions to.
-        overwrite: If True, overwrite the file if it exists.
+    Attributes:
+        sequence_attributions (list of :class:`~inseq.data.FeatureAttributionSequenceOutput`): List
+                        containing all attributions performed on input sentences (one per input sentence, including
+                        source and optionally target-side attribution).
+                step_attributions (list of :class:`~inseq.data.FeatureAttributionStepOutput`, optional): List
+                        containing all step attributions (one per generation step performed on the batch), returned if
+                        `output_step_attributions=True`.
+                info (dict with str keys and any values): Dictionary including all available parameters used to
+                        perform the attribution.
     """
-    if isinstance(attributions, FeatureAttributionSequenceOutput):
-        attributions = [attributions]
-    with open(path, "w" if overwrite else "a") as f:
-        for attribution in attributions:
-            f.write(f"{json.dumps(attribution.as_dict())}\n")
 
+    sequence_attributions: List[FeatureAttributionSequenceOutput]
+    step_attributions: Optional[List[FeatureAttributionStepOutput]] = None
+    info: Dict[str, Any] = field(default_factory=dict)
 
-def load_attributions(
-    path: str,
-) -> OneOrMoreFeatureAttributionSequenceOutputs:
-    """
-    Load attributions from a file.
+    def __str__(self):
+        return f"{self.__class__.__name__}({pretty_dict(self.__dict__)})"
 
-    Args:
-        path: Path to a JSONlines file containing one serialized FeatureAttributionSequenceOutput
-            object per line.
+    def save(self, path: str, overwrite: bool = False) -> None:
+        """
+        Save class contents to a JSON file.
 
-    Returns:
-        A list of FeatureAttributionSequenceOutput loaded from the file.
-    """
-    with open(path) as f:
-        attributions = [json.loads(line) for line in f]
-    return [FeatureAttributionSequenceOutput(**attribution) for attribution in attributions]
+        Args:
+            path (str): Path to save the attributions to.
+            overwrite (bool): If True, overwrite the file if it exists, raise error otherwise.
+        """
+        if not overwrite and os.path.exists(path):
+            raise ValueError(f"File {path} already exists.")
+        out = json.dumps(
+            {
+                "sequence_attributions": [seq.__dict__ for seq in self.sequence_attributions],
+                "step_attributions": [step.__dict__ for step in self.step_attributions]
+                if self.step_attributions
+                else None,
+                "info": self.info,
+            }
+        )
+        with open(path, "w") as f:
+            f.write(out)
+
+    @classmethod
+    def load(cls, path: str) -> "FeatureAttributionOutput":
+        """Loads a saved attribution output into an object
+
+        Args:
+            path (str): Path to the saved attribution output
+
+        Returns:
+            :class:`~inseq.data.FeatureAttributionOutput`: Loaded attribution output
+        """
+        with open(path) as f:
+            output = json.loads(f.read())
+        return cls(
+            sequence_attributions=[FeatureAttributionSequenceOutput(**seq) for seq in output["sequence_attributions"]],
+            step_attributions=[FeatureAttributionStepOutput(**step) for step in output["step_attributions"]]
+            if output["step_attributions"]
+            else None,
+            info=output["info"],
+        )
+
+    def show(
+        self,
+        min_val: Optional[int] = None,
+        max_val: Optional[int] = None,
+        display: bool = True,
+        return_html: Optional[bool] = False,
+    ) -> Optional[str]:
+        """Visualize the sequence attributions.
+
+        Args:
+            min_val (int, optional): Minimum value for color scale.
+            max_val (int, optional): Maximum value for color scale.
+            display (bool, optional): If True, display the attribution visualization.
+            return_html (bool, optional): If True, return the attribution visualization as HTML.
+
+        Returns:
+            str: Attribution visualization as HTML if `return_html=True`, None otherwise.
+        """
+        from inseq import show_attributions
+
+        return show_attributions(self.sequence_attributions, min_val, max_val, display, return_html)

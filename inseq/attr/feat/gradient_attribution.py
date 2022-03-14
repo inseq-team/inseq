@@ -25,7 +25,7 @@ from captum.attr import (
     Saliency,
 )
 
-from ...data import EncoderDecoderBatch, FeatureAttributionStepOutput
+from ...data import EncoderDecoderBatch, FeatureAttributionRawStepOutput
 from ...utils import Registry, extract_signature_args, pretty_tensor, rgetattr, sum_normalize_attributions
 from ...utils.typing import TargetIdsTensor
 from ..attribution_decorators import set_hook, unset_hook
@@ -68,9 +68,8 @@ class GradientAttribution(FeatureAttribution, Registry):
         batch: EncoderDecoderBatch,
         target_ids: TargetIdsTensor,
         attribute_target: bool = False,
-        output_step_probabilities: bool = False,
         **kwargs,
-    ) -> FeatureAttributionStepOutput:
+    ) -> FeatureAttributionRawStepOutput:
         r"""
         Performs a single attribution step for the specified target_ids,
         given sources and targets in the batch.
@@ -80,12 +79,10 @@ class GradientAttribution(FeatureAttribution, Registry):
             target_ids (:obj:`torch.Tensor`): Target token ids of size `(batch_size)` corresponding to tokens
                 for which the attribution step must be performed.
             attribute_target (:obj:`bool`, optional): Whether to attribute the target prefix or not. Defaults to False.
-            output_step_probabilities (:obj:`bool`, optional): Whether to output the prediction probabilities for the
-                current generation step or not. Defaults to False.
             kwargs: Additional keyword arguments to pass to the attribution step.
 
         Returns:
-            :class:`~inseq.data.FeatureAttributionStepOutput`: A dataclass containing a tensor of source-side
+            :class:`~inseq.data.FeatureAttributionRawStepOutput`: A dataclass containing a tensor of source-side
                 attributions of size `(batch_size, source_length)`, possibly a tensor of target attributions of size
                 `(batch_size, prefix length) if attribute_target=True and possibly a tensor of deltas of size
                 `(batch_size)` if the attribution step supports deltas and they are requested.
@@ -103,17 +100,15 @@ class GradientAttribution(FeatureAttribution, Registry):
         # If target size attribution is performed, attributions need to be renormalized
         # by concatenating both source and target.
         attr = sum_normalize_attributions(attr)
-        step_output = FeatureAttributionStepOutput(source_attributions=attr)
+        step_output = FeatureAttributionRawStepOutput(source_attributions=attr)
         if isinstance(attr, tuple):
-            step_output = FeatureAttributionStepOutput(source_attributions=attr[0])
+            step_output = FeatureAttributionRawStepOutput(source_attributions=attr[0])
         logger.debug(f"source attributions postnorm: {pretty_tensor(step_output.source_attributions)}\n")
         if attribute_target:
             assert len(attr) > 1, "Expected target attributions to be present"
             step_output.target_attributions = attr[1]
             logger.debug(f"target attributions postnorm: {pretty_tensor(step_output.target_attributions)}")
         logger.debug("-" * 30)
-        if output_step_probabilities:
-            step_output.probabilities = self.get_step_prediction_probabilities(batch, target_ids)
         step_output.deltas = delta
         return step_output
 
@@ -174,7 +169,7 @@ class DiscretizedIntegratedGradientsAttribution(GradientAttribution):
         target_ids: TargetIdsTensor,
         attribute_target: bool = False,
         **kwargs,
-    ) -> FeatureAttributionStepOutput:
+    ) -> FeatureAttributionRawStepOutput:
         scaled_inputs = (
             self.method.path_builder.scale_inputs(
                 batch.sources.input_ids,

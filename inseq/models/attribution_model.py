@@ -7,7 +7,7 @@ import torch
 from rich.status import Status
 
 from ..attr.feat.feature_attribution import FeatureAttribution
-from ..data import BatchEncoding, OneOrMoreFeatureAttributionSequenceOutputsWithStepOutputs
+from ..data import BatchEncoding, FeatureAttributionOutput
 from ..utils import LengthMismatchError, MissingAttributionMethodError, isnotebook
 from ..utils.typing import (
     EmbeddingsTensor,
@@ -102,8 +102,8 @@ class AttributionModel(ABC, torch.nn.Module):
 
     def attribute(
         self,
-        texts: TextInput,
-        reference_texts: Optional[TextInput] = None,
+        input_texts: TextInput,
+        generated_texts: Optional[TextInput] = None,
         method: Optional[str] = None,
         override_default_attribution: Optional[bool] = False,
         attr_pos_start: Optional[int] = 1,
@@ -116,28 +116,33 @@ class AttributionModel(ABC, torch.nn.Module):
         include_eos_baseline: bool = False,
         device: Optional[str] = None,
         **kwargs,
-    ) -> OneOrMoreFeatureAttributionSequenceOutputsWithStepOutputs:
+    ) -> FeatureAttributionOutput:
         """Perform attribution for one or multiple texts."""
-        if not texts:
-            return []
+        if not input_texts:
+            raise ValueError("At least one text must be provided to perform attribution.")
         if device is not None:
             original_device = self.device
             self.device = device
-        texts, reference_texts = self.format_input_texts(texts, reference_texts)
-        if not reference_texts:
-            texts = self.encode(texts, return_baseline=True, include_eos_baseline=include_eos_baseline)
+        input_texts, generated_texts = self.format_input_texts(input_texts, generated_texts)
+        constrained_decoding = generated_texts is not None
+        orig_input_texts = input_texts
+        if not constrained_decoding:
+            input_texts = self.encode(input_texts, return_baseline=True, include_eos_baseline=include_eos_baseline)
             generation_args = kwargs.pop("generation_args", {})
-            reference_texts = self.generate(texts, return_generation_output=False, **generation_args)
-        logger.debug(f"reference_texts={reference_texts}")
+            generated_texts = self.generate(input_texts, return_generation_output=False, **generation_args)
+        logger.debug(f"reference_texts={generated_texts}")
         attribution_method = self.get_attribution_method(method, override_default_attribution)
         attribution_args = kwargs.pop("attribution_args", {})
-        attribution_args.update(attribution_method.get_attribution_args(**kwargs))
+        extra_attribution_args, unused_args = attribution_method.get_attribution_args(**kwargs)
+        if unused_args:
+            logger.warning(f"Unused arguments during attribution: {unused_args}")
+        attribution_args.update(extra_attribution_args)
         if isnotebook():
             logger.debug("Pretty progress currently not supported in notebooks, falling back to tqdm.")
             pretty_progress = False
-        attribution_outputs = attribution_method.prepare_and_attribute(
-            texts,
-            reference_texts,
+        attribution_output = attribution_method.prepare_and_attribute(
+            input_texts,
+            generated_texts,
             attr_pos_start=attr_pos_start,
             attr_pos_end=attr_pos_end,
             show_progress=show_progress,
@@ -148,9 +153,14 @@ class AttributionModel(ABC, torch.nn.Module):
             include_eos_baseline=include_eos_baseline,
             **attribution_args,
         )
+        attribution_output.info["input_texts"] = orig_input_texts
+        attribution_output.info["generated_texts"] = (
+            [generated_texts] if isinstance(generated_texts, str) else generated_texts
+        )
+        attribution_output.info["constrained_decoding"] = constrained_decoding
         if device is not None:
             self.device = original_device
-        return attribution_outputs
+        return attribution_output
 
     def embed(self, inputs: Union[TextInput, IdsTensor], as_targets: bool = False):
         if isinstance(inputs, str) or (

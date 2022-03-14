@@ -41,14 +41,19 @@ def _pretty_list(l: Optional[Sequence[Any]], lpad: int = 8) -> str:
     if all([isinstance(x, list) for x in l]):
         contents = " " * lpad + "[ " + f" ],\n{' ' * lpad}[ ".join([_pretty_list_contents(subl) for subl in l]) + " ]"
     else:
-        contents = " " * lpad + _pretty_list_contents(l)
+        if all([hasattr(x, "__dict__") for x in l]):
+            contents = ",\n".join(
+                [f"{' ' * lpad + x.__class__.__name__}({pretty_dict(x.__dict__, lpad + 4)}" for x in l]
+            )
+        else:
+            contents = " " * lpad + _pretty_list_contents(l)
     return "[\n" + contents + f"\n{' ' * (lpad - 4)}]"
 
 
 def pretty_list(l: Optional[Sequence[Any]], lpad: int = 8) -> str:
     if l is None:
         return "None"
-    out_txt = f"list with {len(l)} elements"
+    out_txt = f"list with {len(l)} elements of type {l[0].__class__.__name__}"
     if all([isinstance(x, list) for x in l]):
         out_txt = f"list with {len(l)} sub-lists"
         if any([len(sl) > 20 for sl in l]) or len(l) > 15:
@@ -77,8 +82,14 @@ def pretty_dict(d: Dict[str, Any], lpad: int = 4) -> str:
             out_txt += pretty_list(v, lpad + 4)
         elif isinstance(v, Tensor):
             out_txt += pretty_tensor(v)
+        elif isinstance(v, dict):
+            out_txt += pretty_dict(v, lpad + 4)
+        elif hasattr(v, "__dict__"):
+            out_txt += pretty_dict(v.__dict__, lpad + 4)
+        else:
+            out_txt += "None" if v is None else str(v)
         out_txt += ",\n"
-    return out_txt + "}"
+    return out_txt + f"{' ' * (lpad - 4)}}}"
 
 
 def extract_signature_args(
