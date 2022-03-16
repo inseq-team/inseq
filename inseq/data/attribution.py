@@ -18,42 +18,21 @@ from ..utils.typing import (
     TextInput,
     TopProbabilitiesTensor,
 )
-from .batch import Batch, BatchEncoding
+from .batch import Batch, BatchEncoding, TensorWrapper
 
 
 FeatureAttributionInput = Union[TextInput, BatchEncoding, Batch]
 
 
 @dataclass
-class FeatureAttributionRawStepOutput:
+class FeatureAttributionRawStepOutput(TensorWrapper):
     """
     Raw output of a single step of feature attribution
     """
 
     source_attributions: AttributionOutputTensor
     target_attributions: Optional[AttributionOutputTensor] = None
-    deltas: Optional[DeltaOutputTensor] = None
     probabilities: Optional[TopProbabilitiesTensor] = None
-
-    def detach(self) -> "FeatureAttributionRawStepOutput":
-        self.source_attributions.detach()
-        if self.target_attributions is not None:
-            self.target_attributions.detach()
-        if self.deltas is not None:
-            self.deltas.detach()
-        if self.probabilities is not None:
-            self.probabilities.detach()
-        return self
-
-    def to(self, device: str) -> "FeatureAttributionRawStepOutput":
-        self.source_attributions.to(device)
-        if self.target_attributions is not None:
-            self.target_attributions.to(device)
-        if self.deltas is not None:
-            self.deltas.to(device)
-        if self.probabilities is not None:
-            self.probabilities.to(device)
-        return self
 
     def remap_from_filtered(
         self,
@@ -62,25 +41,19 @@ class FeatureAttributionRawStepOutput:
         target_attention_mask: TensorType["batch_size", 1, int],
     ):
         self.source_attributions = remap_from_filtered(
-            source=source_token_indexes,  # orig_batch.sources.input_ids,
+            original=source_token_indexes,
             mask=target_attention_mask,
             filtered=self.source_attributions,
         )
         if self.target_attributions is not None:
             self.target_attributions = remap_from_filtered(
-                source=target_token_indexes,  # orig_batch.targets.input_ids,
+                original=target_token_indexes,
                 mask=target_attention_mask,
                 filtered=self.target_attributions,
             )
-        if self.deltas is not None:
-            self.deltas = remap_from_filtered(
-                source=target_attention_mask.squeeze(),
-                mask=target_attention_mask,
-                filtered=self.deltas,
-            )
         if self.probabilities is not None:
             self.probabilities = remap_from_filtered(
-                source=target_attention_mask.squeeze(),
+                original=target_attention_mask.squeeze(),
                 mask=target_attention_mask,
                 filtered=self.probabilities,
             )
@@ -136,27 +109,6 @@ class FeatureAttributionSequenceOutput:
             target token.
         probabilities (list[float], optional): List of length len(target_tokens) containing
             the probabilities of each target token.
-
-    Example:
-        >> model = AttributionModel('Helsinki-NLP/opus-mt-en-it')
-        >> attr_output = model.attribute( \
-                method='integrated_gradients', \
-                source_text='I like to eat cake.', \
-                n_steps=300, \
-                internal_batch_size=50 \
-            )
-        >> attr_output
-        # 0.42 is the attribution for the first target token '▁Mi'
-        # to the second source token '▁like'.
-        # 0.01 is the convergence delta for the first target token.
-        IntegratedGradientAttributionOutput(
-            source_tokens=['▁I', '▁like', '▁to', '▁eat', '▁cake', '.', '</s>'],
-            target_tokens=['▁Mi', '▁piace', '▁mangiare', '▁la', '▁tor', 'ta', '.' '</s>'],
-            source_attributions=[ [ 0.85, ... ], [ 0.42, ... ], ... ],
-            target_attributions=[ [ 0.85, ... ], [ 0.42, ... ], ... ],
-            deltas=[ 0.01, ... ],
-            probabilities=[ 0.42, ... ]
-        )
     """
 
     source_ids: List[int]
@@ -333,3 +285,31 @@ class FeatureAttributionOutput:
         from inseq import show_attributions
 
         return show_attributions(self.sequence_attributions, min_val, max_val, display, return_html)
+
+
+# Gradient attribution classes
+
+
+@dataclass
+class GradientFeatureAttributionRawStepOutput(FeatureAttributionRawStepOutput):
+    """
+    Raw output of a single step of gradient feature attribution.
+
+    Adds the convergence delta to the base class.
+    """
+
+    deltas: Optional[DeltaOutputTensor] = None
+
+    def remap_from_filtered(
+        self,
+        source_token_indexes: IdsTensor,
+        target_token_indexes: IdsTensor,
+        target_attention_mask: TensorType["batch_size", 1, int],
+    ):
+        super().remap_from_filtered(source_token_indexes, target_token_indexes, target_attention_mask)
+        if self.deltas is not None:
+            self.deltas = remap_from_filtered(
+                original=target_attention_mask.squeeze(),
+                mask=target_attention_mask,
+                filtered=self.deltas,
+            )

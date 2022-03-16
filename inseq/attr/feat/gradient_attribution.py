@@ -13,6 +13,8 @@
 # limitations under the License.
 """ Gradient-based feature attribution methods. """
 
+from typing import Any, Dict
+
 import logging
 
 from captum.attr import (
@@ -25,7 +27,7 @@ from captum.attr import (
     Saliency,
 )
 
-from ...data import EncoderDecoderBatch, FeatureAttributionRawStepOutput
+from ...data import EncoderDecoderBatch, GradientFeatureAttributionRawStepOutput
 from ...utils import Registry, extract_signature_args, pretty_tensor, rgetattr, sum_normalize_attributions
 from ...utils.typing import TargetIdsTensor
 from ..attribution_decorators import set_hook, unset_hook
@@ -69,7 +71,7 @@ class GradientAttribution(FeatureAttribution, Registry):
         target_ids: TargetIdsTensor,
         attribute_target: bool = False,
         **kwargs,
-    ) -> FeatureAttributionRawStepOutput:
+    ) -> GradientFeatureAttributionRawStepOutput:
         r"""
         Performs a single attribution step for the specified target_ids,
         given sources and targets in the batch.
@@ -82,7 +84,7 @@ class GradientAttribution(FeatureAttribution, Registry):
             kwargs: Additional keyword arguments to pass to the attribution step.
 
         Returns:
-            :class:`~inseq.data.FeatureAttributionRawStepOutput`: A dataclass containing a tensor of source-side
+            :class:`~inseq.data.GradientFeatureAttributionRawStepOutput`: A dataclass containing a tensor of source
                 attributions of size `(batch_size, source_length)`, possibly a tensor of target attributions of size
                 `(batch_size, prefix length) if attribute_target=True and possibly a tensor of deltas of size
                 `(batch_size)` if the attribution step supports deltas and they are requested.
@@ -100,9 +102,9 @@ class GradientAttribution(FeatureAttribution, Registry):
         # If target size attribution is performed, attributions need to be renormalized
         # by concatenating both source and target.
         attr = sum_normalize_attributions(attr)
-        step_output = FeatureAttributionRawStepOutput(source_attributions=attr)
+        step_output = GradientFeatureAttributionRawStepOutput(source_attributions=attr)
         if isinstance(attr, tuple):
-            step_output = FeatureAttributionRawStepOutput(source_attributions=attr[0])
+            step_output = GradientFeatureAttributionRawStepOutput(source_attributions=attr[0])
         logger.debug(f"source attributions postnorm: {pretty_tensor(step_output.source_attributions)}\n")
         if attribute_target:
             assert len(attr) > 1, "Expected target attributions to be present"
@@ -169,7 +171,7 @@ class DiscretizedIntegratedGradientsAttribution(GradientAttribution):
         target_ids: TargetIdsTensor,
         attribute_target: bool = False,
         **kwargs,
-    ) -> FeatureAttributionRawStepOutput:
+    ) -> Dict[str, Any]:
         scaled_inputs = (
             self.method.path_builder.scale_inputs(
                 batch.sources.input_ids,

@@ -441,8 +441,9 @@ class FeatureAttribution(Registry):
         Returns:
             :class:`~inseq.data.FeatureAttributionRawStepOutput`: A dataclass containing a tensor of source-side
                 attributions of size `(batch_size, source_length)`, possibly a tensor of target attributions of size
-                `(batch_size, prefix length) if attribute_target=True and possibly a tensor of deltas of size
-                `(batch_size)` if the attribution step supports deltas and they are requested.
+                `(batch_size, prefix length) if attribute_target=True, optionally a tensor of output probabilities of
+                size `(batch_size)` if output_step_probabilities=True, plus any extra information provided by specific
+                attribution methods (e.g. convergence deltas for gradient-based methods).
         """
         orig_batch = batch.clone()
         orig_target_ids = target_ids
@@ -511,6 +512,7 @@ class FeatureAttribution(Registry):
                 target_attributions = [attr[1:] for attr in target_attributions]
             target_attributions = rescale_attributions_to_tokens(target_attributions, prefix_tokens)
         delta = None
+        # TODO: This needs to be dealt with separately for gradient-based methods
         if step_output.deltas is not None:
             delta = step_output.deltas.squeeze().tolist()
             if not isinstance(delta, list):

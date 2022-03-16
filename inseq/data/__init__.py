@@ -4,6 +4,7 @@ from .attribution import (
     FeatureAttributionRawStepOutput,
     FeatureAttributionSequenceOutput,
     FeatureAttributionStepOutput,
+    GradientFeatureAttributionRawStepOutput,
 )
 from .batch import Batch, BatchEmbedding, BatchEncoding, EncoderDecoderBatch
 from .viz import show_attributions
@@ -17,6 +18,7 @@ __all__ = [
     "FeatureAttributionInput",
     "FeatureAttributionStepOutput",
     "FeatureAttributionRawStepOutput",
+    "GradientFeatureAttributionRawStepOutput",
     "FeatureAttributionSequenceOutput",
     "FeatureAttributionOutput",
     "ModelIdentifier",
