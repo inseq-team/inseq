@@ -21,15 +21,15 @@ logger = logging.getLogger(__name__)
 
 @torch.no_grad()
 def remap_from_filtered(
-    source: TensorType[..., Any],
+    original: TensorType["batch_size", Any],
     mask: TensorType["batch_size", 1, int],
-    filtered: TensorType["filtered_batch_size", "seq_len", Any],
-) -> TensorType["batch_size", "seq_len", Any]:
-    if len(filtered.shape) > 1:
-        index = mask.squeeze().nonzero().expand_as(filtered)
-    else:
-        index = mask.squeeze().nonzero().squeeze()
-    new_source = torch.ones_like(source, dtype=filtered.dtype) * float("nan")
+    filtered: TensorType["filtered_batch_size", Any],
+) -> TensorType["batch_size", Any]:
+    index = mask.squeeze().nonzero().squeeze()
+    while len(index.shape) < len(filtered.shape):
+        index = index.unsqueeze(-1)
+    index = index.expand_as(filtered)
+    new_source = torch.ones_like(original, dtype=filtered.dtype) * float("nan")
     return new_source.scatter(0, index, filtered)
 
 
