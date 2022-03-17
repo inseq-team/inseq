@@ -1,23 +1,25 @@
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Type, Union
 
 import json
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 
-import numpy as np
-from torchtyping import TensorType
+import torch
 
-from ..utils import pad, pretty_dict, remap_from_filtered
+from ..utils import drop_padding, get_sequences_from_batched_steps, pretty_dict, remap_from_filtered
 from ..utils.typing import (
-    AttributionOutputTensor,
-    DeltaOutputTensor,
-    IdsTensor,
-    OneOrMoreAttributionSequences,
-    OneOrMoreIdSequences,
-    OneOrMoreTokenSequences,
+    MultipleScoresPerSequenceTensor,
+    MultipleScoresPerStepTensor,
+    OneOrMoreTokenWithIdSequences,
+    SequenceAttributionTensor,
+    SingleScorePerStepTensor,
+    SingleScoresPerSequenceTensor,
+    StepAttributionTensor,
+    TargetIdsTensor,
     TextInput,
-    TopProbabilitiesTensor,
+    TokenWithId,
 )
+from .aggregator import Aggregator, SumNormAggregator
 from .batch import Batch, BatchEncoding, TensorWrapper
 
 
@@ -25,140 +27,147 @@ FeatureAttributionInput = Union[TextInput, BatchEncoding, Batch]
 
 
 @dataclass
-class FeatureAttributionRawStepOutput(TensorWrapper):
+class FeatureAttributionStepOutput(TensorWrapper):
     """
-    Raw output of a single step of feature attribution
+    Output of a single step of feature attribution, plus
+    extra information related to what was attributed.
     """
 
-    source_attributions: AttributionOutputTensor
-    target_attributions: Optional[AttributionOutputTensor] = None
-    probabilities: Optional[TopProbabilitiesTensor] = None
+    source_attributions: StepAttributionTensor
+    target_attributions: Optional[StepAttributionTensor] = None
+    step_scores: Optional[Dict[str, SingleScorePerStepTensor]] = None
+    sequence_scores: Optional[Dict[str, MultipleScoresPerStepTensor]] = None
+    source: Optional[OneOrMoreTokenWithIdSequences] = None
+    prefix: Optional[OneOrMoreTokenWithIdSequences] = None
+    target: Optional[OneOrMoreTokenWithIdSequences] = None
 
     def remap_from_filtered(
         self,
-        source_token_indexes: IdsTensor,
-        target_token_indexes: IdsTensor,
-        target_attention_mask: TensorType["batch_size", 1, int],
-    ):
+        target_attention_mask: TargetIdsTensor,
+    ) -> None:
         self.source_attributions = remap_from_filtered(
-            original=source_token_indexes,
+            original_shape=(len(self.source), *self.source_attributions.shape[1:]),
             mask=target_attention_mask,
             filtered=self.source_attributions,
         )
         if self.target_attributions is not None:
             self.target_attributions = remap_from_filtered(
-                original=target_token_indexes,
+                original_shape=(len(self.prefix), *self.target_attributions.shape[1:]),
                 mask=target_attention_mask,
                 filtered=self.target_attributions,
             )
-        if self.probabilities is not None:
-            self.probabilities = remap_from_filtered(
-                original=target_attention_mask.squeeze(),
-                mask=target_attention_mask,
-                filtered=self.probabilities,
-            )
+        if self.step_scores is not None:
+            for score_name, score_tensor in self.step_scores.items():
+                self.step_scores[score_name] = remap_from_filtered(
+                    original_shape=(len(self.prefix), 1),
+                    mask=target_attention_mask,
+                    filtered=score_tensor.unsqueeze(-1),
+                ).squeeze(-1)
+        if self.sequence_scores is not None:
+            for score_name, score_tensor in self.sequence_scores.items():
+                self.sequence_scores[score_name] = remap_from_filtered(
+                    original_shape=(len(self.source), *self.source_attributions.shape[1:]),
+                    mask=target_attention_mask,
+                    filtered=score_tensor,
+                )
 
 
 @dataclass
-class FeatureAttributionStepOutput:
-    source_attributions: Optional[OneOrMoreAttributionSequences] = None
-    target_attributions: Optional[OneOrMoreAttributionSequences] = None
-    delta: Optional[List[float]] = None
-    probabilities: Optional[List[float]] = None
-    source_ids: Optional[OneOrMoreIdSequences] = None
-    prefix_ids: Optional[OneOrMoreIdSequences] = None
-    target_ids: Optional[OneOrMoreIdSequences] = None
-    source_tokens: Optional[OneOrMoreTokenSequences] = None
-    prefix_tokens: Optional[OneOrMoreTokenSequences] = None
-    target_tokens: Optional[OneOrMoreTokenSequences] = None
-
-    def __str__(self):
-        return f"{self.__class__.__name__}({pretty_dict(self.__dict__)}"
-
-    def __getitem__(self, index: Union[int, slice]) -> "FeatureAttributionStepOutput":
-        return FeatureAttributionStepOutput(
-            source_ids=self.source_ids[index] if self.source_ids is not None else None,
-            prefix_ids=self.prefix_ids[index] if self.prefix_ids is not None else None,
-            target_ids=self.target_ids[index] if self.target_ids is not None else None,
-            source_tokens=self.source_tokens[index] if self.source_tokens is not None else None,
-            prefix_tokens=self.prefix_tokens[index] if self.prefix_tokens is not None else None,
-            target_tokens=self.target_tokens[index] if self.target_tokens is not None else None,
-            source_attributions=self.source_attributions[index],
-            target_attributions=self.target_attributions[index],
-            delta=self.delta[index] if self.delta is not None else None,
-            probabilities=self.probabilities[index] if self.probabilities is not None else None,
-        )
-
-
-@dataclass
-class FeatureAttributionSequenceOutput:
+class FeatureAttributionSequenceOutput(TensorWrapper):
     """
     Output produced by a standard attribution method.
 
     Attributes:
-        source_tokens (list[str]): Tokenized source sequence.
-        target_tokens (list[str]): Tokenized target sequence.
-        source_attributions (list[list[str]]): List of length len(target_tokens) containing
-            lists of attributions of length len(source_tokens) for each
-            source-target token pair (full matrix).
-        target_attributions (list[list[str]]): List of length len(source_tokens) containing
-            lists of attributions of length len(target_tokens) for each
-            target-target token pair (triangular matrix).
-        deltas (list[float], optional): List of length len(target_tokens) containing
-            the deltas for the approximate integration of the gradients for each
-            target token.
-        probabilities (list[float], optional): List of length len(target_tokens) containing
-            the probabilities of each target token.
+        source (list of :class:`~inseq.utils.typing.TokenWithId): Tokenized source sequence.
+        target (list of :class:`~inseq.utils.typing.TokenWithId): Tokenized target sequence.
+        source_attributions (:obj:`SequenceAttributionTensor`): Tensor of shape (`source_len`,
+            `target_len`) plus an optional third dimension if the attribution is granular (e.g.
+            gradient attribution) containing the attribution scores produced at each generation step of
+            the target for every source token.
+        target_attributions (:obj:`SequenceAttributionTensor`, optional): Tensor of shape
+            (`target_len`, `target_len`), plus an optional third dimension if
+            the attribution is granular containing the attribution scores produced at each generation
+            step of the target for every token in the target prefix.
+        step_scores (:obj:`dict[str, SingleScorePerStepTensor]`, optional): Dictionary of step scores
+            produced alongside attributions (one per generation step).
+        sequence_scores (:obj:`dict[str, MultipleScoresPerStepTensor]`, optional): Dictionary of sequence
+            scores produced alongside attributions (n per generation step, as for attributions).
     """
 
-    source_ids: List[int]
-    source_tokens: List[str]
-    target_ids: List[int]
-    target_tokens: List[str]
-    source_attributions: OneOrMoreAttributionSequences
-    target_attributions: Optional[OneOrMoreAttributionSequences] = None
-    deltas: Optional[List[float]] = None
-    probabilities: Optional[List[float]] = None
-
-    def __str__(self):
-        return f"{self.__class__.__name__}({pretty_dict(self.__dict__)})"
+    source: List[TokenWithId]
+    target: List[TokenWithId]
+    source_attributions: SequenceAttributionTensor
+    target_attributions: Optional[SequenceAttributionTensor] = None
+    step_scores: Optional[Dict[str, SingleScoresPerSequenceTensor]] = None
+    sequence_scores: Optional[Dict[str, MultipleScoresPerSequenceTensor]] = None
+    aggregator: Type[Aggregator] = SumNormAggregator
 
     @classmethod
     def from_step_attributions(
-        cls, attributions: List[FeatureAttributionStepOutput]
+        cls,
+        attributions: List[FeatureAttributionStepOutput],
+        pad_id: Optional[Any] = None,
+        has_bos_token: bool = True,
     ) -> List["FeatureAttributionSequenceOutput"]:
-        num_sequences = len(attributions[0].source_attributions)
-        if not all([len(curr.source_attributions) == num_sequences for curr in attributions]):
+        attr = attributions[0]
+        num_sequences = len(attr.source_attributions)
+        if not all([len(att.source_attributions) == num_sequences for att in attributions]):
             raise ValueError("All the attributions must include the same number of sequences.")
-        feat_attr_seq = []
+        source_attributions = get_sequences_from_batched_steps([att.source_attributions for att in attributions])
+        seq_attributions = []
+        sources = [drop_padding(attr.source[seq_id], pad_id) for seq_id in range(num_sequences)]
+        targets = [
+            drop_padding([a.target[seq_id][0] for a in attributions], pad_id) for seq_id in range(num_sequences)
+        ]
         for seq_id in range(num_sequences):
-            feat_attr_seq_args = {
-                "source_ids": attributions[0].source_ids[seq_id],
-                "source_tokens": attributions[0].source_tokens[seq_id],
-                "target_ids": [
-                    attr.target_ids[seq_id][0] for attr in attributions if attr.source_attributions[seq_id]
-                ],
-                "target_tokens": [
-                    attr.target_tokens[seq_id][0] for attr in attributions if attr.source_attributions[seq_id]
-                ],
-                "source_attributions": [
-                    attr.source_attributions[seq_id] for attr in attributions if attr.source_attributions[seq_id]
-                ],
-            }
-            if all(a.delta is not None for a in attributions):
-                feat_attr_seq_args["deltas"] = [
-                    attr.delta[seq_id] for attr in attributions if attr.source_attributions[seq_id]
+            # Remove padding from tensor
+            filtered_source_attribution = source_attributions[seq_id][
+                : len(sources[seq_id]), : len(targets[seq_id]), ...
+            ]
+            seq_attributions.append(
+                cls(
+                    source=sources[seq_id],
+                    target=targets[seq_id],
+                    source_attributions=filtered_source_attribution,
+                )
+            )
+        if attr.target_attributions is not None:
+            target_attributions = get_sequences_from_batched_steps(
+                [att.target_attributions for att in attributions], pad_dims=(1,)
+            )
+            for seq_id in range(num_sequences):
+                if has_bos_token:
+                    target_attributions[seq_id] = target_attributions[seq_id][1:, ...]
+                target_attributions[seq_id] = target_attributions[seq_id][
+                    : len(targets[seq_id]), : len(targets[seq_id]), ...
                 ]
-            if all(a.probabilities is not None for a in attributions):
-                feat_attr_seq_args["probabilities"] = [
-                    attr.probabilities[seq_id] for attr in attributions if attr.source_attributions[seq_id]
-                ]
-            if all(a.target_attributions is not None for a in attributions):
-                feat_attr_seq_args["target_attributions"] = [
-                    attr.target_attributions[seq_id] for attr in attributions if attr.source_attributions[seq_id]
-                ]
-            feat_attr_seq.append(cls(**feat_attr_seq_args))
-        return feat_attr_seq
+                if target_attributions[seq_id].shape[0] != len(targets[seq_id]):
+                    empty_final_row = torch.ones(1, *target_attributions[seq_id].shape[1:]) * float("nan")
+                    target_attributions[seq_id] = torch.cat([target_attributions[seq_id], empty_final_row], dim=0)
+                seq_attributions[seq_id].target_attributions = target_attributions[seq_id]
+        if attr.step_scores is not None:
+            step_scores = [{} for _ in range(num_sequences)]
+            for step_score_name in attr.step_scores.keys():
+                out_step_scores = get_sequences_from_batched_steps(
+                    [att.step_scores[step_score_name] for att in attributions]
+                )
+                for seq_id in range(num_sequences):
+                    step_scores[seq_id][step_score_name] = out_step_scores[seq_id][: len(targets[seq_id])]
+            for seq_id in range(num_sequences):
+                seq_attributions[seq_id].step_scores = step_scores[seq_id]
+        if attr.sequence_scores is not None:
+            seq_scores = [{} for _ in range(num_sequences)]
+            for seq_score_name in attr.sequence_scores.keys():
+                out_seq_scores = get_sequences_from_batched_steps(
+                    [att.sequence_scores[seq_score_name] for att in attributions]
+                )
+                for seq_id in range(num_sequences):
+                    seq_scores[seq_id][seq_score_name] = out_seq_scores[seq_id][
+                        : len(sources[seq_id]), : len(targets[seq_id]), ...
+                    ]
+            for seq_id in range(num_sequences):
+                seq_attributions[seq_id].sequence_scores = seq_scores[seq_id]
+        return seq_attributions
 
     def show(
         self,
@@ -166,37 +175,32 @@ class FeatureAttributionSequenceOutput:
         max_val: Optional[int] = None,
         display: bool = True,
         return_html: Optional[bool] = False,
+        aggregator: Optional[Type[Aggregator]] = None,
     ) -> Optional[str]:
         from inseq import show_attributions
 
-        return show_attributions(self, min_val, max_val, display, return_html)
+        if aggregator is None:
+            aggregator = self.aggregator
+        return show_attributions(aggregator.aggregate(self), min_val, max_val, display, return_html)
 
     @property
     def minimum(self) -> float:
-        values = [np.amin(self.source_scores)]
+        minimum = float(self.source_attributions.min())
         if self.target_attributions is not None:
-            values.append(np.amin(self.target_scores))
-        return min(values)
+            minimum = min(minimum, float(self.target_attributions.min()))
+        return minimum
 
     @property
     def maximum(self) -> float:
-        values = [np.amax(self.source_scores)]
+        maxmimum = float(self.source_attributions.max())
         if self.target_attributions is not None:
-            values.append(np.amax(self.target_scores))
-        return min(values)
+            maxmimum = max(maxmimum, float(self.target_attributions.max()))
+        return maxmimum
 
-    @property
-    def source_scores(self) -> np.ndarray:
-        return np.array(self.source_attributions).T
-
-    @property
-    def target_scores(self) -> Optional[np.ndarray]:
-        if self.target_attributions is None:
-            return None
-        # Add an empty row to the target_attributions to make it a square matrix.
-        return np.vstack(
-            (np.array(pad(self.target_attributions, np.nan)).T, np.ones(len(self.target_attributions)) * np.nan)
-        )
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            field.name: getattr(self, field.name) for field in fields(self.__class__) if field.name != "aggregator"
+        }
 
 
 @dataclass
@@ -234,8 +238,8 @@ class FeatureAttributionOutput:
             raise ValueError(f"File {path} already exists.")
         out = json.dumps(
             {
-                "sequence_attributions": [seq.__dict__ for seq in self.sequence_attributions],
-                "step_attributions": [step.__dict__ for step in self.step_attributions]
+                "sequence_attributions": [seq.to_dict() for seq in self.sequence_attributions],
+                "step_attributions": [step.to_dict() for step in self.step_attributions]
                 if self.step_attributions
                 else None,
                 "info": self.info,
@@ -270,6 +274,7 @@ class FeatureAttributionOutput:
         max_val: Optional[int] = None,
         display: bool = True,
         return_html: Optional[bool] = False,
+        aggregator: Optional[Type[Aggregator]] = None,
     ) -> Optional[str]:
         """Visualize the sequence attributions.
 
@@ -284,32 +289,20 @@ class FeatureAttributionOutput:
         """
         from inseq import show_attributions
 
-        return show_attributions(self.sequence_attributions, min_val, max_val, display, return_html)
+        if aggregator is None:
+            attributions = [attr.aggregator.aggregate(attr) for attr in self.sequence_attributions]
+        else:
+            attributions = [aggregator.aggregate(attr) for attr in self.sequence_attributions]
+        return show_attributions(attributions, min_val, max_val, display, return_html)
 
 
 # Gradient attribution classes
 
 
 @dataclass
-class GradientFeatureAttributionRawStepOutput(FeatureAttributionRawStepOutput):
-    """
-    Raw output of a single step of gradient feature attribution.
-
+class GradientFeatureAttributionStepOutput(FeatureAttributionStepOutput):
+    """Raw output of a single step of gradient feature attribution.
     Adds the convergence delta to the base class.
     """
 
-    deltas: Optional[DeltaOutputTensor] = None
-
-    def remap_from_filtered(
-        self,
-        source_token_indexes: IdsTensor,
-        target_token_indexes: IdsTensor,
-        target_attention_mask: TensorType["batch_size", 1, int],
-    ):
-        super().remap_from_filtered(source_token_indexes, target_token_indexes, target_attention_mask)
-        if self.deltas is not None:
-            self.deltas = remap_from_filtered(
-                original=target_attention_mask.squeeze(),
-                mask=target_attention_mask,
-                filtered=self.deltas,
-            )
+    pass

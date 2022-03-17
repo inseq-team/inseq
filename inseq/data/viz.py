@@ -16,7 +16,7 @@
 # WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
 # OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-from typing import List, Literal, Optional, Tuple, Union
+from typing import Dict, List, Literal, Optional, Tuple, Union
 
 import random
 import string
@@ -74,7 +74,7 @@ def show_attributions(
             curr_html += instance_html
             curr_html += get_heatmap_type(attribution, colors[idx], "Source", isnotebook())
             idx += 1
-            if attribution.target_scores is not None:
+            if attribution.target_attributions is not None:
                 curr_html += instance_html
                 curr_html += get_heatmap_type(attribution, colors[idx], "Target", isnotebook())
                 idx += 1
@@ -86,7 +86,7 @@ def show_attributions(
                 raise AttributeError("display=False is not supported outside of an IPython environment.")
             rprint(get_heatmap_type(attribution, colors[idx], "Source", isnotebook()))
             idx += 1
-            if attribution.target_scores is not None:
+            if attribution.target_attributions is not None:
                 print("\n\n")
                 rprint(get_heatmap_type(attribution, colors[idx], "Target", isnotebook()))
                 idx += 1
@@ -111,9 +111,15 @@ def get_attribution_colors(
         max_val = max(attribution.maximum for attribution in attributions)
     colors = []
     for attribution in attributions:
-        colors.append(get_colors(attribution.source_scores, min_val, max_val, cmap, return_alpha, return_strings))
-        if attribution.target_scores is not None:
-            colors.append(get_colors(attribution.target_scores, min_val, max_val, cmap, return_alpha, return_strings))
+        colors.append(
+            get_colors(attribution.source_attributions.numpy(), min_val, max_val, cmap, return_alpha, return_strings)
+        )
+        if attribution.target_attributions is not None:
+            colors.append(
+                get_colors(
+                    attribution.target_attributions.numpy(), min_val, max_val, cmap, return_alpha, return_strings
+                )
+            )
     return colors
 
 
@@ -124,24 +130,25 @@ def get_heatmap_type(
     use_html: bool = False,
 ) -> str:
     heatmap_func = get_saliency_heatmap_html if use_html else get_saliency_heatmap_rich
+    step_scores = None
+    if attribution.step_scores is not None:
+        step_scores = {k: v.numpy() for k, v in attribution.step_scores.items()}
     if heatmap_type == "Source":
         return heatmap_func(
-            attribution.source_scores,
-            attribution.target_tokens,
-            attribution.source_tokens,
+            attribution.source_attributions.numpy(),
+            attribution.target,
+            attribution.source,
             colors,
-            attribution.deltas,
-            attribution.probabilities,
+            step_scores,
             label="Source",
         )
     elif heatmap_type == "Target":
         return heatmap_func(
-            attribution.target_scores,
-            attribution.target_tokens,
-            attribution.target_tokens,
+            attribution.target_attributions.numpy(),
+            attribution.target,
+            attribution.target,
             colors,
-            attribution.deltas,
-            attribution.probabilities,
+            step_scores,
             label="Target",
         )
     else:
@@ -153,11 +160,9 @@ def get_saliency_heatmap_html(
     column_labels: List[str],
     row_labels: List[str],
     input_colors: List[List[str]],
-    deltas: Optional[List[float]] = None,
-    probabilities: Optional[List[float]] = None,
+    step_scores: Optional[Dict[str, np.ndarray]] = None,
     label: str = "",
-    prob_highlight_threshold: float = 0.5,
-    delta_highlight_threshold: float = 0.5,
+    step_scores_threshold: Union[float, Dict[str, float]] = 0.5,
 ):
     # unique ID added to HTML elements and function to avoid collision of differnent instances
     uuid = "".join(random.choices(string.ascii_lowercase, k=20))
@@ -171,21 +176,20 @@ def get_saliency_heatmap_html(
         for col_index in range(scores.shape[1]):
             score = ""
             if not np.isnan(scores[row_index, col_index]):
-                score = round(scores[row_index][col_index], 3)
+                score = round(float(scores[row_index][col_index]), 3)
             out += f'<th style="background:{input_colors[row_index][col_index]}">{score}</th>'
         out += "</tr>"
-    if probabilities is not None:
-        out += '<tr style="outline: thin solid"><th><b>p(yt|x, y<t)</b></th>'
-        prob_style = lambda val: val >= prob_highlight_threshold
-        for col_index in range(scores.shape[1]):
-            score = round(probabilities[col_index], 3)
-            out += f'<th>{"<b>" if prob_style(score) else ""}{score}{"</b>" if prob_style(score) else ""}</th>'
-    if deltas is not None:
-        out += '<tr style="outline: thin solid"><th><b>δ</b></th>'
-        delta_style = lambda val: abs(val) >= delta_highlight_threshold
-        for col_index in range(scores.shape[1]):
-            score = round(deltas[col_index], 3)
-            out += f'<th>{"<b>" if delta_style(score) else ""}{score}{"</b>" if delta_style(score) else ""}</th>'
+    if step_scores is not None:
+        for step_score_name, step_score_values in step_scores.items():
+            out += f'<tr style="outline: thin solid"><th><b>{step_score_name}</b></th>'
+            if isinstance(step_scores_threshold, float):
+                threshold = step_scores_threshold
+            else:
+                threshold = step_scores_threshold.get(step_score_name, 0.5)
+            style = lambda val: abs(val) >= threshold
+            for col_index in range(scores.shape[1]):
+                score = round(float(step_score_values[col_index]), 3)
+                out += f'<th>{"<b>" if style(score) else ""}{score}{"</b>" if style(score) else ""}</th>'
     out += "</table>"
     saliency_heatmap_markup = saliency_heatmap_html.format(uuid=uuid, content=out, label=label)
     plot_uuid = "".join(random.choices(string.ascii_lowercase, k=20))
@@ -199,12 +203,10 @@ def get_saliency_heatmap_rich(
     scores: np.ndarray,
     column_labels: List[str],
     row_labels: List[str],
-    input_colors: List[List[Tuple[float, float, float]]],
-    deltas: Optional[List[float]] = None,
-    probabilities: Optional[List[float]] = None,
+    input_colors: List[List[str]],
+    step_scores: Optional[Dict[str, np.ndarray]] = None,
     label: str = "",
-    prob_highlight_threshold: float = 0.5,
-    delta_highlight_threshold: float = 0.5,
+    step_scores_threshold: Union[float, Dict[str, float]] = 0.5,
 ):
     columns = [Column(header="", justify="right")]
     for head_id in range(scores.shape[1]):
@@ -226,18 +228,17 @@ def get_saliency_heatmap_rich(
                 score = round(scores[row_index][col_index], 2)
             row.append(Text(f"{score}", justify="center", style=Style(color=color)))
         table.add_row(*row, end_section=row_index == scores.shape[0] - 1)
-    if probabilities:
-        prob_style = lambda val: "bold" if val >= prob_highlight_threshold else ""
-        prob_row = [[Text("p(yt|x, y<t)", style="bold")]]
-        for prob in probabilities:
-            prob_row.append([Text(f"{prob:.2f}", justify="center", style=prob_style(prob))])
-        table.add_row(*prob_row, end_section=True)
-    if deltas:
-        delta_style = lambda val: "bold" if abs(val) >= delta_highlight_threshold else ""
-        delta_row = [[Text("δ", style="bold")]]
-        for delta in deltas:
-            delta_row.append([Text(f"{delta:.2f}", justify="center", style=delta_style(delta))])
-        table.add_row(*delta_row, end_section=True)
+    if step_scores is not None:
+        for step_score_name, step_score_values in step_scores.items():
+            if isinstance(step_scores_threshold, float):
+                threshold = step_scores_threshold
+            else:
+                threshold = step_scores_threshold.get(step_score_name, 0.5)
+            style = lambda val: "bold" if abs(val) >= threshold else ""
+            score_row = [[Text(step_score_name, style="bold")]]
+            for val in step_score_values:
+                score_row.append([Text(f"{score:.2f}", justify="center", style=style(val))])
+            table.add_row(*score_row, end_section=True)
     return table
 
 

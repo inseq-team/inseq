@@ -13,7 +13,13 @@ from .misc import (
     rgetattr,
 )
 from .registry import Registry, get_available_methods
-from .torch_utils import euclidean_distance, probits2probs, remap_from_filtered, sum_normalize_attributions
+from .torch_utils import (
+    euclidean_distance,
+    get_sequences_from_batched_steps,
+    probits2probs,
+    remap_from_filtered,
+    sum_normalize_attributions,
+)
 
 
 __all__ = [
@@ -22,6 +28,7 @@ __all__ = [
     "UnknownAttributionMethodError",
     "cache_results",
     "optional",
+    "pad",
     "pretty_list",
     "pretty_tensor",
     "pretty_dict",
@@ -33,6 +40,7 @@ __all__ = [
     "remap_from_filtered",
     "drop_padding",
     "sum_normalize_attributions",
+    "get_sequences_from_batched_steps",
     "probits2probs",
     "euclidean_distance",
     "Registry",

@@ -1,13 +1,34 @@
 from typing import Sequence, Tuple, Union
 
+from dataclasses import dataclass
+
 from torch import long
 from torchtyping import TensorType
 
 
 TextInput = Union[str, Sequence[str]]
 
+
+@dataclass
+class TokenWithId:
+    token: str
+    id: int
+
+    def __str__(self):
+        return self.token
+
+    def __eq__(self, other: Union[str, int]):
+        if isinstance(other, str):
+            return self.token == other
+        elif isinstance(other, int):
+            return self.id == other
+        else:
+            return False
+
+
 OneOrMoreIdSequences = Sequence[Sequence[int]]
 OneOrMoreTokenSequences = Sequence[Sequence[str]]
+OneOrMoreTokenWithIdSequences = Sequence[Sequence[TokenWithId]]
 OneOrMoreAttributionSequences = Sequence[Sequence[float]]
 
 IdsTensor = TensorType["batch_size", "seq_len", long]
@@ -15,11 +36,38 @@ TargetIdsTensor = TensorType["batch_size", long]
 EmbeddingsTensor = TensorType["batch_size", "seq_len", "embed_size", float]
 MultiStepEmbeddingsTensor = TensorType["batch_size_x_n_steps", "seq_len", "embed_size", float]
 VocabularyEmbeddingsTensor = TensorType["vocab_size", "embed_size", float]
-FullLogitsTensor = TensorType["batch_size", "seq_len", float]
-TopProbabilitiesTensor = TensorType["batch_size", float]
+FullLogitsTensor = TensorType["batch_size", "vocab_size", float]
 
-DeltaOutputTensor = TensorType["batch_size", float]
-AttributionOutputTensor = TensorType["batch_size", "seq_len", float]
+# Step and sequence objects used for stepwise scores (e.g. convergence deltas, probabilities)
+SingleScorePerStepTensor = TensorType["batch_size", float]
+SingleScoresPerSequenceTensor = TensorType["generated_seq_len", float]
+
+# Step and sequence objects used for sequence scores (e.g. attributions over tokens)
+MultipleScoresPerStepTensor = TensorType["batch_size", "attributed_seq_len", float]
+MultipleScoresPerSequenceTensor = TensorType["attributed_seq_len", "generated_seq_len", float]
+
+# One attribution score per embedding value for every attributed token
+# in a single attribution step. Produced by gradient attribution methods.
+GranularStepAttributionTensor = EmbeddingsTensor
+
+# One attribution score per token for a single attribution step
+# Either product of aggregation of GranularStepAttributionTensor over last dimension,
+# or produced by methods that work at token-level (e.g. attention)
+TokenStepAttributionTensor = MultipleScoresPerStepTensor
+
+StepAttributionTensor = Union[GranularStepAttributionTensor, TokenStepAttributionTensor]
+
+# One attribution score per embedding value for every attributed token in attributed_seq
+# for all generated tokens in generated_seq. Produced by aggregating GranularStepAttributionTensor
+# across multiple steps and separating batches.
+GranularSequenceAttributionTensor = TensorType["attributed_seq_len", "generated_seq_len", "embed_size", float]
+
+# One attribution score for every token in attributed_seq for every generated token
+# in generated_seq. Produced by aggregating GranularSequenceAttributionTensor over the last dimension,
+# or by aggregating TokenStepAttributionTensor across multiple steps and separating batches.
+TokenSequenceAttributionTensor = MultipleScoresPerSequenceTensor
+
+SequenceAttributionTensor = Union[GranularSequenceAttributionTensor, TokenSequenceAttributionTensor]
 
 # For Huggingface it's a string identifier e.g. "t5-base", "Helsinki-NLP/opus-mt-en-it"
 # For Fairseq it's a tuple of strings containing repo and model name

@@ -9,6 +9,8 @@ from itertools import dropwhile
 
 from torch import Tensor
 
+from .typing import TokenWithId
+
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +25,7 @@ def optional(condition, context_manager):
 
 
 def _pretty_list_contents(l: Sequence[Any]) -> str:
-    quote = f"""{"'" if l and isinstance(l[0], str) else ""}"""
+    quote = f"""{"'" if l and type(l[0]) in [str, TokenWithId] else ""}"""
     return (
         quote
         + f"{quote}, {quote}".join(
@@ -41,9 +43,9 @@ def _pretty_list(l: Optional[Sequence[Any]], lpad: int = 8) -> str:
     if all([isinstance(x, list) for x in l]):
         contents = " " * lpad + "[ " + f" ],\n{' ' * lpad}[ ".join([_pretty_list_contents(subl) for subl in l]) + " ]"
     else:
-        if all([hasattr(x, "__dict__") for x in l]):
+        if all([hasattr(x, "to_dict") for x in l]):
             contents = ",\n".join(
-                [f"{' ' * lpad + x.__class__.__name__}({pretty_dict(x.__dict__, lpad + 4)}" for x in l]
+                [f"{' ' * lpad + x.__class__.__name__}({pretty_dict(x.to_dict(), lpad + 4)}" for x in l]
             )
         else:
             contents = " " * lpad + _pretty_list_contents(l)
@@ -84,8 +86,8 @@ def pretty_dict(d: Dict[str, Any], lpad: int = 4) -> str:
             out_txt += pretty_tensor(v)
         elif isinstance(v, dict):
             out_txt += pretty_dict(v, lpad + 4)
-        elif hasattr(v, "__dict__"):
-            out_txt += pretty_dict(v.__dict__, lpad + 4)
+        elif hasattr(v, "to_dict") and v.__class__.__name__ != "TokenWithId":
+            out_txt += pretty_dict(v.to_dict(), lpad + 4)
         else:
             out_txt += "None" if v is None else str(v)
         out_txt += ",\n"
@@ -154,6 +156,8 @@ def pad(seq: Sequence[Sequence[Any]], pad_id: Any):
 
 
 def drop_padding(seq: Sequence[Any], pad_id: Any):
+    if pad_id is None:
+        return seq
     return list(reversed(list(dropwhile(lambda x: x == pad_id, reversed(seq)))))
 
 
