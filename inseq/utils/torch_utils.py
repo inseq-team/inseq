@@ -1,4 +1,4 @@
-from typing import Any, List, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, List, Optional, Sequence, Tuple, Union
 
 import logging
 
@@ -74,6 +74,36 @@ def probits2probs(probits: FullLogitsTensor, target_ids: TargetIdsTensor) -> Sin
     # Extracts the ith score from the softmax output over the vocabulary (dim -1 of the probits)
     # where i is the value of the corresponding index in target_ids.
     return probits.gather(-1, target_ids).squeeze(-1)
+
+
+def aggregate_contiguous(
+    t: torch.Tensor,
+    spans: Sequence[Tuple[int, int]],
+    aggregate_fn: Optional[Callable] = None,
+    aggregate_dim: int = 1,
+):
+    if not spans:
+        return t
+    if aggregate_fn is None:
+        aggregate_fn = torch.mean
+    while len(t.shape) < 2:
+        t = t.unsqueeze(-1)
+    t = t.transpose(aggregate_dim, 1)
+    slices = []
+    base_val = 0
+    for start, end in spans:
+        slices.append(t[:, base_val:start])
+        slices.append(aggregate_fn(t[:, start:end]))
+        base_val = end
+    slices.append(t[:, base_val:])
+    out_cat = torch.cat(slices, dim=1).transpose(1, aggregate_dim)
+    if 1 in out_cat.shape:
+        out_cat = out_cat.transpose(1, 0).squeeze(0)
+    return out_cat
+
+
+def abs_max(t: torch.Tensor) -> torch.Tensor:
+    return t.gather(1, t.abs().argmax(dim=1).unsqueeze(1))
 
 
 def get_sequences_from_batched_steps(

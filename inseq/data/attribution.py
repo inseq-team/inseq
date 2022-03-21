@@ -2,7 +2,8 @@ from typing import Any, Dict, List, Optional, Type, Union
 
 import json
 import os
-from dataclasses import dataclass, field, fields
+import pickle
+from dataclasses import dataclass, field
 
 import torch
 
@@ -19,7 +20,7 @@ from ..utils.typing import (
     TextInput,
     TokenWithId,
 )
-from .aggregator import Aggregator, SumNormAggregator
+from .aggregator import Aggregator, AggregatorPipeline, CustomAttributionAggregator
 from .batch import Batch, BatchEncoding, TensorWrapper
 
 
@@ -100,7 +101,7 @@ class FeatureAttributionSequenceOutput(TensorWrapper):
     target_attributions: Optional[SequenceAttributionTensor] = None
     step_scores: Optional[Dict[str, SingleScoresPerSequenceTensor]] = None
     sequence_scores: Optional[Dict[str, MultipleScoresPerSequenceTensor]] = None
-    aggregator: Type[Aggregator] = SumNormAggregator
+    aggregator: Union[AggregatorPipeline, Type[Aggregator]] = CustomAttributionAggregator
 
     @classmethod
     def from_step_attributions(
@@ -175,13 +176,14 @@ class FeatureAttributionSequenceOutput(TensorWrapper):
         max_val: Optional[int] = None,
         display: bool = True,
         return_html: Optional[bool] = False,
-        aggregator: Optional[Type[Aggregator]] = None,
+        aggregator: Union[AggregatorPipeline, Type[Aggregator]] = None,
+        **kwargs,
     ) -> Optional[str]:
         from inseq import show_attributions
 
         if aggregator is None:
             aggregator = self.aggregator
-        return show_attributions(aggregator.aggregate(self), min_val, max_val, display, return_html)
+        return show_attributions(aggregator.aggregate(self, **kwargs), min_val, max_val, display, return_html)
 
     @property
     def minimum(self) -> float:
@@ -196,11 +198,6 @@ class FeatureAttributionSequenceOutput(TensorWrapper):
         if self.target_attributions is not None:
             maxmimum = max(maxmimum, float(self.target_attributions.max()))
         return maxmimum
-
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            field.name: getattr(self, field.name) for field in fields(self.__class__) if field.name != "aggregator"
-        }
 
 
 @dataclass
@@ -226,47 +223,42 @@ class FeatureAttributionOutput:
     def __str__(self):
         return f"{self.__class__.__name__}({pretty_dict(self.__dict__)})"
 
-    def save(self, path: str, overwrite: bool = False) -> None:
+    def save(self, path: str, overwrite: bool = False, name: str = "") -> None:
         """
         Save class contents to a JSON file.
 
         Args:
-            path (str): Path to save the attributions to.
+            path (str): Path to the folder where attributions and their configuration will be stored.
             overwrite (bool): If True, overwrite the file if it exists, raise error otherwise.
+            name (str, default ''): Custom prefix for the generated files.
         """
-        if not overwrite and os.path.exists(path):
-            raise ValueError(f"File {path} already exists.")
-        out = json.dumps(
-            {
-                "sequence_attributions": [seq.to_dict() for seq in self.sequence_attributions],
-                "step_attributions": [step.to_dict() for step in self.step_attributions]
-                if self.step_attributions
-                else None,
-                "info": self.info,
-            }
-        )
-        with open(path, "w") as f:
-            f.write(out)
+        attr_path = os.path.join(path, f"{name + '_' if name else ''}attribution_output.pkl")
+        config_path = os.path.join(path, f"{name + '_' if name else ''}attribution_info.json")
+        if not overwrite and (os.path.exists(attr_path) or os.path.exists(config_path)):
+            raise ValueError(
+                f"{path} already contains the attribution_output.pkl and attribution_info.json files. "
+                "Override with overwrite=True."
+            )
+        os.makedirs(path, exist_ok=True)
+        with open(config_path, "w") as f:
+            f.write(json.dumps(self.info))
+        with open(attr_path, "wb") as f:
+            pickle.dump(self, f)
 
     @classmethod
-    def load(cls, path: str) -> "FeatureAttributionOutput":
-        """Loads a saved attribution output into an object
+    def load(cls, path: str, name: str = "") -> "FeatureAttributionOutput":
+        """Load saved attribution outputs into a new FeatureAttributionOutput object.
 
         Args:
-            path (str): Path to the saved attribution output
+            path (str): Path to the folder containing the saved attribution outputs.
+            name (str, default ''): Custom prefix for the generated files.
 
         Returns:
             :class:`~inseq.data.FeatureAttributionOutput`: Loaded attribution output
         """
-        with open(path) as f:
-            output = json.loads(f.read())
-        return cls(
-            sequence_attributions=[FeatureAttributionSequenceOutput(**seq) for seq in output["sequence_attributions"]],
-            step_attributions=[FeatureAttributionStepOutput(**step) for step in output["step_attributions"]]
-            if output["step_attributions"]
-            else None,
-            info=output["info"],
-        )
+        attr_path = os.path.join(path, f"{name + '_' if name else ''}attribution_output.pkl")
+        with open(attr_path, "rb") as f:
+            return pickle.load(f)
 
     def show(
         self,
@@ -274,7 +266,8 @@ class FeatureAttributionOutput:
         max_val: Optional[int] = None,
         display: bool = True,
         return_html: Optional[bool] = False,
-        aggregator: Optional[Type[Aggregator]] = None,
+        aggregator: Union[AggregatorPipeline, Type[Aggregator]] = None,
+        **kwargs,
     ) -> Optional[str]:
         """Visualize the sequence attributions.
 
@@ -290,9 +283,9 @@ class FeatureAttributionOutput:
         from inseq import show_attributions
 
         if aggregator is None:
-            attributions = [attr.aggregator.aggregate(attr) for attr in self.sequence_attributions]
+            attributions = [attr.aggregator.aggregate(attr, **kwargs) for attr in self.sequence_attributions]
         else:
-            attributions = [aggregator.aggregate(attr) for attr in self.sequence_attributions]
+            attributions = [aggregator.aggregate(attr, **kwargs) for attr in self.sequence_attributions]
         return show_attributions(attributions, min_val, max_val, display, return_html)
 
 

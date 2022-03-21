@@ -14,6 +14,8 @@ from .misc import (
 )
 from .registry import Registry, get_available_methods
 from .torch_utils import (
+    abs_max,
+    aggregate_contiguous,
     euclidean_distance,
     get_sequences_from_batched_steps,
     probits2probs,
@@ -40,6 +42,8 @@ __all__ = [
     "remap_from_filtered",
     "drop_padding",
     "sum_normalize_attributions",
+    "aggregate_contiguous",
+    "abs_max",
     "get_sequences_from_batched_steps",
     "probits2probs",
     "euclidean_distance",

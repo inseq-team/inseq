@@ -31,6 +31,8 @@ OneOrMoreTokenSequences = Sequence[Sequence[str]]
 OneOrMoreTokenWithIdSequences = Sequence[Sequence[TokenWithId]]
 OneOrMoreAttributionSequences = Sequence[Sequence[float]]
 
+IndexSpan = Union[Tuple[int, int], Sequence[Tuple[int, int]]]
+
 IdsTensor = TensorType["batch_size", "seq_len", long]
 TargetIdsTensor = TensorType["batch_size", long]
 EmbeddingsTensor = TensorType["batch_size", "seq_len", "embed_size", float]
