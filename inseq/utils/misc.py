@@ -15,6 +15,9 @@ from .typing import TokenWithId
 logger = logging.getLogger(__name__)
 
 
+identity_fn = lambda x: x
+
+
 @contextmanager
 def optional(condition, context_manager):
     if condition:
@@ -180,3 +183,24 @@ def isnotebook():
             return False  # Other type (?)
     except NameError:
         return False  # Probably standard Python interpreter
+
+
+def aggregate_token_sequence(token_sequence, spans):
+    if not spans:
+        return token_sequence
+    out_sequence = []
+    span_start_idxs = [span[0] for span in spans]
+    curr_idx = 0
+    for tok_idx, token in enumerate(token_sequence):
+        if tok_idx < curr_idx:
+            continue
+        if curr_idx in span_start_idxs:
+            end_idx = spans[span_start_idxs.index(curr_idx)][1]
+            # We use -1 as token index to indicate the token is product of an aggregation
+            # (i.e. not contained in the original vocabulary)
+            out_sequence.append(TokenWithId("".join([t.token for t in token_sequence[curr_idx:end_idx]]), -1))
+            curr_idx = end_idx
+        else:
+            out_sequence.append(token)
+            curr_idx += 1
+    return out_sequence

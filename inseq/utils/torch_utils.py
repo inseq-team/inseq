@@ -106,6 +106,10 @@ def abs_max(t: torch.Tensor) -> torch.Tensor:
     return t.gather(1, t.abs().argmax(dim=1).unsqueeze(1))
 
 
+def prod(t: torch.Tensor) -> torch.Tensor:
+    return t.prod(dim=1, keepdim=True)
+
+
 def get_sequences_from_batched_steps(
     bsteps: List[torch.Tensor], pad_dims: Optional[Sequence[int]] = None
 ) -> List[torch.Tensor]:

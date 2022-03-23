@@ -17,11 +17,13 @@ class TokenWithId:
     def __str__(self):
         return self.token
 
-    def __eq__(self, other: Union[str, int]):
+    def __eq__(self, other: Union[str, int, "TokenWithId"]):
         if isinstance(other, str):
             return self.token == other
         elif isinstance(other, int):
             return self.id == other
+        elif isinstance(other, TokenWithId):
+            return self.token == other.token and self.id == other.id
         else:
             return False
 

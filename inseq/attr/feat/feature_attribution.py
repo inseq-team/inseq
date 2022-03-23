@@ -84,6 +84,7 @@ class FeatureAttribution(Registry):
             hook_to_model (:obj:`bool`, default `True`): Whether the attribution method should be
                 hooked to the attribution model during initialization.
             **kwargs: Additional keyword arguments to pass to the hook method.
+
         Attributes:
             is_layer_attribution (:obj:`bool`, default `False`): If True, the attribution method maps saliency
                 scores to the output of a layer instead of model inputs. Layer attribution methods do not require

@@ -141,7 +141,6 @@ def enrich_step_output(
         batch (:class:`~inseq.data.EncoderDecoderBatch`): The batch on which attribution was performed.
         target_ids (:obj:`torch.Tensor`): Target token ids of size `(batch_size, 1)` corresponding to tokens
             for which the attribution step was performed.
-        has_bos_token (:obj:`bool`): Whether the target sequence contains a BOS token.
 
     Returns:
         :class:`~inseq.data.FeatureAttributionStepOutput`: The enriched attribution output.

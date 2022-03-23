@@ -1,13 +1,10 @@
-from typing import Any, Callable, List, Optional, Type, Union
+from typing import Any, Callable, Dict, List, Optional, Type, Union
 
 from abc import ABC
 
-from ..utils import abs_max, aggregate_contiguous, sum_normalize_attributions
-from ..utils.typing import IndexSpan, TokenWithId
-from .batch import TensorWrapper
-
-
-IDENTITY = lambda x: x
+from ..utils import abs_max, aggregate_contiguous, aggregate_token_sequence, identity_fn
+from ..utils.typing import IndexSpan
+from .data_utils import TensorWrapper
 
 
 class DispatchableDict(dict):
@@ -25,15 +22,30 @@ class DispatchableDict(dict):
 
 class Aggregator(ABC):
     @classmethod
+    def pre_aggregate_hook(cls, tensors: TensorWrapper, **kwargs):
+        pass
+
+    @classmethod
     def aggregate(cls, tensors: TensorWrapper, **kwargs):
         aggregated_sequence_attribution_fields = {}
         for field in tensors.to_dict().keys():
             field_func = getattr(cls, f"aggregate_{field}")
-            dispatched_kwargs = {
-                k: v if not isinstance(v, DispatchableDict) else v.get(k, v.default) for k, v in kwargs.items()
-            }
+            dispatched_kwargs = {}
+            for k, v in kwargs.items():
+                if isinstance(v, DispatchableDict):
+                    dispatched_kwargs[k] = v.get(field, v.default)
+                    # If the subclass is a dict, then we assume its fields represent
+                    # variants depending on the aggregator that is being used.
+                    if isinstance(dispatched_kwargs[k], dict) and cls.name in dispatched_kwargs[k]:
+                        dispatched_kwargs[k] = dispatched_kwargs[k].get(cls.name, v.default)
+                else:
+                    dispatched_kwargs[k] = v
             aggregated_sequence_attribution_fields[field] = field_func(tensors, **dispatched_kwargs)
         return tensors.__class__(**aggregated_sequence_attribution_fields)
+
+    @classmethod
+    def post_aggregate_hook(cls, tensors: TensorWrapper, **kwargs):
+        pass
 
 
 class AggregatorPipeline:
@@ -42,8 +54,38 @@ class AggregatorPipeline:
 
     def aggregate(self, tensors: TensorWrapper, **kwargs):
         for aggregator in self.aggregators:
+            aggregator.pre_aggregate_hook(tensors, **kwargs)
+        for aggregator in self.aggregators:
             tensors = aggregator.aggregate(tensors, **kwargs)
+        for aggregator in self.aggregators:
+            aggregator.post_aggregate_hook(tensors, **kwargs)
         return tensors
+
+
+class AggregableMixin(ABC):
+    _aggregator: Union[AggregatorPipeline, Type[Aggregator]]
+    _dict_aggregate_fn: DispatchableDict
+
+    def aggregate(
+        self,
+        aggregator: Union[AggregatorPipeline, Type[Aggregator]] = None,
+        **kwargs,
+    ) -> "AggregableMixin":
+        """Aggregate attributions using the default or provided aggregator.
+
+        Args:
+            aggregator (:obj:`AggregatorPipeline` or :obj:`Type[Aggregator]`, optional): Aggregator
+                pipeline to use. If not provided, the default aggregator pipeline is used.
+
+        Returns:
+            :obj:`AggregableMixin`: The aggregated output class.
+        """
+        if aggregator is None:
+            aggregator = self._aggregator
+        return aggregator.aggregate(self, **kwargs)
+
+    def __post_init__(self):
+        pass
 
 
 class FeatureAttributionSequenceOutputAggregator(Aggregator):
@@ -52,6 +94,11 @@ class FeatureAttributionSequenceOutputAggregator(Aggregator):
     @classmethod
     def aggregate(cls, attr, **kwargs):
         return super().aggregate(attr, **kwargs)
+
+    @classmethod
+    def post_aggregate_hook(cls, attr: TensorWrapper, **kwargs):
+        super().post_aggregate_hook(attr, **kwargs)
+        cls.is_compatible(attr)
 
     @staticmethod
     def aggregate_source(attr, **kwargs):
@@ -97,8 +144,8 @@ class FeatureAttributionSequenceOutputAggregator(Aggregator):
                 assert sequence_score.shape == attr.source_attributions.shape
 
 
-class CustomAttributionAggregator(FeatureAttributionSequenceOutputAggregator):
-    """Aggregates sequence attributions by summing over the last dimension and
+class SequenceAttributionAggregator(FeatureAttributionSequenceOutputAggregator):
+    """Aggregates sequence attributions using a custom function. By default, sum over the last dimension and
     dividing by the norm of the sequence attributions.
 
     Args:
@@ -108,18 +155,22 @@ class CustomAttributionAggregator(FeatureAttributionSequenceOutputAggregator):
             attributions.
     """
 
+    name = "sequence_aggregate"
+    default_fn = identity_fn
+
     @classmethod
-    def aggregate(cls, attr, aggregate_fn: Union[Callable, DispatchableDict, None] = None, **kwargs):
+    def aggregate(cls, attr, aggregate_fn: Union[Callable, Dict[str, Any], None] = None, **kwargs):
         if aggregate_fn is None:
-            if len(attr.source_attributions.shape) == 2:
-                aggregate_fn = IDENTITY
-            else:
-                aggregate_fn = sum_normalize_attributions
+            aggregate_fn = attr._dict_aggregate_fn if isinstance(attr._dict_aggregate_fn, dict) else cls.default_fn
+        # By default we treat dicts as key-value maps for aggregation functions that
+        # will be applied to specific fields
+        if isinstance(aggregate_fn, dict):
+            aggregate_fn = DispatchableDict(default=cls.default_fn, **aggregate_fn)
         aggregated = super().aggregate(attr, aggregate_fn=aggregate_fn, **kwargs)
         return aggregated
 
     @staticmethod
-    def aggregate_source_attributions(attr, aggregate_fn: Callable, **kwargs):
+    def aggregate_source_attributions(attr, aggregate_fn: Union[Dict[str, Callable], Callable], **kwargs):
         if attr.target_attributions is None:
             return aggregate_fn(attr.source_attributions)
         else:
@@ -147,13 +198,17 @@ class ContiguousSpanAggregator(FeatureAttributionSequenceOutputAggregator):
 
     """
 
+    name = "span_aggregate"
+    default_fn = abs_max
+
     @classmethod
     def aggregate(
         cls,
         attr,
-        aggregate_fn: Union[Callable, DispatchableDict, None] = None,
+        aggregate_fn: Union[Callable, Dict[str, Any], None] = None,
         source_spans: Optional[IndexSpan] = None,
         target_spans: Optional[IndexSpan] = None,
+        **kwargs,
     ):
         """Spans can be:
 
@@ -163,10 +218,9 @@ class ContiguousSpanAggregator(FeatureAttributionSequenceOutputAggregator):
             for multiple contiguous spans.
         """
         if aggregate_fn is None:
-            aggregate_fn = DispatchableDict(
-                default=abs_max,
-                step_scores={"deltas": abs_max, "probabilities": lambda t: t.prod(dim=0, keepdim=True)},
-            )
+            aggregate_fn = attr._dict_aggregate_fn if isinstance(attr._dict_aggregate_fn, dict) else cls.default_fn
+        if isinstance(aggregate_fn, dict):
+            aggregate_fn = DispatchableDict(default=cls.default_fn, **aggregate_fn)
         source_spans = cls.validate_spans(attr.source, source_spans)
         target_spans = cls.validate_spans(attr.target, target_spans)
         return super().aggregate(attr, aggregate_fn=aggregate_fn, source_spans=source_spans, target_spans=target_spans)
@@ -190,27 +244,6 @@ class ContiguousSpanAggregator(FeatureAttributionSequenceOutputAggregator):
         return spans
 
     @staticmethod
-    def _aggregate_token_sequence(token_sequence, spans):
-        if not spans:
-            return token_sequence
-        out_sequence = []
-        span_start_idxs = [span[0] for span in spans]
-        curr_idx = 0
-        for tok_idx, token in enumerate(token_sequence):
-            if tok_idx < curr_idx:
-                continue
-            if curr_idx in span_start_idxs:
-                end_idx = spans[span_start_idxs.index(curr_idx)][1]
-                # We use -1 as token index to indicate the token is product of an aggregation
-                # (i.e. not contained in the original vocabulary)
-                out_sequence.append(TokenWithId("".join([t.token for t in token_sequence[curr_idx:end_idx]]), -1))
-                curr_idx = end_idx
-            else:
-                out_sequence.append(token)
-                curr_idx += 1
-        return out_sequence
-
-    @staticmethod
     def _aggregate_sequential_scores(scores, x_spans, y_spans, aggregate_fn):
         # First aggregate alongside the y-axis
         scores_aggregated_y = aggregate_contiguous(scores, y_spans, aggregate_fn, aggregate_dim=1)
@@ -220,11 +253,11 @@ class ContiguousSpanAggregator(FeatureAttributionSequenceOutputAggregator):
 
     @staticmethod
     def aggregate_source(attr, source_spans, **kwargs):
-        return ContiguousSpanAggregator._aggregate_token_sequence(attr.source, source_spans)
+        return aggregate_token_sequence(attr.source, source_spans)
 
     @staticmethod
     def aggregate_target(attr, target_spans, **kwargs):
-        return ContiguousSpanAggregator._aggregate_token_sequence(attr.target, target_spans)
+        return aggregate_token_sequence(attr.target, target_spans)
 
     @staticmethod
     def aggregate_source_attributions(attr, source_spans, target_spans, aggregate_fn, **kwargs):
@@ -235,6 +268,8 @@ class ContiguousSpanAggregator(FeatureAttributionSequenceOutputAggregator):
 
     @staticmethod
     def aggregate_target_attributions(attr, target_spans, aggregate_fn, **kwargs):
+        if not attr.target_attributions:
+            return attr.target_attributions
         # First aggregate along generated target sequence, then along attributed prefix
         return ContiguousSpanAggregator._aggregate_sequential_scores(
             attr.target_attributions, target_spans, target_spans, aggregate_fn
@@ -244,17 +279,21 @@ class ContiguousSpanAggregator(FeatureAttributionSequenceOutputAggregator):
     def aggregate_step_scores(attr, target_spans, aggregate_fn, **kwargs):
         if not attr.step_scores:
             return attr.step_scores
-        return {
-            k: aggregate_contiguous(v, target_spans, aggregate_fn, aggregate_dim=0)
-            for k, v in attr.step_scores.items()
-        }
+        out_dict = {}
+        for name, step_scores in attr.step_scores.items():
+            agg_fn = aggregate_fn[name] if isinstance(aggregate_fn, dict) else aggregate_fn
+            out_dict[name] = aggregate_contiguous(step_scores, target_spans, agg_fn, aggregate_dim=0)
+        return out_dict
 
     @staticmethod
     def aggregate_sequence_scores(attr, source_spans, target_spans, aggregate_fn, **kwargs):
         # Assume sequence scores are shaped like source attributions
         if not attr.sequence_scores:
             return attr.sequence_scores
-        return {
-            k: ContiguousSpanAggregator._aggregate_sequential_scores(v, source_spans, target_spans, aggregate_fn)
-            for k, v in attr.sequence_scores.items()
-        }
+        out_dict = {}
+        for name, step_scores in attr.sequence_scores.items():
+            aggregate_fn = aggregate_fn[name] if isinstance(aggregate_fn, dict) else aggregate_fn
+            out_dict[name] = ContiguousSpanAggregator._aggregate_sequential_scores(
+                step_scores, source_spans, target_spans, aggregate_fn
+            )
+        return out_dict

@@ -1,13 +1,21 @@
 from typing import Any, Dict, List, Optional, Type, Union
 
-import json
 import os
-import pickle
 from dataclasses import dataclass, field
 
+import json_tricks
 import torch
 
-from ..utils import drop_padding, get_sequences_from_batched_steps, pretty_dict, remap_from_filtered
+from ..utils import (
+    abs_max,
+    drop_padding,
+    get_sequences_from_batched_steps,
+    identity_fn,
+    pretty_dict,
+    prod,
+    remap_from_filtered,
+    sum_normalize_attributions,
+)
 from ..utils.typing import (
     MultipleScoresPerSequenceTensor,
     MultipleScoresPerStepTensor,
@@ -20,61 +28,16 @@ from ..utils.typing import (
     TextInput,
     TokenWithId,
 )
-from .aggregator import Aggregator, AggregatorPipeline, CustomAttributionAggregator
-from .batch import Batch, BatchEncoding, TensorWrapper
+from .aggregator import AggregableMixin, Aggregator, AggregatorPipeline, SequenceAttributionAggregator
+from .batch import Batch, BatchEncoding
+from .data_utils import TensorWrapper
 
 
 FeatureAttributionInput = Union[TextInput, BatchEncoding, Batch]
 
 
-@dataclass
-class FeatureAttributionStepOutput(TensorWrapper):
-    """
-    Output of a single step of feature attribution, plus
-    extra information related to what was attributed.
-    """
-
-    source_attributions: StepAttributionTensor
-    target_attributions: Optional[StepAttributionTensor] = None
-    step_scores: Optional[Dict[str, SingleScorePerStepTensor]] = None
-    sequence_scores: Optional[Dict[str, MultipleScoresPerStepTensor]] = None
-    source: Optional[OneOrMoreTokenWithIdSequences] = None
-    prefix: Optional[OneOrMoreTokenWithIdSequences] = None
-    target: Optional[OneOrMoreTokenWithIdSequences] = None
-
-    def remap_from_filtered(
-        self,
-        target_attention_mask: TargetIdsTensor,
-    ) -> None:
-        self.source_attributions = remap_from_filtered(
-            original_shape=(len(self.source), *self.source_attributions.shape[1:]),
-            mask=target_attention_mask,
-            filtered=self.source_attributions,
-        )
-        if self.target_attributions is not None:
-            self.target_attributions = remap_from_filtered(
-                original_shape=(len(self.prefix), *self.target_attributions.shape[1:]),
-                mask=target_attention_mask,
-                filtered=self.target_attributions,
-            )
-        if self.step_scores is not None:
-            for score_name, score_tensor in self.step_scores.items():
-                self.step_scores[score_name] = remap_from_filtered(
-                    original_shape=(len(self.prefix), 1),
-                    mask=target_attention_mask,
-                    filtered=score_tensor.unsqueeze(-1),
-                ).squeeze(-1)
-        if self.sequence_scores is not None:
-            for score_name, score_tensor in self.sequence_scores.items():
-                self.sequence_scores[score_name] = remap_from_filtered(
-                    original_shape=(len(self.source), *self.source_attributions.shape[1:]),
-                    mask=target_attention_mask,
-                    filtered=score_tensor,
-                )
-
-
-@dataclass
-class FeatureAttributionSequenceOutput(TensorWrapper):
+@dataclass(eq=False)
+class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
     """
     Output produced by a standard attribution method.
 
@@ -101,16 +64,31 @@ class FeatureAttributionSequenceOutput(TensorWrapper):
     target_attributions: Optional[SequenceAttributionTensor] = None
     step_scores: Optional[Dict[str, SingleScoresPerSequenceTensor]] = None
     sequence_scores: Optional[Dict[str, MultipleScoresPerSequenceTensor]] = None
-    aggregator: Union[AggregatorPipeline, Type[Aggregator]] = CustomAttributionAggregator
+    _aggregator: Union[AggregatorPipeline, Type[Aggregator]] = SequenceAttributionAggregator
+    _dict_aggregate_fn: Dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self):
+        if not self._dict_aggregate_fn:
+            seq_agg_fn = identity_fn if self.source_attributions.dim() == 2 else sum_normalize_attributions
+            self._dict_aggregate_fn = {
+                "source_attributions": {"sequence_aggregate": seq_agg_fn, "span_aggregate": abs_max},
+                "target_attributions": {"sequence_aggregate": seq_agg_fn, "span_aggregate": abs_max},
+                "step_scores": {
+                    "span_aggregate": {
+                        "probabilities": prod,
+                    }
+                },
+            }
 
     @classmethod
     def from_step_attributions(
         cls,
-        attributions: List[FeatureAttributionStepOutput],
+        attributions: List["FeatureAttributionStepOutput"],
         pad_id: Optional[Any] = None,
         has_bos_token: bool = True,
     ) -> List["FeatureAttributionSequenceOutput"]:
         attr = attributions[0]
+        seq_attr_cls = attr._sequence_cls
         num_sequences = len(attr.source_attributions)
         if not all([len(att.source_attributions) == num_sequences for att in attributions]):
             raise ValueError("All the attributions must include the same number of sequences.")
@@ -126,7 +104,7 @@ class FeatureAttributionSequenceOutput(TensorWrapper):
                 : len(sources[seq_id]), : len(targets[seq_id]), ...
             ]
             seq_attributions.append(
-                cls(
+                seq_attr_cls(
                     source=sources[seq_id],
                     target=targets[seq_id],
                     source_attributions=filtered_source_attribution,
@@ -181,9 +159,8 @@ class FeatureAttributionSequenceOutput(TensorWrapper):
     ) -> Optional[str]:
         from inseq import show_attributions
 
-        if aggregator is None:
-            aggregator = self.aggregator
-        return show_attributions(aggregator.aggregate(self, **kwargs), min_val, max_val, display, return_html)
+        aggregated = self.aggregate(aggregator, **kwargs)
+        return show_attributions(aggregated, min_val, max_val, display, return_html)
 
     @property
     def minimum(self) -> float:
@@ -198,6 +175,53 @@ class FeatureAttributionSequenceOutput(TensorWrapper):
         if self.target_attributions is not None:
             maxmimum = max(maxmimum, float(self.target_attributions.max()))
         return maxmimum
+
+
+@dataclass(eq=False)
+class FeatureAttributionStepOutput(TensorWrapper):
+    """
+    Output of a single step of feature attribution, plus
+    extra information related to what was attributed.
+    """
+
+    source_attributions: StepAttributionTensor
+    target_attributions: Optional[StepAttributionTensor] = None
+    step_scores: Optional[Dict[str, SingleScorePerStepTensor]] = None
+    sequence_scores: Optional[Dict[str, MultipleScoresPerStepTensor]] = None
+    source: Optional[OneOrMoreTokenWithIdSequences] = None
+    prefix: Optional[OneOrMoreTokenWithIdSequences] = None
+    target: Optional[OneOrMoreTokenWithIdSequences] = None
+    _sequence_cls: Type["FeatureAttributionSequenceOutput"] = FeatureAttributionSequenceOutput
+
+    def remap_from_filtered(
+        self,
+        target_attention_mask: TargetIdsTensor,
+    ) -> None:
+        self.source_attributions = remap_from_filtered(
+            original_shape=(len(self.source), *self.source_attributions.shape[1:]),
+            mask=target_attention_mask,
+            filtered=self.source_attributions,
+        )
+        if self.target_attributions is not None:
+            self.target_attributions = remap_from_filtered(
+                original_shape=(len(self.prefix), *self.target_attributions.shape[1:]),
+                mask=target_attention_mask,
+                filtered=self.target_attributions,
+            )
+        if self.step_scores is not None:
+            for score_name, score_tensor in self.step_scores.items():
+                self.step_scores[score_name] = remap_from_filtered(
+                    original_shape=(len(self.prefix), 1),
+                    mask=target_attention_mask,
+                    filtered=score_tensor.unsqueeze(-1),
+                ).squeeze(-1)
+        if self.sequence_scores is not None:
+            for score_name, score_tensor in self.sequence_scores.items():
+                self.sequence_scores[score_name] = remap_from_filtered(
+                    original_shape=(len(self.source), *self.source_attributions.shape[1:]),
+                    mask=target_attention_mask,
+                    filtered=score_tensor,
+                )
 
 
 @dataclass
@@ -223,42 +247,55 @@ class FeatureAttributionOutput:
     def __str__(self):
         return f"{self.__class__.__name__}({pretty_dict(self.__dict__)})"
 
-    def save(self, path: str, overwrite: bool = False, name: str = "") -> None:
+    def __eq__(self, other):
+        for self_seq, other_seq in zip(self.sequence_attributions, other.sequence_attributions):
+            if self_seq != other_seq:
+                return False
+        if self.step_attributions is not None and other.step_attributions is not None:
+            for self_step, other_step in zip(self.step_attributions, other.step_attributions):
+                if self_step != other_step:
+                    return False
+        if self.info != other.info:
+            return False
+        return True
+
+    def save(self, path: str, overwrite: bool = False) -> None:
         """
         Save class contents to a JSON file.
 
         Args:
             path (str): Path to the folder where attributions and their configuration will be stored.
             overwrite (bool): If True, overwrite the file if it exists, raise error otherwise.
-            name (str, default ''): Custom prefix for the generated files.
         """
-        attr_path = os.path.join(path, f"{name + '_' if name else ''}attribution_output.pkl")
-        config_path = os.path.join(path, f"{name + '_' if name else ''}attribution_info.json")
-        if not overwrite and (os.path.exists(attr_path) or os.path.exists(config_path)):
-            raise ValueError(
-                f"{path} already contains the attribution_output.pkl and attribution_info.json files. "
-                "Override with overwrite=True."
+        if not overwrite and os.path.exists(path):
+            raise ValueError(f"{path} already exists. Override with overwrite=True.")
+        with open(path, "w") as f:
+            json_tricks.dump(
+                self,
+                f,
+                allow_nan=True,
+                indent=4,
+                sort_keys=True,
+                compression=False,
+                properties={"ndarray_compact": True},
             )
-        os.makedirs(path, exist_ok=True)
-        with open(config_path, "w") as f:
-            f.write(json.dumps(self.info))
-        with open(attr_path, "wb") as f:
-            pickle.dump(self, f)
 
     @classmethod
-    def load(cls, path: str, name: str = "") -> "FeatureAttributionOutput":
+    def load(cls, path: str) -> "FeatureAttributionOutput":
         """Load saved attribution outputs into a new FeatureAttributionOutput object.
 
         Args:
             path (str): Path to the folder containing the saved attribution outputs.
-            name (str, default ''): Custom prefix for the generated files.
 
         Returns:
             :class:`~inseq.data.FeatureAttributionOutput`: Loaded attribution output
         """
-        attr_path = os.path.join(path, f"{name + '_' if name else ''}attribution_output.pkl")
-        with open(attr_path, "rb") as f:
-            return pickle.load(f)
+        with open(path) as f:
+            out = json_tricks.load(f)
+        out.sequence_attributions = [seq.torch() for seq in out.sequence_attributions]
+        if out.step_attributions is not None:
+            out.step_attributions = [step.torch() for step in out.step_attributions]
+        return out
 
     def show(
         self,
@@ -276,26 +313,38 @@ class FeatureAttributionOutput:
             max_val (int, optional): Maximum value for color scale.
             display (bool, optional): If True, display the attribution visualization.
             return_html (bool, optional): If True, return the attribution visualization as HTML.
+            aggregator (:obj:`AggregatorPipeline` or :obj:`Type[Aggregator]`, optional): Aggregator
+                or pipeline to use. If not provided, the default aggregator for every sequence attribution
+                is used.
 
         Returns:
             str: Attribution visualization as HTML if `return_html=True`, None otherwise.
         """
         from inseq import show_attributions
 
-        if aggregator is None:
-            attributions = [attr.aggregator.aggregate(attr, **kwargs) for attr in self.sequence_attributions]
-        else:
-            attributions = [aggregator.aggregate(attr, **kwargs) for attr in self.sequence_attributions]
+        attributions = [attr.aggregate(aggregator, **kwargs) for attr in self.sequence_attributions]
         return show_attributions(attributions, min_val, max_val, display, return_html)
 
 
 # Gradient attribution classes
 
 
-@dataclass
+@dataclass(eq=False)
+class GradientFeatureAttributionSequenceOutput(FeatureAttributionSequenceOutput):
+    """Raw output of a single sequence of gradient feature attribution.
+    Adds the convergence delta to the base class.
+    """
+
+    def __post_init__(self):
+        super().__post_init__()
+        if "deltas" not in self._dict_aggregate_fn["step_scores"]["span_aggregate"]:
+            self._dict_aggregate_fn["step_scores"]["span_aggregate"]["deltas"] = abs_max
+
+
+@dataclass(eq=False)
 class GradientFeatureAttributionStepOutput(FeatureAttributionStepOutput):
     """Raw output of a single step of gradient feature attribution.
     Adds the convergence delta to the base class.
     """
 
-    pass
+    _sequence_cls: Type["FeatureAttributionSequenceOutput"] = GradientFeatureAttributionSequenceOutput

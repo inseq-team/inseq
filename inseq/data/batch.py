@@ -1,115 +1,12 @@
 from typing import List, Optional, Union
 
-from copy import deepcopy
-from dataclasses import dataclass, fields
+from dataclasses import dataclass
 
-import torch
-from torchtyping import TensorType
-
-from ..utils import pretty_dict
 from ..utils.typing import EmbeddingsTensor, IdsTensor, OneOrMoreTokenSequences
+from .data_utils import TensorWrapper
 
 
-@dataclass
-class TensorWrapper:
-    @staticmethod
-    def _getitem(attr, subscript):
-        if isinstance(attr, torch.Tensor):
-            if len(attr.shape) == 1:
-                return attr[subscript]
-            if len(attr.shape) >= 2:
-                return attr[:, subscript, ...]
-        elif isinstance(attr, TensorWrapper):
-            return attr[subscript]
-        elif isinstance(attr, list) and isinstance(attr[0], list):
-            return [seq[subscript] for seq in attr]
-        elif isinstance(attr, dict):
-            return {key: TensorWrapper._getitem(val, subscript) for key, val in attr.items()}
-        else:
-            return attr
-
-    @staticmethod
-    def _select_active(attr, mask):
-        if isinstance(attr, torch.Tensor):
-            if len(attr.shape) <= 1:
-                return attr
-            else:
-                curr_mask = mask.clone()
-                if curr_mask.dtype != torch.bool:
-                    curr_mask = curr_mask.bool()
-                while len(curr_mask.shape) < len(attr.shape):
-                    curr_mask = curr_mask.unsqueeze(-1)
-                orig_shape = attr.shape[1:]
-                return attr.masked_select(curr_mask).reshape(-1, *orig_shape)
-        elif isinstance(attr, TensorWrapper):
-            return attr.select_active(mask)
-        elif isinstance(attr, list):
-            return [val for i, val in enumerate(attr) if mask.tolist()[i]]
-        elif isinstance(attr, dict):
-            return {key: TensorWrapper._select_active(val, mask) for key, val in attr.items()}
-        else:
-            return attr
-
-    @staticmethod
-    def _to(attr, device: str):
-        if isinstance(attr, torch.Tensor) or isinstance(attr, TensorWrapper):
-            return attr.to(device)
-        elif isinstance(attr, dict):
-            return {key: TensorWrapper._to(val, device) for key, val in attr.items()}
-        else:
-            return attr
-
-    @staticmethod
-    def _detach(attr):
-        if isinstance(attr, torch.Tensor) or isinstance(attr, TensorWrapper):
-            return attr.detach()
-        elif isinstance(attr, dict):
-            return {key: TensorWrapper._detach(val) for key, val in attr.items()}
-        else:
-            return attr
-
-    def __getitem__(self, subscript):
-        return self.__class__(
-            **{field.name: self._getitem(getattr(self, field.name), subscript) for field in fields(self.__class__)}
-        )
-
-    def select_active(self, mask: TensorType["batch_size", 1, int]):
-        return self.__class__(
-            **{field.name: self._select_active(getattr(self, field.name), mask) for field in fields(self.__class__)}
-        )
-
-    def to(self, device: str):
-        for field in fields(self.__class__):
-            attr = getattr(self, field.name)
-            setattr(self, field.name, self._to(attr, device))
-        return self
-
-    def detach(self):
-        for field in fields(self.__class__):
-            attr = getattr(self, field.name)
-            setattr(self, field.name, self._detach(attr))
-        return self
-
-    def clone(self):
-        out_params = {}
-        for field in fields(self.__class__):
-            attr = getattr(self, field.name)
-            if isinstance(attr, torch.Tensor) or isinstance(attr, TensorWrapper):
-                out_params[field.name] = attr.clone()
-            elif attr is not None:
-                out_params[field.name] = deepcopy(attr)
-            else:
-                out_params[field.name] = None
-        return self.__class__(**out_params)
-
-    def to_dict(self):
-        return self.__dict__
-
-    def __str__(self):
-        return f"{self.__class__.__name__}({pretty_dict(self.to_dict())})"
-
-
-@dataclass
+@dataclass(eq=False)
 class BatchEncoding(TensorWrapper):
     """
     Output produced by the tokenization process.
@@ -134,13 +31,13 @@ class BatchEncoding(TensorWrapper):
     baseline_ids: Optional[IdsTensor]
 
 
-@dataclass
+@dataclass(eq=False)
 class BatchEmbedding(TensorWrapper):
     input_embeds: Optional[EmbeddingsTensor] = None
     baseline_embeds: Optional[EmbeddingsTensor] = None
 
 
-@dataclass
+@dataclass(eq=False)
 class Batch(TensorWrapper):
     encoding: BatchEncoding
     embedding: BatchEmbedding
@@ -194,7 +91,7 @@ class Batch(TensorWrapper):
         self.embedding.baseline_embeds = value
 
 
-@dataclass
+@dataclass(eq=False)
 class EncoderDecoderBatch(TensorWrapper):
     sources: Batch
     targets: Batch
