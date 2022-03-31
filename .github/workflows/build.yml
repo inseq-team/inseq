@@ -29,7 +29,6 @@ jobs:
       run: |
         poetry config virtualenvs.in-project true
         poetry install
-        poe torch-cpu
 
     - name: Run style checks
       run: |
