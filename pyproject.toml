@@ -52,6 +52,7 @@ ipywidgets = "^7.6.5"
 scikit-learn = "^1.0"
 sklearn = "^0.0"
 json-tricks = "^3.15.5"
+torch = "^1.11.0"
 
 [tool.poetry.dev-dependencies]
 bandit = "^1.7.4"

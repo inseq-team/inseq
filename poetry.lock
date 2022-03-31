@@ -1855,7 +1855,7 @@ python-versions = ">=3.6"
 
 [[package]]
 name = "torch"
-version = "1.10.2"
+version = "1.11.0"
 description = "Tensors and Dynamic neural networks in Python with strong GPU acceleration"
 category = "main"
 optional = false
