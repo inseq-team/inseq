@@ -64,7 +64,6 @@ class AggregatorPipeline:
 
 class AggregableMixin(ABC):
     _aggregator: Union[AggregatorPipeline, Type[Aggregator]]
-    _dict_aggregate_fn: DispatchableDict
 
     def aggregate(
         self,
