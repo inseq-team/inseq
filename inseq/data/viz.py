@@ -105,10 +105,10 @@ def get_attribution_colors(
     """A list (one element = one sentence) of lists (one element = attributions for one token)
     of lists (one element = one attribution) of colors. Colors are either strings or RGB(A) tuples.
     """
-    if min_val is None:
-        min_val = min(attribution.minimum for attribution in attributions)
     if max_val is None:
         max_val = max(attribution.maximum for attribution in attributions)
+    if min_val is None:
+        min_val = -max_val
     colors = []
     for attribution in attributions:
         colors.append(

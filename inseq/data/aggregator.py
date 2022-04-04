@@ -268,7 +268,7 @@ class ContiguousSpanAggregator(FeatureAttributionSequenceOutputAggregator):
 
     @staticmethod
     def aggregate_target_attributions(attr, target_spans, aggregate_fn, **kwargs):
-        if not attr.target_attributions:
+        if attr.target_attributions is None:
             return attr.target_attributions
         # First aggregate along generated target sequence, then along attributed prefix
         return ContiguousSpanAggregator._aggregate_sequential_scores(
