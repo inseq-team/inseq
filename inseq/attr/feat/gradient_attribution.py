@@ -13,6 +13,8 @@
 # limitations under the License.
 """ Gradient-based feature attribution methods. """
 
+from typing import Any, Dict
+
 import logging
 
 from captum.attr import (
@@ -25,8 +27,8 @@ from captum.attr import (
     Saliency,
 )
 
-from ...data import EncoderDecoderBatch, FeatureAttributionRawStepOutput
-from ...utils import Registry, extract_signature_args, pretty_tensor, rgetattr, sum_normalize_attributions
+from ...data import EncoderDecoderBatch, GradientFeatureAttributionStepOutput
+from ...utils import Registry, extract_signature_args, pretty_tensor, rgetattr
 from ...utils.typing import TargetIdsTensor
 from ..attribution_decorators import set_hook, unset_hook
 from .feature_attribution import FeatureAttribution
@@ -69,7 +71,7 @@ class GradientAttribution(FeatureAttribution, Registry):
         target_ids: TargetIdsTensor,
         attribute_target: bool = False,
         **kwargs,
-    ) -> FeatureAttributionRawStepOutput:
+    ) -> GradientFeatureAttributionStepOutput:
         r"""
         Performs a single attribution step for the specified target_ids,
         given sources and targets in the batch.
@@ -82,35 +84,29 @@ class GradientAttribution(FeatureAttribution, Registry):
             kwargs: Additional keyword arguments to pass to the attribution step.
 
         Returns:
-            :class:`~inseq.data.FeatureAttributionRawStepOutput`: A dataclass containing a tensor of source-side
+            :class:`~inseq.data.GradientFeatureAttributionStepOutput`: A dataclass containing a tensor of source
                 attributions of size `(batch_size, source_length)`, possibly a tensor of target attributions of size
                 `(batch_size, prefix length) if attribute_target=True and possibly a tensor of deltas of size
-                `(batch_size)` if the attribution step supports deltas and they are requested.
+                `(batch_size)` if the attribution step supports deltas and they are requested. At this point the batch
+                information is empty, and will later be filled by the enrich_step_output function.
         """
         attribute_args = self.format_attribute_args(batch, target_ids, attribute_target, **kwargs)
         logger.debug(f"batch: {batch},\ntarget_ids: {pretty_tensor(target_ids, lpad=4)}")
         attr = self.method.attribute(**attribute_args)
-        delta = None
+        deltas = None
         if (
             attribute_args.get("return_convergence_delta", False)
             and hasattr(self.method, "has_convergence_delta")
             and self.method.has_convergence_delta()
         ):
-            attr, delta = attr
-        # If target size attribution is performed, attributions need to be renormalized
-        # by concatenating both source and target.
-        attr = sum_normalize_attributions(attr)
-        step_output = FeatureAttributionRawStepOutput(source_attributions=attr)
-        if isinstance(attr, tuple):
-            step_output = FeatureAttributionRawStepOutput(source_attributions=attr[0])
-        logger.debug(f"source attributions postnorm: {pretty_tensor(step_output.source_attributions)}\n")
-        if attribute_target:
-            assert len(attr) > 1, "Expected target attributions to be present"
-            step_output.target_attributions = attr[1]
-            logger.debug(f"target attributions postnorm: {pretty_tensor(step_output.target_attributions)}")
-        logger.debug("-" * 30)
-        step_output.deltas = delta
-        return step_output
+            attr, deltas = attr
+        return GradientFeatureAttributionStepOutput(
+            source_attributions=attr if not isinstance(attr, tuple) else attr[0],
+            target_attributions=None
+            if not isinstance(attr, tuple) or (isinstance(attr, tuple) and len(attr) == 1)
+            else attr[1],
+            step_scores={"deltas": deltas} if deltas is not None else {},
+        )
 
 
 class DeepLiftAttribution(GradientAttribution):
@@ -169,7 +165,7 @@ class DiscretizedIntegratedGradientsAttribution(GradientAttribution):
         target_ids: TargetIdsTensor,
         attribute_target: bool = False,
         **kwargs,
-    ) -> FeatureAttributionRawStepOutput:
+    ) -> Dict[str, Any]:
         scaled_inputs = (
             self.method.path_builder.scale_inputs(
                 batch.sources.input_ids,

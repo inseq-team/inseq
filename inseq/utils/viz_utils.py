@@ -23,6 +23,7 @@ import numpy as np
 from matplotlib.colors import Colormap, LinearSegmentedColormap
 
 from .misc import ordinal_str
+from .typing import TokenWithId
 
 
 def get_instance_html(i: int):
@@ -60,7 +61,9 @@ def get_color(
     return color
 
 
-def sanitize_html(txt: str) -> str:
+def sanitize_html(txt: Union[str, TokenWithId]) -> str:
+    if isinstance(txt, TokenWithId):
+        txt = txt.token
     return txt.replace("<", "&lt;").replace(">", "&gt;")
 
 

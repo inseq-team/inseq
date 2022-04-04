@@ -5,7 +5,6 @@ since it is bugged is not very elegant, this will need to be refactored.
 
 from textwrap import dedent
 
-import numpy as np
 import pytest
 import torch
 from pytest import fixture, mark
@@ -87,11 +86,10 @@ def test_cuda_attribution_consistency(texts, reference_texts, attribute_target, 
         assert isinstance(out[device], FeatureAttributionOutput)
         assert isinstance(out[device].sequence_attributions[0], FeatureAttributionSequenceOutput)
     for out_cpu, out_gpu in zip(out["cpu"].sequence_attributions, out["cuda:0"].sequence_attributions):
-        assert all([tok_cpu == tok_gpu for tok_cpu, tok_gpu in zip(out_cpu.target_tokens, out_gpu.target_tokens)])
+        assert all([tok_cpu == tok_gpu for tok_cpu, tok_gpu in zip(out_cpu.target, out_gpu.target)])
         attr_score_matches = [
-            abs(el_cpu - el_gpu) < 1e-3
+            torch.allclose(cpu_attr, gpu_attr, atol=1e-3)
             for cpu_attr, gpu_attr in zip(out_cpu.source_attributions, out_gpu.source_attributions)
-            for el_cpu, el_gpu in zip(cpu_attr, gpu_attr)
         ]
         assert all(attr_score_matches)
 
@@ -125,13 +123,15 @@ def test_batched_attribution_consistency(attribution_method, use_reference, attr
         device="cuda:0" if torch.cuda.is_available() else "cpu",
         method=attribution_method,
     )
-    assert np.allclose(
-        out_single.sequence_attributions[0].source_scores, out_batch.sequence_attributions[0].source_scores, atol=8e-2
+    assert torch.allclose(
+        out_single.sequence_attributions[0].source_attributions,
+        out_batch.sequence_attributions[0].source_attributions,
+        atol=8e-2,
     )
     if attribute_target:
-        assert np.allclose(
-            out_single.sequence_attributions[0].target_scores,
-            out_batch.sequence_attributions[0].target_scores,
+        assert torch.allclose(
+            out_single.sequence_attributions[0].target_attributions,
+            out_batch.sequence_attributions[0].target_attributions,
             atol=8e-2,
             equal_nan=True,
         )

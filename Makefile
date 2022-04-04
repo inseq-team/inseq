@@ -36,6 +36,7 @@ poetry-remove:
 #* Installation
 install:
 	poetry update
+	poe torch-cpu
 
 .PHONY: install-dev
 install-dev:
@@ -44,6 +45,11 @@ install-dev:
 	-poetry run mypy --install-types --non-interactive ./
 	poetry run pre-commit install
 	pre-commit autoupdate
+
+.PHONY: install-gpu
+install-gpu:
+	poetry update
+	poe torch-cuda11
 
 #* Linting
 .PHONY: check-style
@@ -63,7 +69,7 @@ fix-style:
 .PHONY: check-safety
 check-safety:
 	poetry check
-	poetry run safety check --full-report 
+	poetry run safety check --full-report
 	poetry run bandit -ll --recursive inseq tests
 
 .PHONY: lint
