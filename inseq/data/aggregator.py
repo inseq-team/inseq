@@ -3,7 +3,7 @@ from typing import Any, Callable, Dict, List, Optional, Type, Union
 from abc import ABC
 
 from ..utils import abs_max, aggregate_contiguous, aggregate_token_sequence, identity_fn
-from ..utils.typing import IndexSpan
+from ..utils.typing import IndexSpan, TokenWithId
 from .data_utils import TensorWrapper
 
 
@@ -95,7 +95,7 @@ class FeatureAttributionSequenceOutputAggregator(Aggregator):
         return super().aggregate(attr, **kwargs)
 
     @classmethod
-    def post_aggregate_hook(cls, attr: TensorWrapper, **kwargs):
+    def post_aggregate_hook(cls, attr, **kwargs):
         super().post_aggregate_hook(attr, **kwargs)
         cls.is_compatible(attr)
 
@@ -188,8 +188,8 @@ class ContiguousSpanAggregator(FeatureAttributionSequenceOutputAggregator):
 
     Args:
         aggregate_fn (callable, optional): Function used to aggregate sequence attributions.
-            Defaults to summing over the last dimension (for score-level attributions) and renormalizing
-            by the norm of the source(+target) attributions.
+            Defaults to the highest absolute value score across the aggregated span, with original sign
+            preserved (e.g. [0.3, -0.7, 0.1] -> -0.7).
         source_spans (tuple of [int, int] or sequence of tuples of [int, int], optional): Spans to aggregate
             over for the source sequence. Defaults to no aggregation performed.
         target_spans (tuple of [int, int] or sequence of tuples of [int, int], optional): Spans to aggregate
@@ -296,3 +296,63 @@ class ContiguousSpanAggregator(FeatureAttributionSequenceOutputAggregator):
                 step_scores, source_spans, target_spans, aggregate_fn
             )
         return out_dict
+
+
+class SubwordAggregator(ContiguousSpanAggregator):
+    """Aggregates over subwords.
+
+    Args:
+        aggregate_fn (Callable, optional): Function to aggregate over the subwords.
+            Defaults to the highest absolute value score across the aggregated span, with original sign
+            preserved (e.g. [0.3, -0.7, 0.1] -> -0.7).
+        special_symbol (str, optional): Symbol used to identify subwords. Defaults to '▁', used by SentencePiece.
+            If is_suffix_symbol=True, then this symbol is used to identify parts to be aggregated (e.g. # in WordPiece,
+            ['phen', '##omen', '##al']). Otherwise, it identifies the roots that should be preserved (e.g. ▁ in
+            SentencePiece, ['▁phen', 'omen', 'al']).
+        is_suffix_symbol (bool, optional): Whether the special symbol is used to identify suffixes or prefixes.
+            Defaults to False.
+        aggregate_eos (bool, optional): Whether to aggregate final tokens not followed by special symbol. Defaults to
+            False (i.e. preserve final punctuation and </s> as separate).
+    """
+
+    @classmethod
+    def aggregate(
+        cls,
+        attr,
+        aggregate_fn: Union[Callable, Dict[str, Any], None] = None,
+        aggregate_source: bool = True,
+        aggregate_target: bool = True,
+        special_symbol: str = "▁",
+        is_suffix_symbol: bool = False,
+        aggregate_eos: bool = False,
+        **kwargs,
+    ):
+        source_spans = []
+        target_spans = []
+        if aggregate_source:
+            source_spans = cls.get_spans(attr.source, special_symbol, is_suffix_symbol, aggregate_eos)
+        if aggregate_target:
+            target_spans = cls.get_spans(attr.target, special_symbol, is_suffix_symbol, aggregate_eos)
+        return super().aggregate(
+            attr, aggregate_fn=aggregate_fn, source_spans=source_spans, target_spans=target_spans, **kwargs
+        )
+
+    @staticmethod
+    def get_spans(tokens: List[TokenWithId], special_symbol: str, is_suffix_symbol: bool, aggregate_eos: bool):
+        spans = []
+        last_prefix_idx = 0
+        for curr_idx, token in enumerate(tokens):
+            # Suffix if token start with special suffix symbol, or if it doesn't have the special prefix symbol.
+            is_suffix = token.token.startswith(special_symbol) == is_suffix_symbol
+            if is_suffix:
+                continue
+            if curr_idx - last_prefix_idx > 1:
+                spans.append((last_prefix_idx, curr_idx))
+            last_prefix_idx = curr_idx
+        if aggregate_eos and curr_idx - last_prefix_idx > 1:
+            spans.append((last_prefix_idx, curr_idx))
+        return spans
+
+
+class PairDiffAggregator(FeatureAttributionSequenceOutputAggregator):
+    pass
