@@ -1,6 +1,7 @@
 from .cache import INSEQ_ARTIFACTS_CACHE, INSEQ_HOME_CACHE, cache_results
 from .errors import LengthMismatchError, MissingAttributionMethodError, UnknownAttributionMethodError
 from .misc import (
+    aggregate_token_pair,
     aggregate_token_sequence,
     drop_padding,
     extract_signature_args,
