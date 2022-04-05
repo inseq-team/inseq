@@ -1,8 +1,21 @@
+import json
+import os
+
 import torch
 from pytest import fixture
 
 import inseq
-from inseq.data.aggregator import AggregatorPipeline, ContiguousSpanAggregator, SequenceAttributionAggregator
+from inseq.data.aggregator import (
+    AggregatorPipeline,
+    ContiguousSpanAggregator,
+    PairAggregator,
+    SequenceAttributionAggregator,
+    SubwordAggregator,
+)
+
+
+EXAMPLES_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../fixtures/aggregator.json")
+EXAMPLES = json.load(open(EXAMPLES_FILE))
 
 
 @fixture(scope="session")
@@ -59,3 +72,42 @@ def test_aggregator_pipeline(saliency_mt_model):
     assert out_agg_sumsqueeze.step_scores["probabilities"].shape == (4,)
     assert not torch.allclose(out_agg_squeezesum.source_attributions, out_agg_sumsqueeze.source_attributions)
     assert not torch.allclose(out_agg_squeezesum.target_attributions, out_agg_sumsqueeze.target_attributions)
+
+
+def test_subword_aggregator(saliency_mt_model):
+    out = saliency_mt_model.attribute(EXAMPLES["source"])
+    seqattr = out.sequence_attributions[0]
+    for idx, token in enumerate(seqattr.source):
+        assert token.token == EXAMPLES["source_subwords"][idx]
+    for idx, token in enumerate(seqattr.target):
+        assert token.token == EXAMPLES["target_subwords"][idx]
+    # Full aggregation
+    out_agg = seqattr.aggregate(SubwordAggregator)
+    for idx, token in enumerate(out_agg.source):
+        assert token.token == EXAMPLES["source_merged"][idx]
+    for idx, token in enumerate(out_agg.target):
+        assert token.token == EXAMPLES["target_merged"][idx]
+    # Source-only aggregation
+    out_agg = seqattr.aggregate(SubwordAggregator, aggregate_target=False)
+    for idx, token in enumerate(out_agg.source):
+        assert token.token == EXAMPLES["source_merged"][idx]
+    for idx, token in enumerate(out_agg.target):
+        assert token.token == EXAMPLES["target_subwords"][idx]
+    # Target-only aggregation
+    out_agg = seqattr.aggregate(SubwordAggregator, aggregate_source=False)
+    for idx, token in enumerate(out_agg.source):
+        assert token.token == EXAMPLES["source_subwords"][idx]
+    for idx, token in enumerate(out_agg.target):
+        assert token.token == EXAMPLES["target_merged"][idx]
+
+
+def test_pair_aggregator(saliency_mt_model):
+    out = saliency_mt_model.attribute([EXAMPLES["source"], EXAMPLES["alternative_source"]])
+    orig_seqattr = out.sequence_attributions[0].aggregate(aggregator=SequenceAttributionAggregator)
+    alt_seqattr = out.sequence_attributions[1].aggregate(aggregator=SequenceAttributionAggregator)
+    diff_seqattr = orig_seqattr.aggregate(PairAggregator, paired_attr=alt_seqattr)
+    for idx, token in enumerate(diff_seqattr.source):
+        assert token.token == EXAMPLES["diff_subwords"][idx]
+    assert torch.allclose(
+        alt_seqattr.source_attributions - orig_seqattr.source_attributions, diff_seqattr.source_attributions
+    )

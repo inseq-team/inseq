@@ -1,4 +1,4 @@
-from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import functools
 import logging
@@ -15,7 +15,8 @@ from .typing import TokenWithId
 logger = logging.getLogger(__name__)
 
 
-identity_fn = lambda x: x
+def identity_fn(x, **kwargs):
+    return x
 
 
 @contextmanager
@@ -204,3 +205,15 @@ def aggregate_token_sequence(token_sequence, spans):
             out_sequence.append(token)
             curr_idx += 1
     return out_sequence
+
+
+def aggregate_token_pair(tokens: List[TokenWithId], other_tokens: List[TokenWithId]):
+    if not other_tokens:
+        return tokens
+    out_tokens = []
+    for tok, other in zip(tokens, other_tokens):
+        if tok.token == other.token:
+            out_tokens.append(TokenWithId(tok.token, tok.id))
+        else:
+            out_tokens.append(TokenWithId(tok.token + " → " + other.token, -1))
+    return out_tokens

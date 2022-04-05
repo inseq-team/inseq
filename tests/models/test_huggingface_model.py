@@ -3,7 +3,8 @@ TODO: Skipping layer attribution when attributing target and the DIG method
 since it is bugged is not very elegant, this will need to be refactored.
 """
 
-from textwrap import dedent
+import json
+import os
 
 import pytest
 import torch
@@ -14,52 +15,8 @@ from inseq import list_feature_attribution_methods
 from inseq.data import FeatureAttributionOutput, FeatureAttributionSequenceOutput
 
 
-EX_TEXTS = [
-    ("Hello world!", "Buongiorno mondo!"),
-    (
-        [
-            "Hello world!",
-            "Colorless green ideas sleep furiously.",
-        ],
-        [
-            "Buongiorno mondo!",
-            "Le idee verdi senza colore dormono furiosamente",
-        ],
-    ),
-    (
-        [
-            "The manager told the hairdresser that the haircut he made her was terrible.",
-            "Colorless green ideas sleep furiously",
-            "The scientist told the director that she made a new discovery.",
-        ],
-        [
-            "La direttrice ha detto al parrucchiere che il taglio di capelli che le ha fatto è terribile.",
-            "Le idee verdi senza colore dormono furiosamente",
-            "La ricercatrice ha detto al direttore che ha fatto una nuova scoperta.",
-        ],
-    ),
-]
-
-EX_LONG_TEXT = [
-    (
-        dedent(
-            """
-        Integrated gradients is a simple, yet powerful axiomatic attribution
-        method that requires almost no modification of the original network.
-        It can be used for augmenting accuracy metrics, model debugging and
-        feature or rule extraction."""
-        ).replace("\n", " "),
-        dedent(
-            """
-        Integrated gradients è un metodo di attribuzione assiomatico semplice ma
-        potente che non richiede quasi nessuna modifica alla rete originale. Può
-        essere usato per arricchire metriche di accuratezza, per effettuare il
-        debug di modelli e per l'estrazione di feature o regole."""
-        ).replace("\n", " "),
-    )
-]
-
-EX_TEXTS_SHORT = EX_TEXTS[:2]
+EXAMPLES_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../fixtures/huggingface_model.json")
+EXAMPLES = json.load(open(EXAMPLES_FILE))
 
 USE_REFERENCE_TEXT = [True, False]
 ATTRIBUTE_TARGET = [True, False]
@@ -75,7 +32,7 @@ def saliency_mt_model():
 
 @mark.slow
 @mark.require_gpu
-@mark.parametrize(("texts", "reference_texts"), EX_TEXTS_SHORT)
+@mark.parametrize(("texts", "reference_texts"), EXAMPLES["short_texts"])
 @mark.parametrize("attribute_target", ATTRIBUTE_TARGET)
 def test_cuda_attribution_consistency(texts, reference_texts, attribute_target, saliency_mt_model):
     out = {}
@@ -103,8 +60,8 @@ def test_batched_attribution_consistency(attribution_method, use_reference, attr
         pytest.skip("discretized_integrated_gradients currently unsupported")
     if attribution_method.startswith("layer_") and attribute_target:
         pytest.skip("Layer attribution methods do not support attribute_target=True")
-    texts_single, reference_single = EX_TEXTS[0]
-    texts_batch, reference_batch = EX_TEXTS[1]
+    texts_single, reference_single = EXAMPLES["texts"][0]
+    texts_batch, reference_batch = EXAMPLES["texts"][1]
     if not use_reference:
         reference_single, reference_batch = None, None
     out_single = saliency_mt_model.attribute(
@@ -138,7 +95,7 @@ def test_batched_attribution_consistency(attribution_method, use_reference, attr
 
 
 @mark.slow
-@mark.parametrize(("texts", "reference_texts"), EX_TEXTS)
+@mark.parametrize(("texts", "reference_texts"), EXAMPLES["texts"])
 @mark.parametrize("attribution_method", ATTRIBUTION_METHODS)
 @mark.parametrize("use_reference", USE_REFERENCE_TEXT)
 @mark.parametrize("attribute_target", ATTRIBUTE_TARGET)
@@ -188,7 +145,7 @@ def test_attribute(
 
 
 @mark.slow
-@mark.parametrize(("texts", "reference_texts"), EX_LONG_TEXT)
+@mark.parametrize(("texts", "reference_texts"), EXAMPLES["long_text"])
 @mark.parametrize("attribution_method", ATTRIBUTION_METHODS)
 @mark.parametrize("use_reference", USE_REFERENCE_TEXT)
 def test_attribute_long_text(texts, reference_texts, attribution_method, use_reference, saliency_mt_model):
