@@ -9,20 +9,22 @@ VERSION := latest
 .PHONY: help
 help:
 	@echo "Commands:"
-	@echo "poetry-download    : downloads and installs the poetry package manager"
-	@echo "poetry-remove      : removes the poetry package manager"
-	@echo "install            : installs required dependencies"
-	@echo "install-dev        : installs the dev dependencies for the project"
-	@echo "check-style        : run checks on all files without fixing them."
-	@echo "fix-style          : run checks on files and potentially modifies them."
-	@echo "check-safety       : run safety checks on all tests."
-	@echo "lint               : run linting on all files (check-style + check-safety)"
-	@echo "test               : run all tests."
-	@echo "codecov            : check coverage of all the code."
-	@echo "docs               : serve generated documentation locally."
-	@echo "docker-build       : builds docker image for the package."
-	@echo "docker-remove      : removes built docker image."
-	@echo "clean              : cleans all unecessary files."
+	@echo "poetry-download : downloads and installs the poetry package manager"
+	@echo "poetry-remove   : removes the poetry package manager"
+	@echo "install         : installs required dependencies"
+	@echo "install-dev     : installs the dev dependencies for the project"
+	@echo "check-style     : run checks on all files without fixing them."
+	@echo "fix-style       : run checks on files and potentially modifies them."
+	@echo "check-safety    : run safety checks on all tests."
+	@echo "lint            : run linting on all files (check-style + check-safety)"
+	@echo "test            : run all tests."
+	@echo "codecov         : check coverage of all the code."
+	@echo "build-docs      : build sphinx documentation."
+	@echo "serve-docs      : serve documentation locally."
+	@echo "docs            : build and serve generated documentation locally."
+	@echo "docker-build    : builds docker image for the package."
+	@echo "docker-remove   : removes built docker image."
+	@echo "clean           : cleans all unecessary files."
 
 #* Poetry
 .PHONY: poetry-download
@@ -89,10 +91,16 @@ codecov:
 	poetry run pytest --cov inseq --cov-report html
 
 #* Docs
-.PHONY: docs
-docs:
+.PHONY: build-docs
+build-docs:
 	cd docs && make html SPHINXOPTS="-W -j 4"
+
+.PHONY: serve-docs
+serve-docs:
 	cd docs/_build/html && python3 -m http.server 8080
+
+.PHONY: docs
+docs: build-docs serve-docs
 
 #* Docker
 # Example: make docker VERSION=latest
