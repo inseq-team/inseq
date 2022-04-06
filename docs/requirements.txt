@@ -6,3 +6,4 @@ sphinx-copybutton==0.4.0
 sphinx-gitstamp==0.3.2
 sphinx-markdown-tables==0.0.15
 sphinx-rtd-theme==1.0.0
+gitpython==3.1.27
