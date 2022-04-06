@@ -127,7 +127,9 @@ class DeepLiftAttribution(GradientAttribution):
 
 class DiscretizedIntegratedGradientsAttribution(GradientAttribution):
     """Discretized Integrated Gradients attribution method
+
     Reference: https://arxiv.org/abs/2108.13654
+
     Original implementation: https://github.com/INK-USC/DIG
     """
 

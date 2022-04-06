@@ -42,8 +42,8 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
     Output produced by a standard attribution method.
 
     Attributes:
-        source (list of :class:`~inseq.utils.typing.TokenWithId): Tokenized source sequence.
-        target (list of :class:`~inseq.utils.typing.TokenWithId): Tokenized target sequence.
+        source (list of :class:`~inseq.utils.typing.TokenWithId`): Tokenized source sequence.
+        target (list of :class:`~inseq.utils.typing.TokenWithId`): Tokenized target sequence.
         source_attributions (:obj:`SequenceAttributionTensor`): Tensor of shape (`source_len`,
             `target_len`) plus an optional third dimension if the attribution is granular (e.g.
             gradient attribution) containing the attribution scores produced at each generation step of
