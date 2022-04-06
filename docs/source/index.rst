@@ -24,17 +24,34 @@ Here is an example of using Inseq to attribute an English-to-Italian translation
 
     import inseq
 
-    model = inseq.load_model("Helsinki-NLP/opus-mt-en-it", "integrated_gradients")
+    model = inseq.load_model("Helsinki-NLP/opus-mt-en-fr", "integrated_gradients")
     out = model.attribute(
-    "The developer argued with the designer because she did not like the design.",
-    return_convergence_delta=True,
-    n_steps=100
+        "The developer argued with the designer because she did not like the design.",
+        n_steps=300,
+        return_convergence_delta=True,
+        output_step_probabilities=True,
+        internal_batch_size=100,
+        include_eos_baseline=False,
     )
     out.show()
 
+.. raw:: html
+
+    <div class="html-example">
+        <iframe frameborder="0" scale="0.75" src="/_static/winomt_example.htm"></iframe>
+    </div>
+
+
 .. toctree::
     :maxdepth: 2
+    :caption: Using 🐛 Inseq
+
+    examples/pair_comparison
+
+.. toctree::
+    :maxdepth: 4
     :caption: Main Classes
 
+    main_classes/models
+    main_classes/data_classes
     main_classes/feature_attribution
-    main_classes/gradient_attribution

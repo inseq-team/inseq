@@ -17,8 +17,8 @@ from pathlib import Path
 
 
 _PATH_ROOT = Path(__file__).parent.parent.parent.absolute()
-_PATH_SRC = Path(_PATH_ROOT, "inseq")
-sys.path.insert(0, str(_PATH_SRC.absolute()))
+# _PATH_SRC = Path(_PATH_ROOT, "inseq")
+sys.path.insert(0, str(_PATH_ROOT.absolute()))
 
 # -- Project information -----------------------------------------------------
 
@@ -89,6 +89,9 @@ exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = None
 
+# Permalinks
+html_permalinks_icon = "<i class='fas fa-link'></i>"
+
 # If true, `todo` and `todoList` produce output, else they produce nothing.
 todo_include_todos = True
 
@@ -137,6 +140,7 @@ ogp_custom_meta_tags = [
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = [
     "images",
+    "html_outputs",
     "_static",
     "_static/style.css",
     "_static/hk-grotesk-pro/HKGroteskPro-Bold.woff2",
