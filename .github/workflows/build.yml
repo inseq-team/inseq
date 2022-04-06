@@ -48,5 +48,6 @@ jobs:
         make check-safety
 
     - name: Build documentation
-      run: |
-        make build-docs
+      uses: ammaraskar/sphinx-action@master
+      with:
+        docs-folder: "docs/"
