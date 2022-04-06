@@ -16,10 +16,6 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
-    - uses: ammaraskar/sphinx-action@master
-      with:
-        name: "Build documentation"
-        docs-folder: "docs/"
 
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v3
@@ -50,3 +46,8 @@ jobs:
     - name: Run safety checks
       run: |
         make check-safety
+
+    - name: Build documentation
+      uses: ammaraskar/sphinx-action@master
+      with:
+        docs-folder: "docs/"
