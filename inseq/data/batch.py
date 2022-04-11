@@ -6,7 +6,7 @@ from ..utils.typing import EmbeddingsTensor, IdsTensor, OneOrMoreTokenSequences
 from .data_utils import TensorWrapper
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, repr=False)
 class BatchEncoding(TensorWrapper):
     """
     Output produced by the tokenization process.
@@ -31,13 +31,13 @@ class BatchEncoding(TensorWrapper):
     baseline_ids: Optional[IdsTensor]
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, repr=False)
 class BatchEmbedding(TensorWrapper):
     input_embeds: Optional[EmbeddingsTensor] = None
     baseline_embeds: Optional[EmbeddingsTensor] = None
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, repr=False)
 class Batch(TensorWrapper):
     encoding: BatchEncoding
     embedding: BatchEmbedding
@@ -91,7 +91,7 @@ class Batch(TensorWrapper):
         self.embedding.baseline_embeds = value
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, repr=False)
 class EncoderDecoderBatch(TensorWrapper):
     sources: Batch
     targets: Batch

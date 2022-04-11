@@ -5,7 +5,7 @@ default_stages: [commit, push]
 
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.0.1
+    rev: v4.2.0
     hooks:
       - id: trailing-whitespace
       - id: check-yaml
@@ -62,5 +62,14 @@ repos:
         name: clean
         entry: make
         args: ["clean"]
+        language: system
+        pass_filenames: false
+
+  - repo: local
+    hooks:
+      - id: test
+        name: build docs
+        entry: make
+        args: ["build-docs"]
         language: system
         pass_filenames: false
