@@ -28,8 +28,13 @@ from pathlib import Path
 import torch
 from joblib import Parallel, delayed
 from scipy.sparse import csr_matrix
-from sklearn.neighbors import kneighbors_graph
 from torchtyping import TensorType
+
+from ....utils import is_scikitlearn_available
+
+
+if is_scikitlearn_available():
+    from sklearn.neighbors import kneighbors_graph
 
 from ....utils import INSEQ_ARTIFACTS_CACHE, cache_results, euclidean_distance
 from ....utils.typing import MultiStepEmbeddingsTensor, VocabularyEmbeddingsTensor
@@ -80,6 +85,8 @@ class MonotonicPathBuilder:
         """
         Etiher loads or computes the knn graph for token embeddings.
         """
+        if not is_scikitlearn_available():
+            raise ImportError("scikit-learn is not available. Please install it to use MonotonicPathBuilder.")
         knn_graph = kneighbors_graph(
             vocabulary_embeddings,
             n_neighbors=n_neighbors,

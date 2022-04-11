@@ -1,5 +1,14 @@
+from .argparse import InseqArgumentParser
 from .cache import INSEQ_ARTIFACTS_CACHE, INSEQ_HOME_CACHE, cache_results
 from .errors import LengthMismatchError, MissingAttributionMethodError, UnknownAttributionMethodError
+from .import_utils import (
+    is_captum_available,
+    is_datasets_available,
+    is_ipywidgets_available,
+    is_scikitlearn_available,
+    is_sentencepiece_available,
+    is_transformers_available,
+)
 from .misc import (
     aggregate_token_pair,
     aggregate_token_sequence,
@@ -60,4 +69,11 @@ __all__ = [
     "Registry",
     "INSEQ_HOME_CACHE",
     "INSEQ_ARTIFACTS_CACHE",
+    "InseqArgumentParser",
+    "is_ipywidgets_available",
+    "is_scikitlearn_available",
+    "is_transformers_available",
+    "is_sentencepiece_available",
+    "is_datasets_available",
+    "is_captum_available",
 ]

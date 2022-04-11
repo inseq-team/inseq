@@ -1,125 +1,93 @@
-from typing import List, NoReturn, Optional
+from typing import List, Optional
+
+from dataclasses import dataclass, field
 
 import torch
-import typer
 
-import inseq
-
-
-app = typer.Typer(
-    name="attribute",
-    help="Perform attribution on a sequence-to-sequence model",
-)
+from .. import list_feature_attribution_methods, load_model
+from .base import BaseCLICommand
 
 
-@app.command("text")
-def attribute_text(
-    model: str = typer.Option(
-        ...,
-        "-m",
-        "--model",
-        case_sensitive=False,
-        help="Model name in the 🤗 Hub or path to folder containing local model files.",
-    ),
-    source_texts: List[str] = typer.Option(
-        ...,
-        "-s",
-        "--source_texts",
-        case_sensitive=False,
-        help="Source texts to process for performing attribution.",
-    ),
-    attribution: str = typer.Option(
-        "integrated_gradients",
-        "-a",
-        "--attribution_method",
-        case_sensitive=False,
-        help="Attribution method to use.",
-        autocompletion=lambda: inseq.list_feature_attribution_methods(),
-    ),
-    target_texts: Optional[List[str]] = typer.Option(
-        None,
-        "-t",
-        "--target_texts",
-        case_sensitive=False,
-        help="Target texts for performing constrained decoding.",
-    ),
-    output_attributions_path: Optional[str] = typer.Option(
-        None,
-        "-o",
-        "--output_attributions",
-        case_sensitive=False,
-        help="Path to save attribution scores.",
-    ),
-    attribute_target: bool = typer.Option(
-        False,
-        "--attribute_target",
-        case_sensitive=False,
-        help="Whether to attribute the target prefix alongisde the source context.",
-    ),
-    output_step_probabilities: bool = typer.Option(
-        False,
-        "--output_step_probabilities",
-        case_sensitive=False,
-        help="Output step probabilities alongside attribution scores.",
-    ),
-    output_step_attributions: bool = typer.Option(
-        False,
-        "--output_step_attributions",
-        case_sensitive=False,
-        help="Output step attributions alongside sequence attributions.",
-    ),
-    include_eos_baseline: bool = typer.Option(
-        False,
-        "--include_eos_baseline",
-        case_sensitive=False,
-        help="Whether the EOS token should be included in the baseline for attribution scores.",
-    ),
-    n_steps: int = typer.Option(
-        300,
-        "--n_steps",
-        case_sensitive=False,
-        help="Number of steps for the attribution, used only for some attribution methods.",
-    ),
-    return_convergence_delta: bool = typer.Option(
-        False,
-        "--return_convergence_delta",
-        case_sensitive=False,
-        help="Whether to return the convergence delta for the attribution, used only for some attribution methods.",
-    ),
-    internal_batch_size: int = typer.Option(
-        100,
-        "--internal_batch_size",
-        case_sensitive=False,
-        help="Batch size for the attribution, used only for some attribution methods.",
-    ),
-    device: Optional[str] = typer.Option(
-        None,
-        "--device",
-        case_sensitive=False,
-        help="Device to use for the attribution",
-    ),
-) -> NoReturn:
-    """Perform attribution for the given text using the given model."""
-    if device is None:
-        device = "cuda:0" if torch.cuda.is_available() else "cpu"
-    if not source_texts:
-        source_texts = None
-    if not target_texts:
-        target_texts = None
-    model = inseq.load_model(model, attribution_method=attribution)
-    out = model.attribute(
-        source_texts,
-        target_texts,
-        attribute_target=attribute_target,
-        output_step_probabilities=output_step_probabilities,
-        output_step_attributions=output_step_attributions,
-        include_eos_baseline=include_eos_baseline,
-        n_steps=n_steps,
-        internal_batch_size=internal_batch_size,
-        return_convergence_delta=return_convergence_delta,
-        device=device,
+@dataclass
+class AttributeArgs:
+    model_name_or_path: str = field(
+        metadata={"help": "The name or path of the model on which attribution is performed."},
     )
-    out.show()
-    if output_attributions_path:
-        typer.echo(f"Saving attributions to {output_attributions_path}")
-        out.save(output_attributions_path, overwrite=True)
+    input_texts: List[str] = field(metadata={"help": "One or more input texts used for generation."})
+    attribution_method: Optional[str] = field(
+        default="integrated_gradients",
+        metadata={
+            "help": "The attribution method used to perform feature attribution.",
+            "choices": list_feature_attribution_methods(),
+        },
+    )
+    generated_texts: Optional[List[str]] = field(
+        default=None, metadata={"help": "If specified, constrains the decoding procedure to the specified outputs."}
+    )
+    save_path: Optional[str] = field(
+        default=None, metadata={"help": "Path where the attribution output should be saved in JSON format."}
+    )
+    do_prefix_attribution: bool = field(
+        default=False,
+        metadata={"help": "Performs the attribution procedure including the generated prefix at every step."},
+    )
+    output_step_probabilities: bool = field(
+        default=False, metadata={"help": "Adds step decoding probabilities to the attribution output."}
+    )
+    output_step_attributions: bool = field(
+        default=False, metadata={"help": "Adds step-level feature attributions to the output."}
+    )
+    include_eos_baseline: bool = field(
+        default=False,
+        metadata={
+            "help": "Whether the EOS token should be included in the baseline, used for some attribution methods."
+        },
+    )
+    n_approximation_steps: Optional[int] = field(
+        default=100, metadata={"help": "Number of approximation steps, used for some attribution methods."}
+    )
+    return_convergence_delta: bool = field(
+        default=False,
+        metadata={"help": "Returns the convergence delta of the approximation, used for some attribution methods."},
+    )
+    attribution_batch_size: Optional[int] = field(
+        default=50,
+        metadata={
+            "help": "The internal batch size used by the attribution method, used for some attribution methods."
+        },
+    )
+    device: str = field(
+        default="cuda:0" if torch.cuda.is_available() else "cpu",
+        metadata={"help": "The device used for inference with Pytorch. Multi-GPU is not supported."},
+    )
+
+    def __post_init__(self):
+        if isinstance(self.input_texts, str):
+            self.input_texts = [t for t in self.input_texts]
+        if isinstance(self.generated_texts, str):
+            self.generated_texts = [t for t in self.generated_texts]
+
+
+class AttributeCommand(BaseCLICommand):
+    _name = "attribute"
+    _help = "Perform feature attribution on one or multiple sentences"
+    _dataclasses = AttributeArgs
+
+    def run(args: AttributeArgs):
+        model = load_model(args.model_name_or_path, attribution_method=args.attribution_method)
+        out = model.attribute(
+            args.input_texts,
+            args.generated_texts,
+            attribute_target=args.do_prefix_attribution,
+            output_step_probabilities=args.output_step_probabilities,
+            output_step_attributions=args.output_step_attributions,
+            include_eos_baseline=args.include_eos_baseline,
+            n_steps=args.n_approximation_steps,
+            internal_batch_size=args.attribution_batch_size,
+            return_convergence_delta=args.return_convergence_delta,
+            device=args.device,
+        )
+        out.show()
+        if args.save_path:
+            print(f"Saving attributions to {args.save_path}")
+            out.save(args.save_path, overwrite=True)
