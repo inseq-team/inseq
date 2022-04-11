@@ -136,8 +136,8 @@ def get_heatmap_type(
     if heatmap_type == "Source":
         return heatmap_func(
             attribution.source_attributions.numpy(),
-            attribution.target,
-            attribution.source,
+            [t.token for t in attribution.target],
+            [t.token for t in attribution.source],
             colors,
             step_scores,
             label="Source",
@@ -145,8 +145,8 @@ def get_heatmap_type(
     elif heatmap_type == "Target":
         return heatmap_func(
             attribution.target_attributions.numpy(),
-            attribution.target,
-            attribution.target,
+            [t.token for t in attribution.target],
+            [t.token for t in attribution.target],
             colors,
             step_scores,
             label="Target",
@@ -235,9 +235,9 @@ def get_saliency_heatmap_rich(
             else:
                 threshold = step_scores_threshold.get(step_score_name, 0.5)
             style = lambda val: "bold" if abs(val) >= threshold else ""
-            score_row = [[Text(step_score_name, style="bold")]]
-            for val in step_score_values:
-                score_row.append([Text(f"{score:.2f}", justify="center", style=style(val))])
+            score_row = [Text(step_score_name, style="bold")]
+            for score in step_score_values:
+                score_row.append(Text(f"{score:.2f}", justify="center", style=style(score)))
             table.add_row(*score_row, end_section=True)
     return table
 

@@ -148,14 +148,22 @@ class TensorWrapper:
         return {k: v for k, v in self.__dict__.items() if not k.startswith("_")}
 
     def __str__(self):
-        return f"{self.__class__.__name__}({pretty_dict(self.to_dict())})"
+        return f"{self.__class__.__name__}({pretty_dict(self.__dict__)})"
+
+    def __repr__(self):
+        return self.__str__()
 
     def __eq__(self, other):
-        equals = {field: self._eq(val, getattr(other, field)) for field, val in self.to_dict().items()}
+        equals = {field: self._eq(val, getattr(other, field)) for field, val in self.__dict__.items()}
         return all(x for x in equals.values())
 
     def __json_encode__(self):
         return self.clone().detach().to("cpu").numpy().to_dict()
+
+    def __json_decode__(self, **attrs):
+        # Does not contemplate the usage of __slots__
+        self.__dict__ = attrs
+        self.__post_init__()
 
     def __post_init__(self):
         pass

@@ -9,7 +9,8 @@ from itertools import dropwhile
 
 from torch import Tensor
 
-from .typing import TokenWithId
+from .errors import LengthMismatchError
+from .typing import TextInput, TokenWithId
 
 
 logger = logging.getLogger(__name__)
@@ -184,6 +185,20 @@ def isnotebook():
             return False  # Other type (?)
     except NameError:
         return False  # Probably standard Python interpreter
+
+
+def format_input_texts(
+    texts: TextInput,
+    ref_texts: Optional[TextInput] = None,
+) -> Tuple[List[str], List[str]]:
+    texts = [texts] if isinstance(texts, str) else texts
+    reference_texts = [ref_texts] if isinstance(ref_texts, str) else ref_texts
+    if reference_texts and len(texts) != len(reference_texts):
+        raise LengthMismatchError(
+            "Length mismatch for texts and reference_texts."
+            "Input length: {}, reference length: {} ".format(len(texts), len(reference_texts))
+        )
+    return texts, reference_texts
 
 
 def aggregate_token_sequence(token_sequence, spans):

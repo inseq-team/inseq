@@ -8,7 +8,7 @@ from rich.status import Status
 
 from ..attr.feat.feature_attribution import FeatureAttribution
 from ..data import BatchEncoding, FeatureAttributionOutput
-from ..utils import LengthMismatchError, MissingAttributionMethodError, isnotebook
+from ..utils import MissingAttributionMethodError, format_input_texts, isnotebook
 from ..utils.typing import (
     EmbeddingsTensor,
     IdsTensor,
@@ -86,20 +86,6 @@ class AttributionModel(ABC, torch.nn.Module):
                 return FeatureAttribution.load(method, attribution_model=self)
         return self.attribution_method
 
-    def format_input_texts(
-        self,
-        texts: TextInput,
-        ref_texts: Optional[TextInput] = None,
-    ) -> Tuple[List[str], List[str]]:
-        texts = [texts] if isinstance(texts, str) else texts
-        reference_texts = [ref_texts] if isinstance(ref_texts, str) else ref_texts
-        if reference_texts and len(texts) != len(reference_texts):
-            raise LengthMismatchError(
-                "Length mismatch for texts and reference_texts."
-                "Input length: {}, reference length: {} ".format(len(texts), len(reference_texts))
-            )
-        return texts, reference_texts
-
     def attribute(
         self,
         input_texts: TextInput,
@@ -123,7 +109,7 @@ class AttributionModel(ABC, torch.nn.Module):
         if device is not None:
             original_device = self.device
             self.device = device
-        input_texts, generated_texts = self.format_input_texts(input_texts, generated_texts)
+        input_texts, generated_texts = format_input_texts(input_texts, generated_texts)
         constrained_decoding = generated_texts is not None
         orig_input_texts = input_texts
         if not constrained_decoding:

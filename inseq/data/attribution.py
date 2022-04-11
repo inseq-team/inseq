@@ -36,7 +36,7 @@ from .data_utils import TensorWrapper
 FeatureAttributionInput = Union[TextInput, BatchEncoding, Batch]
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, repr=False)
 class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
     """
     Output produced by a standard attribution method.
@@ -64,12 +64,12 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
     target_attributions: Optional[SequenceAttributionTensor] = None
     step_scores: Optional[Dict[str, SingleScoresPerSequenceTensor]] = None
     sequence_scores: Optional[Dict[str, MultipleScoresPerSequenceTensor]] = None
-    _aggregator: Union[AggregatorPipeline, Type[Aggregator]] = SequenceAttributionAggregator
-    _dict_aggregate_fn: Dict[str, Any] = field(default_factory=dict)
+    _aggregator: Union[AggregatorPipeline, Type[Aggregator]] = None
+    _dict_aggregate_fn: Dict[str, Any] = None
 
     def __post_init__(self):
-        if not self._dict_aggregate_fn:
-            seq_agg_fn = identity_fn if self.source_attributions.dim() == 2 else sum_normalize_attributions
+        if self._dict_aggregate_fn is None or self._dict_aggregate_fn == {}:
+            seq_agg_fn = identity_fn if len(self.source_attributions.shape) == 2 else sum_normalize_attributions
             self._dict_aggregate_fn = {
                 "source_attributions": {"sequence_aggregate": seq_agg_fn, "span_aggregate": abs_max},
                 "target_attributions": {"sequence_aggregate": seq_agg_fn, "span_aggregate": abs_max},
@@ -79,6 +79,8 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
                     }
                 },
             }
+        if self._aggregator is None:
+            self._aggregator = SequenceAttributionAggregator
 
     @classmethod
     def from_step_attributions(
@@ -177,7 +179,7 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
         return maxmimum
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, repr=False)
 class FeatureAttributionStepOutput(TensorWrapper):
     """
     Output of a single step of feature attribution, plus
@@ -246,6 +248,9 @@ class FeatureAttributionOutput:
 
     def __str__(self):
         return f"{self.__class__.__name__}({pretty_dict(self.__dict__)})"
+
+    def __repr__(self):
+        return self.__str__()
 
     def __eq__(self, other):
         for self_seq, other_seq in zip(self.sequence_attributions, other.sequence_attributions):
@@ -329,7 +334,7 @@ class FeatureAttributionOutput:
 # Gradient attribution classes
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, repr=False)
 class GradientFeatureAttributionSequenceOutput(FeatureAttributionSequenceOutput):
     """Raw output of a single sequence of gradient feature attribution.
     Adds the convergence delta to the base class.
@@ -341,7 +346,7 @@ class GradientFeatureAttributionSequenceOutput(FeatureAttributionSequenceOutput)
             self._dict_aggregate_fn["step_scores"]["span_aggregate"]["deltas"] = abs_max
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, repr=False)
 class GradientFeatureAttributionStepOutput(FeatureAttributionStepOutput):
     """Raw output of a single step of gradient feature attribution.
     Adds the convergence delta to the base class.
