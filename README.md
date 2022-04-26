@@ -45,16 +45,16 @@ Both commands support the full range of parameters available for `attribute`, at
 
 **Example:** The following command can be used to perform attribution (both source and target-side) of Italian translations for a dummy sample of 20 English sentences taken from the FLORES-101 parallel corpus, using a MarianNMT translation model from Hugging Face `transformers`. The output is shown in the console and saved to disk to `out.json` (you can load it later using `inseq.FeatureAttributionOutput.load("out.json")`).
 
-```shell
-inseq attribute-dataset \                                                                                          44s py inseq-PzwjmCYf-py3.8 node system 16:59:51
---model_name_or_path Helsinki-NLP/opus-mt-en-it \
---attribution_method integrated_gradients \
---do_prefix_attribution \
---dataset_name inseq/dummy_enit \
---input_text_field en \
---dataset_split "train[:20]" \
---save_path out.json \
---batch_size 8
+```bash
+inseq attribute-dataset \
+  --model_name_or_path Helsinki-NLP/opus-mt-en-it \
+  --attribution_method integrated_gradients \
+  --do_prefix_attribution \
+  --dataset_name inseq/dummy_enit \
+  --input_text_field en \
+  --dataset_split "train[:20]" \
+  --save_path out.json \
+  --batch_size 8
 ```
 
 ### Dealing with minimal pairs
