@@ -12,7 +12,7 @@
 
 </div>
 
-## Example usage
+## Example usage in Python
 
 This example uses the Integrated Gradients attribution method to attribute the English-French translation of a sentence taken from the WinoMT corpus:
 
@@ -29,6 +29,33 @@ out.show()
 ```
 
 ![WinoMT Attribution Map](docs/source/images/heatmap_winomt.png)
+
+
+## Using the Inseq client
+
+See the available options by typing `inseq -h` in the terminal after installing the package.
+
+For now, two commands are supported:
+
+- `ìnseq attribute`: Wraps the `attribute` method shown above, requires explicit inputs to be attributed.
+
+- `inseq attribute-dataset`: Enables attribution for a full dataset using Hugging Face `datasets.load_dataset`.
+
+Both commands support the full range of parameters available for `attribute`, attribution visualization in the console and saving outputs to disk.
+
+**Example:** The following command can be used to perform attribution (both source and target-side) of Italian translations for a dummy sample of 20 English sentences taken from the FLORES-101 parallel corpus, using a MarianNMT translation model from Hugging Face `transformers`. The output is shown in the console and saved to disk to `out.json` (you can load it later using `inseq.FeatureAttributionOutput.load("out.json")`).
+
+```shell
+inseq attribute-dataset \                                                                                          44s py inseq-PzwjmCYf-py3.8 node system 16:59:51
+--model_name_or_path Helsinki-NLP/opus-mt-en-it \
+--attribution_method integrated_gradients \
+--do_prefix_attribution \
+--dataset_name inseq/dummy_enit \
+--input_text_field en \
+--dataset_split "train[:20]" \
+--save_path out.json \
+--batch_size 8
+```
 
 ### Dealing with minimal pairs
 

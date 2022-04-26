@@ -72,6 +72,7 @@ class InseqArgumentParser(ArgumentParser):
     def _parse_dataclass_field(parser: ArgumentParser, field: dataclasses.Field):
         field_name = f"--{field.name}"
         kwargs = field.metadata.copy()
+        alias = kwargs.pop("alias", None)
         # field.metadata is not used at all by Data Classes,
         # it is provided as a third-party extension mechanism.
         if isinstance(field.type, str):
@@ -132,7 +133,10 @@ class InseqArgumentParser(ArgumentParser):
                 kwargs["default"] = field.default_factory()
             else:
                 kwargs["required"] = True
-        parser.add_argument(field_name, **kwargs)
+        if alias is not None:
+            parser.add_argument(field_name, alias, **kwargs)
+        else:
+            parser.add_argument(field_name, **kwargs)
 
         # Add a complement `no_*` argument for a boolean field AFTER the initial field has already been added.
         # Order is important for arguments with the same destination!
