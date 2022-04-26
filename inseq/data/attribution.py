@@ -242,6 +242,20 @@ class FeatureAttributionOutput:
                         perform the attribution.
     """
 
+    # These fields of the info dictionary should be matching to allow merging
+    _merge_match_info_fields = [
+        "attribute_target",
+        "attribution_method",
+        "constrained_decoding",
+        "include_eos_baseline",
+        "model_class",
+        "model_name",
+        "output_step_probabilities",
+        "prepend_bos_token",
+        "tokenizer_class",
+        "tokenizer_name",
+    ]
+
     sequence_attributions: List[FeatureAttributionSequenceOutput]
     step_attributions: Optional[List[FeatureAttributionStepOutput]] = None
     info: Dict[str, Any] = field(default_factory=dict)
@@ -264,7 +278,7 @@ class FeatureAttributionOutput:
             return False
         return True
 
-    def save(self, path: str, overwrite: bool = False) -> None:
+    def save(self, path: str, overwrite: bool = False, compress: bool = False) -> None:
         """
         Save class contents to a JSON file.
 
@@ -281,12 +295,12 @@ class FeatureAttributionOutput:
                 allow_nan=True,
                 indent=4,
                 sort_keys=True,
-                compression=False,
+                compression=compress,
                 properties={"ndarray_compact": True},
             )
 
-    @classmethod
-    def load(cls, path: str) -> "FeatureAttributionOutput":
+    @staticmethod
+    def load(path: str) -> "FeatureAttributionOutput":
         """Load saved attribution outputs into a new FeatureAttributionOutput object.
 
         Args:
@@ -329,6 +343,43 @@ class FeatureAttributionOutput:
 
         attributions = [attr.aggregate(aggregator, **kwargs) for attr in self.sequence_attributions]
         return show_attributions(attributions, min_val, max_val, display, return_html)
+
+    @classmethod
+    def merge_attributions(cls, attributions: List["FeatureAttributionOutput"]) -> "FeatureAttributionOutput":
+        """Merges multiple FeatureAttributionOutput object into a single one.
+
+        Merging is allowed only if the attribution process was the same (by checking info).
+
+        Args:
+            attributions (`list(FeatureAttributionOutput)`):
+                The single FeatureAttributionOutput objects to be merged
+
+        Returns:
+            `FeatureAttributionOutput`: Merged object
+        """
+        assert all(
+            isinstance(x, FeatureAttributionOutput) for x in attributions
+        ), "Only FeatureAttributionOutput objects can be merged."
+        first = attributions[0]
+        for match_field in cls._merge_match_info_fields:
+            assert all(
+                attr.info[match_field] == first.info[match_field] for attr in attributions
+            ), f"Cannot merge: incompatible values for field {match_field}"
+        out_info = first.info.copy()
+        out_info.update(
+            {
+                "attr_pos_end": max(attr.info["attr_pos_end"] for attr in attributions),
+                "generated_texts": [text for attr in attributions for text in attr.info["generated_texts"]],
+                "input_texts": [text for attr in attributions for text in attr.info["input_texts"]],
+            }
+        )
+        return cls(
+            sequence_attributions=[seqattr for attr in attributions for seqattr in attr.sequence_attributions],
+            step_attributions=[stepattr for attr in attributions for stepattr in attr.step_attributions]
+            if first.step_attributions is not None
+            else None,
+            info=out_info,
+        )
 
 
 # Gradient attribution classes
