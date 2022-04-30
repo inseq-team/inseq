@@ -363,16 +363,20 @@ class FeatureAttributionOutput:
         first = attributions[0]
         for match_field in cls._merge_match_info_fields:
             assert all(
-                attr.info[match_field] == first.info[match_field] for attr in attributions
+                attr.info[match_field] == first.info[match_field]
+                if match_field in first.info
+                else match_field not in attr.info
+                for attr in attributions
             ), f"Cannot merge: incompatible values for field {match_field}"
         out_info = first.info.copy()
-        out_info.update(
-            {
-                "attr_pos_end": max(attr.info["attr_pos_end"] for attr in attributions),
-                "generated_texts": [text for attr in attributions for text in attr.info["generated_texts"]],
-                "input_texts": [text for attr in attributions for text in attr.info["input_texts"]],
-            }
-        )
+        if "attr_pos_end" in first.info:
+            out_info.update({"attr_pos_end": max(attr.info["attr_pos_end"] for attr in attributions)})
+        if "generated_texts" in first.info:
+            out_info.update(
+                {"generated_texts": [text for attr in attributions for text in attr.info["generated_texts"]]}
+            )
+        if "input_texts" in first.info:
+            out_info.update({"input_texts": [text for attr in attributions for text in attr.info["input_texts"]]})
         return cls(
             sequence_attributions=[seqattr for attr in attributions for seqattr in attr.sequence_attributions],
             step_attributions=[stepattr for attr in attributions for stepattr in attr.step_attributions]

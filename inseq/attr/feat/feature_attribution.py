@@ -44,7 +44,7 @@ from ...utils import (
     pretty_tensor,
 )
 from ...utils.typing import ModelIdentifier, TargetIdsTensor
-from ..attribution_decorators import set_hook, unset_hook
+from ..attribution_decorators import batched, set_hook, unset_hook
 from .attribution_utils import (
     check_attribute_positions,
     enrich_step_output,
@@ -145,6 +145,7 @@ class FeatureAttribution(Registry):
             raise UnknownAttributionMethodError(method_name)
         return methods[method_name](attribution_model, **kwargs)
 
+    @batched
     def prepare_and_attribute(
         self,
         sources: FeatureAttributionInput,
