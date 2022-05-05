@@ -29,7 +29,7 @@ Here is an example of using Inseq to attribute an English-to-Italian translation
         "The developer argued with the designer because she did not like the design.",
         n_steps=300,
         return_convergence_delta=True,
-        output_step_probabilities=True,
+        step_scores=["probabilities"],
         internal_batch_size=100,
         include_eos_baseline=False,
     )

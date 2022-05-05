@@ -17,7 +17,7 @@ Todo:
     * 🟡: Allow custom arguments for model loading in the :class:`FeatureAttribution` :meth:`load` method.
 """
 
-from typing import Any, Dict, NoReturn, Optional, Tuple
+from typing import Any, Dict, List, NoReturn, Optional, Tuple
 
 import logging
 from abc import abstractmethod
@@ -46,11 +46,12 @@ from ...utils import (
 from ...utils.typing import ModelIdentifier, TargetIdsTensor
 from ..attribution_decorators import batched, set_hook, unset_hook
 from .attribution_utils import (
+    STEP_SCORES_MAP,
     check_attribute_positions,
     enrich_step_output,
     get_attribution_sentences,
     get_split_targets,
-    get_step_prediction_probabilities,
+    get_step_scores,
 )
 
 
@@ -156,7 +157,7 @@ class FeatureAttribution(Registry):
         pretty_progress: bool = True,
         output_step_attributions: bool = False,
         attribute_target: bool = False,
-        output_step_probabilities: bool = False,
+        step_scores: List[str] = [],
         include_eos_baseline: bool = False,
         **kwargs,
     ) -> FeatureAttributionOutput:
@@ -181,8 +182,9 @@ class FeatureAttribution(Registry):
                 FeatureAttributionStepOutput objects for each step. Defaults to False.
             attribute_target (:obj:`bool`, `optional`): Whether to include target prefix for feature attribution.
                 Defaults to False.
-            output_step_probabilities (:obj:`bool`, optional): Whether to output the prediction probabilities for the
-                current generation step or not. Defaults to False.
+            step_scores (:obj:`list` of `str`): List of identifiers for step scores that need to be computed during
+                attribution. The available step scores are defined in :obj:`inseq.attr.feat.STEP_SCORES_MAP` and new
+                step scores can be added by using the :meth:`~inseq.register_step_score` function.
             include_eos_baseline (:obj:`bool`, `optional`): Whether to include the EOS token in the baseline for
                 attribution. By default the EOS token is not used for attribution. Defaults to False.
 
@@ -201,7 +203,7 @@ class FeatureAttribution(Registry):
             pretty_progress=pretty_progress,
             output_step_attributions=output_step_attributions,
             attribute_target=attribute_target,
-            output_step_probabilities=output_step_probabilities,
+            step_scores=step_scores,
             **kwargs,
         )
         attribution_output.info["prepend_bos_token"] = prepend_bos_token
@@ -283,7 +285,7 @@ class FeatureAttribution(Registry):
         pretty_progress: bool = True,
         output_step_attributions: bool = False,
         attribute_target: bool = False,
-        output_step_probabilities: bool = False,
+        step_scores: List[str] = [],
         **kwargs,
     ) -> FeatureAttributionOutput:
         r"""
@@ -301,8 +303,9 @@ class FeatureAttribution(Registry):
                 FeatureAttributionStepOutput objects for each step. Defaults to False.
             attribute_target (:obj:`bool`, `optional`): Whether to include target prefix for feature attribution.
                 Defaults to False.
-            output_step_probabilities (:obj:`bool`, optional): Whether to output the prediction probabilities for the
-                current generation step or not. Defaults to False.
+            step_scores (:obj:`list` of `str`): List of identifiers for step scores that need to be computed during
+                attribution. The available step scores are defined in :obj:`inseq.attr.feat.STEP_SCORES_MAP` and new
+                step scores can be added by using the :meth:`~inseq.register_step_score` function.
             kwargs: Additional keyword arguments to pass to the attribution step.
 
         Returns:
@@ -338,7 +341,7 @@ class FeatureAttribution(Registry):
                 batch.targets.input_ids[:, step].unsqueeze(1),
                 batch.targets.attention_mask[:, step].unsqueeze(1),
                 attribute_target=attribute_target,
-                output_step_probabilities=output_step_probabilities,
+                step_scores=step_scores,
                 **kwargs,
             )
             attribution_outputs.append(step_output)
@@ -373,7 +376,7 @@ class FeatureAttribution(Registry):
                     "attr_pos_end": attr_pos_end,
                     "output_step_attributions": output_step_attributions,
                     "attribute_target": attribute_target,
-                    "output_step_probabilities": output_step_probabilities,
+                    "step_scores": step_scores,
                 },
                 **kwargs,
             },
@@ -385,7 +388,7 @@ class FeatureAttribution(Registry):
         target_ids: TensorType["batch_size", 1, int],
         target_attention_mask: Optional[TensorType["batch_size", 1, int]] = None,
         attribute_target: bool = False,
-        output_step_probabilities: bool = False,
+        step_scores: List[str] = [],
         **kwargs: Dict[str, Any],
     ) -> FeatureAttributionStepOutput:
         r"""
@@ -402,15 +405,15 @@ class FeatureAttribution(Registry):
                 specifying which target_ids are valid for attribution and which are padding.
             attribute_target (:obj:`bool`, `optional`): Whether to include target prefix for feature attribution.
                 Defaults to False.
-            output_step_probabilities (:obj:`bool`, optional): Whether to output the prediction probabilities for the
-                current generation step or not. Defaults to False.
+            step_scores (:obj:`list` of `str`): List of identifiers for step scores that need to be computed during
+                attribution. The available step scores are defined in :obj:`inseq.attr.feat.STEP_SCORES_MAP` and new
+                step scores can be added by using the :meth:`~inseq.register_step_score` function.
             kwargs: Additional keyword arguments to pass to the attribution step.
 
         Returns:
             :class:`~inseq.data.FeatureAttributionStepOutput`: A dataclass containing attribution tensors for source
                 and target attributions of size `(batch_size, source_length)` and `(batch_size, prefix length)`.
-                (target optional if attribute_target=True), plus batch information and any step score present (default
-                output probabilities of size `(batch_size)` if output_step_probabilities=True.
+                (target optional if attribute_target=True), plus batch information and any step score present.
         """
         orig_batch = batch.clone()
         orig_target_ids = target_ids.clone()
@@ -428,9 +431,16 @@ class FeatureAttribution(Registry):
         )
         # Perform attribution step
         step_output = self.attribute_step(batch, target_ids, attribute_target, **kwargs)
-        if output_step_probabilities:
-            step_output.step_scores["probabilities"] = get_step_prediction_probabilities(
-                self.attribution_model, batch, target_ids
+        # Calculate step scores
+        for step_score in step_scores:
+            if step_score not in STEP_SCORES_MAP:
+                raise AttributeError(
+                    f"Step score {step_score} not found. Available step scores are: "
+                    f"{', '.join([x for x in STEP_SCORES_MAP.keys()])}. Use the inseq.register_step_score"
+                    f"function to register a custom step score."
+                )
+            step_output.step_scores[step_score] = get_step_scores(
+                self.attribution_model, batch, target_ids, step_score
             )
         # Add batch information to output
         step_output = enrich_step_output(
@@ -490,7 +500,6 @@ class FeatureAttribution(Registry):
         batch: EncoderDecoderBatch,
         target_ids: TensorType["batch_size", int],
         attribute_target: bool = False,
-        output_step_probabilities: bool = False,
         **kwargs: Dict[str, Any],
     ) -> FeatureAttributionStepOutput:
         r"""
@@ -509,8 +518,7 @@ class FeatureAttribution(Registry):
         Returns:
             :class:`~inseq.data.FeatureAttributionStepOutput`: A dataclass containing attribution tensors for source
                 and target attributions of size `(batch_size, source_length)` and `(batch_size, prefix length)`.
-                (target optional if attribute_target=True), plus batch information and any step score present (default
-                output probabilities of size `(batch_size)` if output_step_probabilities=True.
+                (target optional if attribute_target=True), plus batch information and any step score present.
         """
         pass
 

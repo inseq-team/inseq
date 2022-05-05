@@ -35,6 +35,17 @@ from .data_utils import TensorWrapper
 
 FeatureAttributionInput = Union[TextInput, BatchEncoding, Batch]
 
+DEFAULT_ATTRIBUTION_AGGREGATE_DICT = {
+    "source_attributions": {"sequence_aggregate": identity_fn, "span_aggregate": abs_max},
+    "target_attributions": {"sequence_aggregate": identity_fn, "span_aggregate": abs_max},
+    "step_scores": {
+        "span_aggregate": {
+            "probabilities": prod,
+            "crossentropy": prod,
+        }
+    },
+}
+
 
 @dataclass(eq=False, repr=False)
 class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
@@ -68,17 +79,12 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
     _dict_aggregate_fn: Dict[str, Any] = None
 
     def __post_init__(self):
+        aggregate_dict = DEFAULT_ATTRIBUTION_AGGREGATE_DICT
         if self._dict_aggregate_fn is None or self._dict_aggregate_fn == {}:
-            seq_agg_fn = identity_fn if len(self.source_attributions.shape) == 2 else sum_normalize_attributions
-            self._dict_aggregate_fn = {
-                "source_attributions": {"sequence_aggregate": seq_agg_fn, "span_aggregate": abs_max},
-                "target_attributions": {"sequence_aggregate": seq_agg_fn, "span_aggregate": abs_max},
-                "step_scores": {
-                    "span_aggregate": {
-                        "probabilities": prod,
-                    }
-                },
-            }
+            self._dict_aggregate_fn = aggregate_dict
+        elif isinstance(self._dict_aggregate_fn, dict):
+            aggregate_dict.update(self._dict_aggregate_fn)
+            self._dict_aggregate_fn = aggregate_dict
         if self._aggregator is None:
             self._aggregator = SequenceAttributionAggregator
 
@@ -250,7 +256,7 @@ class FeatureAttributionOutput:
         "include_eos_baseline",
         "model_class",
         "model_name",
-        "output_step_probabilities",
+        "step_scores",
         "prepend_bos_token",
         "tokenizer_class",
         "tokenizer_name",
@@ -397,6 +403,8 @@ class GradientFeatureAttributionSequenceOutput(FeatureAttributionSequenceOutput)
 
     def __post_init__(self):
         super().__post_init__()
+        self._dict_aggregate_fn["source_attributions"]["sequence_aggregate"] = sum_normalize_attributions
+        self._dict_aggregate_fn["target_attributions"]["sequence_aggregate"] = sum_normalize_attributions
         if "deltas" not in self._dict_aggregate_fn["step_scores"]["span_aggregate"]:
             self._dict_aggregate_fn["step_scores"]["span_aggregate"]["deltas"] = abs_max
 

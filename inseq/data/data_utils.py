@@ -84,7 +84,9 @@ class TensorWrapper:
     def _numpy(attr):
         if isinstance(attr, torch.Tensor) or isinstance(attr, TensorWrapper):
             np_array = attr.numpy()
-            return np.ascontiguousarray(np_array, dtype=np_array.dtype)
+            if isinstance(np_array, np.ndarray):
+                return np.ascontiguousarray(np_array, dtype=np_array.dtype)
+            return np_array
         elif isinstance(attr, dict):
             return {key: TensorWrapper._numpy(val) for key, val in attr.items()}
         else:

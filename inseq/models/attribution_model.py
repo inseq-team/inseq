@@ -98,7 +98,7 @@ class AttributionModel(ABC, torch.nn.Module):
         pretty_progress: bool = True,
         output_step_attributions: bool = False,
         attribute_target: bool = False,
-        output_step_probabilities: bool = False,
+        step_scores: List[str] = [],
         include_eos_baseline: bool = False,
         device: Optional[str] = None,
         batch_size: Optional[int] = None,
@@ -140,7 +140,7 @@ class AttributionModel(ABC, torch.nn.Module):
             pretty_progress=pretty_progress,
             output_step_attributions=output_step_attributions,
             attribute_target=attribute_target,
-            output_step_probabilities=output_step_probabilities,
+            step_scores=step_scores,
             include_eos_baseline=include_eos_baseline,
             **attribution_args,
         )

@@ -28,8 +28,8 @@ class AttributeBaseArgs:
             "help": "Performs the attribution procedure including the generated prefix at every step.",
         },
     )
-    output_step_probabilities: bool = field(
-        default=False, metadata={"alias": "-sp", "help": "Adds step decoding probabilities to the attribution output."}
+    step_scores: List[str] = field(
+        default=[], metadata={"alias": "-ss", "help": "Adds step scores to the attribution output."}
     )
     output_step_attributions: bool = field(
         default=False, metadata={"alias": "-sa", "help": "Adds step-level feature attributions to the output."}
@@ -112,7 +112,7 @@ def attribute(input_texts, generated_texts, args: AttributeBaseArgs):
         generated_texts,
         batch_size=args.batch_size,
         attribute_target=args.do_prefix_attribution,
-        output_step_probabilities=args.output_step_probabilities,
+        step_scores=args.step_scores,
         output_step_attributions=args.output_step_attributions,
         include_eos_baseline=args.include_eos_baseline,
         n_steps=args.n_approximation_steps,

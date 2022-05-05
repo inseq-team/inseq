@@ -31,6 +31,7 @@ from .torch_utils import (
     aggregate_contiguous,
     euclidean_distance,
     get_sequences_from_batched_steps,
+    probits2ce,
     probits2probs,
     prod,
     remap_from_filtered,

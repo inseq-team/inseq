@@ -21,7 +21,7 @@ EXAMPLES = json.load(open(EXAMPLES_FILE))
 USE_REFERENCE_TEXT = [True, False]
 ATTRIBUTE_TARGET = [True, False]
 RETURN_CONVERGENCE_DELTA = [True, False]
-RETURN_STEP_PROBABILITIES = [True, False]
+STEP_SCORES = [[], ["probabilities"]]
 ATTRIBUTION_METHODS = list_feature_attribution_methods()
 
 
@@ -100,7 +100,7 @@ def test_batched_attribution_consistency(attribution_method, use_reference, attr
 @mark.parametrize("use_reference", USE_REFERENCE_TEXT)
 @mark.parametrize("attribute_target", ATTRIBUTE_TARGET)
 @mark.parametrize("return_convergence_delta", RETURN_CONVERGENCE_DELTA)
-@mark.parametrize("return_step_probabilities", RETURN_STEP_PROBABILITIES)
+@mark.parametrize("step_scores", STEP_SCORES)
 def test_attribute(
     texts,
     reference_texts,
@@ -108,7 +108,7 @@ def test_attribute(
     use_reference,
     attribute_target,
     return_convergence_delta,
-    return_step_probabilities,
+    step_scores,
     saliency_mt_model,
 ):
     if attribution_method == "discretized_integrated_gradients":
@@ -124,7 +124,7 @@ def test_attribute(
         show_progress=False,
         attribute_target=attribute_target,
         return_convergence_delta=return_convergence_delta,
-        output_step_probabilities=return_step_probabilities,
+        step_scores=step_scores,
         internal_batch_size=50,
         n_steps=100,
         device="cuda:0" if torch.cuda.is_available() else "cpu",
@@ -135,7 +135,7 @@ def test_attribute(
     assert out.info["constrained_decoding"] == use_reference
     assert out.info["attribution_method"] == attribution_method
     assert out.info["attribute_target"] == attribute_target
-    assert out.info["output_step_probabilities"] == return_step_probabilities
+    assert out.info["step_scores"] == step_scores
     if "return_convergence_delta" in out.info:
         assert out.info["return_convergence_delta"] == return_convergence_delta
     if "internal_batch_size" in out.info:

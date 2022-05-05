@@ -26,7 +26,7 @@ def saliency_mt_model():
 def test_sequence_attribution_aggregator(saliency_mt_model):
     out = saliency_mt_model.attribute(
         "This is a test.",
-        output_step_probabilities=True,
+        step_scores=["probabilities"],
         attribute_target=True,
         output_step_attributions=True,
         device="cpu",
@@ -46,7 +46,7 @@ def test_sequence_attribution_aggregator(saliency_mt_model):
 
 def test_continuous_span_aggregator(saliency_mt_model):
     out = saliency_mt_model.attribute(
-        "This is a test.", attribute_target=True, output_step_probabilities=True, device="cpu"
+        "This is a test.", attribute_target=True, step_scores=["probabilities"], device="cpu"
     )
     seqattr = out.sequence_attributions[0]
     out_agg = seqattr.aggregate(ContiguousSpanAggregator, source_spans=(3, 5), target_spans=[(0, 3), (4, 6)])
@@ -57,7 +57,7 @@ def test_continuous_span_aggregator(saliency_mt_model):
 
 def test_aggregator_pipeline(saliency_mt_model):
     out = saliency_mt_model.attribute(
-        "This is a test.", attribute_target=True, output_step_probabilities=True, device="cpu"
+        "This is a test.", attribute_target=True, step_scores=["probabilities"], device="cpu"
     )
     seqattr = out.sequence_attributions[0]
     squeezesum = AggregatorPipeline([ContiguousSpanAggregator, SequenceAttributionAggregator])

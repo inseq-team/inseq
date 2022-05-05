@@ -76,6 +76,19 @@ def probits2probs(probits: FullLogitsTensor, target_ids: TargetIdsTensor) -> Sin
     return probits.gather(-1, target_ids).squeeze(-1)
 
 
+@torch.no_grad()
+def probits2ce(probits: FullLogitsTensor, target_ids: TargetIdsTensor) -> SingleScorePerStepTensor:
+    """
+    Compute the scores of the target_ids from the probits.
+    The scores are computed as the cross entropy between the target_ids and the probits.
+    See: https://github.com/ZurichNLP/nmtscore/blob/master/src/nmtscore/models/m2m100.py#L99
+    """
+    target_ids = target_ids.reshape(probits.shape[0], 1)
+    # Extracts the ith score from the softmax output over the vocabulary (dim -1 of the probits)
+    # where i is the value of the corresponding index in target_ids.
+    return 2 ** torch.log(probits.gather(-1, target_ids).squeeze(-1))
+
+
 def aggregate_contiguous(
     t: torch.Tensor,
     spans: Sequence[Tuple[int, int]],

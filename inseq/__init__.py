@@ -2,7 +2,7 @@
 
 from importlib import metadata as importlib_metadata
 
-from .attr import list_feature_attribution_methods
+from .attr import list_feature_attribution_methods, list_step_scores, register_step_score
 from .data import FeatureAttributionOutput, show_attributions
 from .models import AttributionModel, load_model
 
@@ -22,5 +22,7 @@ __all__ = [
     "load_model",
     "show_attributions",
     "list_feature_attribution_methods",
+    "list_step_scores",
+    "register_step_score",
     "version",
 ]

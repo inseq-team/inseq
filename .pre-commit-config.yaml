@@ -10,7 +10,7 @@ repos:
       - id: trailing-whitespace
       - id: check-yaml
       - id: check-added-large-files
-        args: ['--maxkb=1000']
+        args: ['--maxkb=2500']
       - id: check-toml
       - id: check-merge-conflict
       - id: mixed-line-ending
