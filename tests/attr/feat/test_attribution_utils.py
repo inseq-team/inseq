@@ -49,7 +49,7 @@ def test_get_step_prediction_probabilities(m2m100_model, encoder_decoder_batches
             m2m100_model,
             batch.to(m2m100_model.device),
             next_batch.targets.encoding.input_ids[0, -1].to(m2m100_model.device),
-            "probabilities",
+            "probability",
         )
         assert float(pred_proba) == pytest.approx(probas[i], abs=1e-3)
 

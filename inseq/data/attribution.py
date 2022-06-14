@@ -12,8 +12,9 @@ from ..utils import (
     get_sequences_from_batched_steps,
     identity_fn,
     pretty_dict,
-    prod,
+    prod_fn,
     remap_from_filtered,
+    sum_fn,
     sum_normalize_attributions,
 )
 from ..utils.typing import (
@@ -40,8 +41,9 @@ DEFAULT_ATTRIBUTION_AGGREGATE_DICT = {
     "target_attributions": {"sequence_aggregate": identity_fn, "span_aggregate": abs_max},
     "step_scores": {
         "span_aggregate": {
-            "probabilities": prod,
-            "crossentropy": prod,
+            "probability": prod_fn,
+            "crossentropy": sum_fn,
+            "perplexity": prod_fn,
         }
     },
 }

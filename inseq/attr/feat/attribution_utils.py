@@ -6,7 +6,7 @@ import torch
 
 from ...data.attribution import DEFAULT_ATTRIBUTION_AGGREGATE_DICT, FeatureAttributionStepOutput
 from ...data.batch import EncoderDecoderBatch
-from ...utils import probits2ce, probits2probs
+from ...utils import probits2ce, probits2ppl, probits2probs
 from ...utils.typing import (
     OneOrMoreAttributionSequences,
     OneOrMoreIdSequences,
@@ -19,8 +19,9 @@ from ...utils.typing import (
 
 
 STEP_SCORES_MAP = {
-    "probabilities": probits2probs,
+    "probability": probits2probs,
     "crossentropy": probits2ce,
+    "perplexity": probits2ppl,
 }
 
 
@@ -116,7 +117,7 @@ def get_step_scores(
     attribution_model: "AttributionModel",
     batch: EncoderDecoderBatch,
     target_ids: TargetIdsTensor,
-    score_identifier: str = "probabilities",
+    score_identifier: str = "probability",
 ) -> float:
     """
     Returns the probabilities of the target tokens.
@@ -189,7 +190,7 @@ def register_step_score(
         aggregate_map (:obj:`dict`, `optional`): An optional dictionary mapping from :class:`~inseq.data.Aggregator`
             name identifiers to functions taking in input a tensor of shape `(batch_size, seq_len)` and producing
             tensors of shape `(batch_size, aggregated_seq_len)` in output that will be used to aggregate the
-            registered step score when used in conjunction with the corresponding aggregator. E.g. the `probabilities`
+            registered step score when used in conjunction with the corresponding aggregator. E.g. the `probability`
             step score uses the aggregate_map `{"span_aggregate": lambda x: t.prod(dim=1, keepdim=True)}` to aggregate
             probabilities with a product when aggregating scores over spans.
     """

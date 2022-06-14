@@ -82,7 +82,7 @@ out = model.attribute(
     n_steps=300,
     return_convergence_delta=True,
     attribute_target=True,
-    step_scores=["probabilities"],
+    step_scores=["probability"],
     internal_batch_size=100,
     include_eos_baseline=False,
 )

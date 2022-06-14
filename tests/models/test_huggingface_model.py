@@ -21,7 +21,7 @@ EXAMPLES = json.load(open(EXAMPLES_FILE))
 USE_REFERENCE_TEXT = [True, False]
 ATTRIBUTE_TARGET = [True, False]
 RETURN_CONVERGENCE_DELTA = [True, False]
-STEP_SCORES = [[], ["probabilities"]]
+STEP_SCORES = [[], ["probability"]]
 ATTRIBUTION_METHODS = list_feature_attribution_methods()
 
 
