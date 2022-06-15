@@ -17,7 +17,7 @@ Todo:
     * 🟡: Allow custom arguments for model loading in the :class:`FeatureAttribution` :meth:`load` method.
 """
 
-from typing import Any, Dict, List, NoReturn, Optional, Tuple
+from typing import Any, Callable, Dict, List, NoReturn, Optional, Tuple, Union
 
 import logging
 from abc import abstractmethod
@@ -43,11 +43,12 @@ from ...utils import (
     get_available_methods,
     pretty_tensor,
 )
-from ...utils.typing import ModelIdentifier, TargetIdsTensor
+from ...utils.typing import ModelIdentifier, SingleScorePerStepTensor, TargetIdsTensor
 from ..attribution_decorators import batched, set_hook, unset_hook
 from .attribution_utils import (
     STEP_SCORES_MAP,
     check_attribute_positions,
+    default_attributed_fn_factory,
     enrich_step_output,
     get_attribution_sentences,
     get_split_targets,
@@ -159,6 +160,7 @@ class FeatureAttribution(Registry):
         attribute_target: bool = False,
         step_scores: List[str] = [],
         include_eos_baseline: bool = False,
+        attributed_fn: Union[str, Callable[..., SingleScorePerStepTensor], None] = None,
         **kwargs,
     ) -> FeatureAttributionOutput:
         r"""
@@ -187,7 +189,12 @@ class FeatureAttribution(Registry):
                 step scores can be added by using the :meth:`~inseq.register_step_score` function.
             include_eos_baseline (:obj:`bool`, `optional`): Whether to include the EOS token in the baseline for
                 attribution. By default the EOS token is not used for attribution. Defaults to False.
-
+            attributed_fn (:obj:`str` or :obj:`Callable[..., SingleScorePerStepTensor]`, `optional`): The identifier or
+                function of model outputs representing what should be attributed (e.g. output probits of model best
+                prediction after softmax). If it is a string, it must be a valid function.
+                Otherwise, it must be a function that taking multiple keyword arguments and returns a :obj:`tensor`
+                of size (batch_size,). If not provided, the default attributed function for the model will be used
+                (change attribution_model.default_attributed_fn_id).
         Returns:
             :class:`~inseq.data.FeatureAttributionOutput`: An object containing a list of sequence attributions, with
                 an optional added list of single :class:`~inseq.data.FeatureAttributionStepOutput` for each step and
@@ -204,6 +211,7 @@ class FeatureAttribution(Registry):
             output_step_attributions=output_step_attributions,
             attribute_target=attribute_target,
             step_scores=step_scores,
+            attributed_fn=attributed_fn,
             **kwargs,
         )
         attribution_output.info["prepend_bos_token"] = prepend_bos_token
@@ -286,6 +294,7 @@ class FeatureAttribution(Registry):
         output_step_attributions: bool = False,
         attribute_target: bool = False,
         step_scores: List[str] = [],
+        attributed_fn: Union[str, Callable[..., SingleScorePerStepTensor], None] = None,
         **kwargs,
     ) -> FeatureAttributionOutput:
         r"""
@@ -306,6 +315,12 @@ class FeatureAttribution(Registry):
             step_scores (:obj:`list` of `str`): List of identifiers for step scores that need to be computed during
                 attribution. The available step scores are defined in :obj:`inseq.attr.feat.STEP_SCORES_MAP` and new
                 step scores can be added by using the :meth:`~inseq.register_step_score` function.
+            attributed_fn (:obj:`str` or :obj:`Callable[..., SingleScorePerStepTensor]`, `optional`): The identifier or
+                function of model outputs representing what should be attributed (e.g. output probits of model best
+                prediction after softmax). If it is a string, it must be a valid function.
+                Otherwise, it must be a function that taking multiple keyword arguments and returns a :obj:`tensor`
+                of size (batch_size,). If not provided, the default attributed function for the model will be used
+                (change attribution_model.default_attributed_fn_id).
             kwargs: Additional keyword arguments to pass to the attribution step.
 
         Returns:
@@ -317,6 +332,14 @@ class FeatureAttribution(Registry):
             raise ValueError(
                 "Layer attribution methods do not support attribute_target=True. Use regular ones instead."
             )
+        # If the attributed function is an identifier, we temporarily swap out the current default
+        # for the model (similar to what we do for the attribution method)
+        if isinstance(attributed_fn, str):
+            if attributed_fn not in STEP_SCORES_MAP:
+                raise ValueError(
+                    f"Unknown function: {attributed_fn}. Register custom functions with inseq.register_step_score"
+                )
+            attributed_fn = default_attributed_fn_factory(attributed_fn)
         max_generated_length = batch.targets.input_ids.shape[1]
         attr_pos_start, attr_pos_end = check_attribute_positions(
             max_generated_length,
@@ -342,6 +365,7 @@ class FeatureAttribution(Registry):
                 batch.targets.attention_mask[:, step].unsqueeze(1),
                 attribute_target=attribute_target,
                 step_scores=step_scores,
+                attributed_fn=attributed_fn,
                 **kwargs,
             )
             attribution_outputs.append(step_output)
@@ -389,6 +413,7 @@ class FeatureAttribution(Registry):
         target_attention_mask: Optional[TensorType["batch_size", 1, int]] = None,
         attribute_target: bool = False,
         step_scores: List[str] = [],
+        attributed_fn: Optional[Callable[..., SingleScorePerStepTensor]] = None,
         **kwargs: Dict[str, Any],
     ) -> FeatureAttributionStepOutput:
         r"""
@@ -408,6 +433,11 @@ class FeatureAttribution(Registry):
             step_scores (:obj:`list` of `str`): List of identifiers for step scores that need to be computed during
                 attribution. The available step scores are defined in :obj:`inseq.attr.feat.STEP_SCORES_MAP` and new
                 step scores can be added by using the :meth:`~inseq.register_step_score` function.
+            attributed_fn (:obj:`Callable[..., SingleScorePerStepTensor]`, `optional`): The function of model outputs
+                representing what should be attributed (e.g. output probits of model best prediction after softmax).
+                The parameter must be a function that taking multiple keyword arguments and returns a :obj:`tensor`
+                of size (batch_size,). If not provided, the default attributed function for the model will be used
+                (change attribution_model.default_attributed_fn_id).
             kwargs: Additional keyword arguments to pass to the attribution step.
 
         Returns:
@@ -430,7 +460,7 @@ class FeatureAttribution(Registry):
             f"target_attention_mask: {pretty_tensor(target_attention_mask)}"
         )
         # Perform attribution step
-        step_output = self.attribute_step(batch, target_ids, attribute_target, **kwargs)
+        step_output = self.attribute_step(batch, target_ids, attribute_target, attributed_fn, **kwargs)
         # Calculate step scores
         for step_score in step_scores:
             if step_score not in STEP_SCORES_MAP:
@@ -464,6 +494,7 @@ class FeatureAttribution(Registry):
         batch: EncoderDecoderBatch,
         target_ids: TargetIdsTensor,
         attribute_target: bool = False,
+        attributed_fn: Optional[Callable[..., SingleScorePerStepTensor]] = None,
         **kwargs,
     ) -> Dict[str, Any]:
         if self.is_layer_attribution:
@@ -477,13 +508,17 @@ class FeatureAttribution(Registry):
             baselines = baselines + (batch.targets.baseline_embeds,)
         attribute_args = {
             "inputs": inputs,
-            "target": target_ids,
             "additional_forward_args": (
+                # Making targets 2D enables _expand_additional_forward_args
+                # in Captum to preserve the expected batch dimension for methods
+                # such as intergrated gradients.
+                target_ids.unsqueeze(-1),
                 batch.sources.attention_mask,
                 batch.targets.attention_mask,
                 # Defines how to treat source and target tensors
                 # Maps on the use_embeddings argument of forward
                 not self.is_layer_attribution,
+                attributed_fn,
             ),
         }
         if not attribute_target:

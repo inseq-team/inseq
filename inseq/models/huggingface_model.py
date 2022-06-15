@@ -1,5 +1,5 @@
 """ HuggingFace Seq2seq model """
-from typing import List, NoReturn, Optional, Tuple, Union
+from typing import Callable, List, NoReturn, Optional, Tuple, Union
 
 import logging
 
@@ -8,15 +8,18 @@ from torch import long
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 from transformers.generation_utils import BeamSampleOutput, BeamSearchOutput, GreedySearchOutput, SampleOutput
 
+from ..attr import default_attributed_fn_factory
 from ..data import BatchEncoding
 from ..utils import optional, pretty_tensor
 from ..utils.typing import (
     AttributionForwardInputs,
     EmbeddingsTensor,
+    ExpandedTargetIdsTensor,
     FullLogitsTensor,
     IdsTensor,
     OneOrMoreIdSequences,
     OneOrMoreTokenSequences,
+    SingleScorePerStepTensor,
     TextInput,
     VocabularyEmbeddingsTensor,
 )
@@ -120,16 +123,22 @@ class HuggingfaceModel(AttributionModel):
         self,
         encoder_tensors: AttributionForwardInputs,
         decoder_embeds: AttributionForwardInputs,
+        target_ids: ExpandedTargetIdsTensor,
         encoder_attention_mask: Optional[IdsTensor] = None,
         decoder_attention_mask: Optional[IdsTensor] = None,
         use_embeddings: bool = True,
+        attributed_fn: Optional[Callable[..., SingleScorePerStepTensor]] = None,
+        **kwargs,
     ) -> FullLogitsTensor:
+        target_ids = target_ids.squeeze(-1)
         if use_embeddings:
             encoder_embeds = encoder_tensors
             encoder_ids = None
         else:
             encoder_embeds = None
             encoder_ids = encoder_tensors
+        if attributed_fn is None:
+            attributed_fn = default_attributed_fn_factory(self.default_attributed_fn_id)
         output = self.model(
             input_ids=encoder_ids,
             inputs_embeds=encoder_embeds,
@@ -137,11 +146,18 @@ class HuggingfaceModel(AttributionModel):
             decoder_inputs_embeds=decoder_embeds,
             decoder_attention_mask=decoder_attention_mask,
         )
-        # Full logits for last position of every sentence:
-        # (batch_size, tgt_seq_len, vocab_size) => (batch_size, vocab_size)
-        logits = output.logits[:, -1, :].squeeze(1)
-        logger.debug(f"logits: {pretty_tensor(logits)}")
-        return torch.softmax(logits, dim=-1)
+        logger.debug(f"logits: {pretty_tensor(output.logits)}")
+        return attributed_fn(
+            attribution_model=self,
+            forward_output=output,
+            input_ids=encoder_ids,
+            input_embeds=encoder_embeds,
+            attention_mask=encoder_attention_mask,
+            decoder_inputs_embeds=decoder_embeds,
+            decoder_attention_mask=decoder_attention_mask,
+            target_ids=target_ids,
+            **kwargs,
+        )
 
     @unhooked
     def generate(

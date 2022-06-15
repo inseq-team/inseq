@@ -37,6 +37,7 @@ IndexSpan = Union[Tuple[int, int], Sequence[Tuple[int, int]]]
 
 IdsTensor = TensorType["batch_size", "seq_len", long]
 TargetIdsTensor = TensorType["batch_size", long]
+ExpandedTargetIdsTensor = TensorType["batch_size", 1, long]
 EmbeddingsTensor = TensorType["batch_size", "seq_len", "embed_size", float]
 MultiStepEmbeddingsTensor = TensorType["batch_size_x_n_steps", "seq_len", "embed_size", float]
 VocabularyEmbeddingsTensor = TensorType["vocab_size", "embed_size", float]

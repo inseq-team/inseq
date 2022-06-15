@@ -13,7 +13,7 @@
 # limitations under the License.
 """ Gradient-based feature attribution methods. """
 
-from typing import Any, Dict
+from typing import Any, Callable, Dict, Optional
 
 import logging
 
@@ -29,7 +29,7 @@ from captum.attr import (
 
 from ...data import EncoderDecoderBatch, GradientFeatureAttributionStepOutput
 from ...utils import Registry, extract_signature_args, pretty_tensor, rgetattr
-from ...utils.typing import TargetIdsTensor
+from ...utils.typing import SingleScorePerStepTensor, TargetIdsTensor
 from ..attribution_decorators import set_hook, unset_hook
 from .feature_attribution import FeatureAttribution
 from .ops import DiscretetizedIntegratedGradients
@@ -70,6 +70,7 @@ class GradientAttribution(FeatureAttribution, Registry):
         batch: EncoderDecoderBatch,
         target_ids: TargetIdsTensor,
         attribute_target: bool = False,
+        attributed_fn: Optional[Callable[..., SingleScorePerStepTensor]] = None,
         **kwargs,
     ) -> GradientFeatureAttributionStepOutput:
         r"""
@@ -90,8 +91,8 @@ class GradientAttribution(FeatureAttribution, Registry):
                 `(batch_size)` if the attribution step supports deltas and they are requested. At this point the batch
                 information is empty, and will later be filled by the enrich_step_output function.
         """
-        attribute_args = self.format_attribute_args(batch, target_ids, attribute_target, **kwargs)
         logger.debug(f"batch: {batch},\ntarget_ids: {pretty_tensor(target_ids, lpad=4)}")
+        attribute_args = self.format_attribute_args(batch, target_ids, attribute_target, attributed_fn, **kwargs)
         attr = self.method.attribute(**attribute_args)
         deltas = None
         if (

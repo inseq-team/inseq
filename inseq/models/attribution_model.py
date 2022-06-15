@@ -1,4 +1,4 @@
-from typing import Any, List, Optional, Tuple, Union
+from typing import Any, Callable, List, Optional, Tuple, Union
 
 import logging
 from abc import ABC, abstractmethod
@@ -6,6 +6,7 @@ from abc import ABC, abstractmethod
 import torch
 from rich.status import Status
 
+from ..attr import STEP_SCORES_MAP
 from ..attr.feat.feature_attribution import FeatureAttribution
 from ..data import BatchEncoding, FeatureAttributionOutput
 from ..utils import MissingAttributionMethodError, format_input_texts, isnotebook
@@ -15,6 +16,7 @@ from ..utils.typing import (
     ModelIdentifier,
     OneOrMoreIdSequences,
     OneOrMoreTokenSequences,
+    SingleScorePerStepTensor,
     TextInput,
     VocabularyEmbeddingsTensor,
 )
@@ -33,6 +35,7 @@ class AttributionModel(ABC, torch.nn.Module):
         self._device = None
         self.attribution_method = None
         self.is_hooked = False
+        self._default_attributed_fn_id = "probability"
 
     @property
     def device(self) -> str:
@@ -56,6 +59,16 @@ class AttributionModel(ABC, torch.nn.Module):
             self.model.eval()
             self.model.zero_grad()
             self.attribution_method = self.get_attribution_method(attribution_method)
+
+    @property
+    def default_attributed_fn_id(self) -> str:
+        return self._default_attributed_fn_id
+
+    @default_attributed_fn_id.setter
+    def set_attributed_fn(self, fn: str):
+        if fn not in STEP_SCORES_MAP:
+            raise ValueError(f"Unknown function: {fn}. Register custom functions with inseq.register_step_score")
+        self._default_attributed_fn_id = fn
 
     @staticmethod
     def load(
@@ -100,6 +113,7 @@ class AttributionModel(ABC, torch.nn.Module):
         attribute_target: bool = False,
         step_scores: List[str] = [],
         include_eos_baseline: bool = False,
+        attributed_fn: Union[str, Callable[..., SingleScorePerStepTensor], None] = None,
         device: Optional[str] = None,
         batch_size: Optional[int] = None,
         **kwargs,
@@ -142,6 +156,7 @@ class AttributionModel(ABC, torch.nn.Module):
             attribute_target=attribute_target,
             step_scores=step_scores,
             include_eos_baseline=include_eos_baseline,
+            attributed_fn=attributed_fn,
             **attribution_args,
         )
         attribution_output = FeatureAttributionOutput.merge_attributions(attribution_outputs)
