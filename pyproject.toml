@@ -57,6 +57,7 @@ scipy = "^1.8.1"
 matplotlib = "^3.5.2"
 tqdm = "^4.64.0"
 ipywidgets = "^7.6.5"
+poethepoet = "^0.13.1"
 
 scikit-learn = { version = "^1.0", optional = true }
 datasets = { version = "^2.0.0", optional = true, extras = ["torch"] }
@@ -71,7 +72,6 @@ isort = {extras = ["colors"], version = "^5.10.1"}
 mypy = "^0.910"
 mypy-extensions = "^0.4.3"
 pre-commit = "^2.19.0"
-poethepoet = "^0.13.1"
 pydocstyle = "^6.1.1"
 pylint = "^2.14.1"
 pytest = "^6.2.5"
@@ -95,6 +95,7 @@ all = [
 ]
 
 [tool.poe.tasks]
+upgrade-pip = "python -m pip install --upgrade pip"
 torch-cpu = "python -m pip install torch==1.11.0+cpu -f https://download.pytorch.org/whl/torch_stable.html"
 torch-cuda11 = "python -m pip install torch==1.11.0+cu113 -f https://download.pytorch.org/whl/torch_stable.html"
 

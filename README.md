@@ -12,6 +12,22 @@
 
 </div>
 
+## Installation
+
+To install the package, clone the repository and run the following commands:
+
+```bash
+cd inseq
+make poetry-download # Download and install the Poetry package manager
+make install # Installs the package and all dependencies
+```
+
+If you have a GPU available, use `make install-gpu` to install the latest `torch` version with GPU support.
+
+For library developers, you can use the `make install-dev` command to install and its GPU-friendly counterpart `make install-dev-gpu` to install all development dependencies (quality, docs, extras).
+
+After installation, you should be able to run `make fast-test` and `make lint` without errors.
+
 ## Example usage in Python
 
 This example uses the Integrated Gradients attribution method to attribute the English-French translation of a sentence taken from the WinoMT corpus:
