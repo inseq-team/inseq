@@ -76,6 +76,28 @@ def probits2probs(probits: FullLogitsTensor, target_ids: TargetIdsTensor) -> Sin
     return probits.gather(-1, target_ids).squeeze(-1)
 
 
+@torch.no_grad()
+def probits2ce(probits: FullLogitsTensor, target_ids: TargetIdsTensor) -> SingleScorePerStepTensor:
+    """
+    Compute the scores of the target_ids from the probits.
+    The scores are computed as the cross entropy between the target_ids and the probits.
+    See: https://github.com/ZurichNLP/nmtscore/blob/master/src/nmtscore/models/m2m100.py#L99
+    """
+    return -torch.log2(probits2probs(probits, target_ids))
+
+
+@torch.no_grad()
+def probits2ppl(probits: FullLogitsTensor, target_ids: TargetIdsTensor) -> SingleScorePerStepTensor:
+    """
+    Compute perplexity of the target_ids from the probits.
+    Perplexity is the weighted branching factor. If we have a perplexity of 100,
+    it means that whenever the model is trying to guess the next word it is as
+    confused as if it had to pick between 100 words.
+    Reference: https://chiaracampagnola.io/2020/05/17/perplexity-in-language-models/
+    """
+    return 2 ** probits2ce(probits, target_ids)
+
+
 def aggregate_contiguous(
     t: torch.Tensor,
     spans: Sequence[Tuple[int, int]],
@@ -106,8 +128,12 @@ def abs_max(t: torch.Tensor) -> torch.Tensor:
     return t.gather(1, t.abs().argmax(dim=1).unsqueeze(1))
 
 
-def prod(t: torch.Tensor) -> torch.Tensor:
+def prod_fn(t: torch.Tensor) -> torch.Tensor:
     return t.prod(dim=1, keepdim=True)
+
+
+def sum_fn(t: torch.Tensor) -> torch.Tensor:
+    return t.sum(dim=1, keepdim=True)
 
 
 def get_sequences_from_batched_steps(

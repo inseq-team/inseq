@@ -1,18 +1,28 @@
-from typing import List, Optional, Tuple
+from typing import Callable, Dict, List, Optional, Tuple
 
 import math
 
-from ...data.attribution import FeatureAttributionStepOutput
+import torch
+
+from ...data.attribution import DEFAULT_ATTRIBUTION_AGGREGATE_DICT, FeatureAttributionStepOutput
 from ...data.batch import EncoderDecoderBatch
-from ...utils import probits2probs
+from ...utils import probits2ce, probits2ppl, probits2probs
 from ...utils.typing import (
     OneOrMoreAttributionSequences,
     OneOrMoreIdSequences,
     OneOrMoreTokenSequences,
+    SingleScorePerStepTensor,
     TargetIdsTensor,
     TextInput,
     TokenWithId,
 )
+
+
+STEP_SCORES_MAP = {
+    "probability": probits2probs,
+    "crossentropy": probits2ce,
+    "perplexity": probits2ppl,
+}
 
 
 def tok2string(
@@ -103,8 +113,11 @@ def check_attribute_positions(
     return attr_pos_start, attr_pos_end
 
 
-def get_step_prediction_probabilities(
-    attribution_model: "AttributionModel", batch: EncoderDecoderBatch, target_ids: TargetIdsTensor
+def get_step_scores(
+    attribution_model: "AttributionModel",
+    batch: EncoderDecoderBatch,
+    target_ids: TargetIdsTensor,
+    score_identifier: str = "probability",
 ) -> float:
     """
     Returns the probabilities of the target tokens.
@@ -118,7 +131,7 @@ def get_step_prediction_probabilities(
         decoder_attention_mask=batch.targets.attention_mask,
         use_embeddings=True,
     )
-    return probits2probs(probits, target_ids)
+    return STEP_SCORES_MAP[score_identifier](probits, target_ids)
 
 
 def join_token_ids(tokens: OneOrMoreTokenSequences, ids: OneOrMoreIdSequences) -> List[TokenWithId]:
@@ -151,3 +164,39 @@ def enrich_step_output(
     step_output.target = [[TokenWithId(token[0], id)] for token, id in zip(target_tokens, target_ids.tolist())]
     step_output.prefix = join_token_ids(batch.targets.input_tokens, batch.targets.input_ids.tolist())
     return step_output
+
+
+def list_step_scores() -> List[str]:
+    """
+    Returns a list of all available step scores.
+    """
+    return list(STEP_SCORES_MAP.keys())
+
+
+def register_step_score(
+    fn: Callable[["AttributionModel", EncoderDecoderBatch, TargetIdsTensor], SingleScorePerStepTensor],
+    identifier: str,
+    aggregate_map: Optional[Dict[str, Callable[[torch.Tensor], torch.Tensor]]] = None,
+) -> None:
+    """
+    Registers a function to be used to compute step scores and store them in the FeatureAttributionOutput object.
+
+    Args:
+        fn (:obj:`callable`): The function to be used to compute step scores. It must accept three parameters: an
+            :class:`~inseq.models.AttributionModel` instance, an :class:`~inseq.data.EncoderDecoderBatch` instance and
+            a :obj:`torch.Tensor` of target token ids of size `(batch_size,)` and type long.
+            Returns a :obj:`torch.Tensor` of size `(batch_size,)` of float or long.
+        identifier (:obj:`str`): The identifier that will be used for the registered step score.
+        aggregate_map (:obj:`dict`, `optional`): An optional dictionary mapping from :class:`~inseq.data.Aggregator`
+            name identifiers to functions taking in input a tensor of shape `(batch_size, seq_len)` and producing
+            tensors of shape `(batch_size, aggregated_seq_len)` in output that will be used to aggregate the
+            registered step score when used in conjunction with the corresponding aggregator. E.g. the `probability`
+            step score uses the aggregate_map `{"span_aggregate": lambda x: t.prod(dim=1, keepdim=True)}` to aggregate
+            probabilities with a product when aggregating scores over spans.
+    """
+    STEP_SCORES_MAP[identifier] = fn
+    if isinstance(aggregate_map, dict):
+        for agg_name, agg_fn in aggregate_map.items():
+            if agg_name not in DEFAULT_ATTRIBUTION_AGGREGATE_DICT["step_scores"]:
+                DEFAULT_ATTRIBUTION_AGGREGATE_DICT["step_scores"][agg_name] = {}
+            DEFAULT_ATTRIBUTION_AGGREGATE_DICT["step_scores"][agg_name][identifier] = agg_fn

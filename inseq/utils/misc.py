@@ -60,6 +60,8 @@ def _pretty_list(l: Optional[Sequence[Any]], lpad: int = 8) -> str:
 def pretty_list(l: Optional[Sequence[Any]], lpad: int = 8) -> str:
     if l is None:
         return "None"
+    if len(l) == 0:
+        return "list with 0 elements"
     out_txt = f"list with {len(l)} elements of type {l[0].__class__.__name__}"
     if all([isinstance(x, list) for x in l]):
         out_txt = f"list with {len(l)} sub-lists"

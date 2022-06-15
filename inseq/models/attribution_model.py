@@ -98,9 +98,10 @@ class AttributionModel(ABC, torch.nn.Module):
         pretty_progress: bool = True,
         output_step_attributions: bool = False,
         attribute_target: bool = False,
-        output_step_probabilities: bool = False,
+        step_scores: List[str] = [],
         include_eos_baseline: bool = False,
         device: Optional[str] = None,
+        batch_size: Optional[int] = None,
         **kwargs,
     ) -> FeatureAttributionOutput:
         """Perform attribution for one or multiple texts."""
@@ -110,6 +111,9 @@ class AttributionModel(ABC, torch.nn.Module):
             original_device = self.device
             self.device = device
         input_texts, generated_texts = format_input_texts(input_texts, generated_texts)
+        if batch_size is not None:
+            n_batches = len(input_texts) // batch_size + ((len(input_texts) % batch_size) > 0)
+            logger.info(f"Splitting input texts into {n_batches} batches of size {batch_size}.")
         constrained_decoding = generated_texts is not None
         orig_input_texts = input_texts
         if not constrained_decoding:
@@ -126,19 +130,21 @@ class AttributionModel(ABC, torch.nn.Module):
         if isnotebook():
             logger.debug("Pretty progress currently not supported in notebooks, falling back to tqdm.")
             pretty_progress = False
-        attribution_output = attribution_method.prepare_and_attribute(
+        attribution_outputs = attribution_method.prepare_and_attribute(
             input_texts,
             generated_texts,
+            batch_size=batch_size,
             attr_pos_start=attr_pos_start,
             attr_pos_end=attr_pos_end,
             show_progress=show_progress,
             pretty_progress=pretty_progress,
             output_step_attributions=output_step_attributions,
             attribute_target=attribute_target,
-            output_step_probabilities=output_step_probabilities,
+            step_scores=step_scores,
             include_eos_baseline=include_eos_baseline,
             **attribution_args,
         )
+        attribution_output = FeatureAttributionOutput.merge_attributions(attribution_outputs)
         attribution_output.info["input_texts"] = orig_input_texts
         attribution_output.info["generated_texts"] = (
             [generated_texts] if isinstance(generated_texts, str) else generated_texts

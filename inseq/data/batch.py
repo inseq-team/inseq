@@ -30,11 +30,17 @@ class BatchEncoding(TensorWrapper):
     attention_mask: IdsTensor
     baseline_ids: Optional[IdsTensor]
 
+    def __len__(self) -> int:
+        return len(self.input_tokens)
+
 
 @dataclass(eq=False, repr=False)
 class BatchEmbedding(TensorWrapper):
     input_embeds: Optional[EmbeddingsTensor] = None
     baseline_embeds: Optional[EmbeddingsTensor] = None
+
+    def __len__(self) -> int:
+        return self.input_embeds.shape[0]
 
 
 @dataclass(eq=False, repr=False)

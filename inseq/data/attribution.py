@@ -12,8 +12,9 @@ from ..utils import (
     get_sequences_from_batched_steps,
     identity_fn,
     pretty_dict,
-    prod,
+    prod_fn,
     remap_from_filtered,
+    sum_fn,
     sum_normalize_attributions,
 )
 from ..utils.typing import (
@@ -34,6 +35,18 @@ from .data_utils import TensorWrapper
 
 
 FeatureAttributionInput = Union[TextInput, BatchEncoding, Batch]
+
+DEFAULT_ATTRIBUTION_AGGREGATE_DICT = {
+    "source_attributions": {"sequence_aggregate": identity_fn, "span_aggregate": abs_max},
+    "target_attributions": {"sequence_aggregate": identity_fn, "span_aggregate": abs_max},
+    "step_scores": {
+        "span_aggregate": {
+            "probability": prod_fn,
+            "crossentropy": sum_fn,
+            "perplexity": prod_fn,
+        }
+    },
+}
 
 
 @dataclass(eq=False, repr=False)
@@ -68,17 +81,12 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
     _dict_aggregate_fn: Dict[str, Any] = None
 
     def __post_init__(self):
+        aggregate_dict = DEFAULT_ATTRIBUTION_AGGREGATE_DICT
         if self._dict_aggregate_fn is None or self._dict_aggregate_fn == {}:
-            seq_agg_fn = identity_fn if len(self.source_attributions.shape) == 2 else sum_normalize_attributions
-            self._dict_aggregate_fn = {
-                "source_attributions": {"sequence_aggregate": seq_agg_fn, "span_aggregate": abs_max},
-                "target_attributions": {"sequence_aggregate": seq_agg_fn, "span_aggregate": abs_max},
-                "step_scores": {
-                    "span_aggregate": {
-                        "probabilities": prod,
-                    }
-                },
-            }
+            self._dict_aggregate_fn = aggregate_dict
+        elif isinstance(self._dict_aggregate_fn, dict):
+            aggregate_dict.update(self._dict_aggregate_fn)
+            self._dict_aggregate_fn = aggregate_dict
         if self._aggregator is None:
             self._aggregator = SequenceAttributionAggregator
 
@@ -250,7 +258,7 @@ class FeatureAttributionOutput:
         "include_eos_baseline",
         "model_class",
         "model_name",
-        "output_step_probabilities",
+        "step_scores",
         "prepend_bos_token",
         "tokenizer_class",
         "tokenizer_name",
@@ -363,16 +371,20 @@ class FeatureAttributionOutput:
         first = attributions[0]
         for match_field in cls._merge_match_info_fields:
             assert all(
-                attr.info[match_field] == first.info[match_field] for attr in attributions
+                attr.info[match_field] == first.info[match_field]
+                if match_field in first.info
+                else match_field not in attr.info
+                for attr in attributions
             ), f"Cannot merge: incompatible values for field {match_field}"
         out_info = first.info.copy()
-        out_info.update(
-            {
-                "attr_pos_end": max(attr.info["attr_pos_end"] for attr in attributions),
-                "generated_texts": [text for attr in attributions for text in attr.info["generated_texts"]],
-                "input_texts": [text for attr in attributions for text in attr.info["input_texts"]],
-            }
-        )
+        if "attr_pos_end" in first.info:
+            out_info.update({"attr_pos_end": max(attr.info["attr_pos_end"] for attr in attributions)})
+        if "generated_texts" in first.info:
+            out_info.update(
+                {"generated_texts": [text for attr in attributions for text in attr.info["generated_texts"]]}
+            )
+        if "input_texts" in first.info:
+            out_info.update({"input_texts": [text for attr in attributions for text in attr.info["input_texts"]]})
         return cls(
             sequence_attributions=[seqattr for attr in attributions for seqattr in attr.sequence_attributions],
             step_attributions=[stepattr for attr in attributions for stepattr in attr.step_attributions]
@@ -393,6 +405,8 @@ class GradientFeatureAttributionSequenceOutput(FeatureAttributionSequenceOutput)
 
     def __post_init__(self):
         super().__post_init__()
+        self._dict_aggregate_fn["source_attributions"]["sequence_aggregate"] = sum_normalize_attributions
+        self._dict_aggregate_fn["target_attributions"]["sequence_aggregate"] = sum_normalize_attributions
         if "deltas" not in self._dict_aggregate_fn["step_scores"]["span_aggregate"]:
             self._dict_aggregate_fn["step_scores"]["span_aggregate"]["deltas"] = abs_max
 
