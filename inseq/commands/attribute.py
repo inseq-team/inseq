@@ -29,7 +29,7 @@ class AttributeBaseArgs:
         },
     )
     step_scores: List[str] = field(
-        default=[], metadata={"alias": "-ss", "help": "Adds step scores to the attribution output."}
+        default_factory=list, metadata={"alias": "-ss", "help": "Adds step scores to the attribution output."}
     )
     output_step_attributions: bool = field(
         default=False, metadata={"alias": "-sa", "help": "Adds step-level feature attributions to the output."}
