@@ -5,6 +5,7 @@ from .import_utils import (
     is_captum_available,
     is_datasets_available,
     is_ipywidgets_available,
+    is_joblib_available,
     is_scikitlearn_available,
     is_sentencepiece_available,
     is_transformers_available,
@@ -82,4 +83,5 @@ __all__ = [
     "is_sentencepiece_available",
     "is_datasets_available",
     "is_captum_available",
+    "is_joblib_available",
 ]
