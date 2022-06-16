@@ -1,5 +1,5 @@
 """ HuggingFace Seq2seq model """
-from typing import Callable, List, NoReturn, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, NoReturn, Optional, Tuple, Union
 
 import logging
 
@@ -130,7 +130,7 @@ class HuggingfaceModel(AttributionModel):
         encoder_attention_mask: Optional[IdsTensor] = None,
         decoder_attention_mask: Optional[IdsTensor] = None,
         use_embeddings: bool = True,
-        **kwargs,
+        attributed_fn_args: Dict[str, Any] = {},
     ) -> FullLogitsTensor:
         target_ids = target_ids.squeeze(-1)
         encoder_embeds = encoder_tensors if use_embeddings else None
@@ -153,7 +153,7 @@ class HuggingfaceModel(AttributionModel):
             target_ids=target_ids,
             encoder_attention_mask=encoder_attention_mask,
             decoder_attention_mask=decoder_attention_mask,
-            **kwargs,
+            **attributed_fn_args,
         )
 
     @unhooked

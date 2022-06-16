@@ -548,16 +548,13 @@ class FeatureAttribution(Registry):
                 # Defines how to treat source and target tensors
                 # Maps on the use_embeddings argument of forward
                 not self.is_layer_attribution,
+                attributed_fn_args,
             ),
         }
         if not attribute_target:
             attribute_fn_args["additional_forward_args"] = (batch.targets.input_embeds,) + attribute_fn_args[
                 "additional_forward_args"
             ]
-        if len(attributed_fn_args.keys()) > 0:
-            attribute_fn_args["additional_forward_args"] = attribute_fn_args["additional_forward_args"] + tuple(
-                attributed_fn_args.values()
-            )
         if self.use_baseline:
             attribute_fn_args["baselines"] = baselines
         return attribute_fn_args
