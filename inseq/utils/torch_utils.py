@@ -7,7 +7,6 @@ import torch.nn.functional as F
 from torchtyping import TensorType
 
 from .typing import (
-    FullLogitsTensor,
     GranularSequenceAttributionTensor,
     SingleScorePerStepTensor,
     TargetIdsTensor,
@@ -64,10 +63,13 @@ def euclidean_distance(vec_a: torch.Tensor, vec_b: torch.Tensor) -> float:
     return (vec_a - vec_b).pow(2).sum(-1).sqrt()
 
 
-def logits2prob(logits: FullLogitsTensor, target_ids: TargetIdsTensor) -> SingleScorePerStepTensor:
+def output2prob(
+    attribution_model: "AttributionModel", forward_output, target_ids: TargetIdsTensor, **kwargs
+) -> SingleScorePerStepTensor:
     """
     Compute the probabilty of target_ids from the logits.
     """
+    logits = attribution_model.output2logits(forward_output)
     target_ids = target_ids.reshape(logits.shape[0], 1)
     logits = torch.softmax(logits, dim=-1)
     # Extracts the ith score from the softmax output over the vocabulary (dim -1 of the logits)
@@ -75,26 +77,34 @@ def logits2prob(logits: FullLogitsTensor, target_ids: TargetIdsTensor) -> Single
     return logits.gather(-1, target_ids).squeeze(-1)
 
 
-def logits2ent(logits: FullLogitsTensor, target_ids: TargetIdsTensor) -> SingleScorePerStepTensor:
+def output2ent(
+    attribution_model: "AttributionModel", forward_output, target_ids: TargetIdsTensor = None, **kwargs
+) -> SingleScorePerStepTensor:
     """
     Compute the entropy of the outputs from the logits.
-    Target id is not used in the computation, but kept for consistency with the other functions.
+    Target id is not used in the computation, but kept for consistency with
+    the other functions.
     """
+    logits = attribution_model.output2logits(forward_output)
     out = torch.distributions.Categorical(logits=logits).entropy()
     if len(out.shape) > 1:
         out = out.squeeze(-1)
     return out
 
 
-def logits2ce(logits: FullLogitsTensor, target_ids: TargetIdsTensor) -> SingleScorePerStepTensor:
+def output2ce(
+    attribution_model: "AttributionModel", forward_output, target_ids: TargetIdsTensor, **kwargs
+) -> SingleScorePerStepTensor:
     """
     Compute the cross entropy between the target_ids and the logits.
     See: https://github.com/ZurichNLP/nmtscore/blob/master/src/nmtscore/models/m2m100.py#L99
     """
-    return -torch.log2(logits2prob(logits, target_ids))
+    return -torch.log2(output2prob(attribution_model, forward_output, target_ids))
 
 
-def logits2ppl(logits: FullLogitsTensor, target_ids: TargetIdsTensor) -> SingleScorePerStepTensor:
+def output2ppl(
+    attribution_model: "AttributionModel", forward_output, target_ids: TargetIdsTensor, **kwargs
+) -> SingleScorePerStepTensor:
     """
     Compute perplexity of the target_ids from the logits.
     Perplexity is the weighted branching factor. If we have a perplexity of 100,
@@ -102,7 +112,7 @@ def logits2ppl(logits: FullLogitsTensor, target_ids: TargetIdsTensor) -> SingleS
     confused as if it had to pick between 100 words.
     Reference: https://chiaracampagnola.io/2020/05/17/perplexity-in-language-models/
     """
-    return 2 ** logits2ce(logits, target_ids)
+    return 2 ** output2ce(attribution_model, forward_output, target_ids)
 
 
 def aggregate_contiguous(

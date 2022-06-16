@@ -1,4 +1,4 @@
-from .attribution_utils import STEP_SCORES_MAP, default_attributed_fn_factory, list_step_scores, register_step_score
+from .attribution_utils import STEP_SCORES_MAP, list_step_scores, register_step_score
 from .feature_attribution import FeatureAttribution, list_feature_attribution_methods
 from .gradient_attribution import (
     DeepLiftAttribution,
@@ -28,5 +28,4 @@ __all__ = [
     "LayerIntegratedGradientsAttribution",
     "LayerGradientXActivationAttribution",
     "LayerDeepLiftAttribution",
-    "default_attributed_fn_factory",
 ]

@@ -1,7 +1,7 @@
-from typing import Any, Callable, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import logging
-from abc import ABC, abstractmethod
+from abc import ABC, abstractmethod, abstractstaticmethod
 
 import torch
 from rich.status import Status
@@ -9,9 +9,10 @@ from rich.status import Status
 from ..attr import STEP_SCORES_MAP
 from ..attr.feat.feature_attribution import FeatureAttribution
 from ..data import BatchEncoding, FeatureAttributionOutput
-from ..utils import MissingAttributionMethodError, format_input_texts, isnotebook
+from ..utils import MissingAttributionMethodError, extract_signature_args, format_input_texts, isnotebook
 from ..utils.typing import (
     EmbeddingsTensor,
+    FullLogitsTensor,
     IdsTensor,
     ModelIdentifier,
     OneOrMoreIdSequences,
@@ -24,6 +25,20 @@ from .model_decorators import unhooked
 
 
 logger = logging.getLogger(__name__)
+
+# Default arguments for custom attributed functions
+# in the AttributionModel.forward method.
+_DEFAULT_ATTRIBUTED_FN_ARGS = [
+    "attribution_model",
+    "forward_output",
+    "encoder_input_ids",
+    "decoder_input_ids",
+    "encoder_input_embeds",
+    "decoder_input_embeds",
+    "target_ids",
+    "encoder_attention_mask",
+    "decoder_attention_mask",
+]
 
 
 class AttributionModel(ABC, torch.nn.Module):
@@ -99,6 +114,37 @@ class AttributionModel(ABC, torch.nn.Module):
                 return FeatureAttribution.load(method, attribution_model=self)
         return self.attribution_method
 
+    def get_attributed_fn(
+        self, attributed_fn: Union[str, Callable[..., SingleScorePerStepTensor], None] = None
+    ) -> Callable[..., SingleScorePerStepTensor]:
+        if attributed_fn is None:
+            attributed_fn = self.default_attributed_fn_id
+        if isinstance(attributed_fn, str):
+            if attributed_fn not in STEP_SCORES_MAP:
+                raise ValueError(
+                    f"Unknown function: {attributed_fn}." "Register custom functions with inseq.register_step_score"
+                )
+            attributed_fn = STEP_SCORES_MAP[attributed_fn]
+        return attributed_fn
+
+    def extract_args(
+        self,
+        attribution_method: "FeatureAttribution",
+        attributed_fn: Callable[..., SingleScorePerStepTensor],
+        **kwargs,
+    ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+        attribution_args = kwargs.pop("attribution_args", {})
+        attributed_fn_args = kwargs.pop("attributed_fn_args", {})
+        extra_attribution_args, unused_args = attribution_method.get_attribution_args(**kwargs)
+        extra_attributed_fn_args, unused_args = extract_signature_args(
+            unused_args, attributed_fn, exclude_args=_DEFAULT_ATTRIBUTED_FN_ARGS, return_remaining=True
+        )
+        if unused_args:
+            logger.warning(f"Unused arguments during attribution: {unused_args}")
+        attribution_args.update(extra_attribution_args)
+        attributed_fn_args.update(extra_attributed_fn_args)
+        return attribution_args, attributed_fn_args
+
     def attribute(
         self,
         input_texts: TextInput,
@@ -113,6 +159,7 @@ class AttributionModel(ABC, torch.nn.Module):
         attribute_target: bool = False,
         step_scores: List[str] = [],
         include_eos_baseline: bool = False,
+        prepend_bos_token: bool = True,
         attributed_fn: Union[str, Callable[..., SingleScorePerStepTensor], None] = None,
         device: Optional[str] = None,
         batch_size: Optional[int] = None,
@@ -130,17 +177,16 @@ class AttributionModel(ABC, torch.nn.Module):
             logger.info(f"Splitting input texts into {n_batches} batches of size {batch_size}.")
         constrained_decoding = generated_texts is not None
         orig_input_texts = input_texts
+        # If constrained decoding is not enabled, we need to generate the
+        # generated texts from the input texts.
         if not constrained_decoding:
             input_texts = self.encode(input_texts, return_baseline=True, include_eos_baseline=include_eos_baseline)
             generation_args = kwargs.pop("generation_args", {})
             generated_texts = self.generate(input_texts, return_generation_output=False, **generation_args)
         logger.debug(f"reference_texts={generated_texts}")
         attribution_method = self.get_attribution_method(method, override_default_attribution)
-        attribution_args = kwargs.pop("attribution_args", {})
-        extra_attribution_args, unused_args = attribution_method.get_attribution_args(**kwargs)
-        if unused_args:
-            logger.warning(f"Unused arguments during attribution: {unused_args}")
-        attribution_args.update(extra_attribution_args)
+        attributed_fn = self.get_attributed_fn(attributed_fn)
+        attribution_args, attributed_fn_args = self.extract_args(attribution_method, attributed_fn, **kwargs)
         if isnotebook():
             logger.debug("Pretty progress currently not supported in notebooks, falling back to tqdm.")
             pretty_progress = False
@@ -156,14 +202,17 @@ class AttributionModel(ABC, torch.nn.Module):
             attribute_target=attribute_target,
             step_scores=step_scores,
             include_eos_baseline=include_eos_baseline,
+            prepend_bos_token=prepend_bos_token,
             attributed_fn=attributed_fn,
-            **attribution_args,
+            attribution_args=attribution_args,
+            attributed_fn_args=attributed_fn_args,
         )
         attribution_output = FeatureAttributionOutput.merge_attributions(attribution_outputs)
         attribution_output.info["input_texts"] = orig_input_texts
         attribution_output.info["generated_texts"] = (
             [generated_texts] if isinstance(generated_texts, str) else generated_texts
         )
+        attribution_output.info["generation_args"] = generation_args
         attribution_output.info["constrained_decoding"] = constrained_decoding
         if device is not None:
             self.device = original_device
@@ -187,6 +236,10 @@ class AttributionModel(ABC, torch.nn.Module):
         return_generation_output: Optional[bool] = False,
         **kwargs,
     ) -> Union[List[str], Tuple[List[str], Any]]:
+        pass
+
+    @abstractstaticmethod
+    def output2logits(forward_output) -> FullLogitsTensor:
         pass
 
     @abstractmethod

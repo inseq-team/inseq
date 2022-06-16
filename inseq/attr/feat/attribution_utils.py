@@ -6,9 +6,8 @@ import torch
 
 from ...data.attribution import DEFAULT_ATTRIBUTION_AGGREGATE_DICT, FeatureAttributionStepOutput
 from ...data.batch import EncoderDecoderBatch
-from ...utils import logits2ce, logits2ent, logits2ppl, logits2prob
+from ...utils import output2ce, output2ent, output2ppl, output2prob
 from ...utils.typing import (
-    IdsTensor,
     OneOrMoreAttributionSequences,
     OneOrMoreIdSequences,
     OneOrMoreTokenSequences,
@@ -20,10 +19,10 @@ from ...utils.typing import (
 
 
 STEP_SCORES_MAP = {
-    "probability": logits2prob,
-    "entropy": logits2ent,
-    "crossentropy": logits2ce,
-    "perplexity": logits2ppl,
+    "probability": output2prob,
+    "entropy": output2ent,
+    "crossentropy": output2ce,
+    "perplexity": output2ppl,
 }
 
 
@@ -133,10 +132,17 @@ def get_step_scores(
             attention_mask=batch.sources.attention_mask,
             decoder_attention_mask=batch.targets.attention_mask,
         )
-        # Full logits for last position of every sentence:
-        # (batch_size, tgt_seq_len, vocab_size) => (batch_size, vocab_size)
-        last_logits = output.logits[:, -1, :].squeeze(1)
-        return STEP_SCORES_MAP[score_identifier](last_logits, target_ids)
+        return STEP_SCORES_MAP[score_identifier](
+            attribution_model=attribution_model,
+            forward_output=output,
+            encoder_input_ids=batch.sources.input_ids,
+            decoder_input_ids=batch.targets.input_ids,
+            encoder_input_embeds=batch.sources.input_embeds,
+            decoder_input_embeds=batch.targets.input_embeds,
+            target_ids=target_ids,
+            encoder_attention_mask=batch.sources.attention_mask,
+            decoder_attention_mask=batch.targets.attention_mask,
+        )
 
 
 def join_token_ids(tokens: OneOrMoreTokenSequences, ids: OneOrMoreIdSequences) -> List[TokenWithId]:
@@ -205,14 +211,3 @@ def register_step_score(
             if agg_name not in DEFAULT_ATTRIBUTION_AGGREGATE_DICT["step_scores"]:
                 DEFAULT_ATTRIBUTION_AGGREGATE_DICT["step_scores"][agg_name] = {}
             DEFAULT_ATTRIBUTION_AGGREGATE_DICT["step_scores"][agg_name][identifier] = agg_fn
-
-
-def default_attributed_fn_factory(default_attributed_fn_id: str) -> Callable[..., SingleScorePerStepTensor]:
-    def default_attributed_fn(
-        forward_output,
-        target_ids: IdsTensor,
-        **kwargs,
-    ) -> SingleScorePerStepTensor:
-        return STEP_SCORES_MAP[default_attributed_fn_id](forward_output.logits[:, -1, :].squeeze(1), target_ids)
-
-    return default_attributed_fn

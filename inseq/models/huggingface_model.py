@@ -7,8 +7,8 @@ import torch
 from torch import long
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 from transformers.generation_utils import BeamSampleOutput, BeamSearchOutput, GreedySearchOutput, SampleOutput
+from transformers.modeling_outputs import Seq2SeqLMOutput
 
-from ..attr import default_attributed_fn_factory
 from ..data import BatchEncoding
 from ..utils import optional, pretty_tensor
 from ..utils.typing import (
@@ -122,40 +122,37 @@ class HuggingfaceModel(AttributionModel):
     def forward(
         self,
         encoder_tensors: AttributionForwardInputs,
-        decoder_embeds: AttributionForwardInputs,
+        decoder_input_embeds: AttributionForwardInputs,
+        encoder_input_ids: IdsTensor,
+        decoder_input_ids: IdsTensor,
         target_ids: ExpandedTargetIdsTensor,
+        attributed_fn: Callable[..., SingleScorePerStepTensor],
         encoder_attention_mask: Optional[IdsTensor] = None,
         decoder_attention_mask: Optional[IdsTensor] = None,
         use_embeddings: bool = True,
-        attributed_fn: Optional[Callable[..., SingleScorePerStepTensor]] = None,
         **kwargs,
     ) -> FullLogitsTensor:
         target_ids = target_ids.squeeze(-1)
-        if use_embeddings:
-            encoder_embeds = encoder_tensors
-            encoder_ids = None
-        else:
-            encoder_embeds = None
-            encoder_ids = encoder_tensors
-        if attributed_fn is None:
-            attributed_fn = default_attributed_fn_factory(self.default_attributed_fn_id)
+        encoder_embeds = encoder_tensors if use_embeddings else None
+        encoder_ids = None if use_embeddings else encoder_tensors
         output = self.model(
             input_ids=encoder_ids,
             inputs_embeds=encoder_embeds,
             attention_mask=encoder_attention_mask,
-            decoder_inputs_embeds=decoder_embeds,
+            decoder_inputs_embeds=decoder_input_embeds,
             decoder_attention_mask=decoder_attention_mask,
         )
         logger.debug(f"logits: {pretty_tensor(output.logits)}")
         return attributed_fn(
             attribution_model=self,
             forward_output=output,
-            input_ids=encoder_ids,
-            input_embeds=encoder_embeds,
-            attention_mask=encoder_attention_mask,
-            decoder_inputs_embeds=decoder_embeds,
-            decoder_attention_mask=decoder_attention_mask,
+            encoder_input_ids=encoder_input_ids,
+            decoder_input_ids=decoder_input_ids,
+            encoder_input_embeds=encoder_embeds,
+            decoder_input_embeds=decoder_input_embeds,
             target_ids=target_ids,
+            encoder_attention_mask=encoder_attention_mask,
+            decoder_attention_mask=decoder_attention_mask,
             **kwargs,
         )
 
@@ -185,6 +182,12 @@ class HuggingfaceModel(AttributionModel):
         if return_generation_output:
             return texts, generation_out
         return texts
+
+    @staticmethod
+    def output2logits(forward_output: Seq2SeqLMOutput) -> FullLogitsTensor:
+        # Full logits for last position of every sentence:
+        # (batch_size, tgt_seq_len, vocab_size) => (batch_size, vocab_size)
+        return forward_output.logits[:, -1, :].squeeze(1)
 
     def encode(
         self,
