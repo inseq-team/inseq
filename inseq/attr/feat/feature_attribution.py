@@ -22,6 +22,7 @@ from typing import Any, Callable, Dict, List, NoReturn, Optional, Tuple, Union
 import logging
 from abc import abstractmethod
 
+import torch
 from torchtyping import TensorType
 
 from ...data import (
@@ -371,6 +372,8 @@ class FeatureAttribution(Registry):
             method_name=self.method_name,
             show=show_progress,
             pretty=pretty_progress,
+            attr_pos_start=attr_pos_start,
+            attr_pos_end=attr_pos_end,
         )
         whitespace_indexes = find_char_indexes(targets, " ")
         attribution_outputs = []
@@ -401,6 +404,7 @@ class FeatureAttribution(Registry):
                 update_progress_bar(pbar, show=show_progress, pretty=pretty_progress)
         close_progress_bar(pbar, show=show_progress, pretty=pretty_progress)
         batch.to("cpu")
+        torch.cuda.empty_cache()
         return FeatureAttributionOutput(
             sequence_attributions=FeatureAttributionSequenceOutput.from_step_attributions(
                 attribution_outputs, self.attribution_model.pad_token, prepend_bos_token
@@ -462,7 +466,7 @@ class FeatureAttribution(Registry):
                 and target attributions of size `(batch_size, source_length)` and `(batch_size, prefix length)`.
                 (target optional if attribute_target=True), plus batch information and any step score present.
         """
-        orig_batch = batch.clone()
+        orig_batch = batch.clone().detach().to("cpu")
         orig_target_ids = target_ids.clone()
         is_filtered = False
         # Filter out finished sentences
@@ -501,12 +505,14 @@ class FeatureAttribution(Registry):
             step_output,
             orig_batch,
             self.attribution_model.convert_ids_to_tokens(orig_target_ids, skip_special_tokens=False),
-            orig_target_ids.squeeze().detach().cpu(),
+            orig_target_ids.squeeze().detach().to("cpu"),
         )
         # Reinsert finished sentences
         if target_attention_mask is not None and is_filtered:
             step_output.remap_from_filtered(target_attention_mask)
-        return step_output.detach().to("cpu")
+        step_output = step_output.detach().to("cpu")
+        torch.cuda.empty_cache()
+        return step_output
 
     def get_attribution_args(self, **kwargs) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         if hasattr(self, "method") and hasattr(self.method, "attribute"):

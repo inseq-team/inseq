@@ -179,9 +179,9 @@ class AttributionModel(ABC, torch.nn.Module):
         orig_input_texts = input_texts
         # If constrained decoding is not enabled, we need to generate the
         # generated texts from the input texts.
+        generation_args = kwargs.pop("generation_args", {})
         if not constrained_decoding:
             input_texts = self.encode(input_texts, return_baseline=True, include_eos_baseline=include_eos_baseline)
-            generation_args = kwargs.pop("generation_args", {})
             generated_texts = self.generate(input_texts, return_generation_output=False, **generation_args)
         logger.debug(f"reference_texts={generated_texts}")
         attribution_method = self.get_attribution_method(method, override_default_attribution)

@@ -250,14 +250,17 @@ def get_progress_bar(
     method_name: str,
     show: bool,
     pretty: bool,
+    attr_pos_start: int,
+    attr_pos_end: int,
 ) -> Union[tqdm, Tuple[Progress, Live], None]:
     sources, targets, lengths = all_sentences
     if not show:
         return None
     elif show and not pretty:
         return tqdm(
-            total=max(tgt_len for tgt_len in lengths),
+            total=attr_pos_end,
             desc=f"Attributing with {method_name}...",
+            initial=attr_pos_start,
         )
     elif show and pretty:
         job_progress = Progress(
