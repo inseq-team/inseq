@@ -12,7 +12,7 @@ help:
 	@echo "poetry-download : downloads and installs the poetry package manager"
 	@echo "poetry-remove   : removes the poetry package manager"
 	@echo "install         : installs required dependencies"
-	@echo "install-gpu"    : installs required dependencies, plus Torch GPU support"
+	@echo "install-gpu    : installs required dependencies, plus Torch GPU support"
 	@echo "install-dev     : installs the dev dependencies for the project"
 	@echo "install-dev-gpu : installs the dev dependencies for the project, plus Torch GPU support"
 	@echo "update-deps     : updates the dependencies and writes them to requirements.txt"
@@ -33,11 +33,11 @@ help:
 #* Poetry
 .PHONY: poetry-download
 poetry-download:
-	curl -sSL https://raw.githubusercontent.com/python-poetry/poetry/master/get-poetry.py | $(PYTHON) -
+	curl -sSL https://install.python-poetry.org | $(PYTHON) -
 
 .PHONY: poetry-remove
 poetry-remove:
-	curl -sSL https://raw.githubusercontent.com/python-poetry/poetry/master/get-poetry.py | $(PYTHON) - --uninstall
+	curl -sSL https://install.python-poetry.org | $(PYTHON) - --uninstall
 
 #* Installation
 
