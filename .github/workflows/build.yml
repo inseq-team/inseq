@@ -25,7 +25,7 @@ jobs:
     - name: Install poetry
       run: |
         make poetry-download
-        source $HOME/.poetry/env
+        export PATH="$HOME/.poetry/env:$PATH"
 
     - name: Set up cache
       uses: actions/cache@v3.0.1
