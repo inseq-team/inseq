@@ -12,7 +12,7 @@ help:
 	@echo "poetry-download : downloads and installs the poetry package manager"
 	@echo "poetry-remove   : removes the poetry package manager"
 	@echo "install         : installs required dependencies"
-	@echo "install-gpu"    : installs required dependencies, plus Torch GPU support"
+	@echo "install-gpu    : installs required dependencies, plus Torch GPU support"
 	@echo "install-dev     : installs the dev dependencies for the project"
 	@echo "install-dev-gpu : installs the dev dependencies for the project, plus Torch GPU support"
 	@echo "update-deps     : updates the dependencies and writes them to requirements.txt"
