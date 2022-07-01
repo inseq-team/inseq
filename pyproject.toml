@@ -46,7 +46,7 @@ classifiers = [  #! Update me
 python = ">=3.8,<3.11"
 
 rich = "^10.13.0"
-transformers =  { version = "^4.19.4", extras = ["sentencepiece", "tokenizers", "torch", "torchhub"] }
+transformers =  { version = "^4.20.1", extras = ["sentencepiece", "tokenizers", "torch", "torchhub"] }
 protobuf = "^3.20.1"
 captum = "^0.4.1"
 numpy = "^1.22.4"
