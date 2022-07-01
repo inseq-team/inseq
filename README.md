@@ -28,6 +28,14 @@ For library developers, you can use the `make install-dev` command to install an
 
 After installation, you should be able to run `make fast-test` and `make lint` without errors.
 
+<details>
+  <summary>FAQ Installation</summary>
+
+  - Installing the `tokenizers` package requires a Rust compiler installation. You can install Rust from [https://rustup.rs](https://rustup.rs) and add `$HOME/.cargo/env` to your PATH.
+
+  - Installing `sentencepiece` requires various packages, install with `sudo apt-get install cmake build-essential pkg-config` or `brew install cmake gperftools pkg-config`.
+</details>
+
 ## Example usage in Python
 
 This example uses the Integrated Gradients attribution method to attribute the English-French translation of a sentence taken from the WinoMT corpus:

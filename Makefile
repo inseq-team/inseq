@@ -33,11 +33,11 @@ help:
 #* Poetry
 .PHONY: poetry-download
 poetry-download:
-	curl -sSL https://raw.githubusercontent.com/python-poetry/poetry/master/install-poetry.py | $(PYTHON) -
+	curl -sSL https://raw.githubusercontent.com/python-poetry/poetry/master/get-poetry.py | $(PYTHON) -
 
 .PHONY: poetry-remove
 poetry-remove:
-	curl -sSL https://raw.githubusercontent.com/python-poetry/poetry/master/install-poetry.py | $(PYTHON) - --uninstall
+	curl -sSL https://raw.githubusercontent.com/python-poetry/poetry/master/get-poetry.py | $(PYTHON) - --uninstall
 
 #* Installation
 
@@ -65,7 +65,7 @@ install-dev-gpu: install-dev add-torch-gpu
 
 .PHONY: update-deps
 update-deps:
-	poetry lock && poetry export --without-hashes >'requirements.txt
+	poetry lock && poetry export --without-hashes > requirements.txt
 
 #* Linting
 .PHONY: check-style
@@ -131,7 +131,7 @@ docker-build:
 .PHONY: docker-remove
 docker-remove:
 	@echo Removing docker $(IMAGE):$(VERSION) ...
-	docker rmi -f $(IMAGE):$(VERSION)
+#	docker rmi -f $(IMAGE):$(VERSION)
 
 #* Cleaning
 .PHONY: pycache-remove
