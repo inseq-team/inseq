@@ -33,11 +33,11 @@ help:
 #* Poetry
 .PHONY: poetry-download
 poetry-download:
-	curl -sSL https://raw.githubusercontent.com/python-poetry/poetry/master/get-poetry.py | $(PYTHON) -
+	curl -sSL https://install.python-poetry.org | $(PYTHON) -
 
 .PHONY: poetry-remove
 poetry-remove:
-	curl -sSL https://raw.githubusercontent.com/python-poetry/poetry/master/get-poetry.py | $(PYTHON) - --uninstall
+	curl -sSL https://install.python-poetry.org | $(PYTHON) - --uninstall
 
 #* Installation
 
