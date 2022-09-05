@@ -1,4 +1,4 @@
-from typing import Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import math
 
@@ -119,7 +119,8 @@ def get_step_scores(
     batch: EncoderDecoderBatch,
     target_ids: TargetIdsTensor,
     score_identifier: str = "probability",
-) -> float:
+    step_scores_args: Dict[str, Any] = {},
+) -> SingleScorePerStepTensor:
     """
     Returns step scores for the target tokens.
     """
@@ -142,6 +143,7 @@ def get_step_scores(
             target_ids=target_ids,
             encoder_attention_mask=batch.sources.attention_mask,
             decoder_attention_mask=batch.targets.attention_mask,
+            **step_scores_args,
         )
 
 

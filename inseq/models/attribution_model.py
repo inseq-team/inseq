@@ -26,22 +26,23 @@ from .model_decorators import unhooked
 
 logger = logging.getLogger(__name__)
 
-# Default arguments for custom attributed functions
-# in the AttributionModel.forward method.
-_DEFAULT_ATTRIBUTED_FN_ARGS = [
-    "attribution_model",
-    "forward_output",
-    "encoder_input_ids",
-    "decoder_input_ids",
-    "encoder_input_embeds",
-    "decoder_input_embeds",
-    "target_ids",
-    "encoder_attention_mask",
-    "decoder_attention_mask",
-]
-
 
 class AttributionModel(ABC, torch.nn.Module):
+
+    # Default arguments for custom attributed functions
+    # in the AttributionModel.forward method.
+    _DEFAULT_ATTRIBUTED_FN_ARGS = [
+        "attribution_model",
+        "forward_output",
+        "encoder_input_ids",
+        "decoder_input_ids",
+        "encoder_input_embeds",
+        "decoder_input_embeds",
+        "target_ids",
+        "encoder_attention_mask",
+        "decoder_attention_mask",
+    ]
+
     def __init__(self, attribution_method: Optional[str] = None, device: str = None, **kwargs) -> None:
         super().__init__()
         if not hasattr(self, "model"):
@@ -131,19 +132,44 @@ class AttributionModel(ABC, torch.nn.Module):
         self,
         attribution_method: "FeatureAttribution",
         attributed_fn: Callable[..., SingleScorePerStepTensor],
+        step_scores: List[str],
         **kwargs,
     ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         attribution_args = kwargs.pop("attribution_args", {})
         attributed_fn_args = kwargs.pop("attributed_fn_args", {})
-        extra_attribution_args, unused_args = attribution_method.get_attribution_args(**kwargs)
-        extra_attributed_fn_args, unused_args = extract_signature_args(
-            unused_args, attributed_fn, exclude_args=_DEFAULT_ATTRIBUTED_FN_ARGS, return_remaining=True
+        step_scores_args = kwargs.pop("step_scores_args", {})
+        extra_attribution_args, attribution_unused_args = attribution_method.get_attribution_args(**kwargs)
+        extra_attributed_fn_args, attributed_fn_unused_args = extract_signature_args(
+            kwargs, attributed_fn, exclude_args=self._DEFAULT_ATTRIBUTED_FN_ARGS, return_remaining=True
         )
+        extra_step_scores_args = {}
+        for step_score in step_scores:
+            if step_score not in STEP_SCORES_MAP:
+                raise AttributeError(
+                    f"Step score {step_score} not found. Available step scores are: "
+                    f"{', '.join([x for x in STEP_SCORES_MAP.keys()])}. Use the inseq.register_step_score"
+                    f"function to register a custom step score."
+                )
+            extra_step_scores_args.update(
+                **extract_signature_args(
+                    kwargs,
+                    STEP_SCORES_MAP[step_score],
+                    exclude_args=self._DEFAULT_ATTRIBUTED_FN_ARGS,
+                    return_remaining=False,
+                )
+            )
+        step_scores_unused_args = {k: v for k, v in kwargs.items() if k not in extra_step_scores_args}
+        unused_args = {
+            k: v
+            for k, v in kwargs.items()
+            if k in attribution_unused_args.keys() & attributed_fn_unused_args.keys() & step_scores_unused_args.keys()
+        }
         if unused_args:
             logger.warning(f"Unused arguments during attribution: {unused_args}")
         attribution_args.update(extra_attribution_args)
         attributed_fn_args.update(extra_attributed_fn_args)
-        return attribution_args, attributed_fn_args
+        step_scores_args.update(extra_step_scores_args)
+        return attribution_args, attributed_fn_args, step_scores_args
 
     def attribute(
         self,
@@ -186,7 +212,9 @@ class AttributionModel(ABC, torch.nn.Module):
         logger.debug(f"reference_texts={generated_texts}")
         attribution_method = self.get_attribution_method(method, override_default_attribution)
         attributed_fn = self.get_attributed_fn(attributed_fn)
-        attribution_args, attributed_fn_args = self.extract_args(attribution_method, attributed_fn, **kwargs)
+        attribution_args, attributed_fn_args, step_scores_args = self.extract_args(
+            attribution_method, attributed_fn, step_scores, **kwargs
+        )
         if isnotebook():
             logger.debug("Pretty progress currently not supported in notebooks, falling back to tqdm.")
             pretty_progress = False
@@ -206,6 +234,7 @@ class AttributionModel(ABC, torch.nn.Module):
             attributed_fn=attributed_fn,
             attribution_args=attribution_args,
             attributed_fn_args=attributed_fn_args,
+            step_scores_args=step_scores_args,
         )
         attribution_output = FeatureAttributionOutput.merge_attributions(attribution_outputs)
         attribution_output.info["input_texts"] = orig_input_texts

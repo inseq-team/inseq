@@ -130,8 +130,10 @@ class HuggingfaceModel(AttributionModel):
         encoder_attention_mask: Optional[IdsTensor] = None,
         decoder_attention_mask: Optional[IdsTensor] = None,
         use_embeddings: bool = True,
-        attributed_fn_args: Dict[str, Any] = {},
+        attributed_fn_argnames: Optional[List[str]] = None,
+        *args,
     ) -> FullLogitsTensor:
+        assert len(args) == len(attributed_fn_argnames), "Number of arguments and number of argnames must match"
         target_ids = target_ids.squeeze(-1)
         encoder_embeds = encoder_tensors if use_embeddings else None
         encoder_ids = None if use_embeddings else encoder_tensors
@@ -153,7 +155,7 @@ class HuggingfaceModel(AttributionModel):
             target_ids=target_ids,
             encoder_attention_mask=encoder_attention_mask,
             decoder_attention_mask=decoder_attention_mask,
-            **attributed_fn_args,
+            **{k: v for k, v in zip(attributed_fn_argnames, args) if v is not None},
         )
 
     @unhooked
