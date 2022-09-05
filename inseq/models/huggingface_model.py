@@ -1,5 +1,5 @@
 """ HuggingFace Seq2seq model """
-from typing import Any, Callable, Dict, List, NoReturn, Optional, Tuple, Union
+from typing import Callable, List, NoReturn, Optional, Tuple, Union
 
 import logging
 
