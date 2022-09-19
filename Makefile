@@ -12,7 +12,7 @@ help:
 	@echo "poetry-download : downloads and installs the poetry package manager"
 	@echo "poetry-remove   : removes the poetry package manager"
 	@echo "install         : installs required dependencies"
-	@echo "install-gpu"    : installs required dependencies, plus Torch GPU support"
+	@echo "install-gpu    : installs required dependencies, plus Torch GPU support"
 	@echo "install-dev     : installs the dev dependencies for the project"
 	@echo "install-dev-gpu : installs the dev dependencies for the project, plus Torch GPU support"
 	@echo "update-deps     : updates the dependencies and writes them to requirements.txt"
@@ -33,11 +33,11 @@ help:
 #* Poetry
 .PHONY: poetry-download
 poetry-download:
-	curl -sSL https://raw.githubusercontent.com/python-poetry/poetry/master/install-poetry.py | $(PYTHON) -
+	curl -sSL https://install.python-poetry.org | $(PYTHON) -
 
 .PHONY: poetry-remove
 poetry-remove:
-	curl -sSL https://raw.githubusercontent.com/python-poetry/poetry/master/install-poetry.py | $(PYTHON) - --uninstall
+	curl -sSL https://install.python-poetry.org | $(PYTHON) - --uninstall
 
 #* Installation
 
@@ -65,7 +65,7 @@ install-dev-gpu: install-dev add-torch-gpu
 
 .PHONY: update-deps
 update-deps:
-	poetry lock && poetry export --without-hashes >'requirements.txt
+	poetry lock && poetry export --without-hashes > requirements.txt
 
 #* Linting
 .PHONY: check-style
@@ -131,7 +131,7 @@ docker-build:
 .PHONY: docker-remove
 docker-remove:
 	@echo Removing docker $(IMAGE):$(VERSION) ...
-	docker rmi -f $(IMAGE):$(VERSION)
+#	docker rmi -f $(IMAGE):$(VERSION)
 
 #* Cleaning
 .PHONY: pycache-remove
