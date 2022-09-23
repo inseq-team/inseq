@@ -31,9 +31,10 @@ After installation, you should be able to run `make fast-test` and `make lint` w
 <details>
   <summary>FAQ Installation</summary>
 
-  - Installing the `tokenizers` package requires a Rust compiler installation. You can install Rust from [https://rustup.rs](https://rustup.rs) and add `$HOME/.cargo/env` to your PATH.
+- Installing the `tokenizers` package requires a Rust compiler installation. You can install Rust from [https://rustup.rs](https://rustup.rs) and add `$HOME/.cargo/env` to your PATH.
 
-  - Installing `sentencepiece` requires various packages, install with `sudo apt-get install cmake build-essential pkg-config` or `brew install cmake gperftools pkg-config`.
+- Installing `sentencepiece` requires various packages, install with `sudo apt-get install cmake build-essential pkg-config` or `brew install cmake gperftools pkg-config`.
+
 </details>
 
 ## Example usage in Python
@@ -53,7 +54,6 @@ out.show()
 ```
 
 ![WinoMT Attribution Map](docs/source/images/heatmap_winomt.png)
-
 
 ## Using the Inseq client
 
@@ -84,7 +84,6 @@ inseq attribute-dataset \
 ### Dealing with minimal pairs
 
 Inseq support minimal pair analysis via the `PairAggregator` component. Here is an example of using `PairAggregator` to produce a heatmap containing the score difference between two `FeatureAttributionSequenceOutput` objects:
-
 
 ```python
 import inseq
