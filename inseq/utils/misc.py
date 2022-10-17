@@ -118,7 +118,7 @@ def extract_signature_args(
 
 
 def ordinal_str(n: int):
-    """Converts a number to and ordinal string."""
+    """Converts a number to an ordinal string."""
     return str(n) + {1: "st", 2: "nd", 3: "rd"}.get(4 if 10 <= n % 100 < 20 else n % 10, "th")
 
 

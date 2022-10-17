@@ -37,7 +37,7 @@ GenerationOutput = Union[
 
 
 class HuggingfaceModel(AttributionModel):
-    """Performs  attribution for any seq2seq model in the HuggingFace Hub.
+    """Performs attribution for any seq2seq model in the HuggingFace Hub.
 
     Attributes:
         model (AutoModelForSeq2SeqLM): the seq2seq model on which
@@ -85,6 +85,10 @@ class HuggingfaceModel(AttributionModel):
         model_kwargs = kwargs.pop("model_kwargs", {})
         tokenizer_inputs = kwargs.pop("tokenizer_inputs", {})
         tokenizer_kwargs = kwargs.pop("tokenizer_kwargs", {})
+
+        if "output_attentions" not in model_kwargs:
+            model_kwargs["output_attentions"] = True
+
         self.model = AutoModelForSeq2SeqLM.from_pretrained(model_name_or_path, *model_args, **model_kwargs)
         self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_name_or_path, *tokenizer_inputs, **tokenizer_kwargs)
         self.model_name = self.model.config.name_or_path
