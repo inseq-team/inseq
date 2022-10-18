@@ -99,6 +99,8 @@ Now that we have our custom attribution function, integrating it in Inseq is ver
 .. code-block:: python
 
     import inseq
+    from inseq.data.aggregator import AggregatorPipeline
+
 
     # Register the function defined above
     # Since outputs are still probabilities, contiguous tokens can still be aggregated using product
@@ -108,7 +110,7 @@ Now that we have our custom attribution function, integrating it in Inseq is ver
         aggregate_map={"span_aggregate": lambda x: x.prod(dim=1, keepdim=True)},
     )
 
-    attribution_model = inseq.load_model("Helsinki-NLP/opus-mt-en-it", "integrated_gradients")
+    attribution_model = inseq.load_model("Helsinki-NLP/opus-mt-en-it", "saliency")
 
     # Pre-compute ids and attention map for the contrastive target
     contrast = attribution_model.encode("Ho salutato la manager", as_targets=True, prepend_bos_token=True)
@@ -117,17 +119,21 @@ Now that we have our custom attribution function, integrating it in Inseq is ver
     # Regular (forced) target -> "Non posso crederci."
     # Contrastive target      -> "Non posso crederlo."
     # contrast_ids & contrast_attention_mask are kwargs defined in the function definition
-    out = saliency_mt_model.attribute(
+    out = attribution_model.attribute(
         "I said hi to the manager",
         "Ho salutato il manager",
-        n_steps=10,
         attributed_fn="contrast_logits_diff",
         contrast_ids=contrast.input_ids,
         contrast_attention_mask=contrast.attention_mask,
+        attribute_target=True,
         # We also visualize the step score
         step_scores=["contrast_logits_diff"]
     )
+
+    # Weight attribution scores by the difference in logits
+    out.weight_attributions("contrast_logits_diff")
     out.show()
+
 
 .. raw:: html
 
@@ -136,8 +142,9 @@ Now that we have our custom attribution function, integrating it in Inseq is ver
     </div>
 
 From this example, we see that the masculine Italian determiner "il" is 70% more likely than its feminine counterpart "la" before "manager",
-and that the model is mostly influenced by nouns and pronouns in the source, including the word manager itself. A textbook example of gender bias in machine translation!
-We can also see how the divergence between the two generations has almost no impact in the generation of what is left in the sentence.
+and that the model is mostly influenced by the word manager itself. A textbook example of gender bias in machine translation!
+We can also see how the divergence between the two generations has almost no impact on following tokens, if we weight them by the difference in log probabilities.
+
 
 .. note::
     The ``aggregate_map`` argument is useful to inform the library about which functions should be used when aggregating

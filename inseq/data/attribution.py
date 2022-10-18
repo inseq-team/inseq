@@ -186,6 +186,18 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
             maxmimum = max(maxmimum, float(self.target_attributions.max()))
         return maxmimum
 
+    def weight_attributions(self, step_score_id: str):
+        aggregated_attr = self.aggregate()
+        step_scores = self.step_scores[step_score_id].T.unsqueeze(1)
+        source_attr = aggregated_attr.source_attributions.float().T
+        self.source_attributions = (step_scores * source_attr).T
+        if self.target_attributions is not None:
+            target_attr = aggregated_attr.target_attributions.float().T
+            self.target_attributions = (step_scores * target_attr).T
+        print(step_scores.shape, source_attr.shape, target_attr.shape)
+        self._aggregator = AggregatorPipeline([])
+        return self
+
 
 @dataclass(eq=False, repr=False)
 class FeatureAttributionStepOutput(TensorWrapper):
@@ -392,6 +404,10 @@ class FeatureAttributionOutput:
             else None,
             info=out_info,
         )
+
+    def weight_attributions(self, step_score_id: str):
+        for i, attr in enumerate(self.sequence_attributions):
+            self.sequence_attributions[i] = attr.weight_attributions(step_score_id)
 
 
 # Gradient attribution classes
