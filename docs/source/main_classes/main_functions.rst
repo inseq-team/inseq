@@ -10,12 +10,22 @@
     an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
     specific language governing permissions and limitations under the License.
 
-Models
+Main Functions
 =======================================================================================================================
 
-.. autoclass:: inseq.models.AttributionModel
-    :members:
+The functions described in this section can be called from the top level of the `inseq` library and implement the base
+functionalities required for its usage.
 
+.. currentmodule:: inseq
 
-.. autoclass:: inseq.models.HuggingfaceModel
-    :members:
+.. autofunction:: get_version
+
+.. autofunction:: list_feature_attribution_methods
+
+.. autofunction:: list_step_scores
+
+.. autofunction:: load_model
+
+.. autofunction:: register_step_score
+
+.. autofunction:: show_attributions

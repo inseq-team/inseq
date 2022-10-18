@@ -631,6 +631,6 @@ class FeatureAttribution(Registry):
 
 def list_feature_attribution_methods():
     """
-    Lists all available feature attribution methods.
+    Lists identifiers for all available feature attribution methods.
     """
     return get_available_methods(FeatureAttribution)
