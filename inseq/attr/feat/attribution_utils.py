@@ -1,4 +1,4 @@
-from typing import Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import math
 
@@ -6,7 +6,7 @@ import torch
 
 from ...data.attribution import DEFAULT_ATTRIBUTION_AGGREGATE_DICT, FeatureAttributionStepOutput
 from ...data.batch import EncoderDecoderBatch
-from ...utils import probits2ce, probits2ppl, probits2probs
+from ...utils import output2ce, output2ent, output2ppl, output2prob
 from ...utils.typing import (
     OneOrMoreAttributionSequences,
     OneOrMoreIdSequences,
@@ -19,9 +19,10 @@ from ...utils.typing import (
 
 
 STEP_SCORES_MAP = {
-    "probability": probits2probs,
-    "crossentropy": probits2ce,
-    "perplexity": probits2ppl,
+    "probability": output2prob,
+    "entropy": output2ent,
+    "crossentropy": output2ce,
+    "perplexity": output2ppl,
 }
 
 
@@ -118,20 +119,32 @@ def get_step_scores(
     batch: EncoderDecoderBatch,
     target_ids: TargetIdsTensor,
     score_identifier: str = "probability",
-) -> float:
+    step_scores_args: Dict[str, Any] = {},
+) -> SingleScorePerStepTensor:
     """
-    Returns the probabilities of the target tokens.
+    Returns step scores for the target tokens.
     """
     if attribution_model is None:
         raise ValueError("Attribution model is not set.")
-    probits = attribution_model(
-        encoder_tensors=batch.sources.input_embeds,
-        decoder_embeds=batch.targets.input_embeds,
-        encoder_attention_mask=batch.sources.attention_mask,
-        decoder_attention_mask=batch.targets.attention_mask,
-        use_embeddings=True,
-    )
-    return STEP_SCORES_MAP[score_identifier](probits, target_ids)
+    with torch.no_grad():
+        output = attribution_model.model(
+            inputs_embeds=batch.sources.input_embeds,
+            decoder_inputs_embeds=batch.targets.input_embeds,
+            attention_mask=batch.sources.attention_mask,
+            decoder_attention_mask=batch.targets.attention_mask,
+        )
+        return STEP_SCORES_MAP[score_identifier](
+            attribution_model=attribution_model,
+            forward_output=output,
+            encoder_input_ids=batch.sources.input_ids,
+            decoder_input_ids=batch.targets.input_ids,
+            encoder_input_embeds=batch.sources.input_embeds,
+            decoder_input_embeds=batch.targets.input_embeds,
+            target_ids=target_ids,
+            encoder_attention_mask=batch.sources.attention_mask,
+            decoder_attention_mask=batch.targets.attention_mask,
+            **step_scores_args,
+        )
 
 
 def join_token_ids(tokens: OneOrMoreTokenSequences, ids: OneOrMoreIdSequences) -> List[TokenWithId]:
@@ -168,7 +181,7 @@ def enrich_step_output(
 
 def list_step_scores() -> List[str]:
     """
-    Returns a list of all available step scores.
+    Lists identifiers for all available step scores.
     """
     return list(STEP_SCORES_MAP.keys())
 
@@ -179,13 +192,31 @@ def register_step_score(
     aggregate_map: Optional[Dict[str, Callable[[torch.Tensor], torch.Tensor]]] = None,
 ) -> None:
     """
-    Registers a function to be used to compute step scores and store them in the FeatureAttributionOutput object.
+    Registers a function to be used to compute step scores and store them in the
+    :class:`~inseq.data.attribution.FeatureAttributionOutput` object. Registered step functions can also be used as
+    attribution targets by gradient-based feature attribution methods.
 
     Args:
-        fn (:obj:`callable`): The function to be used to compute step scores. It must accept three parameters: an
-            :class:`~inseq.models.AttributionModel` instance, an :class:`~inseq.data.EncoderDecoderBatch` instance and
-            a :obj:`torch.Tensor` of target token ids of size `(batch_size,)` and type long.
-            Returns a :obj:`torch.Tensor` of size `(batch_size,)` of float or long.
+        fn (:obj:`callable`): The function to be used to compute step scores. Default parameters (use kwargs to capture
+        unused ones when defining your function):
+
+            - :obj:`attribution_model`: an :class:`~inseq.models.AttributionModel` instance, corresponding to the model
+                used for computing the score.
+
+            - :obj:`forward_output`: the output of the forward pass from the attribution model.
+
+            - :obj:`encoder_input_ids`, :obj:`decoder_input_ids`, :obj:`encoder_input_embeds`,
+                :obj:`decoder_input_embeds`, :obj:`encoder_attention_mask`, :obj:`decoder_attention_mask`: all the
+                elements composing the :class:`~inseq.data.EncoderDecoderBatch` used as context of the model.
+
+            - :obj:`target_ids`: :obj:`torch.Tensor` of target token ids of size `(batch_size,)` and type long,
+                corresponding to the target predicted tokens for the next generation step.
+
+            The function can also define an arbitrary number of custom parameters that can later be provided directly
+            to the `model.attribute` function call, and it must return a :obj:`torch.Tensor` of size `(batch_size,)` of
+            float or long. If parameter names conflict with `model.attribute` ones, pass them as key-value pairs in the
+            :obj:`step_scores_args` dict parameter.
+
         identifier (:obj:`str`): The identifier that will be used for the registered step score.
         aggregate_map (:obj:`dict`, `optional`): An optional dictionary mapping from :class:`~inseq.data.Aggregator`
             name identifiers to functions taking in input a tensor of shape `(batch_size, seq_len)` and producing

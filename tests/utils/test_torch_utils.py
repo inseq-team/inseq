@@ -21,7 +21,7 @@ def test_pretty_tensor(tensor: torch.Tensor, output: str) -> None:
     assert pretty_tensor(tensor).startswith(output)
 
 
-def test_probits2probs():
+def test_probits2prob():
     # Test with batch of size > 1
     probits = torch.stack(
         [
