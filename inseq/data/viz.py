@@ -90,6 +90,7 @@ def show_attributions(
             curr_html += get_heatmap_type(attribution, html_colors[idx + 1], "Target", use_html=True)
         if display and isnotebook():
             from IPython.core.display import HTML, display
+
             display(HTML(curr_html))
         html_out += curr_html
         if not isnotebook():

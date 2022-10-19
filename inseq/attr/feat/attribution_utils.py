@@ -192,26 +192,30 @@ def register_step_score(
     aggregate_map: Optional[Dict[str, Callable[[torch.Tensor], torch.Tensor]]] = None,
 ) -> None:
     """
-    Registers a function to be used to compute step scores and store them in the :class:`~inseq.data.attribution.FeatureAttributionOutput`
-    object. Registered step functions can also be used as attribution targets by gradient-based feature attribution methods.
+    Registers a function to be used to compute step scores and store them in the
+    :class:`~inseq.data.attribution.FeatureAttributionOutput` object. Registered step functions can also be used as
+    attribution targets by gradient-based feature attribution methods.
 
     Args:
-        fn (:obj:`callable`): The function to be used to compute step scores. The following parameters are passed by default:
+        fn (:obj:`callable`): The function to be used to compute step scores. Default parameters (use kwargs to capture
+        unused ones when defining your function):
 
-            - `attribution_model`: an :class:`~inseq.models.AttributionModel` instance, corresponding to the model used for computing the score.
+            - :obj:`attribution_model`: an :class:`~inseq.models.AttributionModel` instance, corresponding to the model
+                used for computing the score.
 
-            - `forward_output`: the output of the forward pass from the attribution model.
+            - :obj:`forward_output`: the output of the forward pass from the attribution model.
 
-            - `encoder_input_ids`, `decoder_input_ids`, `encoder_input_embeds`, `decoder_input_embeds`, `encoder_attention_mask`,
-                `decoder_attention_mask`: all the elements composing the :class:`~inseq.data.EncoderDecoderBatch` used as context
-                of the model.
+            - :obj:`encoder_input_ids`, :obj:`decoder_input_ids`, :obj:`encoder_input_embeds`,
+                :obj:`decoder_input_embeds`, :obj:`encoder_attention_mask`, :obj:`decoder_attention_mask`: all the
+                elements composing the :class:`~inseq.data.EncoderDecoderBatch` used as context of the model.
 
-            - `target_ids`: :obj:`torch.Tensor` of target token ids of size `(batch_size,)` and type long, corresponding to the target
-                predicted tokens for the next generation step.
+            - :obj:`target_ids`: :obj:`torch.Tensor` of target token ids of size `(batch_size,)` and type long,
+                corresponding to the target predicted tokens for the next generation step.
 
-            The function can also define an arbitrary number of custom parameters that can later be provided directly to the `model.attribute`
-            function call, and it must return a :obj:`torch.Tensor` of size `(batch_size,)` of float or long.
-            If parameter names conflict with `model.attribute` ones, pass them as key-value pairs in the `step_scores_args` :obj:dict parameter.
+            The function can also define an arbitrary number of custom parameters that can later be provided directly
+            to the `model.attribute` function call, and it must return a :obj:`torch.Tensor` of size `(batch_size,)` of
+            float or long. If parameter names conflict with `model.attribute` ones, pass them as key-value pairs in the
+            :obj:`step_scores_args` dict parameter.
 
         identifier (:obj:`str`): The identifier that will be used for the registered step score.
         aggregate_map (:obj:`dict`, `optional`): An optional dictionary mapping from :class:`~inseq.data.Aggregator`

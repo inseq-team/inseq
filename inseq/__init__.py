@@ -8,9 +8,11 @@ from .models import AttributionModel, load_model
 def get_version() -> str:
     try:
         import pkg_resources
+
         return pkg_resources.get_distribution("inseq").version
     except pkg_resources.DistributionNotFound:
         return "unknown"
+
 
 __all__ = [
     "AttributionModel",

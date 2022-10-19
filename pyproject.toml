@@ -47,7 +47,7 @@ python = ">=3.8,<3.11"
 
 rich = "^10.13.0"
 transformers =  { version = "^4.20.1", extras = ["sentencepiece", "tokenizers", "torch", "torchhub"] }
-protobuf = "^3.20.1"
+protobuf = "^3.20.2"
 captum = "^0.5.0"
 numpy = "^1.22.4"
 torchtyping = "^0.1.4"
@@ -58,6 +58,7 @@ matplotlib = "^3.5.2"
 tqdm = "^4.64.0"
 ipywidgets = "^8.0.0rc2"
 poethepoet = "^0.13.1"
+joblib = "^1.2.0"
 
 scikit-learn = { version = "^1.1.1", optional = true }
 datasets = { version = "^2.3.2", optional = true, extras = ["torch"] }
