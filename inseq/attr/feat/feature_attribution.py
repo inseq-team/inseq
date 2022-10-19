@@ -21,6 +21,7 @@ from typing import Any, Callable, Dict, List, NoReturn, Optional, Tuple, Union
 
 import logging
 from abc import abstractmethod
+from datetime import datetime
 
 import torch
 from torchtyping import TensorType
@@ -359,6 +360,7 @@ class FeatureAttribution(Registry):
             raise ValueError(
                 "Layer attribution methods do not support attribute_target=True. Use regular ones instead."
             )
+        start = datetime.now()
         max_generated_length = batch.targets.input_ids.shape[1]
         attr_pos_start, attr_pos_end = check_attribute_positions(
             max_generated_length,
@@ -408,6 +410,7 @@ class FeatureAttribution(Registry):
         close_progress_bar(pbar, show=show_progress, pretty=pretty_progress)
         batch.to("cpu")
         torch.cuda.empty_cache()
+        end = datetime.now()
         return FeatureAttributionOutput(
             sequence_attributions=FeatureAttributionSequenceOutput.from_step_attributions(
                 attribution_outputs, self.attribution_model.pad_token, prepend_bos_token
@@ -424,6 +427,8 @@ class FeatureAttribution(Registry):
                 "output_step_attributions": output_step_attributions,
                 "attribute_target": attribute_target,
                 "step_scores": step_scores,
+                # Convert to datetime.timedelta as timedelta(seconds=exec_time)
+                "exec_time": (end - start).total_seconds(),
             },
         )
 
