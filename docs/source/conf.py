@@ -33,7 +33,7 @@ release = "0.2.0"
 
 
 # Prefix link to point to master, comment this during version release and uncomment below line
-extlinks = {"prefix_link": ("https://github.com/inseq-team/inseq/blob/master/%s", "")}
+extlinks = {"prefix_link": ("https://github.com/inseq-team/inseq/blob/master/%s", "version %s")}
 
 # -- General configuration ---------------------------------------------------
 
@@ -67,7 +67,10 @@ templates_path = ["_templates"]
 
 # The suffix(es) of source filenames.
 # You can specify multiple suffix as a list of string:
-#
+source_parsers = {
+    ".md": "recommonmark.parser.CommonMarkParser",
+}
+
 source_suffix = [".rst", ".md"]
 # source_suffix = '.rst'
 

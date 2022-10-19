@@ -47,11 +47,13 @@ Here is an example of using Inseq to attribute an English-to-Italian translation
     :caption: Using 🐛 Inseq
 
     examples/pair_comparison
+    examples/custom_attribute_target
 
 .. toctree::
-    :maxdepth: 4
+    :maxdepth: 3
     :caption: Main Classes
 
+    main_classes/main_functions
     main_classes/models
     main_classes/data_classes
     main_classes/feature_attribution

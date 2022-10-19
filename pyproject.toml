@@ -47,7 +47,7 @@ python = ">=3.8,<3.11"
 
 rich = "^10.13.0"
 transformers =  { version = "^4.20.1", extras = ["sentencepiece", "tokenizers", "torch", "torchhub"] }
-protobuf = "^3.20.1"
+protobuf = "^3.20.2"
 captum = "^0.5.0"
 numpy = "^1.22.4"
 torchtyping = "^0.1.4"
@@ -56,8 +56,9 @@ torch = "^1.12.0"
 scipy = "^1.8.1"
 matplotlib = "^3.5.2"
 tqdm = "^4.64.0"
-ipywidgets = "^7.6.5"
+ipywidgets = "^8.0.0rc2"
 poethepoet = "^0.13.1"
+joblib = "^1.2.0"
 
 scikit-learn = { version = "^1.1.1", optional = true }
 datasets = { version = "^2.3.2", optional = true, extras = ["torch"] }
@@ -79,12 +80,12 @@ pytest = "^6.2.5"
 pyupgrade = "^2.34.0"
 recommonmark = "^0.7.1"
 safety = "^1.10.3"
-sphinx = "^4.4.0"
+sphinx = "^5.3.0"
 sphinxemoji = "^0.2.0"
 sphinxext-opengraph = "^0.4.2"
 sphinx-copybutton = "^0.4.0"
 sphinx-gitstamp = "^0.3.2"
-sphinx-markdown-tables = "^0.0.15"
+sphinx-markdown-tables = "^0.0.17"
 sphinx-rtd-theme = "^1.0.0"
 
 [tool.poetry.extras]
@@ -98,7 +99,7 @@ all = [
 [tool.poe.tasks]
 upgrade-pip = "python -m pip install --upgrade pip"
 torch-cpu = "python -m pip install torch==1.12.0+cpu -f https://download.pytorch.org/whl/torch_stable.html"
-torch-cuda11 = "python -m pip install torch==1.12.0+cu113 -f https://download.pytorch.org/whl/torch_stable.html"
+torch-cuda11 = "python -m pip install torch --extra-index-url https://download.pytorch.org/whl/cu116"
 
 [tool.black]
 # https://github.com/psf/black

@@ -14,29 +14,17 @@ Feature Attribution
 =======================================================================================================================
 
 
-FeatureAttribution
------------------------------------------------------------------------------------------------------------------------
-
 .. autoclass:: inseq.attr.FeatureAttribution
     :members:
 
-
-Gradient Attribution
------------------------------------------------------------------------------------------------------------------------
 
 .. autoclass:: inseq.attr.feat.GradientAttribution
     :members:
 
 
-DeepLiftAttribution
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 .. autoclass:: inseq.attr.feat.DeepLiftAttribution
     :members:
 
-
-DiscretizedIntegratedGradientsAttribution
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. warning::
     The DiscretizedIntegratedGradientsAttribution class is currently not functioning and needs fixing.
@@ -45,22 +33,13 @@ DiscretizedIntegratedGradientsAttribution
     :members:
 
 
-IntegratedGradientsAttribution
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 .. autoclass:: inseq.attr.feat.IntegratedGradientsAttribution
     :members:
 
 
-InputXGradientAttribution
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 .. autoclass:: inseq.attr.feat.InputXGradientAttribution
     :members:
 
-
-SaliencyAttribution
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: inseq.attr.feat.SaliencyAttribution
     :members:
