@@ -5,7 +5,7 @@ import logging
 
 import torch
 from torch import long
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer, PreTrainedModel, PreTrainedTokenizerBase
 from transformers.generation_utils import BeamSampleOutput, BeamSearchOutput, GreedySearchOutput, SampleOutput
 from transformers.modeling_outputs import Seq2SeqLMOutput
 
@@ -40,84 +40,91 @@ GenerationOutput = Union[
 
 
 class HuggingfaceModel(AttributionModel):
-    """Performs  attribution for any seq2seq model in the HuggingFace Hub.
+    """Model wrapper for any ForCausalLM and ForConditionalGeneration model in the HuggingFace Hub used to enable
+    feature attribution. Corresponds to AutoModelForCausalLM and AutoModelForSeq2SeqLM auto classes.
 
     Attributes:
-        model (AutoModelForSeq2SeqLM): the seq2seq model on which
-            attribution is performed.
+        model (:obj:`transformers.AutoModelForSeq2SeqLM` or :obj:`transformers.AutoModelForSeq2SeqLM`):
+            the model on which attribution is performed.
         tokenizer (AutoTokenizer): the tokenizer associated to the model.
         device (str): the device on which the model is run (CPU or GPU).
-        pad_id (int): the id of the pad token.
-        eos_id (int): the id of the end of sequence token.
-        bos_id (int): the id of the beginning of sequence token.
-        encoder_int_embeds (InterpretableEmbeddingBase): the interpretable embedding
-            layer for the encoder.
-        decoder_int_embeds (InterpretableEmbeddingBase): the interpretable embedding
-            layer for the decoder.
-        encoder_embed_scale (float, optional): scale factor for encoder embeddings.
-        decoder_embed_scale (float, optional): scale factor for decoder embeddings.
+        encoder_int_embeds (InterpretableEmbeddingBase): the interpretable embedding layer for the encoder, used for
+            layer attribution methods in Captum.
+        decoder_int_embeds (InterpretableEmbeddingBase): the interpretable embedding layer for the decoder, used for
+            layer attribution methods in Captum.
+        embed_scale (float, optional): scale factor for embeddings.
     """
 
     def __init__(
         self,
-        model_name_or_path: str,
+        model: Union[str, PreTrainedModel],
         attribution_method: Optional[str] = None,
-        tokenizer_name_or_path: Optional[str] = None,
+        tokenizer: Union[str, PreTrainedTokenizerBase, None] = None,
         device: str = None,
         **kwargs,
     ) -> NoReturn:
         """
-        Initialize the AttributionModel with a Huggingface-compatible seq2seq model.
+        Initialize the AttributionModel with a Huggingface-compatible model.
         Performs the setup for model and embeddings.
 
         Args:
-            model_name_or_path (str): the name of the model in the
+            model (:obj:`str` or :obj:`transformers.PreTrainedModel`): the name of the model in the
                 Huggingface Hub or path to folder containing local model files.
-            tokenizer_name_or_path (str, optional): the name of the tokenizer in the
-                Huggingface Hub or path to folder containing local tokenizer files.
-                Default: use model_name_or_path value.
+            tokenizer (:obj:`str` or :obj:`transformers.PreTrainedTokenizerBase`, optional): the name of the tokenizer
+                in the Huggingface Hub or path to folder containing local tokenizer files.
+                Default: use model name.
             attribution_method (str, optional): The attribution method to use.
                 Passing it here reduces overhead on attribute call, since it is already
                 initialized.
             **kwargs: additional arguments for the model and the tokenizer.
         """
-        super().__init__(attribution_method, **kwargs)
-        if not tokenizer_name_or_path:
-            tokenizer_name_or_path = model_name_or_path
+        super().__init__(**kwargs)
         model_args = kwargs.pop("model_args", {})
         model_kwargs = kwargs.pop("model_kwargs", {})
+        if isinstance(model, PreTrainedModel):
+            self.model = model
+        else:
+            self.model = AutoModelForSeq2SeqLM.from_pretrained(model, *model_args, **model_kwargs)
+        self.model_name = self.model.config.name_or_path
+        self.tokenizer_name = tokenizer
+        if tokenizer is None:
+            tokenizer = model if isinstance(model, str) else self.model_name
+            if not tokenizer:
+                raise ValueError(
+                    "Unspecified tokenizer for model loaded from scratch. Use explicit identifier as tokenizer=<ID>"
+                    "during model loading."
+                )
         tokenizer_inputs = kwargs.pop("tokenizer_inputs", {})
         tokenizer_kwargs = kwargs.pop("tokenizer_kwargs", {})
-        self.model = AutoModelForSeq2SeqLM.from_pretrained(model_name_or_path, *model_args, **model_kwargs)
-        self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_name_or_path, *tokenizer_inputs, **tokenizer_kwargs)
-        self.model_name = self.model.config.name_or_path
-        self.tokenizer_name = tokenizer_name_or_path
-        self.pad_id = self.model.config.pad_token_id
-        self.unk_id = self.tokenizer.unk_token_id
-        self.eos_id = self.model.config.eos_token_id
-        self.bos_id = self.model.config.decoder_start_token_id
-        self.unk_token = self.tokenizer.unk_token
-        self.pad_token = self.tokenizer.convert_ids_to_tokens(self.pad_id)
-        self.eos_token = self.tokenizer.convert_ids_to_tokens(self.eos_id)
-        self.bos_token = self.tokenizer.convert_ids_to_tokens(self.bos_id)
-        self.encoder_embed_scale = 1.0
-        self.decoder_embed_scale = 1.0
+        if isinstance(tokenizer, PreTrainedTokenizerBase):
+            self.tokenizer = tokenizer
+        else:
+            self.tokenizer = AutoTokenizer.from_pretrained(tokenizer, *tokenizer_inputs, **tokenizer_kwargs)
+        self.pad_token = self.tokenizer.convert_ids_to_tokens(self.model.config.pad_token_id)
+        self.embed_scale = 1.0
         self.encoder_int_embeds = None
         self.decoder_int_embeds = None
         self.configure_embeddings_scale()
         self.setup(device, attribution_method, **kwargs)
 
     @classmethod
-    def load(cls, model_name_or_path: str, **kwargs):
-        return HuggingfaceModel(model_name_or_path, **kwargs)
+    def load(
+        cls,
+        model: Union[str, PreTrainedModel],
+        attribution_method: Optional[str] = None,
+        tokenizer: Union[str, PreTrainedTokenizerBase, None] = None,
+        device: str = None,
+        **kwargs,
+    ) -> "HuggingfaceModel":
+        return cls(model, attribution_method, tokenizer, device, **kwargs)
 
     def configure_embeddings_scale(self):
         encoder = self.model.get_encoder()
         decoder = self.model.get_decoder()
         if hasattr(encoder, "embed_scale"):
-            self.encoder_embed_scale = encoder.embed_scale
-        if hasattr(decoder, "embed_scale"):
-            self.decoder_embed_scale = decoder.embed_scale
+            self.embed_scale = encoder.embed_scale
+        if hasattr(decoder, "embed_scale") and decoder.embed_scale != self.embed_scale:
+            raise ValueError("Different encoder and decoder embed scales are not supported")
 
     def forward(
         self,
@@ -225,14 +232,16 @@ class HuggingfaceModel(AttributionModel):
         baseline_ids = None
         if return_baseline:
             if include_eos_baseline:
-                baseline_ids = torch.ones_like(batch["input_ids"]).long() * self.unk_id
+                baseline_ids = torch.ones_like(batch["input_ids"]).long() * self.tokenizer.unk_token_id
             else:
-                baseline_ids = batch["input_ids"].ne(self.eos_id).long() * self.unk_id
+                baseline_ids = (
+                    batch["input_ids"].ne(self.model.config.eos_token_id).long() * self.tokenizer.unk_token_id
+                )
         # We prepend a BOS token only when tokenizing target texts.
         if as_targets and prepend_bos_token:
             ones_mask = torch.ones((batch["input_ids"].shape[0], 1), device=self.device, dtype=long)
             batch["attention_mask"] = torch.cat((ones_mask, batch["attention_mask"]), dim=1)
-            bos_ids = ones_mask * self.bos_id
+            bos_ids = ones_mask * self.model.config.decoder_start_token_id
             batch["input_ids"] = torch.cat((bos_ids, batch["input_ids"]), dim=1)
             if return_baseline:
                 baseline_ids = torch.cat((bos_ids, baseline_ids), dim=1)
@@ -246,18 +255,18 @@ class HuggingfaceModel(AttributionModel):
     def encoder_embed_ids(self, ids: IdsTensor) -> EmbeddingsTensor:
         if self.encoder_int_embeds:
             embeddings = self.encoder_int_embeds.indices_to_embeddings(ids)
-            return embeddings * self.encoder_embed_scale
+            return embeddings * self.embed_scale
         else:
             embeddings = self.model.get_input_embeddings()
-            return embeddings(ids) * self.encoder_embed_scale
+            return embeddings(ids) * self.embed_scale
 
     def decoder_embed_ids(self, ids: IdsTensor) -> EmbeddingsTensor:
         if self.decoder_int_embeds:
             embeddings = self.decoder_int_embeds.indices_to_embeddings(ids)
-            return embeddings * self.decoder_embed_scale
+            return embeddings * self.embed_scale
         else:
             embeddings = self.model.get_input_embeddings()
-            return embeddings(ids) * self.decoder_embed_scale
+            return embeddings(ids) * self.embed_scale
 
     def convert_ids_to_tokens(
         self, ids: IdsTensor, skip_special_tokens: Optional[bool] = True

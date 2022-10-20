@@ -9,11 +9,12 @@ from rich.status import Status
 from ..attr import STEP_SCORES_MAP
 from ..attr.feat.feature_attribution import FeatureAttribution
 from ..data import BatchEncoding, FeatureAttributionOutput
-from ..utils import MissingAttributionMethodError, extract_signature_args, format_input_texts, isnotebook
+from ..utils import MissingAttributionMethodError, extract_signature_args, format_input_texts, isnotebook, optional
 from ..utils.typing import (
     EmbeddingsTensor,
     FullLogitsTensor,
     IdsTensor,
+    ModelClass,
     ModelIdentifier,
     OneOrMoreIdSequences,
     OneOrMoreTokenSequences,
@@ -43,11 +44,13 @@ class AttributionModel(ABC, torch.nn.Module):
         "decoder_attention_mask",
     ]
 
-    def __init__(self, attribution_method: Optional[str] = None, device: str = None, **kwargs) -> None:
+    def __init__(self, **kwargs) -> None:
         super().__init__()
         if not hasattr(self, "model"):
             self.model = None
             self.model_name = None
+        self.pad_token = None
+        self.embed_scale = None
         self._device = None
         self.attribution_method = None
         self.is_hooked = False
@@ -86,13 +89,14 @@ class AttributionModel(ABC, torch.nn.Module):
             raise ValueError(f"Unknown function: {fn}. Register custom functions with inseq.register_step_score")
         self._default_attributed_fn_id = fn
 
-    @staticmethod
+    @classmethod
     def load(
-        model_name_or_path: ModelIdentifier,
+        cls,
+        model: ModelIdentifier,
         attribution_method: Optional[str] = None,
         **kwargs,
-    ):
-        return load_model(model_name_or_path, attribution_method, **kwargs)
+    ) -> "AttributionModel":
+        return cls(model, attribution_method, **kwargs)
 
     def get_attribution_method(
         self,
@@ -349,19 +353,18 @@ class AttributionModel(ABC, torch.nn.Module):
 
 
 def load_model(
-    model_name_or_path: ModelIdentifier,
+    model: Union[ModelIdentifier, ModelClass],
     attribution_method: Optional[str] = None,
+    from_hf: bool = True,
     **kwargs,
 ):
     from .huggingface_model import HuggingfaceModel
 
-    from_hf = kwargs.pop("from_hf", None)
-    desc_id = ", ".join(model_name_or_path) if isinstance(model_name_or_path, tuple) else model_name_or_path
-    desc = f"Loading {desc_id}" + (
-        f" with {attribution_method} method..." if attribution_method else " without methods..."
-    )
-    with Status(desc):
+    model_name = model if isinstance(model, str) else "model"
+    method_desc = f"with {attribution_method} method..." if attribution_method else " without attribution methods..."
+    load_msg = f"Loading {model_name} {method_desc}"
+    with optional(isnotebook(), Status(load_msg), logger.info, msg=load_msg):
         if from_hf:
-            return HuggingfaceModel(model_name_or_path, attribution_method, **kwargs)
+            return HuggingfaceModel.load(model, attribution_method, **kwargs)
         else:  # Default behavior is using Huggingface
-            return HuggingfaceModel(model_name_or_path, attribution_method, **kwargs)
+            return HuggingfaceModel.load(model, attribution_method, **kwargs)

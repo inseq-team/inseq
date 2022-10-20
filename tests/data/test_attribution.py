@@ -1,11 +1,11 @@
 from pytest import fixture
 
-from inseq import AttributionModel, FeatureAttributionOutput
+from inseq import FeatureAttributionOutput, load_model
 
 
 @fixture(scope="session")
 def saliency_mt_model():
-    return AttributionModel.load("Helsinki-NLP/opus-mt-en-it", "saliency", device="cpu")
+    return load_model("Helsinki-NLP/opus-mt-en-it", "saliency", device="cpu")
 
 
 def test_save_load_attribution(tmp_path, saliency_mt_model):

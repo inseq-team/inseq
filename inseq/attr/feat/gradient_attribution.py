@@ -165,7 +165,7 @@ class DiscretizedIntegratedGradientsAttribution(GradientAttribution):
             self.attribution_model.model_name,
             vocabulary_embeddings=self.attribution_model.vocabulary_embeddings.detach(),
             special_tokens=self.attribution_model.special_tokens_ids,
-            embedding_scaling=self.attribution_model.encoder_embed_scale,
+            embedding_scaling=self.attribution_model.embed_scale,
             **load_kwargs,
         )
         super().hook(**other_kwargs)

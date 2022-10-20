@@ -134,7 +134,7 @@ class FeatureAttribution(Registry):
         Returns:
             :class:`~inseq.attr.feat.FeatureAttribution`: The loaded attribution method.
         """
-        from inseq import AttributionModel
+        from ...models import load_model
 
         if model_name_or_path is None == attribution_model is None:  # noqa
             raise RuntimeError(
@@ -142,7 +142,7 @@ class FeatureAttribution(Registry):
                 "must be defined when loading the attribution method."
             )
         if model_name_or_path:
-            attribution_model = AttributionModel.load(model_name_or_path)
+            attribution_model = load_model(model_name_or_path)
         methods = cls.available_classes()
         if method_name not in methods:
             raise UnknownAttributionMethodError(method_name)

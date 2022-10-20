@@ -21,11 +21,13 @@ def identity_fn(x, **kwargs):
 
 
 @contextmanager
-def optional(condition, context_manager):
+def optional(condition, context_manager, alternative_fn=None, **alternative_fn_kwargs):
     if condition:
         with context_manager:
             yield
     else:
+        if alternative_fn is not None:
+            alternative_fn(**alternative_fn_kwargs)
         yield
 
 

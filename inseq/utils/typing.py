@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 from torch import long
 from torchtyping import TensorType
+from transformers import PreTrainedModel
 
 
 TextInput = Union[str, Sequence[str]]
@@ -77,7 +78,8 @@ SequenceAttributionTensor = Union[GranularSequenceAttributionTensor, TokenSequen
 # For Huggingface it's a string identifier e.g. "t5-base", "Helsinki-NLP/opus-mt-en-it"
 # For Fairseq it's a tuple of strings containing repo and model name
 # e.g. ("pytorch/fairseq", "transformer.wmt14.en-fr")
-ModelIdentifier = Union[str, Tuple[str, str]]
+ModelIdentifier = str  # Union[str, Tuple[str, str]]
+ModelClass = PreTrainedModel
 
 AttributionForwardInputs = Union[IdsTensor, EmbeddingsTensor]
 AttributionForwardInputsPair = Union[
