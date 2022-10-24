@@ -1,7 +1,7 @@
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import logging
-from abc import ABC, abstractmethod, abstractstaticmethod
+from abc import ABC, abstractmethod
 
 import torch
 from rich.status import Status
@@ -175,6 +175,7 @@ class AttributionModel(ABC, torch.nn.Module):
         self,
         input_texts: TextInput,
         generated_texts: Optional[TextInput] = None,
+        generation_outputs: Optional[Dict] = {},
         method: Optional[str] = None,
         override_default_attribution: Optional[bool] = False,
         attr_pos_start: Optional[int] = 1,
@@ -208,12 +209,14 @@ class AttributionModel(ABC, torch.nn.Module):
         generation_args = kwargs.pop("generation_args", {})
         if not constrained_decoding:
             input_texts = self.encode(input_texts, return_baseline=True, include_eos_baseline=include_eos_baseline)
-            generated_texts = self.generate(input_texts, return_generation_output=False, **generation_args)
+            generated_texts, generation_outputs = self.generate(
+                input_texts, return_generation_output=True, **generation_args
+            )
         logger.debug(f"reference_texts={generated_texts}")
         attribution_method = self.get_attribution_method(method, override_default_attribution)
         attributed_fn = self.get_attributed_fn(attributed_fn)
         attribution_args, attributed_fn_args, step_scores_args = self.extract_args(
-            attribution_method, attributed_fn, step_scores, **kwargs
+            attribution_method, attributed_fn, step_scores, **generation_outputs, **kwargs
         )
         if isnotebook():
             logger.debug("Pretty progress currently not supported in notebooks, falling back to tqdm.")
@@ -267,12 +270,13 @@ class AttributionModel(ABC, torch.nn.Module):
     ) -> Union[List[str], Tuple[List[str], Any]]:
         pass
 
-    @abstractstaticmethod
+    @staticmethod
+    @abstractmethod
     def output2logits(forward_output) -> FullLogitsTensor:
         pass
 
     @abstractmethod
-    def encode(self, texts: TextInput, as_targets: Optional[bool] = False, *args) -> BatchEncoding:
+    def encode(self, texts: TextInput, as_targets: Optional[bool] = False, *args, **kwargs) -> BatchEncoding:
         pass
 
     @abstractmethod

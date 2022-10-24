@@ -109,7 +109,7 @@ class FeatureAttribution(Registry):
         cls,
         method_name: str,
         attribution_model=None,
-        model_name_or_path: ModelIdentifier = None,
+        model_name_or_path: Union[ModelIdentifier, None] = None,
         **kwargs,
     ) -> "FeatureAttribution":
         r"""
