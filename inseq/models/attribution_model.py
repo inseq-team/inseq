@@ -7,9 +7,9 @@ import torch
 from rich.status import Status
 
 from ..attr import STEP_SCORES_MAP
-from ..attr.feat.feature_attribution import FeatureAttribution
+from ..attr.feat import FeatureAttribution, extract_args
 from ..data import BatchEncoding, FeatureAttributionOutput
-from ..utils import MissingAttributionMethodError, extract_signature_args, format_input_texts, isnotebook, optional
+from ..utils import MissingAttributionMethodError, format_input_texts, isnotebook, optional
 from ..utils.typing import (
     EmbeddingsTensor,
     FullLogitsTensor,
@@ -89,6 +89,13 @@ class AttributionModel(ABC, torch.nn.Module):
             raise ValueError(f"Unknown function: {fn}. Register custom functions with inseq.register_step_score")
         self._default_attributed_fn_id = fn
 
+    @property
+    def info(self) -> Dict[str, str]:
+        return {
+            "model_name": self.model_name,
+            "model_class": self.model.__class__.__name__ if self.model is not None else None,
+        }
+
     @classmethod
     def load(
         cls,
@@ -132,49 +139,6 @@ class AttributionModel(ABC, torch.nn.Module):
             attributed_fn = STEP_SCORES_MAP[attributed_fn]
         return attributed_fn
 
-    def extract_args(
-        self,
-        attribution_method: "FeatureAttribution",
-        attributed_fn: Callable[..., SingleScorePerStepTensor],
-        step_scores: List[str],
-        **kwargs,
-    ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
-        attribution_args = kwargs.pop("attribution_args", {})
-        attributed_fn_args = kwargs.pop("attributed_fn_args", {})
-        step_scores_args = kwargs.pop("step_scores_args", {})
-        extra_attribution_args, attribution_unused_args = attribution_method.get_attribution_args(**kwargs)
-        extra_attributed_fn_args, attributed_fn_unused_args = extract_signature_args(
-            kwargs, attributed_fn, exclude_args=self._DEFAULT_ATTRIBUTED_FN_ARGS, return_remaining=True
-        )
-        extra_step_scores_args = {}
-        for step_score in step_scores:
-            if step_score not in STEP_SCORES_MAP:
-                raise AttributeError(
-                    f"Step score {step_score} not found. Available step scores are: "
-                    f"{', '.join([x for x in STEP_SCORES_MAP.keys()])}. Use the inseq.register_step_score"
-                    f"function to register a custom step score."
-                )
-            extra_step_scores_args.update(
-                **extract_signature_args(
-                    kwargs,
-                    STEP_SCORES_MAP[step_score],
-                    exclude_args=self._DEFAULT_ATTRIBUTED_FN_ARGS,
-                    return_remaining=False,
-                )
-            )
-        step_scores_unused_args = {k: v for k, v in kwargs.items() if k not in extra_step_scores_args}
-        unused_args = {
-            k: v
-            for k, v in kwargs.items()
-            if k in attribution_unused_args.keys() & attributed_fn_unused_args.keys() & step_scores_unused_args.keys()
-        }
-        if unused_args:
-            logger.warning(f"Unused arguments during attribution: {unused_args}")
-        attribution_args.update(extra_attribution_args)
-        attributed_fn_args.update(extra_attributed_fn_args)
-        step_scores_args.update(extra_step_scores_args)
-        return attribution_args, attributed_fn_args, step_scores_args
-
     def attribute(
         self,
         input_texts: TextInput,
@@ -216,8 +180,8 @@ class AttributionModel(ABC, torch.nn.Module):
         logger.debug(f"reference_texts={generated_texts}")
         attribution_method = self.get_attribution_method(method, override_default_attribution)
         attributed_fn = self.get_attributed_fn(attributed_fn)
-        attribution_args, attributed_fn_args, step_scores_args = self.extract_args(
-            attribution_method, attributed_fn, step_scores, **kwargs
+        attribution_args, attributed_fn_args, step_scores_args = extract_args(
+            attribution_method, attributed_fn, step_scores, default_args=self._DEFAULT_ATTRIBUTED_FN_ARGS, **kwargs
         )
         if isnotebook():
             logger.debug("Pretty progress currently not supported in notebooks, falling back to tqdm.")
@@ -257,9 +221,7 @@ class AttributionModel(ABC, torch.nn.Module):
         ):
             batch = self.encode(inputs, as_targets)
             inputs = batch.input_ids
-        if as_targets:
-            return self.decoder_embed_ids(inputs)
-        return self.encoder_embed_ids(inputs)
+        return self.embed_ids(inputs, as_targets=as_targets)
 
     @unhooked
     @abstractmethod
@@ -276,15 +238,11 @@ class AttributionModel(ABC, torch.nn.Module):
         pass
 
     @abstractmethod
-    def encode(self, texts: TextInput, as_targets: Optional[bool] = False, *args) -> BatchEncoding:
+    def encode(self, texts: TextInput, as_targets: bool = False, *args) -> BatchEncoding:
         pass
 
     @abstractmethod
-    def encoder_embed_ids(self, ids: IdsTensor) -> EmbeddingsTensor:
-        pass
-
-    @abstractmethod
-    def decoder_embed_ids(self, ids: IdsTensor) -> EmbeddingsTensor:
+    def embed_ids(self, ids: IdsTensor, as_targets: bool = False) -> EmbeddingsTensor:
         pass
 
     @abstractmethod
@@ -315,6 +273,7 @@ class AttributionModel(ABC, torch.nn.Module):
         pass
 
     @property
+    @abstractmethod
     def special_tokens(self) -> List[str]:
         pass
 
@@ -358,13 +317,13 @@ def load_model(
     from_hf: bool = True,
     **kwargs,
 ):
-    from .huggingface_model import HuggingfaceModel
+    from .huggingface_model import load_huggingface_model
 
     model_name = model if isinstance(model, str) else "model"
     method_desc = f"with {attribution_method} method..." if attribution_method else " without attribution methods..."
     load_msg = f"Loading {model_name} {method_desc}"
-    with optional(isnotebook(), Status(load_msg), logger.info, msg=load_msg):
+    with optional(not isnotebook(), Status(load_msg), logger.info, msg=load_msg):
         if from_hf:
-            return HuggingfaceModel.load(model, attribution_method, **kwargs)
+            return load_huggingface_model(model, attribution_method, **kwargs)
         else:  # Default behavior is using Huggingface
-            return HuggingfaceModel.load(model, attribution_method, **kwargs)
+            return load_huggingface_model(model, attribution_method, **kwargs)

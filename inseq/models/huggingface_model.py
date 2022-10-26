@@ -1,16 +1,24 @@
 """ HuggingFace Seq2seq model """
-from typing import Callable, List, NoReturn, Optional, Tuple, Union
+from typing import Callable, Dict, List, NoReturn, Optional, Tuple, Union
 
 import logging
+from abc import abstractmethod
 
 import torch
 from torch import long
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer, PreTrainedModel, PreTrainedTokenizerBase
+from transformers import (
+    AutoConfig,
+    AutoModelForCausalLM,
+    AutoModelForSeq2SeqLM,
+    AutoTokenizer,
+    PreTrainedModel,
+    PreTrainedTokenizerBase,
+)
 from transformers.generation_utils import BeamSampleOutput, BeamSearchOutput, GreedySearchOutput, SampleOutput
 from transformers.modeling_outputs import Seq2SeqLMOutput
 
 from ..data import BatchEncoding
-from ..utils import optional, pretty_tensor
+from ..utils import pretty_tensor
 from ..utils.typing import (
     AttributionForwardInputs,
     EmbeddingsTensor,
@@ -38,12 +46,17 @@ GenerationOutput = Union[
     torch.LongTensor,
 ]
 
+# Update if other model types are added
+SUPPORTED_AUTOCLASSES = [AutoModelForSeq2SeqLM, AutoModelForCausalLM]
+
 
 class HuggingfaceModel(AttributionModel):
-    """Model wrapper for any ForCausalLM and ForConditionalGeneration model in the HuggingFace Hub used to enable
+    """Model wrapper for any ForCausalLM and ForConditionalGeneration model on the HuggingFace Hub used to enable
     feature attribution. Corresponds to AutoModelForCausalLM and AutoModelForSeq2SeqLM auto classes.
 
     Attributes:
+        _autoclass (:obj:`Type[transformers.AutoModel`]): The HuggingFace model class to use for initialization.
+            Must be defined in subclasses.
         model (:obj:`transformers.AutoModelForSeq2SeqLM` or :obj:`transformers.AutoModelForSeq2SeqLM`):
             the model on which attribution is performed.
         tokenizer (AutoTokenizer): the tokenizer associated to the model.
@@ -54,6 +67,8 @@ class HuggingfaceModel(AttributionModel):
             layer attribution methods in Captum.
         embed_scale (float, optional): scale factor for embeddings.
     """
+
+    _autoclass = None
 
     def __init__(
         self,
@@ -79,14 +94,18 @@ class HuggingfaceModel(AttributionModel):
             **kwargs: additional arguments for the model and the tokenizer.
         """
         super().__init__(**kwargs)
+        if self._autoclass is None or self._autoclass not in SUPPORTED_AUTOCLASSES:
+            raise ValueError(
+                f"Invalid autoclass {self._autoclass}. Must be one of {[x.__name__ for x in SUPPORTED_AUTOCLASSES]}."
+            )
         model_args = kwargs.pop("model_args", {})
         model_kwargs = kwargs.pop("model_kwargs", {})
         if isinstance(model, PreTrainedModel):
             self.model = model
         else:
-            self.model = AutoModelForSeq2SeqLM.from_pretrained(model, *model_args, **model_kwargs)
+            self.model = self._autoclass.from_pretrained(model, *model_args, **model_kwargs)
         self.model_name = self.model.config.name_or_path
-        self.tokenizer_name = tokenizer
+        self.tokenizer_name = tokenizer if isinstance(tokenizer, str) else None
         if tokenizer is None:
             tokenizer = model if isinstance(model, str) else self.model_name
             if not tokenizer:
@@ -100,31 +119,29 @@ class HuggingfaceModel(AttributionModel):
             self.tokenizer = tokenizer
         else:
             self.tokenizer = AutoTokenizer.from_pretrained(tokenizer, *tokenizer_inputs, **tokenizer_kwargs)
-        self.pad_token = self.tokenizer.convert_ids_to_tokens(self.model.config.pad_token_id)
+        if self.model.config.pad_token_id is not None:
+            self.pad_token = self.tokenizer.convert_ids_to_tokens(self.model.config.pad_token_id)
         self.embed_scale = 1.0
         self.encoder_int_embeds = None
         self.decoder_int_embeds = None
         self.configure_embeddings_scale()
         self.setup(device, attribution_method, **kwargs)
 
-    @classmethod
-    def load(
-        cls,
-        model: Union[str, PreTrainedModel],
-        attribution_method: Optional[str] = None,
-        tokenizer: Union[str, PreTrainedTokenizerBase, None] = None,
-        device: str = None,
-        **kwargs,
-    ) -> "HuggingfaceModel":
-        return cls(model, attribution_method, tokenizer, device, **kwargs)
+    @abstractmethod
+    def configure_embeddings_scale(self) -> NoReturn:
+        """Configure the scale factor for embeddings."""
+        pass
 
-    def configure_embeddings_scale(self):
-        encoder = self.model.get_encoder()
-        decoder = self.model.get_decoder()
-        if hasattr(encoder, "embed_scale"):
-            self.embed_scale = encoder.embed_scale
-        if hasattr(decoder, "embed_scale") and decoder.embed_scale != self.embed_scale:
-            raise ValueError("Different encoder and decoder embed scales are not supported")
+    @property
+    def info(self) -> Dict[str, str]:
+        dic_info = super().info
+        dic_info.update(
+            {
+                "tokenizer_name": self.tokenizer_name,
+                "tokenizer_class": self.tokenizer.__class__.__name__,
+            }
+        )
+        return dic_info
 
     def forward(
         self,
@@ -215,20 +232,22 @@ class HuggingfaceModel(AttributionModel):
         Returns:
             BatchEncoding: contains ids and attention masks.
         """
-        with optional(as_targets, self.tokenizer.as_target_tokenizer()):
-            max_length = self.tokenizer.max_len_single_sentence
-            # Some tokenizer have weird values for max_len_single_sentence
-            # Cap length with max_model_input_sizes instead
-            if max_length > 1e6:
-                max_length = max(v for _, v in self.tokenizer.max_model_input_sizes.items())
-            batch = self.tokenizer(
-                texts,
-                add_special_tokens=True,
-                padding=True,
-                truncation=True,
-                max_length=max_length,
-                return_tensors="pt",
-            ).to(self.device)
+        if as_targets and self._autoclass is AutoModelForCausalLM:
+            raise ValueError("Causal language models should use tokenization as source only.")
+        max_length = self.tokenizer.max_len_single_sentence
+        # Some tokenizer have weird values for max_len_single_sentence
+        # Cap length with max_model_input_sizes instead
+        if max_length > 1e6:
+            max_length = max(v for _, v in self.tokenizer.max_model_input_sizes.items())
+        batch = self.tokenizer(
+            text=texts if not as_targets else None,
+            text_target=texts if as_targets else None,
+            add_special_tokens=True,
+            padding=True,
+            truncation=True,
+            max_length=max_length,
+            return_tensors="pt",
+        ).to(self.device)
         baseline_ids = None
         if return_baseline:
             if include_eos_baseline:
@@ -252,21 +271,16 @@ class HuggingfaceModel(AttributionModel):
             baseline_ids=baseline_ids,
         )
 
-    def encoder_embed_ids(self, ids: IdsTensor) -> EmbeddingsTensor:
-        if self.encoder_int_embeds:
+    def embed_ids(self, ids: IdsTensor, as_targets: bool = False) -> EmbeddingsTensor:
+        if as_targets and self._autoclass is AutoModelForCausalLM:
+            raise ValueError("Causal language models should use tokenization as source only.")
+        if self.encoder_int_embeds is not None and not as_targets:
             embeddings = self.encoder_int_embeds.indices_to_embeddings(ids)
-            return embeddings * self.embed_scale
-        else:
-            embeddings = self.model.get_input_embeddings()
-            return embeddings(ids) * self.embed_scale
-
-    def decoder_embed_ids(self, ids: IdsTensor) -> EmbeddingsTensor:
-        if self.decoder_int_embeds:
+        elif self.decoder_int_embeds is not None and as_targets:
             embeddings = self.decoder_int_embeds.indices_to_embeddings(ids)
-            return embeddings * self.embed_scale
         else:
-            embeddings = self.model.get_input_embeddings()
-            return embeddings(ids) * self.embed_scale
+            embeddings = self.get_embedding_layer()(ids)
+        return embeddings * self.embed_scale
 
     def convert_ids_to_tokens(
         self, ids: IdsTensor, skip_special_tokens: Optional[bool] = True
@@ -307,8 +321,10 @@ class HuggingfaceModel(AttributionModel):
         as_targets: bool = False,
     ) -> OneOrMoreTokenSequences:
         if isinstance(text, str):
-            with optional(as_targets, self.tokenizer.as_target_tokenizer()):
-                ids = self.tokenizer(text)["input_ids"]
+            ids = self.tokenizer(
+                text=text if not as_targets else None,
+                text_target=text if as_targets else None,
+            )["input_ids"]
             return self.tokenizer.convert_ids_to_tokens(ids, skip_special_tokens)
         return [self.convert_string_to_tokens(t, skip_special_tokens, as_targets) for t in text]
 
@@ -325,4 +341,85 @@ class HuggingfaceModel(AttributionModel):
         return self.get_embedding_layer().weight
 
     def get_embedding_layer(self) -> torch.nn.Module:
-        return self.model.get_encoder().embed_tokens
+        return self.model.get_input_embeddings()
+
+
+class HuggingfaceEncoderDecoderModel(HuggingfaceModel):
+    """Model wrapper for any ForConditionalGeneration model on the HuggingFace Hub used to enable
+    feature attribution. Corresponds to AutoModelForSeq2SeqLM auto classes in HF transformers.
+
+    Attributes:
+        model (::obj:`transformers.AutoModelForSeq2SeqLM`):
+            the model on which attribution is performed.
+    """
+
+    _autoclass = AutoModelForSeq2SeqLM
+
+    def __init__(
+        self,
+        model: Union[str, PreTrainedModel],
+        attribution_method: Optional[str] = None,
+        tokenizer: Union[str, PreTrainedTokenizerBase, None] = None,
+        device: str = None,
+        **kwargs,
+    ) -> NoReturn:
+        super().__init__(model, attribution_method, tokenizer, device, **kwargs)
+
+    def configure_embeddings_scale(self):
+        encoder = self.model.get_encoder()
+        decoder = self.model.get_decoder()
+        if hasattr(encoder, "embed_scale"):
+            self.embed_scale = encoder.embed_scale
+        if hasattr(decoder, "embed_scale") and decoder.embed_scale != self.embed_scale:
+            raise ValueError("Different encoder and decoder embed scales are not supported")
+
+
+class HuggingfaceDecoderOnlyModel(HuggingfaceModel):
+    """Model wrapper for any ForCausalLM or LMHead model on the HuggingFace Hub used to enable
+    feature attribution. Corresponds to AutoModelForCausalLM auto classes in HF transformers.
+
+    Attributes:
+        model (::obj:`transformers.AutoModelForCausalLM`):
+            the model on which attribution is performed.
+    """
+
+    _autoclass = AutoModelForCausalLM
+
+    def __init__(
+        self,
+        model: Union[str, PreTrainedModel],
+        attribution_method: Optional[str] = None,
+        tokenizer: Union[str, PreTrainedTokenizerBase, None] = None,
+        device: str = None,
+        **kwargs,
+    ) -> NoReturn:
+        super().__init__(model, attribution_method, tokenizer, device, **kwargs)
+        self.tokenizer.padding_side = "left"
+        self.tokenizer.truncation_side = "left"
+        if self.pad_token is None:
+            self.pad_token = self.tokenizer.bos_token
+            self.tokenizer.pad_token = self.tokenizer.bos_token
+
+    def configure_embeddings_scale(self):
+        if hasattr(self.model, "embed_scale"):
+            self.embed_scale = self.model.embed_scale
+
+
+def load_huggingface_model(
+    model: Union[str, PreTrainedModel],
+    attribution_method: Optional[str] = None,
+    tokenizer: Union[str, PreTrainedTokenizerBase, None] = None,
+    device: str = None,
+    **kwargs,
+) -> "HuggingfaceModel":
+    """Loads a HuggingFace model and tokenizer and wraps them in the appropriate AttributionModel."""
+    is_encoder_decoder = kwargs.pop("is_encoder_decoder", None)
+    if is_encoder_decoder is None:
+        if isinstance(model, str):
+            is_encoder_decoder = AutoConfig.from_pretrained(model).is_encoder_decoder
+        else:
+            is_encoder_decoder = model.config.is_encoder_decoder
+    if is_encoder_decoder:
+        return HuggingfaceEncoderDecoderModel(model, attribution_method, tokenizer, device, **kwargs)
+    else:
+        return HuggingfaceDecoderOnlyModel(model, attribution_method, tokenizer, device, **kwargs)

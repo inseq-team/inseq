@@ -104,3 +104,8 @@ class EncoderDecoderBatch(TensorWrapper):
 
     def __getitem__(self, subscript: Union[slice, int]) -> "EncoderDecoderBatch":
         return EncoderDecoderBatch(sources=self.sources, targets=self.targets[subscript])
+
+
+@dataclass(eq=False, repr=False)
+class DecoderOnlyBatch(Batch):
+    pass

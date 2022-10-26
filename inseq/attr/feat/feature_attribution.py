@@ -411,16 +411,12 @@ class FeatureAttribution(Registry):
         batch.to("cpu")
         torch.cuda.empty_cache()
         end = datetime.now()
-        return FeatureAttributionOutput(
+        out = FeatureAttributionOutput(
             sequence_attributions=FeatureAttributionSequenceOutput.from_step_attributions(
                 attribution_outputs, self.attribution_model.pad_token, prepend_bos_token
             ),
             step_attributions=attribution_outputs if output_step_attributions else None,
             info={
-                "model_name": self.attribution_model.model_name,
-                "model_class": self.attribution_model.model.__class__.__name__,
-                "tokenizer_name": self.attribution_model.tokenizer_name,
-                "tokenizer_class": self.attribution_model.tokenizer.__class__.__name__,
                 "attribution_method": self.method_name,
                 "attr_pos_start": attr_pos_start,
                 "attr_pos_end": attr_pos_end,
@@ -431,6 +427,8 @@ class FeatureAttribution(Registry):
                 "exec_time": (end - start).total_seconds(),
             },
         )
+        out.info.update(self.attribution_model.info)
+        return out
 
     def filtered_attribute_step(
         self,

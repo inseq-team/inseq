@@ -1,12 +1,13 @@
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
+import logging
 import math
 
 import torch
 
 from ...data.attribution import DEFAULT_ATTRIBUTION_AGGREGATE_DICT, FeatureAttributionStepOutput
 from ...data.batch import EncoderDecoderBatch
-from ...utils import output2ce, output2ent, output2ppl, output2prob
+from ...utils import extract_signature_args, output2ce, output2ent, output2ppl, output2prob
 from ...utils.typing import (
     OneOrMoreAttributionSequences,
     OneOrMoreIdSequences,
@@ -24,6 +25,8 @@ STEP_SCORES_MAP = {
     "crossentropy": output2ce,
     "perplexity": output2ppl,
 }
+
+logger = logging.getLogger(__name__)
 
 
 def tok2string(
@@ -177,6 +180,50 @@ def enrich_step_output(
     step_output.target = [[TokenWithId(token[0], id)] for token, id in zip(target_tokens, target_ids.tolist())]
     step_output.prefix = join_token_ids(batch.targets.input_tokens, batch.targets.input_ids.tolist())
     return step_output
+
+
+def extract_args(
+    attribution_method: "FeatureAttribution",
+    attributed_fn: Callable[..., SingleScorePerStepTensor],
+    step_scores: List[str],
+    default_args: List[str],
+    **kwargs,
+) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    attribution_args = kwargs.pop("attribution_args", {})
+    attributed_fn_args = kwargs.pop("attributed_fn_args", {})
+    step_scores_args = kwargs.pop("step_scores_args", {})
+    extra_attribution_args, attribution_unused_args = attribution_method.get_attribution_args(**kwargs)
+    extra_attributed_fn_args, attributed_fn_unused_args = extract_signature_args(
+        kwargs, attributed_fn, exclude_args=default_args, return_remaining=True
+    )
+    extra_step_scores_args = {}
+    for step_score in step_scores:
+        if step_score not in STEP_SCORES_MAP:
+            raise AttributeError(
+                f"Step score {step_score} not found. Available step scores are: "
+                f"{', '.join([x for x in STEP_SCORES_MAP.keys()])}. Use the inseq.register_step_score"
+                f"function to register a custom step score."
+            )
+        extra_step_scores_args.update(
+            **extract_signature_args(
+                kwargs,
+                STEP_SCORES_MAP[step_score],
+                exclude_args=default_args,
+                return_remaining=False,
+            )
+        )
+    step_scores_unused_args = {k: v for k, v in kwargs.items() if k not in extra_step_scores_args}
+    unused_args = {
+        k: v
+        for k, v in kwargs.items()
+        if k in attribution_unused_args.keys() & attributed_fn_unused_args.keys() & step_scores_unused_args.keys()
+    }
+    if unused_args:
+        logger.warning(f"Unused arguments during attribution: {unused_args}")
+    attribution_args.update(extra_attribution_args)
+    attributed_fn_args.update(extra_attributed_fn_args)
+    step_scores_args.update(extra_step_scores_args)
+    return attribution_args, attributed_fn_args, step_scores_args
 
 
 def list_step_scores() -> List[str]:
