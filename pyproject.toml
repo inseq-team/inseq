@@ -43,7 +43,7 @@ classifiers = [  #! Update me
 "inseq" = "inseq.commands.cli:main"
 
 [tool.poetry.dependencies]
-python = ">=3.8,<3.11"
+python = ">=3.8,<3.12"
 
 rich = "^10.13.0"
 transformers =  { version = "^4.20.1", extras = ["sentencepiece", "tokenizers", "torch", "torchhub"] }
