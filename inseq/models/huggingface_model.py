@@ -14,8 +14,7 @@ from transformers import (
     PreTrainedModel,
     PreTrainedTokenizerBase,
 )
-from transformers.generation_utils import BeamSampleOutput, BeamSearchOutput, GreedySearchOutput, SampleOutput
-from transformers.modeling_outputs import Seq2SeqLMOutput
+from transformers.modeling_outputs import CausalLMOutput, ModelOutput, Seq2SeqLMOutput
 
 from ..data import BatchEncoding
 from ..utils import pretty_tensor
@@ -37,14 +36,6 @@ from .model_decorators import unhooked
 
 logger = logging.getLogger(__name__)
 logging.getLogger("urllib3").setLevel(logging.WARNING)
-
-GenerationOutput = Union[
-    GreedySearchOutput,
-    SampleOutput,
-    BeamSearchOutput,
-    BeamSampleOutput,
-    torch.LongTensor,
-]
 
 # Update if other model types are added
 SUPPORTED_AUTOCLASSES = [AutoModelForSeq2SeqLM, AutoModelForCausalLM]
@@ -124,6 +115,7 @@ class HuggingfaceModel(AttributionModel):
         self.embed_scale = 1.0
         self.encoder_int_embeds = None
         self.decoder_int_embeds = None
+        self.is_encoder_decoder = self.model.config.is_encoder_decoder
         self.configure_embeddings_scale()
         self.setup(device, attribution_method, **kwargs)
 
@@ -186,9 +178,21 @@ class HuggingfaceModel(AttributionModel):
     def generate(
         self,
         inputs: Union[TextInput, BatchEncoding],
-        return_generation_output: Optional[bool] = False,
+        return_generation_output: bool = False,
         **kwargs,
-    ) -> Union[List[str], Tuple[List[str], GenerationOutput]]:
+    ) -> Union[List[str], Tuple[List[str], ModelOutput]]:
+        """Wrapper of model.generate to handle tokenization and decoding.
+
+        Args:
+            inputs (`Union[TextInput, BatchEncoding]`):
+                Inputs to be provided to the model for generation.
+            return_generation_output (`bool`, *optional*, defaults to False):
+                If true, generation outputs are returned alongside the generated text.
+
+        Returns:
+            `Union[List[str], Tuple[List[str], ModelOutput]]`: Generated text or a tuple of generated text and
+            generation outputs.
+        """
         if isinstance(inputs, str) or (
             isinstance(inputs, list) and len(inputs) > 0 and all([isinstance(x, str) for x in inputs])
         ):
@@ -210,7 +214,7 @@ class HuggingfaceModel(AttributionModel):
         return texts
 
     @staticmethod
-    def output2logits(forward_output: Seq2SeqLMOutput) -> FullLogitsTensor:
+    def output2logits(forward_output: Union[Seq2SeqLMOutput, CausalLMOutput]) -> FullLogitsTensor:
         # Full logits for last position of every sentence:
         # (batch_size, tgt_seq_len, vocab_size) => (batch_size, vocab_size)
         return forward_output.logits[:, -1, :].squeeze(1)
@@ -232,8 +236,8 @@ class HuggingfaceModel(AttributionModel):
         Returns:
             BatchEncoding: contains ids and attention masks.
         """
-        if as_targets and self._autoclass is AutoModelForCausalLM:
-            raise ValueError("Causal language models should use tokenization as source only.")
+        if as_targets and not self.is_encoder_decoder:
+            raise ValueError("Decoder-only models should use tokenization as source only.")
         max_length = self.tokenizer.max_len_single_sentence
         # Some tokenizer have weird values for max_len_single_sentence
         # Cap length with max_model_input_sizes instead
@@ -272,8 +276,8 @@ class HuggingfaceModel(AttributionModel):
         )
 
     def embed_ids(self, ids: IdsTensor, as_targets: bool = False) -> EmbeddingsTensor:
-        if as_targets and self._autoclass is AutoModelForCausalLM:
-            raise ValueError("Causal language models should use tokenization as source only.")
+        if as_targets and not self.is_encoder_decoder:
+            raise ValueError("Decoder-only models should use tokenization as source only.")
         if self.encoder_int_embeds is not None and not as_targets:
             embeddings = self.encoder_int_embeds.indices_to_embeddings(ids)
         elif self.decoder_int_embeds is not None and as_targets:
@@ -413,12 +417,10 @@ def load_huggingface_model(
     **kwargs,
 ) -> "HuggingfaceModel":
     """Loads a HuggingFace model and tokenizer and wraps them in the appropriate AttributionModel."""
-    is_encoder_decoder = kwargs.pop("is_encoder_decoder", None)
-    if is_encoder_decoder is None:
-        if isinstance(model, str):
-            is_encoder_decoder = AutoConfig.from_pretrained(model).is_encoder_decoder
-        else:
-            is_encoder_decoder = model.config.is_encoder_decoder
+    if isinstance(model, str):
+        is_encoder_decoder = AutoConfig.from_pretrained(model).is_encoder_decoder
+    else:
+        is_encoder_decoder = model.config.is_encoder_decoder
     if is_encoder_decoder:
         return HuggingfaceEncoderDecoderModel(model, attribution_method, tokenizer, device, **kwargs)
     else:

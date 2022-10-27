@@ -101,7 +101,11 @@ class GradientAttribution(FeatureAttribution, Registry):
         """
         logger.debug(f"batch: {batch},\ntarget_ids: {pretty_tensor(target_ids, lpad=4)}")
         attribute_fn_args = self.format_attribute_args(
-            batch, target_ids, attributed_fn, attribute_target, attributed_fn_args, **attribution_args
+            batch=batch,
+            target_ids=target_ids,
+            attributed_fn=attributed_fn,
+            attribute_target=attribute_target,
+            attributed_fn_args=attributed_fn_args,
         )
         attr = self.method.attribute(**attribute_fn_args, **attribution_args)
         deltas = None
@@ -179,10 +183,13 @@ class DiscretizedIntegratedGradientsAttribution(GradientAttribution):
         attributed_fn_args: Dict[str, Any] = {},
         n_steps: Optional[int] = None,
         strategy: Optional[str] = None,
-        **kwargs,
     ) -> Dict[str, Any]:
         attribute_fn_args = super().format_attribute_args(
-            batch, target_ids, attributed_fn, attribute_target, attributed_fn_args, **kwargs
+            batch=batch,
+            target_ids=target_ids,
+            attributed_fn=attributed_fn,
+            attribute_target=attribute_target,
+            attributed_fn_args=attributed_fn_args,
         )
         attribute_fn_args["inputs"] = (
             self.method.path_builder.scale_inputs(

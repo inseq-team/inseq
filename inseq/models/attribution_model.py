@@ -49,6 +49,7 @@ class AttributionModel(ABC, torch.nn.Module):
         if not hasattr(self, "model"):
             self.model = None
             self.model_name = None
+            self.is_encoder_decoder = True
         self.pad_token = None
         self.embed_scale = None
         self._device = None
@@ -162,6 +163,8 @@ class AttributionModel(ABC, torch.nn.Module):
         """Perform attribution for one or multiple texts."""
         if not input_texts:
             raise ValueError("At least one text must be provided to perform attribution.")
+        if attribute_target and not self.is_encoder_decoder:
+            logger.warning("attribute_target parameter is set to True, but will be ignored (not an encoder-decoder).")
         if device is not None:
             original_device = self.device
             self.device = device
@@ -238,7 +241,14 @@ class AttributionModel(ABC, torch.nn.Module):
         pass
 
     @abstractmethod
-    def encode(self, texts: TextInput, as_targets: bool = False, *args) -> BatchEncoding:
+    def encode(
+        self,
+        texts: TextInput,
+        as_targets: bool = False,
+        prepend_bos_token: bool = True,
+        return_baseline: bool = False,
+        include_eos_baseline: bool = False,
+    ) -> BatchEncoding:
         pass
 
     @abstractmethod
@@ -316,7 +326,7 @@ def load_model(
     attribution_method: Optional[str] = None,
     from_hf: bool = True,
     **kwargs,
-):
+) -> AttributionModel:
     from .huggingface_model import load_huggingface_model
 
     model_name = model if isinstance(model, str) else "model"

@@ -207,8 +207,8 @@ class FeatureAttributionStepOutput(TensorWrapper):
     """
 
     source_attributions: StepAttributionTensor
+    step_scores: Dict[str, SingleScorePerStepTensor]
     target_attributions: Optional[StepAttributionTensor] = None
-    step_scores: Optional[Dict[str, SingleScorePerStepTensor]] = None
     sequence_scores: Optional[Dict[str, MultipleScoresPerStepTensor]] = None
     source: Optional[OneOrMoreTokenWithIdSequences] = None
     prefix: Optional[OneOrMoreTokenWithIdSequences] = None

@@ -16,8 +16,7 @@
 Todo:
     * 🟡: Allow custom arguments for model loading in the :class:`FeatureAttribution` :meth:`load` method.
 """
-
-from typing import Any, Callable, Dict, List, NoReturn, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Union
 
 import logging
 from abc import abstractmethod
@@ -51,10 +50,15 @@ from .attribution_utils import (
     STEP_SCORES_MAP,
     check_attribute_positions,
     enrich_step_output,
+    format_attribute_args,
     get_attribution_sentences,
     get_split_targets,
     get_step_scores,
 )
+
+
+if TYPE_CHECKING:
+    from ...models import AttributionModel
 
 
 logger = logging.getLogger(__name__)
@@ -73,10 +77,10 @@ class FeatureAttribution(Registry):
             naming convention.
     """
 
-    attr = "method_name"
+    registry_attr = "method_name"
     ignore_extra_args = ["inputs", "baselines", "target", "additional_forward_args"]
 
-    def __init__(self, attribution_model, hook_to_model: bool = True, **kwargs):
+    def __init__(self, attribution_model: "AttributionModel", hook_to_model: bool = True, **kwargs):
         r"""
         Common instantiation steps for FeatureAttribution methods. Hooks the attribution method
         to the model calling the :meth:`~inseq.attr.feat.FeatureAttribution.hook` method of the child class.
@@ -108,8 +112,8 @@ class FeatureAttribution(Registry):
     def load(
         cls,
         method_name: str,
-        attribution_model=None,
-        model_name_or_path: ModelIdentifier = None,
+        attribution_model: Optional["AttributionModel"] = None,
+        model_name_or_path: Optional[ModelIdentifier] = None,
         **kwargs,
     ) -> "FeatureAttribution":
         r"""
@@ -136,17 +140,19 @@ class FeatureAttribution(Registry):
         """
         from ...models import load_model
 
-        if model_name_or_path is None == attribution_model is None:  # noqa
+        if model_name_or_path is not None:
+            model = load_model(model_name_or_path)
+        elif attribution_model is not None:
+            model = attribution_model
+        else:
             raise RuntimeError(
                 "Only one among an initialized model and a model identifier "
                 "must be defined when loading the attribution method."
             )
-        if model_name_or_path:
-            attribution_model = load_model(model_name_or_path)
         methods = cls.available_classes()
         if method_name not in methods:
             raise UnknownAttributionMethodError(method_name)
-        return methods[method_name](attribution_model, **kwargs)
+        return methods[method_name](model, **kwargs)
 
     @batched
     def prepare_and_attribute(
@@ -275,37 +281,56 @@ class FeatureAttribution(Registry):
             :obj:`EncoderDecoderBatch`: An :class:`~inseq.data.EncoderDecoderBatch` object containing sources
                 and targets in encoded and embedded formats for all inputs.
         """
-        if isinstance(sources, str) or isinstance(sources, list):
-            sources: BatchEncoding = self.attribution_model.encode(
-                sources, return_baseline=True, include_eos_baseline=include_eos_baseline
-            )
-        if isinstance(sources, BatchEncoding):
+        if isinstance(sources, Batch):
+            source_batch = sources
+        else:
+            if isinstance(sources, str) or isinstance(sources, list):
+                source_encodings: BatchEncoding = self.attribution_model.encode(
+                    sources, return_baseline=True, include_eos_baseline=include_eos_baseline
+                )
+            elif isinstance(sources, BatchEncoding):
+                source_encodings = sources
+            else:
+                raise ValueError(
+                    f"sources must be either a string, a list of strings, a BatchEncoding or a Batch, "
+                    f"not {type(sources)}"
+                )
             # Even when we are performing layer attribution, we might need the embeddings
             # to compute step probabilities.
-            embeds = BatchEmbedding(
-                input_embeds=self.attribution_model.embed(sources.input_ids),
-                baseline_embeds=self.attribution_model.embed(sources.baseline_ids),
+            source_embeddings = BatchEmbedding(
+                input_embeds=self.attribution_model.embed(source_encodings.input_ids),
+                baseline_embeds=self.attribution_model.embed(source_encodings.baseline_ids),
             )
-            sources = Batch(sources, embeds)
-        if isinstance(targets, str) or isinstance(targets, list):
-            targets: BatchEncoding = self.attribution_model.encode(
-                targets,
-                as_targets=True,
-                prepend_bos_token=prepend_bos_token,
-                return_baseline=True,
-                include_eos_baseline=include_eos_baseline,
-            )
-        if isinstance(targets, BatchEncoding):
+            source_batch = Batch(source_encodings, source_embeddings)
+
+        if isinstance(targets, Batch):
+            target_batch = targets
+        else:
+            if isinstance(targets, str) or isinstance(targets, list):
+                target_encodings: BatchEncoding = self.attribution_model.encode(
+                    targets,
+                    as_targets=True,
+                    prepend_bos_token=prepend_bos_token,
+                    return_baseline=True,
+                    include_eos_baseline=include_eos_baseline,
+                )
+            elif isinstance(targets, BatchEncoding):
+                target_encodings = targets
+            else:
+                raise ValueError(
+                    f"targets must be either a string, a list of strings, a BatchEncoding or a Batch, "
+                    f"not {type(targets)}"
+                )
             baseline_embeds = None
             if not self.is_layer_attribution:
-                baseline_embeds = self.attribution_model.embed(targets.baseline_ids, as_targets=True)
-            target_embeds = BatchEmbedding(
-                input_embeds=self.attribution_model.embed(targets.input_ids, as_targets=True),
+                baseline_embeds = self.attribution_model.embed(target_encodings.baseline_ids, as_targets=True)
+            target_embeddings = BatchEmbedding(
+                input_embeds=self.attribution_model.embed(target_encodings.input_ids, as_targets=True),
                 baseline_embeds=baseline_embeds,
             )
-            targets = Batch(targets, target_embeds)
-        sources_targets = EncoderDecoderBatch(sources, targets)
-        return sources_targets.to(self.attribution_model.device)
+            target_batch = Batch(target_encodings, target_embeddings)
+        encoder_decoder_batch = EncoderDecoderBatch(source_batch, target_batch)
+        return encoder_decoder_batch.to(self.attribution_model.device)
 
     def attribute(
         self,
@@ -532,45 +557,17 @@ class FeatureAttribution(Registry):
         attributed_fn: Callable[..., SingleScorePerStepTensor],
         attribute_target: bool = False,
         attributed_fn_args: Dict[str, Any] = {},
-        **kwargs,
     ) -> Dict[str, Any]:
-        if self.is_layer_attribution:
-            inputs = (batch.sources.input_ids,)
-            baselines = (batch.sources.baseline_ids,)
-        else:
-            inputs = (batch.sources.input_embeds,)
-            baselines = (batch.sources.baseline_embeds,)
-        if attribute_target:
-            inputs = inputs + (batch.targets.input_embeds,)
-            baselines = baselines + (batch.targets.baseline_embeds,)
-        attribute_fn_args = {
-            "inputs": inputs,
-            "additional_forward_args": (
-                # Ids are always explicitly passed as extra arguments to enable
-                # usage in custom attribution functions.
-                batch.sources.input_ids,
-                batch.targets.input_ids,
-                # Making targets 2D enables _expand_additional_forward_args
-                # in Captum to preserve the expected batch dimension for methods
-                # such as intergrated gradients.
-                target_ids.unsqueeze(-1),
-                attributed_fn,
-                batch.sources.attention_mask,
-                batch.targets.attention_mask,
-                # Defines how to treat source and target tensors
-                # Maps on the use_embeddings argument of forward
-                not self.is_layer_attribution,
-                list(attributed_fn_args.keys()),
-            )
-            + tuple(attributed_fn_args.values()),
-        }
-        if not attribute_target:
-            attribute_fn_args["additional_forward_args"] = (batch.targets.input_embeds,) + attribute_fn_args[
-                "additional_forward_args"
-            ]
-        if self.use_baseline:
-            attribute_fn_args["baselines"] = baselines
-        return attribute_fn_args
+        return format_attribute_args(
+            batch=batch,
+            target_ids=target_ids,
+            attributed_fn=attributed_fn,
+            attribute_target=attribute_target,
+            attributed_fn_args=attributed_fn_args,
+            is_layer_attribution=self.is_layer_attribution,
+            use_baseline=self.use_baseline,
+            is_encoder_decoder=self.attribution_model.is_encoder_decoder,
+        )
 
     @abstractmethod
     def attribute_step(
@@ -611,7 +608,7 @@ class FeatureAttribution(Registry):
 
     @abstractmethod
     @set_hook
-    def hook(self, **kwargs) -> NoReturn:
+    def hook(self, **kwargs) -> None:
         r"""
         Hooks the attribution method to the model. Useful to implement pre-attribution logic
         (e.g. freezing layers, replacing embeddings, raise warnings, etc.).
@@ -622,7 +619,7 @@ class FeatureAttribution(Registry):
 
     @abstractmethod
     @unset_hook
-    def unhook(self, **kwargs) -> NoReturn:
+    def unhook(self, **kwargs) -> None:
         r"""
         Unhooks the attribution method from the model. If the model was modified in any way, this
         should restore its initial state.
