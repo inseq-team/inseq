@@ -70,7 +70,6 @@ optional = true
 
 [tool.poetry.group.docs.dependencies]
 recommonmark = "^0.7.1"
-safety = "^1.10.3"
 sphinx = "^5.3.0"
 sphinxemoji = "^0.2.0"
 sphinxext-opengraph = "^0.4.2"
@@ -84,6 +83,7 @@ optional = true
 
 [tool.poetry.group.lint.dependencies]
 bandit = "^1.7.4"
+safety = "^1.10.3"
 black = "^22.6.0"
 darglint = "^1.8.1"
 flake8 = "^4.0.1"
