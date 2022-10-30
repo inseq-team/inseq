@@ -63,6 +63,10 @@ install-gpu: install add-torch-gpu
 .PHONY: install-dev-gpu
 install-dev-gpu: install-dev add-torch-gpu
 
+.PHONY: install-ci
+install-dev:
+	poetry install
+
 .PHONY: update-deps
 update-deps:
 	poetry lock && poetry export --without-hashes > requirements.txt
