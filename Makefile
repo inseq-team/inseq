@@ -64,7 +64,7 @@ install-gpu: install add-torch-gpu
 install-dev-gpu: install-dev add-torch-gpu
 
 .PHONY: install-ci
-install-dev:
+install-ci:
 	poetry install
 
 .PHONY: update-deps
