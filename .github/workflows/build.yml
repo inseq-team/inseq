@@ -12,13 +12,13 @@ jobs:
     if: github.actor != 'dependabot[bot]' && github.actor != 'dependabot-preview[bot]'
     strategy:
       matrix:
-        python-version: ["3.8", "3.9", "3.10"]
+        python-version: ["3.8", "3.9", "3.10", "3.11"]
 
     steps:
     - uses: actions/checkout@v3
 
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v3
+      uses: actions/setup-python@v4.3.0
       with:
         python-version: ${{ matrix.python-version }}
 
@@ -28,14 +28,14 @@ jobs:
         export PATH="$HOME/.poetry/env:$PATH"
 
     - name: Set up cache
-      uses: actions/cache@v3.0.1
+      uses: actions/cache@v3.0.11
       with:
         path: .venv
         key: venv-${{ matrix.python-version }}-${{ hashFiles('pyproject.toml') }}-${{ hashFiles('poetry.lock') }}
     - name: Install dependencies
       run: |
         poetry config virtualenvs.in-project true
-        poetry install
+        make install-ci
 
     - name: Run style checks
       run: |
