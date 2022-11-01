@@ -30,7 +30,9 @@ from .registry import Registry, get_available_methods
 from .torch_utils import (
     abs_max,
     aggregate_contiguous,
+    check_device,
     euclidean_distance,
+    get_default_device,
     get_sequences_from_batched_steps,
     output2ce,
     output2ent,
@@ -86,4 +88,6 @@ __all__ = [
     "is_datasets_available",
     "is_captum_available",
     "is_joblib_available",
+    "check_device",
+    "get_default_device",
 ]

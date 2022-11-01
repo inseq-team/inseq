@@ -22,7 +22,6 @@ import logging
 from abc import abstractmethod
 from datetime import datetime
 
-import torch
 from torchtyping import TensorType
 
 from ...data import (
@@ -434,7 +433,6 @@ class FeatureAttribution(Registry):
                 update_progress_bar(pbar, show=show_progress, pretty=pretty_progress)
         close_progress_bar(pbar, show=show_progress, pretty=pretty_progress)
         batch.to("cpu")
-        torch.cuda.empty_cache()
         end = datetime.now()
         out = FeatureAttributionOutput(
             sequence_attributions=FeatureAttributionSequenceOutput.from_step_attributions(
@@ -542,7 +540,6 @@ class FeatureAttribution(Registry):
         if target_attention_mask is not None and is_filtered:
             step_output.remap_from_filtered(target_attention_mask)
         step_output = step_output.detach().to("cpu")
-        torch.cuda.empty_cache()
         return step_output
 
     def get_attribution_args(self, **kwargs) -> Tuple[Dict[str, Any], Dict[str, Any]]:

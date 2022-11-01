@@ -2,9 +2,8 @@ from typing import List, Optional
 
 from dataclasses import dataclass, field
 
-import torch
-
 from .. import list_feature_attribution_methods, load_model
+from ..utils import get_default_device
 from .base import BaseCLICommand
 
 
@@ -67,7 +66,7 @@ class AttributeBaseArgs:
         },
     )
     device: str = field(
-        default="cuda:0" if torch.cuda.is_available() else "cpu",
+        default=get_default_device(),
         metadata={"alias": "-dev", "help": "The device used for inference with Pytorch. Multi-GPU is not supported."},
     )
     hide_attributions: bool = field(

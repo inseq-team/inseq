@@ -9,7 +9,14 @@ from rich.status import Status
 from ..attr import STEP_SCORES_MAP
 from ..attr.feat import FeatureAttribution, extract_args
 from ..data import BatchEncoding, FeatureAttributionOutput
-from ..utils import MissingAttributionMethodError, format_input_texts, isnotebook, optional
+from ..utils import (
+    MissingAttributionMethodError,
+    check_device,
+    format_input_texts,
+    get_default_device,
+    isnotebook,
+    optional,
+)
 from ..utils.typing import (
     EmbeddingsTensor,
     FullLogitsTensor,
@@ -58,23 +65,19 @@ class AttributionModel(ABC, torch.nn.Module):
         self._default_attributed_fn_id = "probability"
 
     @property
-    def device(self) -> str:
+    def device(self) -> Optional[str]:
         return self._device
 
     @device.setter
     def device(self, new_device: str) -> None:
-        if "cuda" in new_device and not torch.cuda.is_available():
-            raise torch.cuda.CudaError("Cannot use CUDA device, CUDA is not available.")
+        check_device(new_device)
         self._device = new_device
         if self.model:
             self.model.to(self._device)
 
-    def setup(self, device: str = None, attribution_method: str = None) -> None:
+    def setup(self, device: Optional[str] = None, attribution_method: Optional[str] = None) -> None:
         """Move the model to device and in eval mode."""
-        if device is not None:
-            self.device = device
-        else:
-            self.device = "cuda:0" if torch.cuda.is_available() else "cpu"
+        self.device = device if device is not None else get_default_device()
         if self.model:
             self.model.eval()
             self.model.zero_grad()
@@ -91,20 +94,11 @@ class AttributionModel(ABC, torch.nn.Module):
         self._default_attributed_fn_id = fn
 
     @property
-    def info(self) -> Dict[str, str]:
+    def info(self) -> Dict[Optional[str], Optional[str]]:
         return {
             "model_name": self.model_name,
             "model_class": self.model.__class__.__name__ if self.model is not None else None,
         }
-
-    @classmethod
-    def load(
-        cls,
-        model: ModelIdentifier,
-        attribution_method: Optional[str] = None,
-        **kwargs,
-    ) -> "AttributionModel":
-        return cls(model, attribution_method, **kwargs)
 
     def get_attribution_method(
         self,

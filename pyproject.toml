@@ -179,7 +179,7 @@ doctest_optionflags = ["NUMBER", "NORMALIZE_WHITESPACE", "IGNORE_EXCEPTION_DETAI
 
 markers = [
   "slow",
-  "require_gpu"
+  "require_cuda_gpu"
 ]
 
 # Extra options:

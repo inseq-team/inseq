@@ -1,9 +1,13 @@
-from typing import Any, Callable, List, Optional, Sequence, Tuple, Union
+from typing import TYPE_CHECKING, Any, Callable, List, Optional, Sequence, Tuple, Union
 
 import logging
 
 import torch
 import torch.nn.functional as F
+from torch.backends.cuda import is_built as is_cuda_built
+from torch.backends.mps import is_available as is_mps_available
+from torch.backends.mps import is_built as is_mps_built
+from torch.cuda import is_available as is_cuda_available
 from torchtyping import TensorType
 
 from .typing import (
@@ -14,7 +18,15 @@ from .typing import (
 )
 
 
+if TYPE_CHECKING:
+    from ..models import AttributionModel
+
 logger = logging.getLogger(__name__)
+
+TORCH_BACKEND_DEVICE_MAP = {
+    "cuda": (is_cuda_built, is_cuda_available),
+    "mps": (is_mps_built, is_mps_available),
+}
 
 
 @torch.no_grad()
@@ -47,6 +59,8 @@ def sum_normalize_attributions(
         concat = True
         orig_sizes = [a.shape[cat_dim] for a in attributions]
         attributions = torch.cat(attributions, dim=cat_dim)
+    else:
+        orig_sizes = [attributions.shape[cat_dim]]
     # nansum is used to handle the target side sequence attribution case
     attributions = torch.nansum(attributions, dim=-1).squeeze(0)
     attributions = F.normalize(attributions, p=2, dim=norm_dim)
@@ -58,7 +72,7 @@ def sum_normalize_attributions(
     return attributions
 
 
-def euclidean_distance(vec_a: torch.Tensor, vec_b: torch.Tensor) -> float:
+def euclidean_distance(vec_a: torch.Tensor, vec_b: torch.Tensor) -> torch.Tensor:
     """Compute the Euclidean distance between two points."""
     return (vec_a - vec_b).pow(2).sum(-1).sqrt()
 
@@ -188,3 +202,26 @@ def get_sequences_from_batched_steps(
         return [t.squeeze() for t in torch.stack(bsteps, dim=2).split(1, dim=0)]
     else:
         return [t.squeeze() for t in torch.stack(bsteps, dim=1).split(1, dim=0)]
+
+
+def check_device(device_name: str) -> bool:
+    if device_name == "cpu":
+        return True
+    if device_name not in TORCH_BACKEND_DEVICE_MAP:
+        raise ValueError(f"Unknown device {device_name}")
+    else:
+        available_fn, built_fn = TORCH_BACKEND_DEVICE_MAP[device_name]
+        if not available_fn():
+            raise ValueError(f"Cannot use {device_name} device, {device_name} is not available.")
+        if not built_fn():
+            raise ValueError(f"urrent Pytorch distribution does not support {device_name} execution")
+    return True
+
+
+def get_default_device() -> str:
+    if is_cuda_available and is_cuda_built:
+        return "cuda"
+    elif is_mps_available and is_mps_built:
+        return "mps"
+    else:
+        return "cpu"

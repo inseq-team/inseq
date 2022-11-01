@@ -13,6 +13,7 @@ from pytest import fixture, mark
 import inseq
 from inseq import list_feature_attribution_methods
 from inseq.data import FeatureAttributionOutput, FeatureAttributionSequenceOutput
+from inseq.utils import get_default_device
 
 
 EXAMPLES_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../fixtures/huggingface_model.json")
@@ -31,7 +32,7 @@ def saliency_mt_model():
 
 
 @mark.slow
-@mark.require_gpu
+@mark.require_cuda_gpu
 @mark.parametrize(("texts", "reference_texts"), EXAMPLES["short_texts"])
 @mark.parametrize("attribute_target", ATTRIBUTE_TARGET)
 def test_cuda_attribution_consistency(texts, reference_texts, attribute_target, saliency_mt_model):
@@ -69,7 +70,7 @@ def test_batched_attribution_consistency(attribution_method, use_reference, attr
         reference_single,
         show_progress=False,
         attribute_target=attribute_target,
-        device="cuda:0" if torch.cuda.is_available() else "cpu",
+        device=get_default_device(),
         method=attribution_method,
     )
     out_batch = saliency_mt_model.attribute(
@@ -77,7 +78,7 @@ def test_batched_attribution_consistency(attribution_method, use_reference, attr
         reference_batch,
         show_progress=False,
         attribute_target=attribute_target,
-        device="cuda:0" if torch.cuda.is_available() else "cpu",
+        device=get_default_device(),
         method=attribution_method,
     )
     assert torch.allclose(
@@ -127,7 +128,7 @@ def test_attribute(
         step_scores=step_scores,
         internal_batch_size=50,
         n_steps=100,
-        device="cuda:0" if torch.cuda.is_available() else "cpu",
+        device=get_default_device(),
     )
     assert isinstance(out, FeatureAttributionOutput)
     assert isinstance(out.sequence_attributions[0], FeatureAttributionSequenceOutput)
@@ -160,7 +161,7 @@ def test_attribute_long_text(texts, reference_texts, attribution_method, use_ref
         show_progress=False,
         internal_batch_size=10,
         n_steps=100,
-        device="cuda:0" if torch.cuda.is_available() else "cpu",
+        device=get_default_device(),
     )
     assert isinstance(out, FeatureAttributionOutput)
     assert isinstance(out.sequence_attributions[0], FeatureAttributionSequenceOutput)
