@@ -189,6 +189,8 @@ def isnotebook():
             return False  # Other type (?)
     except NameError:
         return False  # Probably standard Python interpreter
+    except ModuleNotFoundError:
+        return False  # IPython not installed
 
 
 def format_input_texts(

@@ -70,7 +70,9 @@ install-ci:
 
 .PHONY: update-deps
 update-deps:
-	poetry lock && poetry export --without-hashes > requirements.txt
+	poetry lock
+	poetry export --without-hashes > requirements.txt
+	poetry export --without-hashes -E sklearn -E datasets -E notebook --with lint,docs > requirements-dev.txt
 
 #* Linting
 .PHONY: check-style

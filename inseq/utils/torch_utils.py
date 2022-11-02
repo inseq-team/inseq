@@ -209,19 +209,18 @@ def check_device(device_name: str) -> bool:
         return True
     if device_name not in TORCH_BACKEND_DEVICE_MAP:
         raise ValueError(f"Unknown device {device_name}")
-    else:
-        available_fn, built_fn = TORCH_BACKEND_DEVICE_MAP[device_name]
-        if not available_fn():
-            raise ValueError(f"Cannot use {device_name} device, {device_name} is not available.")
-        if not built_fn():
-            raise ValueError(f"urrent Pytorch distribution does not support {device_name} execution")
+    available_fn, built_fn = TORCH_BACKEND_DEVICE_MAP[device_name]
+    if not available_fn():
+        raise ValueError(f"Cannot use {device_name} device, {device_name} is not available.")
+    if not built_fn():
+        raise ValueError(f"Current Pytorch distribution does not support {device_name} execution")
     return True
 
 
 def get_default_device() -> str:
-    if is_cuda_available and is_cuda_built:
+    if is_cuda_available() and is_cuda_built():
         return "cuda"
-    elif is_mps_available and is_mps_built:
+    elif is_mps_available() and is_mps_built():
         return "mps"
     else:
         return "cpu"
