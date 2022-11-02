@@ -83,7 +83,7 @@ optional = true
 
 [tool.poetry.group.lint.dependencies]
 bandit = "^1.7.4"
-safety = "^1.10.3"
+safety = "^2.2.0"
 black = "^22.6.0"
 darglint = "^1.8.1"
 flake8 = "^5.0.4"
@@ -91,7 +91,7 @@ isort = {extras = ["colors"], version = "^5.10.1"}
 pre-commit = "^2.19.0"
 pylint = "^2.14.1"
 pyupgrade = "^2.34.0"
-pytest = "^6.2.5"
+pytest = "^7.2.0"
 
 [tool.poetry.extras]
 sklearn = ["scikit-learn", "joblib"]
