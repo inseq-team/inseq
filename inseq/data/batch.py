@@ -39,8 +39,10 @@ class BatchEmbedding(TensorWrapper):
     input_embeds: Optional[EmbeddingsTensor] = None
     baseline_embeds: Optional[EmbeddingsTensor] = None
 
-    def __len__(self) -> int:
-        return self.input_embeds.shape[0]
+    def __len__(self) -> Optional[int]:
+        if self.input_embeds is not None:
+            return self.input_embeds.shape[0]
+        return None
 
 
 @dataclass(eq=False, repr=False)
@@ -53,7 +55,7 @@ class Batch(TensorWrapper):
         return self.encoding.input_ids
 
     @property
-    def input_tokens(self) -> List[List[str]]:
+    def input_tokens(self) -> OneOrMoreTokenSequences:
         return self.encoding.input_tokens
 
     @property
@@ -96,6 +98,10 @@ class Batch(TensorWrapper):
     def baseline_embeds(self, value: Optional[EmbeddingsTensor]):
         self.embedding.baseline_embeds = value
 
+    @property
+    def max_generation_length(self) -> int:
+        return self.input_ids.shape[1]
+
 
 @dataclass(eq=False, repr=False)
 class EncoderDecoderBatch(TensorWrapper):
@@ -105,7 +111,6 @@ class EncoderDecoderBatch(TensorWrapper):
     def __getitem__(self, subscript: Union[slice, int]) -> "EncoderDecoderBatch":
         return EncoderDecoderBatch(sources=self.sources, targets=self.targets[subscript])
 
-
-@dataclass(eq=False, repr=False)
-class DecoderOnlyBatch(Batch):
-    pass
+    @property
+    def max_generation_length(self) -> int:
+        return self.targets.input_ids.shape[1]

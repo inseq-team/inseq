@@ -28,7 +28,7 @@ from captum.attr import (
 )
 
 from ...data import EncoderDecoderBatch, GradientFeatureAttributionStepOutput
-from ...utils import Registry, extract_signature_args, pretty_tensor, rgetattr
+from ...utils import Registry, extract_signature_args, rgetattr
 from ...utils.typing import SingleScorePerStepTensor, TargetIdsTensor
 from ..attribution_decorators import set_hook, unset_hook
 from .feature_attribution import FeatureAttribution
@@ -67,31 +67,18 @@ class GradientAttribution(FeatureAttribution, Registry):
 
     def attribute_step(
         self,
-        batch: EncoderDecoderBatch,
-        target_ids: TargetIdsTensor,
-        attributed_fn: Callable[..., SingleScorePerStepTensor],
-        attribute_target: bool = False,
+        attribute_fn_main_args: Dict[str, Any],
         attribution_args: Dict[str, Any] = {},
-        attributed_fn_args: Dict[str, Any] = {},
     ) -> GradientFeatureAttributionStepOutput:
         r"""
-        Performs a single attribution step for the specified target_ids,
-        given sources and targets in the batch.
+        Performs a single attribution step for the specified attribution arguments.
 
         Args:
-            batch (:class:`~inseq.data.EncoderDecoderBatch`): The batch of sequences on which attribution is performed.
-            target_ids (:obj:`torch.Tensor`): Target token ids of size `(batch_size)` corresponding to tokens
-                for which the attribution step must be performed.
-            attributed_fn (:obj:`Callable[..., SingleScorePerStepTensor]`): The function of model outputs
-                representing what should be attributed (e.g. output probits of model best prediction after softmax).
-                The parameter must be a function that taking multiple keyword arguments and returns a :obj:`tensor`
-                of size (batch_size,). If not provided, the default attributed function for the model will be used
-                (change attribution_model.default_attributed_fn_id).
-            attribute_target (:obj:`bool`, optional): Whether to attribute the target prefix or not. Defaults to False.
+            attribute_fn_main_args (:obj:`dict`): Main arguments used for the attribution method. These are built from
+                model inputs at the current step of the feature attribution process.
             attribution_args (:obj:`dict`, `optional`): Additional arguments to pass to the attribution method.
-                Defaults to {}.
-            attributed_fn_args (:obj:`dict`, `optional`): Additional arguments to pass to the attributed function.
-                Defaults to {}.
+                These can be specified by the user while calling the top level `attribute` methods. Defaults to {}.
+
         Returns:
             :class:`~inseq.data.GradientFeatureAttributionStepOutput`: A dataclass containing a tensor of source
                 attributions of size `(batch_size, source_length)`, possibly a tensor of target attributions of size
@@ -99,15 +86,7 @@ class GradientAttribution(FeatureAttribution, Registry):
                 `(batch_size)` if the attribution step supports deltas and they are requested. At this point the batch
                 information is empty, and will later be filled by the enrich_step_output function.
         """
-        logger.debug(f"batch: {batch},\ntarget_ids: {pretty_tensor(target_ids, lpad=4)}")
-        attribute_fn_args = self.format_attribute_args(
-            batch=batch,
-            target_ids=target_ids,
-            attributed_fn=attributed_fn,
-            attribute_target=attribute_target,
-            attributed_fn_args=attributed_fn_args,
-        )
-        attr = self.method.attribute(**attribute_fn_args, **attribution_args)
+        attr = self.method.attribute(**attribute_fn_main_args, **attribution_args)
         deltas = None
         if (
             attribution_args.get("return_convergence_delta", False)

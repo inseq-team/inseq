@@ -82,7 +82,6 @@ def test_contrastive_attribution(saliency_mt_model):
     out = saliency_mt_model.attribute(
         "I can't believe it",
         "Non posso crederci.",
-        n_steps=10,
         attributed_fn="contrast_logits_diff",
         contrast_ids=contrast.input_ids,
         contrast_attention_mask=contrast.attention_mask,

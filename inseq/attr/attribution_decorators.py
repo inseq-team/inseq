@@ -54,7 +54,7 @@ def unset_hook(f: Callable[[Any], Any]) -> Callable[[Any], Any]:
     return unset_hook_wrapper
 
 
-def batched(f: Callable[[Any], Any]) -> Callable[[Any], Any]:
+def batched(f: Callable[..., Any]) -> Callable[..., Any]:
     """
     Decorator that enables batching of the args
     """
@@ -64,8 +64,10 @@ def batched(f: Callable[[Any], Any]) -> Callable[[Any], Any]:
         def get_batched(bs: Optional[int], seq: Sequence[Any]) -> List[List[Any]]:
             if isinstance(seq, str):
                 seq = [seq]
-            if isinstance(seq, list) or isinstance(seq, tuple):
+            if isinstance(seq, list):
                 return [seq[i : i + bs] for i in range(0, len(seq), bs)]  # noqa
+            if isinstance(seq, tuple):
+                return list(zip(*[get_batched(bs, s) for s in seq]))
             elif isinstance(seq, TensorWrapper):
                 return [seq.slice_batch(slice(i, i + bs)) for i in range(0, len(seq), bs)]  # noqa
             else:

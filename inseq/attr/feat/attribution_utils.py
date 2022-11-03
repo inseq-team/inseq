@@ -1,4 +1,4 @@
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple
 
 import logging
 import math
@@ -6,7 +6,7 @@ import math
 import torch
 
 from ...data.attribution import DEFAULT_ATTRIBUTION_AGGREGATE_DICT, FeatureAttributionStepOutput
-from ...data.batch import DecoderOnlyBatch, EncoderDecoderBatch
+from ...data.batch import EncoderDecoderBatch
 from ...utils import extract_signature_args, output2ce, output2ent, output2ppl, output2prob
 from ...utils.typing import (
     OneOrMoreAttributionSequences,
@@ -17,6 +17,11 @@ from ...utils.typing import (
     TextInput,
     TokenWithId,
 )
+
+
+if TYPE_CHECKING:
+    from ...models import AttributionModel
+    from .feature_attribution import FeatureAttribution
 
 
 STEP_SCORES_MAP = {
@@ -42,24 +47,6 @@ def tok2string(
         [tokens[start[i] : end[i]] for i, tokens in enumerate(token_lists)],  # noqa: E203
         as_targets=as_targets,
     )
-
-
-def get_attribution_sentences(
-    attribution_model: "AttributionModel",
-    batch: EncoderDecoderBatch,
-    start: int,
-    end: int,
-) -> Tuple[List[str], List[str], List[int]]:
-    source_sentences = tok2string(attribution_model, batch.sources.input_tokens, as_targets=False)
-    target_sentences = tok2string(attribution_model, batch.targets.input_tokens)
-    if isinstance(source_sentences, str):
-        source_sentences = [source_sentences]
-        target_sentences = [target_sentences]
-    tokenized_target_sentences = [
-        attribution_model.convert_string_to_tokens(sent, as_targets=True) for sent in target_sentences
-    ]
-    lengths = [min(end, len(tts) + 1) - start for tts in tokenized_target_sentences]
-    return source_sentences, target_sentences, lengths
 
 
 def get_split_targets(
@@ -188,7 +175,7 @@ def extract_args(
     step_scores: List[str],
     default_args: List[str],
     **kwargs,
-) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+) -> Tuple[Dict[str, Any], Dict[str, Any], Dict[str, Any]]:
     attribution_args = kwargs.pop("attribution_args", {})
     attributed_fn_args = kwargs.pop("attributed_fn_args", {})
     step_scores_args = kwargs.pop("step_scores_args", {})
@@ -224,114 +211,6 @@ def extract_args(
     attributed_fn_args.update(extra_attributed_fn_args)
     step_scores_args.update(extra_step_scores_args)
     return attribution_args, attributed_fn_args, step_scores_args
-
-
-def format_attribute_args(
-    batch: Union[EncoderDecoderBatch, DecoderOnlyBatch],
-    target_ids: TargetIdsTensor,
-    attributed_fn: Callable[..., SingleScorePerStepTensor],
-    attribute_target: bool = False,
-    attributed_fn_args: Dict[str, Any] = {},
-    is_layer_attribution: bool = False,
-    use_baseline: bool = False,
-    is_encoder_decoder: bool = True,
-) -> Dict[str, Any]:
-    format_args = {
-        "batch": batch,
-        "target_ids": target_ids,
-        "attributed_fn": attributed_fn,
-        "attributed_fn_args": attributed_fn_args,
-        "is_layer_attribution": is_layer_attribution,
-    }
-    if is_encoder_decoder:
-        format_fn = format_attribute_args_encoder_decoder
-        format_args["attribute_target"] = attribute_target
-    else:
-        format_fn = format_attribute_args_decoder_only
-    attribute_fn_args, baselines = format_fn(**format_args)
-    if use_baseline:
-        attribute_fn_args["baselines"] = baselines
-    return attribute_fn_args
-
-
-def format_attribute_args_encoder_decoder(
-    batch: EncoderDecoderBatch,
-    target_ids: TargetIdsTensor,
-    attributed_fn: Callable[..., SingleScorePerStepTensor],
-    attribute_target: bool = False,
-    attributed_fn_args: Dict[str, Any] = {},
-    is_layer_attribution: bool = False,
-) -> Tuple[Dict[str, Any], Optional[Tuple[torch.Tensor]]]:
-    if is_layer_attribution:
-        inputs = (batch.sources.input_ids,)
-        baselines = (batch.sources.baseline_ids,)
-    else:
-        inputs = (batch.sources.input_embeds,)
-        baselines = (batch.sources.baseline_embeds,)
-    if attribute_target:
-        inputs = inputs + (batch.targets.input_embeds,)
-        baselines = baselines + (batch.targets.baseline_embeds,)
-    attribute_fn_args = {
-        "inputs": inputs,
-        "additional_forward_args": (
-            # Ids are always explicitly passed as extra arguments to enable
-            # usage in custom attribution functions.
-            batch.sources.input_ids,
-            batch.targets.input_ids,
-            # Making targets 2D enables _expand_additional_forward_args
-            # in Captum to preserve the expected batch dimension for methods
-            # such as intergrated gradients.
-            target_ids.unsqueeze(-1),
-            attributed_fn,
-            batch.sources.attention_mask,
-            batch.targets.attention_mask,
-            # Defines how to treat source and target tensors
-            # Maps on the use_embeddings argument of forward
-            not is_layer_attribution,
-            list(attributed_fn_args.keys()),
-        )
-        + tuple(attributed_fn_args.values()),
-    }
-    if not attribute_target:
-        attribute_fn_args["additional_forward_args"] = (batch.targets.input_embeds,) + attribute_fn_args[
-            "additional_forward_args"
-        ]
-    return attribute_fn_args, baselines
-
-
-def format_attribute_args_decoder_only(
-    batch: DecoderOnlyBatch,
-    target_ids: TargetIdsTensor,
-    attributed_fn: Callable[..., SingleScorePerStepTensor],
-    attributed_fn_args: Dict[str, Any] = {},
-    is_layer_attribution: bool = False,
-) -> Tuple[Dict[str, Any], Optional[Tuple[torch.Tensor]]]:
-    if is_layer_attribution:
-        inputs = (batch.input_ids,)
-        baselines = (batch.baseline_ids,)
-    else:
-        inputs = (batch.input_embeds,)
-        baselines = (batch.baseline_embeds,)
-    attribute_fn_args = {
-        "inputs": inputs,
-        "additional_forward_args": (
-            # Ids are always explicitly passed as extra arguments to enable
-            # usage in custom attribution functions.
-            batch.input_ids,
-            # Making targets 2D enables _expand_additional_forward_args
-            # in Captum to preserve the expected batch dimension for methods
-            # such as intergrated gradients.
-            target_ids.unsqueeze(-1),
-            attributed_fn,
-            batch.attention_mask,
-            # Defines how to treat source and target tensors
-            # Maps on the use_embeddings argument of forward
-            not is_layer_attribution,
-            list(attributed_fn_args.keys()),
-        )
-        + tuple(attributed_fn_args.values()),
-    }
-    return attribute_fn_args, baselines
 
 
 def list_step_scores() -> List[str]:

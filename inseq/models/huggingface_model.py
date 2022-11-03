@@ -12,7 +12,7 @@ from transformers import (
     AutoModelForSeq2SeqLM,
     AutoTokenizer,
     PreTrainedModel,
-    PreTrainedTokenizerBase,
+    PreTrainedTokenizer,
 )
 from transformers.modeling_outputs import CausalLMOutput, ModelOutput, Seq2SeqLMOutput
 
@@ -31,6 +31,8 @@ from ..utils.typing import (
     VocabularyEmbeddingsTensor,
 )
 from .attribution_model import AttributionModel
+from .decoder_only import DecoderOnlyAttributionModel
+from .encoder_decoder import EncoderDecoderAttributionModel
 from .model_decorators import unhooked
 
 
@@ -65,10 +67,10 @@ class HuggingfaceModel(AttributionModel):
         self,
         model: Union[str, PreTrainedModel],
         attribution_method: Optional[str] = None,
-        tokenizer: Union[str, PreTrainedTokenizerBase, None] = None,
-        device: str = None,
+        tokenizer: Union[str, PreTrainedTokenizer, None] = None,
+        device: Optional[str] = None,
         **kwargs,
-    ) -> NoReturn:
+    ) -> None:
         """
         Initialize the AttributionModel with a Huggingface-compatible model.
         Performs the setup for model and embeddings.
@@ -106,7 +108,7 @@ class HuggingfaceModel(AttributionModel):
                 )
         tokenizer_inputs = kwargs.pop("tokenizer_inputs", {})
         tokenizer_kwargs = kwargs.pop("tokenizer_kwargs", {})
-        if isinstance(tokenizer, PreTrainedTokenizerBase):
+        if isinstance(tokenizer, PreTrainedTokenizer):
             self.tokenizer = tokenizer
         else:
             self.tokenizer = AutoTokenizer.from_pretrained(tokenizer, *tokenizer_inputs, **tokenizer_kwargs)
@@ -119,66 +121,55 @@ class HuggingfaceModel(AttributionModel):
         self.configure_embeddings_scale()
         self.setup(device, attribution_method, **kwargs)
 
+    @staticmethod
+    def load(
+        model: Union[str, PreTrainedModel],
+        attribution_method: Optional[str] = None,
+        tokenizer: Union[str, PreTrainedTokenizer, None] = None,
+        device: str = None,
+        **kwargs,
+    ) -> "HuggingfaceModel":
+        """Loads a HuggingFace model and tokenizer and wraps them in the appropriate AttributionModel."""
+        if isinstance(model, str):
+            is_encoder_decoder = AutoConfig.from_pretrained(model).is_encoder_decoder
+        else:
+            is_encoder_decoder = model.config.is_encoder_decoder
+        if is_encoder_decoder:
+            return HuggingfaceEncoderDecoderModel(model, attribution_method, tokenizer, device, **kwargs)
+        else:
+            return HuggingfaceDecoderOnlyModel(model, attribution_method, tokenizer, device, **kwargs)
+
     @abstractmethod
-    def configure_embeddings_scale(self) -> NoReturn:
+    def configure_embeddings_scale(self) -> None:
         """Configure the scale factor for embeddings."""
         pass
 
     @property
     def info(self) -> Dict[str, str]:
-        dic_info = super().info
-        dic_info.update(
-            {
-                "tokenizer_name": self.tokenizer_name,
-                "tokenizer_class": self.tokenizer.__class__.__name__,
-            }
-        )
+        dic_info: Dict[str, str] = super().info
+        extra_info = {
+            "tokenizer_name": self.tokenizer_name,
+            "tokenizer_class": self.tokenizer.__class__.__name__,
+        }
+        dic_info.update(extra_info)
         return dic_info
 
+    @abstractmethod
     def forward(
         self,
-        encoder_tensors: AttributionForwardInputs,
-        decoder_input_embeds: AttributionForwardInputs,
-        encoder_input_ids: IdsTensor,
-        decoder_input_ids: IdsTensor,
-        target_ids: ExpandedTargetIdsTensor,
         attributed_fn: Callable[..., SingleScorePerStepTensor],
-        encoder_attention_mask: Optional[IdsTensor] = None,
-        decoder_attention_mask: Optional[IdsTensor] = None,
-        use_embeddings: bool = True,
         attributed_fn_argnames: Optional[List[str]] = None,
         *args,
+        **kwargs,
     ) -> FullLogitsTensor:
-        assert len(args) == len(attributed_fn_argnames), "Number of arguments and number of argnames must match"
-        target_ids = target_ids.squeeze(-1)
-        encoder_embeds = encoder_tensors if use_embeddings else None
-        encoder_ids = None if use_embeddings else encoder_tensors
-        output = self.model(
-            input_ids=encoder_ids,
-            inputs_embeds=encoder_embeds,
-            attention_mask=encoder_attention_mask,
-            decoder_inputs_embeds=decoder_input_embeds,
-            decoder_attention_mask=decoder_attention_mask,
-        )
-        logger.debug(f"logits: {pretty_tensor(output.logits)}")
-        return attributed_fn(
-            attribution_model=self,
-            forward_output=output,
-            encoder_input_ids=encoder_input_ids,
-            decoder_input_ids=decoder_input_ids,
-            encoder_input_embeds=encoder_embeds,
-            decoder_input_embeds=decoder_input_embeds,
-            target_ids=target_ids,
-            encoder_attention_mask=encoder_attention_mask,
-            decoder_attention_mask=decoder_attention_mask,
-            **{k: v for k, v in zip(attributed_fn_argnames, args) if v is not None},
-        )
+        pass
 
     @unhooked
     def generate(
         self,
         inputs: Union[TextInput, BatchEncoding],
         return_generation_output: bool = False,
+        max_new_tokens: int = 512,
         **kwargs,
     ) -> Union[List[str], Tuple[List[str], ModelOutput]]:
         """Wrapper of model.generate to handle tokenization and decoding.
@@ -202,6 +193,7 @@ class HuggingfaceModel(AttributionModel):
             input_ids=inputs.input_ids,
             attention_mask=inputs.attention_mask,
             return_dict_in_generate=True,
+            max_new_tokens=max_new_tokens,
             **kwargs,
         )
         texts = self.tokenizer.batch_decode(
@@ -304,7 +296,7 @@ class HuggingfaceModel(AttributionModel):
         self,
         tokens: OneOrMoreTokenSequences,
         skip_special_tokens: bool = True,
-        as_targets: bool = True,
+        as_targets: bool = False,
     ) -> TextInput:
         if isinstance(tokens, list) and len(tokens) == 0:
             return ""
@@ -348,7 +340,7 @@ class HuggingfaceModel(AttributionModel):
         return self.model.get_input_embeddings()
 
 
-class HuggingfaceEncoderDecoderModel(HuggingfaceModel):
+class HuggingfaceEncoderDecoderModel(HuggingfaceModel, EncoderDecoderAttributionModel):
     """Model wrapper for any ForConditionalGeneration model on the HuggingFace Hub used to enable
     feature attribution. Corresponds to AutoModelForSeq2SeqLM auto classes in HF transformers.
 
@@ -363,7 +355,7 @@ class HuggingfaceEncoderDecoderModel(HuggingfaceModel):
         self,
         model: Union[str, PreTrainedModel],
         attribution_method: Optional[str] = None,
-        tokenizer: Union[str, PreTrainedTokenizerBase, None] = None,
+        tokenizer: Union[str, PreTrainedTokenizer, None] = None,
         device: str = None,
         **kwargs,
     ) -> NoReturn:
@@ -377,8 +369,47 @@ class HuggingfaceEncoderDecoderModel(HuggingfaceModel):
         if hasattr(decoder, "embed_scale") and decoder.embed_scale != self.embed_scale:
             raise ValueError("Different encoder and decoder embed scales are not supported")
 
+    def forward(
+        self,
+        encoder_tensors: AttributionForwardInputs,
+        decoder_input_embeds: AttributionForwardInputs,
+        encoder_input_ids: IdsTensor,
+        decoder_input_ids: IdsTensor,
+        target_ids: ExpandedTargetIdsTensor,
+        attributed_fn: Callable[..., SingleScorePerStepTensor],
+        encoder_attention_mask: Optional[IdsTensor] = None,
+        decoder_attention_mask: Optional[IdsTensor] = None,
+        use_embeddings: bool = True,
+        attributed_fn_argnames: Optional[List[str]] = None,
+        *args,
+    ) -> FullLogitsTensor:
+        assert len(args) == len(attributed_fn_argnames), "Number of arguments and number of argnames must match"
+        target_ids = target_ids.squeeze(-1)
+        encoder_embeds = encoder_tensors if use_embeddings else None
+        encoder_ids = None if use_embeddings else encoder_tensors
+        output = self.model(
+            input_ids=encoder_ids,
+            inputs_embeds=encoder_embeds,
+            attention_mask=encoder_attention_mask,
+            decoder_inputs_embeds=decoder_input_embeds,
+            decoder_attention_mask=decoder_attention_mask,
+        )
+        logger.debug(f"logits: {pretty_tensor(output.logits)}")
+        return attributed_fn(
+            attribution_model=self,
+            forward_output=output,
+            encoder_input_ids=encoder_input_ids,
+            decoder_input_ids=decoder_input_ids,
+            encoder_input_embeds=encoder_embeds,
+            decoder_input_embeds=decoder_input_embeds,
+            target_ids=target_ids,
+            encoder_attention_mask=encoder_attention_mask,
+            decoder_attention_mask=decoder_attention_mask,
+            **{k: v for k, v in zip(attributed_fn_argnames, args) if v is not None},
+        )
 
-class HuggingfaceDecoderOnlyModel(HuggingfaceModel):
+
+class HuggingfaceDecoderOnlyModel(HuggingfaceModel, DecoderOnlyAttributionModel):
     """Model wrapper for any ForCausalLM or LMHead model on the HuggingFace Hub used to enable
     feature attribution. Corresponds to AutoModelForCausalLM auto classes in HF transformers.
 
@@ -393,7 +424,7 @@ class HuggingfaceDecoderOnlyModel(HuggingfaceModel):
         self,
         model: Union[str, PreTrainedModel],
         attribution_method: Optional[str] = None,
-        tokenizer: Union[str, PreTrainedTokenizerBase, None] = None,
+        tokenizer: Union[str, PreTrainedTokenizer, None] = None,
         device: str = None,
         **kwargs,
     ) -> NoReturn:
@@ -407,21 +438,3 @@ class HuggingfaceDecoderOnlyModel(HuggingfaceModel):
     def configure_embeddings_scale(self):
         if hasattr(self.model, "embed_scale"):
             self.embed_scale = self.model.embed_scale
-
-
-def load_huggingface_model(
-    model: Union[str, PreTrainedModel],
-    attribution_method: Optional[str] = None,
-    tokenizer: Union[str, PreTrainedTokenizerBase, None] = None,
-    device: str = None,
-    **kwargs,
-) -> "HuggingfaceModel":
-    """Loads a HuggingFace model and tokenizer and wraps them in the appropriate AttributionModel."""
-    if isinstance(model, str):
-        is_encoder_decoder = AutoConfig.from_pretrained(model).is_encoder_decoder
-    else:
-        is_encoder_decoder = model.config.is_encoder_decoder
-    if is_encoder_decoder:
-        return HuggingfaceEncoderDecoderModel(model, attribution_method, tokenizer, device, **kwargs)
-    else:
-        return HuggingfaceDecoderOnlyModel(model, attribution_method, tokenizer, device, **kwargs)

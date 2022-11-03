@@ -201,18 +201,26 @@ class SequenceAttributionAggregator(Aggregator):
         return attr.sequence_scores
 
     @staticmethod
+    def aggregate_attr_pos_start(attr, **kwargs):
+        return attr.attr_pos_start
+
+    @staticmethod
+    def aggregate_attr_pos_end(attr, **kwargs):
+        return attr.attr_pos_end
+
+    @staticmethod
     def is_compatible(attr):
         from .attribution import FeatureAttributionSequenceOutput
 
         assert isinstance(attr, FeatureAttributionSequenceOutput)
         assert attr.source_attributions.shape[0] == len(attr.source)
-        assert attr.source_attributions.shape[1] == len(attr.target)
+        assert attr.source_attributions.shape[1] == attr.attr_pos_end - attr.attr_pos_start
         if attr.target_attributions is not None:
-            assert attr.target_attributions.shape[0] == len(attr.target)
-            assert attr.target_attributions.shape[1] == len(attr.target)
+            assert attr.target_attributions.shape[0] == min(len(attr.target), attr.attr_pos_end - 1)
+            assert attr.target_attributions.shape[1] == attr.attr_pos_end - attr.attr_pos_start
         if attr.step_scores is not None:
             for step_score in attr.step_scores.values():
-                assert len(step_score) == len(attr.target)
+                assert len(step_score) == attr.attr_pos_end - attr.attr_pos_start
         if attr.sequence_scores is not None:
             for sequence_score in attr.sequence_scores.values():
                 assert sequence_score.shape == attr.source_attributions.shape

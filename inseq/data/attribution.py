@@ -77,6 +77,8 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
     target_attributions: Optional[SequenceAttributionTensor] = None
     step_scores: Optional[Dict[str, SingleScoresPerSequenceTensor]] = None
     sequence_scores: Optional[Dict[str, MultipleScoresPerSequenceTensor]] = None
+    attr_pos_start: int = 0
+    attr_pos_end: Optional[int] = None
     _aggregator: Union[AggregatorPipeline, Type[Aggregator]] = None
     _dict_aggregate_fn: Dict[str, Any] = None
 
@@ -89,13 +91,18 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
             self._dict_aggregate_fn = aggregate_dict
         if self._aggregator is None:
             self._aggregator = SequenceAttributionAggregator
+        if self.attr_pos_end is None or self.attr_pos_end > len(self.target) + 1:
+            self.attr_pos_end = len(self.target) + 1
 
     @classmethod
     def from_step_attributions(
         cls,
         attributions: List["FeatureAttributionStepOutput"],
+        tokenized_target_sentences: Optional[List[List[TokenWithId]]] = None,
         pad_id: Optional[Any] = None,
         has_bos_token: bool = True,
+        attr_pos_start: int = 0,
+        attr_pos_end: Optional[int] = None,
     ) -> List["FeatureAttributionSequenceOutput"]:
         attr = attributions[0]
         seq_attr_cls = attr._sequence_cls
@@ -108,6 +115,10 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
         targets = [
             drop_padding([a.target[seq_id][0] for a in attributions], pad_id) for seq_id in range(num_sequences)
         ]
+        if tokenized_target_sentences is None:
+            tokenized_target_sentences = targets
+        if attr_pos_end is None:
+            attr_pos_end = max([len(t) for t in tokenized_target_sentences])
         for seq_id in range(num_sequences):
             # Remove padding from tensor
             filtered_source_attribution = source_attributions[seq_id][
@@ -116,8 +127,10 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
             seq_attributions.append(
                 seq_attr_cls(
                     source=sources[seq_id],
-                    target=targets[seq_id],
+                    target=tokenized_target_sentences[seq_id],
                     source_attributions=filtered_source_attribution,
+                    attr_pos_start=attr_pos_start,
+                    attr_pos_end=attr_pos_end,
                 )
             )
         if attr.target_attributions is not None:
@@ -128,9 +141,9 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
                 if has_bos_token:
                     target_attributions[seq_id] = target_attributions[seq_id][1:, ...]
                 target_attributions[seq_id] = target_attributions[seq_id][
-                    : len(targets[seq_id]), : len(targets[seq_id]), ...
+                    : len(tokenized_target_sentences[seq_id]), : len(targets[seq_id]), ...
                 ]
-                if target_attributions[seq_id].shape[0] != len(targets[seq_id]):
+                if target_attributions[seq_id].shape[0] != len(tokenized_target_sentences[seq_id]):
                     empty_final_row = torch.ones(1, *target_attributions[seq_id].shape[1:]) * float("nan")
                     target_attributions[seq_id] = torch.cat([target_attributions[seq_id], empty_final_row], dim=0)
                 seq_attributions[seq_id].target_attributions = target_attributions[seq_id]
@@ -194,7 +207,6 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
         if self.target_attributions is not None:
             target_attr = aggregated_attr.target_attributions.float().T
             self.target_attributions = (step_scores * target_attr).T
-        print(step_scores.shape, source_attr.shape, target_attr.shape)
         self._aggregator = AggregatorPipeline([])
         return self
 

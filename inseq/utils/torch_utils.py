@@ -68,7 +68,7 @@ def sum_normalize_attributions(
         attributions = attributions.unsqueeze(0)
     if concat:
         attributions = attributions.split(orig_sizes, dim=cat_dim)
-        return attributions[0], attributions[1] + torch.tril(torch.ones_like(attributions[1]) * float("nan"))
+        return attributions[0], attributions[1]
     return attributions
 
 

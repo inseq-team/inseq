@@ -147,16 +147,18 @@ def get_heatmap_type(
     if heatmap_type == "Source":
         return heatmap_func(
             attribution.source_attributions.numpy(),
-            [t.token for t in attribution.target],
+            [t.token for t in attribution.target[attribution.attr_pos_start - 1: attribution.attr_pos_end]], # noqa
             [t.token for t in attribution.source],
             colors,
             step_scores,
             label="Source",
         )
     elif heatmap_type == "Target":
+        mask = np.ones_like(attribution.target_attributions.numpy()) * float("nan")
+        mask = np.tril(mask, k=1 - attribution.attr_pos_start)
         return heatmap_func(
-            attribution.target_attributions.numpy(),
-            [t.token for t in attribution.target],
+            attribution.target_attributions.numpy() + mask,
+            [t.token for t in attribution.target[attribution.attr_pos_start - 1: attribution.attr_pos_end]], # noqa
             [t.token for t in attribution.target],
             colors,
             step_scores,

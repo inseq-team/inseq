@@ -26,8 +26,6 @@ from torchtyping import TensorType
 
 from ...data import (
     Batch,
-    BatchEmbedding,
-    BatchEncoding,
     EncoderDecoderBatch,
     FeatureAttributionInput,
     FeatureAttributionOutput,
@@ -43,14 +41,17 @@ from ...utils import (
     get_available_methods,
     pretty_tensor,
 )
-from ...utils.typing import ModelIdentifier, SingleScorePerStepTensor, TargetIdsTensor
+from ...utils.typing import (
+    ModelIdentifier,
+    SingleScorePerStepTensor,
+    TargetIdsTensor,
+    TokenWithId,
+)
 from ..attribution_decorators import batched, set_hook, unset_hook
 from .attribution_utils import (
     STEP_SCORES_MAP,
     check_attribute_positions,
     enrich_step_output,
-    format_attribute_args,
-    get_attribution_sentences,
     get_split_targets,
     get_step_scores,
 )
@@ -156,8 +157,7 @@ class FeatureAttribution(Registry):
     @batched
     def prepare_and_attribute(
         self,
-        sources: FeatureAttributionInput,
-        targets: FeatureAttributionInput,
+        inputs: Union[FeatureAttributionInput, Tuple[FeatureAttributionInput, FeatureAttributionInput]],
         attr_pos_start: Optional[int] = 1,
         attr_pos_end: Optional[int] = None,
         show_progress: bool = True,
@@ -176,13 +176,11 @@ class FeatureAttribution(Registry):
         Prepares inputs and performs attribution.
 
         Wraps the attribution method :meth:`~inseq.attr.feat.FeatureAttribution.attribute` method
-        and the :meth:`~inseq.attr.feat.FeatureAttribution.prepare` method.
+        and the :meth:`~inseq.models.AttributionModel.prepare_inputs_for_attribution` method.
 
         Args:
-            sources (:obj:`FeatureAttributionInput`): The sources provided to the
-                :meth:`~inseq.attr.feat.FeatureAttribution.prepare` method.
-            targets (:obj:`FeatureAttributionInput): The targets provided to the
-                :meth:`~inseq.attr.feat.FeatureAttribution.prepare` method.
+            inputs (:obj:`FeatureAttributionInput` or :obj:`tuple` of :obj:`FeatureAttributionInput`): The inputs
+                provided to the :meth:`~inseq.models.AttributionModel.prepare_inputs_for_attribution` method.
             attr_pos_start (:obj:`int`, `optional`): The initial position for performing
                 sequence attribution. Defaults to 0.
             attr_pos_end (:obj:`int`, `optional`): The final position for performing sequence
@@ -214,7 +212,12 @@ class FeatureAttribution(Registry):
                 an optional added list of single :class:`~inseq.data.FeatureAttributionStepOutput` for each step and
                 extra information regarding the attribution parameters.
         """
-        batch = self.prepare(sources, targets, prepend_bos_token, include_eos_baseline)
+        batch = self.attribution_model.prepare_inputs_for_attribution(
+            inputs,
+            prepend_bos_token,
+            include_eos_baseline,
+            self.is_layer_attribution,
+        )
         # If prepare_and_attribute was called from AttributionModel.attribute,
         # attributed_fn is already a Callable. Keep here to allow for usage independently
         # of AttributionModel.attribute.
@@ -236,8 +239,6 @@ class FeatureAttribution(Registry):
         )
         # Same here, repeated from AttributionModel.attribute
         # to allow independent usage
-        attribution_output.info["input_texts"] = [sources] if isinstance(sources, str) else sources
-        attribution_output.info["generated_texts"] = [targets] if isinstance(targets, str) else targets
         attribution_output.info["prepend_bos_token"] = prepend_bos_token
         attribution_output.info["include_eos_baseline"] = include_eos_baseline
         attribution_output.info["attributed_fn"] = attributed_fn.__name__
@@ -246,94 +247,9 @@ class FeatureAttribution(Registry):
         attribution_output.info["step_scores_args"] = step_scores_args
         return attribution_output
 
-    def prepare(
-        self,
-        sources: FeatureAttributionInput,
-        targets: FeatureAttributionInput,
-        prepend_bos_token: bool = True,
-        include_eos_baseline: bool = False,
-    ) -> EncoderDecoderBatch:
-        r"""
-        Prepares sources and target to produce an :class:`~inseq.data.EncoderDecoderBatch`.
-        There are two stages of preparation:
-
-            1. Raw text sources and target texts are encoded by the model.
-            2. The encoded sources and targets are converted to tensors for the forward pass.
-
-        This method is agnostic of the preparation stage of sources and targets. If they are both
-        raw text, they will undergo both steps. If they are already encoded, they will only be embedded.
-        If the feature attribution method works on layers, the embedding step is skipped and embeddings are
-        set to None.
-        The final result will be consistent in both cases.
-
-        Args:
-            sources (:obj:`FeatureAttributionInput`): The sources provided to the
-                :meth:`~inseq.attr.feat.FeatureAttribution.prepare` method.
-            targets (:obj:`FeatureAttributionInput): The targets provided to the
-                :meth:`~inseq.attr.feat.FeatureAttribution.prepare` method.
-            prepend_bos_token (:obj:`bool`, `optional`): Whether to prepend a BOS token to the
-                targets, if they are to be encoded. Defaults to True.
-            include_eos_baseline (:obj:`bool`, `optional`): Whether to include the EOS token in the baseline for
-                attribution. By default the EOS token is not used for attribution. Defaults to False.
-
-        Returns:
-            :obj:`EncoderDecoderBatch`: An :class:`~inseq.data.EncoderDecoderBatch` object containing sources
-                and targets in encoded and embedded formats for all inputs.
-        """
-        if isinstance(sources, Batch):
-            source_batch = sources
-        else:
-            if isinstance(sources, str) or isinstance(sources, list):
-                source_encodings: BatchEncoding = self.attribution_model.encode(
-                    sources, return_baseline=True, include_eos_baseline=include_eos_baseline
-                )
-            elif isinstance(sources, BatchEncoding):
-                source_encodings = sources
-            else:
-                raise ValueError(
-                    f"sources must be either a string, a list of strings, a BatchEncoding or a Batch, "
-                    f"not {type(sources)}"
-                )
-            # Even when we are performing layer attribution, we might need the embeddings
-            # to compute step probabilities.
-            source_embeddings = BatchEmbedding(
-                input_embeds=self.attribution_model.embed(source_encodings.input_ids),
-                baseline_embeds=self.attribution_model.embed(source_encodings.baseline_ids),
-            )
-            source_batch = Batch(source_encodings, source_embeddings)
-
-        if isinstance(targets, Batch):
-            target_batch = targets
-        else:
-            if isinstance(targets, str) or isinstance(targets, list):
-                target_encodings: BatchEncoding = self.attribution_model.encode(
-                    targets,
-                    as_targets=True,
-                    prepend_bos_token=prepend_bos_token,
-                    return_baseline=True,
-                    include_eos_baseline=include_eos_baseline,
-                )
-            elif isinstance(targets, BatchEncoding):
-                target_encodings = targets
-            else:
-                raise ValueError(
-                    f"targets must be either a string, a list of strings, a BatchEncoding or a Batch, "
-                    f"not {type(targets)}"
-                )
-            baseline_embeds = None
-            if not self.is_layer_attribution:
-                baseline_embeds = self.attribution_model.embed(target_encodings.baseline_ids, as_targets=True)
-            target_embeddings = BatchEmbedding(
-                input_embeds=self.attribution_model.embed(target_encodings.input_ids, as_targets=True),
-                baseline_embeds=baseline_embeds,
-            )
-            target_batch = Batch(target_encodings, target_embeddings)
-        encoder_decoder_batch = EncoderDecoderBatch(source_batch, target_batch)
-        return encoder_decoder_batch.to(self.attribution_model.device)
-
     def attribute(
         self,
-        batch: EncoderDecoderBatch,
+        batch: Union[Batch, EncoderDecoderBatch],
         attributed_fn: Callable[..., SingleScorePerStepTensor],
         attr_pos_start: Optional[int] = 1,
         attr_pos_end: Optional[int] = None,
@@ -348,10 +264,11 @@ class FeatureAttribution(Registry):
         step_scores_args: Dict[str, Any] = {},
     ) -> FeatureAttributionOutput:
         r"""
-        Attributes each target token to each source token for every sequence in the batch.
+        Performs the feature attribution procedure using the specified attribution method.
 
         Args:
-            batch (:class:`~inseq.data.EncoderDecoderBatch`): The batch of sequences to attribute.
+            batch (:class:`~inseq.data.EncoderDecoderBatch` or :class:`~inseq.data.Batch`): The batch of sequences to
+                attribute.
             attributed_fn (:obj:`Callable[..., SingleScorePerStepTensor]`): The function of model
                 outputs representing what should be attributed (e.g. output probits of model best
                 prediction after softmax). It must be a function that taking multiple keyword
@@ -384,19 +301,29 @@ class FeatureAttribution(Registry):
             raise ValueError(
                 "Layer attribution methods do not support attribute_target=True. Use regular ones instead."
             )
-        start = datetime.now()
-        max_generated_length = batch.targets.input_ids.shape[1]
         attr_pos_start, attr_pos_end = check_attribute_positions(
-            max_generated_length,
+            batch.max_generation_length,
             attr_pos_start,
             attr_pos_end,
         )
         logger.debug("=" * 30 + f"\nfull batch: {batch}\n" + "=" * 30)
-        sources, targets, lengths = get_attribution_sentences(
-            self.attribution_model, batch, attr_pos_start, attr_pos_end
-        )
+        sources = self.attribution_model.convert_tokens_to_string(batch.sources.input_tokens)
+        targets = self.attribution_model.convert_tokens_to_string(batch.targets.input_tokens, as_targets=True)
+        tokenized_target_sentences = [
+            self.attribution_model.convert_string_to_tokens(sent, as_targets=True, skip_special_tokens=False)
+            for sent in targets
+        ]
+        ids_target_sentences = self.attribution_model.convert_tokens_to_ids(tokenized_target_sentences)
+        target_tokens_with_ids = [
+            [
+                TokenWithId(tokenized_target_sentences[sent_idx][tok_idx], ids_target_sentences[sent_idx][tok_idx])
+                for tok_idx in range(len(tokenized_target_sentences[sent_idx]))
+            ]
+            for sent_idx in range(len(tokenized_target_sentences))
+        ]
+        targets_lengths = [min(attr_pos_end, len(tts)) - attr_pos_start for tts in tokenized_target_sentences]
         pbar = get_progress_bar(
-            all_sentences=(sources, targets, lengths),
+            all_sentences=(sources, targets, targets_lengths),
             method_name=self.method_name,
             show=show_progress,
             pretty=pretty_progress,
@@ -405,6 +332,9 @@ class FeatureAttribution(Registry):
         )
         whitespace_indexes = find_char_indexes(targets, " ")
         attribution_outputs = []
+        start = datetime.now()
+
+        # Attribution loop for generation
         for step in range(attr_pos_start, attr_pos_end):
             step_output = self.filtered_attribute_step(
                 batch[:step],
@@ -431,12 +361,17 @@ class FeatureAttribution(Registry):
                 )
             else:
                 update_progress_bar(pbar, show=show_progress, pretty=pretty_progress)
+        end = datetime.now()
         close_progress_bar(pbar, show=show_progress, pretty=pretty_progress)
         batch.to("cpu")
-        end = datetime.now()
         out = FeatureAttributionOutput(
             sequence_attributions=FeatureAttributionSequenceOutput.from_step_attributions(
-                attribution_outputs, self.attribution_model.pad_token, prepend_bos_token
+                attributions=attribution_outputs,
+                tokenized_target_sentences=target_tokens_with_ids,
+                pad_id=self.attribution_model.pad_token,
+                has_bos_token=prepend_bos_token,
+                attr_pos_start=attr_pos_start,
+                attr_pos_end=attr_pos_end,
             ),
             step_attributions=attribution_outputs if output_step_attributions else None,
             info={
@@ -509,14 +444,17 @@ class FeatureAttribution(Registry):
             f"\ntarget_ids: {pretty_tensor(target_ids)},\n"
             f"target_attention_mask: {pretty_tensor(target_attention_mask)}"
         )
+        attribute_main_args = self.format_attribute_args(
+            batch=batch,
+            target_ids=target_ids,
+            attributed_fn=attributed_fn,
+            attribute_target=attribute_target,
+            attributed_fn_args=attributed_fn_args,
+        )
         # Perform attribution step
         step_output = self.attribute_step(
-            batch,
-            target_ids,
-            attributed_fn,
-            attribute_target,
+            attribute_main_args,
             attribution_args,
-            attributed_fn_args,
         )
         # Calculate step scores
         for step_score in step_scores:
@@ -549,41 +487,18 @@ class FeatureAttribution(Registry):
 
     def format_attribute_args(
         self,
-        batch: EncoderDecoderBatch,
+        batch: Union[Batch, EncoderDecoderBatch],
         target_ids: TargetIdsTensor,
         attributed_fn: Callable[..., SingleScorePerStepTensor],
-        attribute_target: bool = False,
         attributed_fn_args: Dict[str, Any] = {},
+        **kwargs,
     ) -> Dict[str, Any]:
-        return format_attribute_args(
-            batch=batch,
-            target_ids=target_ids,
-            attributed_fn=attributed_fn,
-            attribute_target=attribute_target,
-            attributed_fn_args=attributed_fn_args,
-            is_layer_attribution=self.is_layer_attribution,
-            use_baseline=self.use_baseline,
-            is_encoder_decoder=self.attribution_model.is_encoder_decoder,
-        )
-
-    @abstractmethod
-    def attribute_step(
-        self,
-        batch: EncoderDecoderBatch,
-        target_ids: TensorType["batch_size", int],
-        attributed_fn: Callable[..., SingleScorePerStepTensor],
-        attribute_target: bool = False,
-        attribution_args: Dict[str, Any] = {},
-        attributed_fn_args: Dict[str, Any] = {},
-    ) -> FeatureAttributionStepOutput:
         r"""
-        Performs a single attribution step for the specified target_ids,
-        given sources and targets in the batch.
-
-        Abstract method, must be implemented by subclasses.
+        Formats inputs for the attribution method based on the model type and the attribution method requirements.
 
         Args:
-            batch (:class:`~inseq.data.EncoderDecoderBatch`): The batch of sequences on which attribution is performed.
+            batch (:class:`~inseq.data.Batch` or :class:`~inseq.data.EncoderDecoderBatch`): The batch of sequences on
+                which attribution is performed.
             target_ids (:obj:`torch.Tensor`): Target token ids of size `(batch_size)` corresponding to tokens
                 for which the attribution step must be performed.
             attributed_fn (:obj:`Callable[..., SingleScorePerStepTensor]`): The function of model outputs
@@ -592,16 +507,47 @@ class FeatureAttribution(Registry):
                 of size (batch_size,). If not provided, the default attributed function for the model will be used
                 (change attribution_model.default_attributed_fn_id).
             attribute_target (:obj:`bool`, optional): Whether to attribute the target prefix or not. Defaults to False.
-            attribution_args (:obj:`dict`, `optional`): Additional arguments to pass to the attribution method.
-                Defaults to {}.
             attributed_fn_args (:obj:`dict`, `optional`): Additional arguments to pass to the attributed function.
                 Defaults to {}.
+            **kwargs: Additional arguments to pass to the model-specific
+                :meth:`inseq.models.AttributionModel.format_attribution_args` method.
         Returns:
-            :class:`~inseq.data.FeatureAttributionStepOutput`: A dataclass containing attribution tensors for source
-                and target attributions of size `(batch_size, source_length)` and `(batch_size, prefix length)`.
-                (target optional if attribute_target=True), plus batch information and any step score present.
+            :obj:`dict`: A dictionary containing the formatted attribution arguments.
         """
-        pass
+        logger.debug(f"batch: {batch},\ntarget_ids: {pretty_tensor(target_ids, lpad=4)}")
+        attribute_fn_args, baselines = self.attribution_model.format_attribution_args(
+            batch=batch,
+            target_ids=target_ids,
+            attributed_fn=attributed_fn,
+            attributed_fn_args=attributed_fn_args,
+            is_layer_attribution=self.is_layer_attribution,
+            **kwargs,
+        )
+        if self.use_baseline:
+            attribute_fn_args["baselines"] = baselines
+        return attribute_fn_args
+
+    def attribute_step(
+        self,
+        attribute_fn_main_args: Dict[str, Any],
+        attribution_args: Dict[str, Any] = {},
+    ) -> Any:
+        r"""
+        Performs a single attribution step for the specified attribution arguments.
+
+        Args:
+            attribute_fn_main_args (:obj:`dict`): Main arguments used for the attribution method. These are built from
+                model inputs at the current step of the feature attribution process.
+            attribution_args (:obj:`dict`, `optional`): Additional arguments to pass to the attribution method.
+                These can be specified by the user while calling the top level `attribute` methods. Defaults to {}.
+
+        Returns:
+            :class:`~inseq.data.FeatureAttributionStepOutput`: A dataclass containing a tensor of source
+                attributions of size `(batch_size, source_length)`. At this point the batch
+                information is empty, and will later be filled by the enrich_step_output function.
+        """
+        attr = self.method.attribute(**attribute_fn_main_args, **attribution_args)
+        return FeatureAttributionStepOutput(source_attributions=attr, step_scores={})
 
     @abstractmethod
     @set_hook

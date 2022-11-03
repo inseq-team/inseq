@@ -1,31 +1,22 @@
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import logging
-from abc import ABC, abstractmethod, abstractstaticmethod
+from abc import ABC, abstractmethod
 
 import torch
-from rich.status import Status
 
 from ..attr import STEP_SCORES_MAP
 from ..attr.feat import FeatureAttribution, extract_args
-from ..data import BatchEncoding, FeatureAttributionOutput
-from ..utils import (
-    MissingAttributionMethodError,
-    check_device,
-    format_input_texts,
-    get_default_device,
-    isnotebook,
-    optional,
-)
+from ..data import Batch, BatchEncoding, EncoderDecoderBatch, FeatureAttributionOutput
+from ..utils import MissingAttributionMethodError, check_device, format_input_texts, get_default_device, isnotebook
 from ..utils.typing import (
     EmbeddingsTensor,
     FullLogitsTensor,
     IdsTensor,
-    ModelClass,
-    ModelIdentifier,
     OneOrMoreIdSequences,
     OneOrMoreTokenSequences,
     SingleScorePerStepTensor,
+    TargetIdsTensor,
     TextInput,
     VocabularyEmbeddingsTensor,
 )
@@ -159,8 +150,8 @@ class AttributionModel(ABC, torch.nn.Module):
             raise ValueError("At least one text must be provided to perform attribution.")
         if attribute_target and not self.is_encoder_decoder:
             logger.warning("attribute_target parameter is set to True, but will be ignored (not an encoder-decoder).")
+        original_device = self.device
         if device is not None:
-            original_device = self.device
             self.device = device
         input_texts, generated_texts = format_input_texts(input_texts, generated_texts)
         if batch_size is not None:
@@ -171,9 +162,10 @@ class AttributionModel(ABC, torch.nn.Module):
         # If constrained decoding is not enabled, we need to generate the
         # generated texts from the input texts.
         generation_args = kwargs.pop("generation_args", {})
+        encoded_input = None
         if not constrained_decoding:
-            input_texts = self.encode(input_texts, return_baseline=True, include_eos_baseline=include_eos_baseline)
-            generated_texts = self.generate(input_texts, return_generation_output=False, **generation_args)
+            encoded_input = self.encode(input_texts, return_baseline=True, include_eos_baseline=include_eos_baseline)
+            generated_texts = self.generate(encoded_input, return_generation_output=False, **generation_args)
         logger.debug(f"reference_texts={generated_texts}")
         attribution_method = self.get_attribution_method(method, override_default_attribution)
         attributed_fn = self.get_attributed_fn(attributed_fn)
@@ -183,9 +175,10 @@ class AttributionModel(ABC, torch.nn.Module):
         if isnotebook():
             logger.debug("Pretty progress currently not supported in notebooks, falling back to tqdm.")
             pretty_progress = False
+        sources = input_texts if not constrained_decoding else encoded_input
+        inputs = (sources, generated_texts) if self.is_encoder_decoder else generated_texts
         attribution_outputs = attribution_method.prepare_and_attribute(
-            input_texts,
-            generated_texts,
+            inputs,
             batch_size=batch_size,
             attr_pos_start=attr_pos_start,
             attr_pos_end=attr_pos_end,
@@ -208,7 +201,7 @@ class AttributionModel(ABC, torch.nn.Module):
         )
         attribution_output.info["generation_args"] = generation_args
         attribution_output.info["constrained_decoding"] = constrained_decoding
-        if device is not None:
+        if device and original_device:
             self.device = original_device
         return attribution_output
 
@@ -220,6 +213,8 @@ class AttributionModel(ABC, torch.nn.Module):
             inputs = batch.input_ids
         return self.embed_ids(inputs, as_targets=as_targets)
 
+    # Framework-specific methods
+
     @unhooked
     @abstractmethod
     def generate(
@@ -230,7 +225,8 @@ class AttributionModel(ABC, torch.nn.Module):
     ) -> Union[List[str], Tuple[List[str], Any]]:
         pass
 
-    @abstractstaticmethod
+    @staticmethod
+    @abstractmethod
     def output2logits(forward_output) -> FullLogitsTensor:
         pass
 
@@ -267,6 +263,7 @@ class AttributionModel(ABC, torch.nn.Module):
         self,
         tokens: OneOrMoreTokenSequences,
         skip_special_tokens: Optional[bool] = True,
+        as_targets: bool = False,
     ) -> TextInput:
         pass
 
@@ -314,20 +311,26 @@ class AttributionModel(ABC, torch.nn.Module):
         """
         pass
 
+    # Architecture-specific methods
 
-def load_model(
-    model: Union[ModelIdentifier, ModelClass],
-    attribution_method: Optional[str] = None,
-    from_hf: bool = True,
-    **kwargs,
-) -> AttributionModel:
-    from .huggingface_model import load_huggingface_model
+    @abstractmethod
+    def prepare_inputs_for_attribution(
+        self,
+        inputs: Any,
+        prepend_bos_token: bool = True,
+        include_eos_baseline: bool = False,
+        use_layer_attribution: bool = False,
+    ) -> Union[Batch, EncoderDecoderBatch]:
+        pass
 
-    model_name = model if isinstance(model, str) else "model"
-    method_desc = f"with {attribution_method} method..." if attribution_method else " without attribution methods..."
-    load_msg = f"Loading {model_name} {method_desc}"
-    with optional(not isnotebook(), Status(load_msg), logger.info, msg=load_msg):
-        if from_hf:
-            return load_huggingface_model(model, attribution_method, **kwargs)
-        else:  # Default behavior is using Huggingface
-            return load_huggingface_model(model, attribution_method, **kwargs)
+    @staticmethod
+    @abstractmethod
+    def format_attribution_args(
+        batch: Union[Batch, EncoderDecoderBatch],
+        target_ids: TargetIdsTensor,
+        attributed_fn: Callable[..., SingleScorePerStepTensor],
+        attributed_fn_args: Dict[str, Any] = {},
+        is_layer_attribution: bool = False,
+        **kwargs,
+    ) -> Tuple[Dict[str, Any], Tuple[Union[IdsTensor, EmbeddingsTensor, None], ...]]:
+        pass
