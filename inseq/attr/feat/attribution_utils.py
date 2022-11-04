@@ -5,7 +5,7 @@ import math
 
 import torch
 
-from ...data.attribution import DEFAULT_ATTRIBUTION_AGGREGATE_DICT, FeatureAttributionStepOutput
+from ...data.attribution import DEFAULT_ATTRIBUTION_AGGREGATE_DICT
 from ...data.batch import EncoderDecoderBatch
 from ...utils import extract_signature_args, output2ce, output2ent, output2ppl, output2prob
 from ...utils.typing import (
