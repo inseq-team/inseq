@@ -41,26 +41,13 @@ def tok2string(
     end: Optional[int] = None,
     as_targets: bool = True,
 ) -> TextInput:
+    """Enables bounded tokenization of a list of lists of tokens with start and end positions."""
     start = [0 if start is None else start for _ in token_lists]
     end = [len(tokens) if end is None else end for tokens in token_lists]
     return attribution_model.convert_tokens_to_string(
         [tokens[start[i] : end[i]] for i, tokens in enumerate(token_lists)],  # noqa: E203
         as_targets=as_targets,
     )
-
-
-def get_split_targets(
-    attribution_model: "AttributionModel",
-    targets: OneOrMoreTokenSequences,
-    start: int,
-    end: int,
-    step: int,
-) -> Tuple[List[str], List[str], List[str], List[str]]:
-    skipped_prefixes = tok2string(attribution_model, targets, end=start)
-    attributed_sentences = tok2string(attribution_model, targets, start, step + 1)
-    unattributed_suffixes = tok2string(attribution_model, targets, step + 1, end)
-    skipped_suffixes = tok2string(attribution_model, targets, start=end)
-    return skipped_prefixes, attributed_sentences, unattributed_suffixes, skipped_suffixes
 
 
 def rescale_attributions_to_tokens(
@@ -139,34 +126,6 @@ def get_step_scores(
 
 def join_token_ids(tokens: OneOrMoreTokenSequences, ids: OneOrMoreIdSequences) -> List[TokenWithId]:
     return [[TokenWithId(token, id) for token, id in zip(tok_seq, idx_seq)] for tok_seq, idx_seq in zip(tokens, ids)]
-
-
-def enrich_step_output(
-    step_output: FeatureAttributionStepOutput,
-    batch: EncoderDecoderBatch,
-    target_tokens: OneOrMoreTokenSequences,
-    target_ids: TargetIdsTensor,
-) -> FeatureAttributionStepOutput:
-    r"""
-    Enriches the attribution output with token information, producing the finished
-    :class:`~inseq.data.FeatureAttributionStepOutput` object.
-
-    Args:
-        step_output (:class:`~inseq.data.FeatureAttributionStepOutput`): The output produced
-            by the attribution step, with missing batch information.
-        batch (:class:`~inseq.data.EncoderDecoderBatch`): The batch on which attribution was performed.
-        target_ids (:obj:`torch.Tensor`): Target token ids of size `(batch_size, 1)` corresponding to tokens
-            for which the attribution step was performed.
-
-    Returns:
-        :class:`~inseq.data.FeatureAttributionStepOutput`: The enriched attribution output.
-    """
-    if len(target_ids.shape) == 0:
-        target_ids = target_ids.unsqueeze(0)
-    step_output.source = join_token_ids(batch.sources.input_tokens, batch.sources.input_ids.tolist())
-    step_output.target = [[TokenWithId(token[0], id)] for token, id in zip(target_tokens, target_ids.tolist())]
-    step_output.prefix = join_token_ids(batch.targets.input_tokens, batch.targets.input_ids.tolist())
-    return step_output
 
 
 def extract_args(

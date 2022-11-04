@@ -36,6 +36,7 @@ from rich.text import Text
 from tqdm.std import tqdm
 
 from ..utils import isnotebook
+from ..utils.typing import TextSequences
 from ..utils.viz_utils import (
     final_plot_html,
     get_colors,
@@ -147,7 +148,7 @@ def get_heatmap_type(
     if heatmap_type == "Source":
         return heatmap_func(
             attribution.source_attributions.numpy(),
-            [t.token for t in attribution.target[attribution.attr_pos_start - 1: attribution.attr_pos_end]], # noqa
+            [t.token for t in attribution.target[attribution.attr_pos_start - 1 : attribution.attr_pos_end]],  # noqa
             [t.token for t in attribution.source],
             colors,
             step_scores,
@@ -158,7 +159,7 @@ def get_heatmap_type(
         mask = np.tril(mask, k=1 - attribution.attr_pos_start)
         return heatmap_func(
             attribution.target_attributions.numpy() + mask,
-            [t.token for t in attribution.target[attribution.attr_pos_start - 1: attribution.attr_pos_end]], # noqa
+            [t.token for t in attribution.target[attribution.attr_pos_start - 1 : attribution.attr_pos_end]],  # noqa
             [t.token for t in attribution.target],
             colors,
             step_scores,
@@ -259,14 +260,14 @@ def get_saliency_heatmap_rich(
 
 
 def get_progress_bar(
-    all_sentences: Tuple[List[str], List[str], List[int]],
+    sequences: TextSequences,
+    target_lengths: List[int],
     method_name: str,
     show: bool,
     pretty: bool,
     attr_pos_start: int,
     attr_pos_end: int,
 ) -> Union[tqdm, Tuple[Progress, Live], None]:
-    sources, targets, lengths = all_sentences
     if not show:
         return None
     elif show and not pretty:
@@ -281,23 +282,27 @@ def get_progress_bar(
             BarColumn(),
             TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
         )
-        for idx, (tgt, tgt_len) in enumerate(zip(targets, lengths)):
+        for idx, (tgt, tgt_len) in enumerate(zip(sequences.targets, target_lengths)):
             job_progress.add_task(f"{idx}. {tgt}", total=tgt_len)
         progress_table = Table.grid()
-        progress_table.add_row(
-            Panel.fit(
-                "\n".join([f"{idx}. {src}" for idx, src in enumerate(sources)]),
-                title="Source sentences",
-                border_style="red",
-                padding=(1, 2),
-            ),
+        row_contents = [
             Panel.fit(
                 job_progress,
                 title=f"[b]Attributing with {method_name}",
                 border_style="green",
                 padding=(1, 2),
-            ),
-        )
+            )
+        ]
+        if sequences.sources is not None:
+            row_contents = [
+                Panel.fit(
+                    "\n".join([f"{idx}. {src}" for idx, src in enumerate(sequences.sources)]),
+                    title="Source sentences",
+                    border_style="red",
+                    padding=(1, 2),
+                )
+            ] + row_contents
+        progress_table.add_row(*row_contents)
         live = Live(Padding(progress_table, (1, 0, 1, 0)), refresh_per_second=10)
         live.start(refresh=live._renderable is not None)
         return job_progress, live
@@ -305,7 +310,10 @@ def get_progress_bar(
 
 def update_progress_bar(
     pbar: Union[tqdm, Tuple[Progress, Live], None],
-    split_targets: Tuple[List[str], List[str], List[str], List[str]] = None,
+    skipped_prefixes: List[str],
+    attributed_sentences: List[str],
+    unattributed_suffixes: List[str],
+    skipped_suffixes: List[str],
     whitespace_indexes: List[List[int]] = None,
     show: bool = False,
     pretty: bool = False,
@@ -315,6 +323,7 @@ def update_progress_bar(
     elif show and not pretty:
         pbar.update(1)
     else:
+        split_targets = (skipped_prefixes, attributed_sentences, unattributed_suffixes, skipped_suffixes)
         for job in pbar[0].tasks:
             if not job.finished:
                 pbar[0].advance(job.id)

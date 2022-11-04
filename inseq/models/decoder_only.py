@@ -1,7 +1,7 @@
 from typing import Any, Callable, Dict, Tuple, Union
 
-from ..data import Batch, BatchEmbedding, BatchEncoding, FeatureAttributionInput
-from ..utils.typing import EmbeddingsTensor, IdsTensor, SingleScorePerStepTensor, TargetIdsTensor
+from ..data import Batch, BatchEmbedding, BatchEncoding, DecoderOnlyBatch, FeatureAttributionInput
+from ..utils.typing import EmbeddingsTensor, IdsTensor, SingleScorePerStepTensor, TargetIdsTensor, TextSequences
 from .attribution_model import AttributionModel
 
 
@@ -14,7 +14,7 @@ class DecoderOnlyAttributionModel(AttributionModel):
         prepend_bos_token: bool = True,
         include_eos_baseline: bool = False,
         use_layer_attribution: bool = False,
-    ) -> Batch:
+    ) -> DecoderOnlyBatch:
         if isinstance(inputs, Batch):
             batch = inputs
         else:
@@ -38,15 +38,15 @@ class DecoderOnlyAttributionModel(AttributionModel):
             if not use_layer_attribution:
                 baseline_embeds = self.embed(encodings.baseline_ids)
             embeddings = BatchEmbedding(
-                input_embeds=self.embed(encodings.input_ids, as_targets=True),
+                input_embeds=self.embed(encodings.input_ids),
                 baseline_embeds=baseline_embeds,
             )
-            batch = Batch(encodings, embeddings)
+            batch = DecoderOnlyBatch(encodings, embeddings)
         return batch
 
     @staticmethod
     def format_attribution_args(
-        batch: Batch,
+        batch: DecoderOnlyBatch,
         target_ids: TargetIdsTensor,
         attributed_fn: Callable[..., SingleScorePerStepTensor],
         attributed_fn_args: Dict[str, Any] = {},
@@ -79,3 +79,9 @@ class DecoderOnlyAttributionModel(AttributionModel):
             + tuple(attributed_fn_args.values()),
         }
         return attribute_fn_args, baselines
+
+    def get_sequences(self, batch: DecoderOnlyBatch) -> TextSequences:
+        return TextSequences(
+            sources=None,
+            targets=self.convert_tokens_to_string(batch.input_tokens, as_targets=True),
+        )

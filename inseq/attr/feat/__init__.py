@@ -1,4 +1,4 @@
-from .attribution_utils import STEP_SCORES_MAP, extract_args, list_step_scores, register_step_score
+from .attribution_utils import STEP_SCORES_MAP, extract_args, join_token_ids, list_step_scores, register_step_score
 from .feature_attribution import FeatureAttribution, list_feature_attribution_methods
 from .gradient_attribution import (
     DeepLiftAttribution,
@@ -19,6 +19,7 @@ __all__ = [
     "list_feature_attribution_methods",
     "STEP_SCORES_MAP",
     "register_step_score",
+    "join_token_ids",
     "list_step_scores",
     "GradientAttribution",
     "DeepLiftAttribution",

@@ -1,8 +1,8 @@
-from typing import List, Optional, Union
+from typing import List, Optional, Tuple, Union
 
 from dataclasses import dataclass
 
-from ..utils.typing import EmbeddingsTensor, IdsTensor, OneOrMoreTokenSequences
+from ..utils.typing import EmbeddingsTensor, ExpandedTargetIdsTensor, IdsTensor, OneOrMoreTokenSequences
 from .data_utils import TensorWrapper
 
 
@@ -98,10 +98,6 @@ class Batch(TensorWrapper):
     def baseline_embeds(self, value: Optional[EmbeddingsTensor]):
         self.embedding.baseline_embeds = value
 
-    @property
-    def max_generation_length(self) -> int:
-        return self.input_ids.shape[1]
-
 
 @dataclass(eq=False, repr=False)
 class EncoderDecoderBatch(TensorWrapper):
@@ -114,3 +110,34 @@ class EncoderDecoderBatch(TensorWrapper):
     @property
     def max_generation_length(self) -> int:
         return self.targets.input_ids.shape[1]
+
+    @property
+    def target_tokens(self) -> OneOrMoreTokenSequences:
+        return self.targets.input_tokens
+
+    def get_step_target(
+        self, step: int, with_attention: bool = False
+    ) -> Union[ExpandedTargetIdsTensor, Tuple[ExpandedTargetIdsTensor, ExpandedTargetIdsTensor]]:
+        tgt = self.targets.input_ids[:, step]
+        if with_attention:
+            return tgt, self.targets.attention_mask[:, step]
+        return tgt
+
+
+@dataclass(eq=False, repr=False)
+class DecoderOnlyBatch(Batch):
+    @property
+    def max_generation_length(self) -> int:
+        return self.input_ids.shape[1]
+
+    @property
+    def target_tokens(self) -> OneOrMoreTokenSequences:
+        return self.input_tokens
+
+    def get_step_target(
+        self, step: int, with_attention: bool = False
+    ) -> Union[ExpandedTargetIdsTensor, Tuple[ExpandedTargetIdsTensor, ExpandedTargetIdsTensor]]:
+        tgt = self.input_ids[:, step]
+        if with_attention:
+            return tgt, self.attention_mask[:, step]
+        return tgt

@@ -26,6 +26,7 @@ from torchtyping import TensorType
 
 from ...data import (
     Batch,
+    DecoderOnlyBatch,
     EncoderDecoderBatch,
     FeatureAttributionInput,
     FeatureAttributionOutput,
@@ -41,20 +42,9 @@ from ...utils import (
     get_available_methods,
     pretty_tensor,
 )
-from ...utils.typing import (
-    ModelIdentifier,
-    SingleScorePerStepTensor,
-    TargetIdsTensor,
-    TokenWithId,
-)
+from ...utils.typing import ModelIdentifier, SingleScorePerStepTensor, TargetIdsTensor
 from ..attribution_decorators import batched, set_hook, unset_hook
-from .attribution_utils import (
-    STEP_SCORES_MAP,
-    check_attribute_positions,
-    enrich_step_output,
-    get_split_targets,
-    get_step_scores,
-)
+from .attribution_utils import STEP_SCORES_MAP, check_attribute_positions, get_step_scores, tok2string
 
 
 if TYPE_CHECKING:
@@ -249,7 +239,7 @@ class FeatureAttribution(Registry):
 
     def attribute(
         self,
-        batch: Union[Batch, EncoderDecoderBatch],
+        batch: Union[DecoderOnlyBatch, EncoderDecoderBatch],
         attributed_fn: Callable[..., SingleScorePerStepTensor],
         attr_pos_start: Optional[int] = 1,
         attr_pos_end: Optional[int] = None,
@@ -267,8 +257,8 @@ class FeatureAttribution(Registry):
         Performs the feature attribution procedure using the specified attribution method.
 
         Args:
-            batch (:class:`~inseq.data.EncoderDecoderBatch` or :class:`~inseq.data.Batch`): The batch of sequences to
-                attribute.
+            batch (:class:`~inseq.data.EncoderDecoderBatch` or :class:`~inseq.data.DecoderOnlyBatch`): The batch of
+                sequences to attribute.
             attributed_fn (:obj:`Callable[..., SingleScorePerStepTensor]`): The function of model
                 outputs representing what should be attributed (e.g. output probits of model best
                 prediction after softmax). It must be a function that taking multiple keyword
@@ -307,40 +297,33 @@ class FeatureAttribution(Registry):
             attr_pos_end,
         )
         logger.debug("=" * 30 + f"\nfull batch: {batch}\n" + "=" * 30)
-        sources = self.attribution_model.convert_tokens_to_string(batch.sources.input_tokens)
-        targets = self.attribution_model.convert_tokens_to_string(batch.targets.input_tokens, as_targets=True)
-        tokenized_target_sentences = [
-            self.attribution_model.convert_string_to_tokens(sent, as_targets=True, skip_special_tokens=False)
-            for sent in targets
-        ]
-        ids_target_sentences = self.attribution_model.convert_tokens_to_ids(tokenized_target_sentences)
-        target_tokens_with_ids = [
-            [
-                TokenWithId(tokenized_target_sentences[sent_idx][tok_idx], ids_target_sentences[sent_idx][tok_idx])
-                for tok_idx in range(len(tokenized_target_sentences[sent_idx]))
-            ]
-            for sent_idx in range(len(tokenized_target_sentences))
-        ]
-        targets_lengths = [min(attr_pos_end, len(tts)) - attr_pos_start for tts in tokenized_target_sentences]
+        # Sources are empty for decoder-only models
+        sequences = self.attribution_model.get_sequences(batch)
+        target_tokens_with_ids = self.attribution_model.tokenize_with_ids(
+            sequences.targets, as_targets=True, skip_special_tokens=False
+        )
+        targets_lengths = [min(attr_pos_end, len(tts)) - attr_pos_start for tts in target_tokens_with_ids]
         pbar = get_progress_bar(
-            all_sentences=(sources, targets, targets_lengths),
+            sequences=sequences,
+            target_lengths=targets_lengths,
             method_name=self.method_name,
             show=show_progress,
             pretty=pretty_progress,
             attr_pos_start=attr_pos_start,
             attr_pos_end=attr_pos_end,
         )
-        whitespace_indexes = find_char_indexes(targets, " ")
+        whitespace_indexes = find_char_indexes(sequences.targets, " ")
         attribution_outputs = []
         start = datetime.now()
 
         # Attribution loop for generation
         for step in range(attr_pos_start, attr_pos_end):
+            tgt_ids, tgt_mask = batch.get_step_target(step, with_attention=True)
             step_output = self.filtered_attribute_step(
                 batch[:step],
-                target_ids=batch.targets.input_ids[:, step].unsqueeze(1),
+                target_ids=tgt_ids.unsqueeze(1),
                 attributed_fn=attributed_fn,
-                target_attention_mask=batch.targets.attention_mask[:, step].unsqueeze(1),
+                target_attention_mask=tgt_mask.unsqueeze(1),
                 attribute_target=attribute_target,
                 step_scores=step_scores,
                 attribution_args=attribution_args,
@@ -349,12 +332,17 @@ class FeatureAttribution(Registry):
             )
             attribution_outputs.append(step_output)
             if pretty_progress:
-                split_targets = get_split_targets(
-                    self.attribution_model, batch.targets.input_tokens, attr_pos_start, attr_pos_end, step
-                )
+                tgt_tokens = batch.target_tokens
+                skipped_prefixes = tok2string(self.attribution_model, tgt_tokens, end=attr_pos_start)
+                attributed_sentences = tok2string(self.attribution_model, tgt_tokens, attr_pos_start, step + 1)
+                unattributed_suffixes = tok2string(self.attribution_model, tgt_tokens, step + 1, attr_pos_end)
+                skipped_suffixes = tok2string(self.attribution_model, tgt_tokens, start=attr_pos_end)
                 update_progress_bar(
                     pbar,
-                    split_targets,
+                    skipped_prefixes,
+                    attributed_sentences,
+                    unattributed_suffixes,
+                    skipped_suffixes,
                     whitespace_indexes,
                     show=show_progress,
                     pretty=pretty_progress,
@@ -390,7 +378,7 @@ class FeatureAttribution(Registry):
 
     def filtered_attribute_step(
         self,
-        batch: EncoderDecoderBatch,
+        batch: Union[DecoderOnlyBatch, EncoderDecoderBatch],
         target_ids: TensorType["batch_size", 1, int],
         attributed_fn: Callable[..., SingleScorePerStepTensor],
         target_attention_mask: Optional[TensorType["batch_size", 1, int]] = None,
@@ -407,7 +395,8 @@ class FeatureAttribution(Registry):
         faster and then reinserted before returning.
 
         Args:
-            batch (:class:`~inseq.data.EncoderDecoderBatch`): The batch of sequences to attribute.
+            batch (:class:`~inseq.data.EncoderDecoderBatch` or :class:`~inseq.data.DecoderOnlyBatch`): The batch of
+                sequences to attribute.
             target_ids (:obj:`torch.Tensor`): Target token ids of size `(batch_size, 1)` corresponding to tokens
                 for which the attribution step must be performed.
             attributed_fn (:obj:`Callable[..., SingleScorePerStepTensor]`): The function of model outputs
@@ -468,7 +457,7 @@ class FeatureAttribution(Registry):
                 self.attribution_model, batch, target_ids, step_score, step_scores_args
             )
         # Add batch information to output
-        step_output = enrich_step_output(
+        step_output = self.attribution_model.enrich_step_output(
             step_output,
             orig_batch,
             self.attribution_model.convert_ids_to_tokens(orig_target_ids, skip_special_tokens=False),

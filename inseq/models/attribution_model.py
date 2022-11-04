@@ -6,8 +6,14 @@ from abc import ABC, abstractmethod
 import torch
 
 from ..attr import STEP_SCORES_MAP
-from ..attr.feat import FeatureAttribution, extract_args
-from ..data import Batch, BatchEncoding, EncoderDecoderBatch, FeatureAttributionOutput
+from ..attr.feat import FeatureAttribution, extract_args, join_token_ids
+from ..data import (
+    BatchEncoding,
+    DecoderOnlyBatch,
+    EncoderDecoderBatch,
+    FeatureAttributionOutput,
+    FeatureAttributionStepOutput,
+)
 from ..utils import MissingAttributionMethodError, check_device, format_input_texts, get_default_device, isnotebook
 from ..utils.typing import (
     EmbeddingsTensor,
@@ -18,6 +24,8 @@ from ..utils.typing import (
     SingleScorePerStepTensor,
     TargetIdsTensor,
     TextInput,
+    TextSequences,
+    TokenWithId,
     VocabularyEmbeddingsTensor,
 )
 from .model_decorators import unhooked
@@ -175,7 +183,7 @@ class AttributionModel(ABC, torch.nn.Module):
         if isnotebook():
             logger.debug("Pretty progress currently not supported in notebooks, falling back to tqdm.")
             pretty_progress = False
-        sources = input_texts if not constrained_decoding else encoded_input
+        sources = input_texts if constrained_decoding else encoded_input
         inputs = (sources, generated_texts) if self.is_encoder_decoder else generated_texts
         attribution_outputs = attribution_method.prepare_and_attribute(
             inputs,
@@ -212,6 +220,15 @@ class AttributionModel(ABC, torch.nn.Module):
             batch = self.encode(inputs, as_targets)
             inputs = batch.input_ids
         return self.embed_ids(inputs, as_targets=as_targets)
+
+    def tokenize_with_ids(
+        self, inputs: TextInput, as_targets: bool = False, skip_special_tokens: bool = True
+    ) -> List[List[TokenWithId]]:
+        tokenized_sentences = self.convert_string_to_tokens(
+            inputs, as_targets=as_targets, skip_special_tokens=skip_special_tokens
+        )
+        ids_sentences = self.convert_tokens_to_ids(tokenized_sentences)
+        return join_token_ids(tokenized_sentences, ids_sentences)
 
     # Framework-specific methods
 
@@ -269,7 +286,10 @@ class AttributionModel(ABC, torch.nn.Module):
 
     @abstractmethod
     def convert_string_to_tokens(
-        self, text: TextInput, skip_special_tokens: Optional[bool] = True
+        self,
+        text: TextInput,
+        skip_special_tokens: bool = True,
+        as_targets: bool = False,
     ) -> OneOrMoreTokenSequences:
         pass
 
@@ -320,17 +340,31 @@ class AttributionModel(ABC, torch.nn.Module):
         prepend_bos_token: bool = True,
         include_eos_baseline: bool = False,
         use_layer_attribution: bool = False,
-    ) -> Union[Batch, EncoderDecoderBatch]:
+    ) -> Union[DecoderOnlyBatch, EncoderDecoderBatch]:
         pass
 
     @staticmethod
     @abstractmethod
     def format_attribution_args(
-        batch: Union[Batch, EncoderDecoderBatch],
+        batch: Union[DecoderOnlyBatch, EncoderDecoderBatch],
         target_ids: TargetIdsTensor,
         attributed_fn: Callable[..., SingleScorePerStepTensor],
         attributed_fn_args: Dict[str, Any] = {},
         is_layer_attribution: bool = False,
         **kwargs,
     ) -> Tuple[Dict[str, Any], Tuple[Union[IdsTensor, EmbeddingsTensor, None], ...]]:
+        pass
+
+    @abstractmethod
+    def get_sequences(self, batch: Union[DecoderOnlyBatch, EncoderDecoderBatch]) -> TextSequences:
+        pass
+
+    @staticmethod
+    @abstractmethod
+    def enrich_step_output(
+        step_output: FeatureAttributionStepOutput,
+        batch: EncoderDecoderBatch,
+        target_tokens: OneOrMoreTokenSequences,
+        target_ids: TargetIdsTensor,
+    ) -> FeatureAttributionStepOutput:
         pass

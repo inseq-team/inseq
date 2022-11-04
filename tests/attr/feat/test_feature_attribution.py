@@ -3,11 +3,12 @@ from pytest import fixture
 from transformers import AutoModelForSeq2SeqLM
 
 import inseq
+from inseq.models.huggingface_model import HuggingfaceEncoderDecoderModel
 from inseq.utils import output2prob
 
 
 @fixture(scope="session")
-def saliency_mt_model():
+def saliency_mt_model() -> HuggingfaceEncoderDecoderModel:
     return inseq.load_model("Helsinki-NLP/opus-mt-en-it", "saliency")
 
 
@@ -59,7 +60,7 @@ def attribute_contrast_logits_diff(
     return model_probs - contrast_probs
 
 
-def test_contrastive_attribution(saliency_mt_model):
+def test_contrastive_attribution(saliency_mt_model: HuggingfaceEncoderDecoderModel):
     """Runs a contrastive feature attribution using the method relying on logits difference
     introduced by [Yin and Neubig '22](https://arxiv.org/pdf/2202.10419.pdf), taking advantage of
     the custom feature attribution target function module.

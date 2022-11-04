@@ -1,7 +1,23 @@
 from typing import Any, Callable, Dict, Tuple, Union
 
-from ..data import Batch, BatchEmbedding, BatchEncoding, EncoderDecoderBatch, FeatureAttributionInput
-from ..utils.typing import EmbeddingsTensor, IdsTensor, SingleScorePerStepTensor, TargetIdsTensor
+from ..attr.feat import join_token_ids
+from ..data import (
+    Batch,
+    BatchEmbedding,
+    BatchEncoding,
+    EncoderDecoderBatch,
+    FeatureAttributionInput,
+    FeatureAttributionStepOutput,
+)
+from ..utils.typing import (
+    EmbeddingsTensor,
+    IdsTensor,
+    OneOrMoreTokenSequences,
+    SingleScorePerStepTensor,
+    TargetIdsTensor,
+    TextSequences,
+    TokenWithId,
+)
 from .attribution_model import AttributionModel
 
 
@@ -138,3 +154,37 @@ class EncoderDecoderAttributionModel(AttributionModel):
                 "additional_forward_args"
             ]
         return attribute_fn_args, baselines
+
+    def get_sequences(self, batch: EncoderDecoderBatch) -> TextSequences:
+        return TextSequences(
+            sources=self.convert_tokens_to_string(batch.sources.input_tokens),
+            targets=self.convert_tokens_to_string(batch.targets.input_tokens, as_targets=True),
+        )
+
+    @staticmethod
+    def enrich_step_output(
+        step_output: FeatureAttributionStepOutput,
+        batch: EncoderDecoderBatch,
+        target_tokens: OneOrMoreTokenSequences,
+        target_ids: TargetIdsTensor,
+    ) -> FeatureAttributionStepOutput:
+        r"""
+        Enriches the attribution output with token information, producing the finished
+        :class:`~inseq.data.FeatureAttributionStepOutput` object.
+
+        Args:
+            step_output (:class:`~inseq.data.FeatureAttributionStepOutput`): The output produced
+                by the attribution step, with missing batch information.
+            batch (:class:`~inseq.data.EncoderDecoderBatch`): The batch on which attribution was performed.
+            target_ids (:obj:`torch.Tensor`): Target token ids of size `(batch_size, 1)` corresponding to tokens
+                for which the attribution step was performed.
+
+        Returns:
+            :class:`~inseq.data.FeatureAttributionStepOutput`: The enriched attribution output.
+        """
+        if len(target_ids.shape) == 0:
+            target_ids = target_ids.unsqueeze(0)
+        step_output.source = join_token_ids(batch.sources.input_tokens, batch.sources.input_ids.tolist())
+        step_output.target = [[TokenWithId(token[0], id)] for token, id in zip(target_tokens, target_ids.tolist())]
+        step_output.prefix = join_token_ids(batch.targets.input_tokens, batch.targets.input_ids.tolist())
+        return step_output

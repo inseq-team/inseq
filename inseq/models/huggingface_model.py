@@ -69,6 +69,7 @@ class HuggingfaceModel(AttributionModel):
         attribution_method: Optional[str] = None,
         tokenizer: Union[str, PreTrainedTokenizer, None] = None,
         device: Optional[str] = None,
+        model_max_length: Optional[int] = 512,
         **kwargs,
     ) -> None:
         """
@@ -84,6 +85,8 @@ class HuggingfaceModel(AttributionModel):
             attribution_method (str, optional): The attribution method to use.
                 Passing it here reduces overhead on attribute call, since it is already
                 initialized.
+            model_max_length (int, optional): The maximum length of the model. If not provided, will be inferred from
+                the model config.
             **kwargs: additional arguments for the model and the tokenizer.
         """
         super().__init__(**kwargs)
@@ -111,7 +114,9 @@ class HuggingfaceModel(AttributionModel):
         if isinstance(tokenizer, PreTrainedTokenizer):
             self.tokenizer = tokenizer
         else:
-            self.tokenizer = AutoTokenizer.from_pretrained(tokenizer, *tokenizer_inputs, **tokenizer_kwargs)
+            self.tokenizer = AutoTokenizer.from_pretrained(
+                tokenizer, *tokenizer_inputs, model_max_length=model_max_length, **tokenizer_kwargs
+            )
         if self.model.config.pad_token_id is not None:
             self.pad_token = self.tokenizer.convert_ids_to_tokens(self.model.config.pad_token_id)
         self.embed_scale = 1.0
@@ -438,3 +443,37 @@ class HuggingfaceDecoderOnlyModel(HuggingfaceModel, DecoderOnlyAttributionModel)
     def configure_embeddings_scale(self):
         if hasattr(self.model, "embed_scale"):
             self.embed_scale = self.model.embed_scale
+
+    def forward(
+        self,
+        attributed_tensors: AttributionForwardInputs,
+        input_ids: IdsTensor,
+        target_ids: ExpandedTargetIdsTensor,
+        attributed_fn: Callable[..., SingleScorePerStepTensor],
+        attention_mask: Optional[IdsTensor] = None,
+        use_embeddings: bool = True,
+        attributed_fn_argnames: Optional[List[str]] = None,
+        *args,
+    ) -> FullLogitsTensor:
+        assert len(args) == len(attributed_fn_argnames), "Number of arguments and number of argnames must match"
+        target_ids = target_ids.squeeze(-1)
+        embeds = attributed_tensors if use_embeddings else None
+        ids = None if use_embeddings else attributed_tensors
+        output = self.model(
+            input_ids=ids,
+            inputs_embeds=embeds,
+            attention_mask=attention_mask,
+        )
+        logger.debug(f"logits: {pretty_tensor(output.logits)}")
+        return attributed_fn(
+            attribution_model=self,
+            forward_output=output,
+            encoder_input_ids=None,
+            decoder_input_ids=input_ids,
+            encoder_input_embeds=None,
+            decoder_input_embeds=embeds,
+            target_ids=target_ids,
+            encoder_attention_mask=None,
+            decoder_attention_mask=attention_mask,
+            **{k: v for k, v in zip(attributed_fn_argnames, args) if v is not None},
+        )

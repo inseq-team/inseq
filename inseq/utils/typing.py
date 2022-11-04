@@ -1,4 +1,4 @@
-from typing import Sequence, Tuple, Union
+from typing import Optional, Sequence, Tuple, Union
 
 from dataclasses import dataclass
 
@@ -27,6 +27,12 @@ class TokenWithId:
             return self.token == other.token and self.id == other.id
         else:
             return False
+
+
+@dataclass
+class TextSequences:
+    targets: TextInput
+    sources: Optional[TextInput] = None
 
 
 OneOrMoreIdSequences = Sequence[Sequence[int]]
