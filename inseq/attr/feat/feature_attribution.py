@@ -298,7 +298,7 @@ class FeatureAttribution(Registry):
         )
         logger.debug("=" * 30 + f"\nfull batch: {batch}\n" + "=" * 30)
         # Sources are empty for decoder-only models
-        sequences = self.attribution_model.get_sequences(batch)
+        sequences = self.attribution_model.get_text_sequences(batch)
         target_tokens_with_ids = self.attribution_model.tokenize_with_ids(
             sequences.targets, as_targets=True, skip_special_tokens=False
         )

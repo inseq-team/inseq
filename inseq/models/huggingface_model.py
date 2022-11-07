@@ -1,5 +1,5 @@
 """ HuggingFace Seq2seq model """
-from typing import Callable, Dict, List, NoReturn, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, NoReturn, Optional, Tuple, Union
 
 import logging
 from abc import abstractmethod
@@ -120,6 +120,7 @@ class HuggingfaceModel(AttributionModel):
         if self.model.config.pad_token_id is not None:
             self.pad_token = self.tokenizer.convert_ids_to_tokens(self.model.config.pad_token_id)
         self.embed_scale = 1.0
+        self.model_max_length = model_max_length
         self.encoder_int_embeds = None
         self.decoder_int_embeds = None
         self.is_encoder_decoder = self.model.config.is_encoder_decoder
@@ -174,7 +175,7 @@ class HuggingfaceModel(AttributionModel):
         self,
         inputs: Union[TextInput, BatchEncoding],
         return_generation_output: bool = False,
-        max_new_tokens: int = 512,
+        max_new_tokens: Optional[int] = None,
         **kwargs,
     ) -> Union[List[str], Tuple[List[str], ModelOutput]]:
         """Wrapper of model.generate to handle tokenization and decoding.
@@ -193,6 +194,8 @@ class HuggingfaceModel(AttributionModel):
             isinstance(inputs, list) and len(inputs) > 0 and all([isinstance(x, str) for x in inputs])
         ):
             inputs = self.encode(inputs)
+        if max_new_tokens is None:
+            max_new_tokens = self.model_max_length - inputs.input_ids.shape[-1]
         inputs = inputs.to(self.device)
         generation_out = self.model.generate(
             input_ids=inputs.input_ids,
@@ -374,6 +377,24 @@ class HuggingfaceEncoderDecoderModel(HuggingfaceModel, EncoderDecoderAttribution
         if hasattr(decoder, "embed_scale") and decoder.embed_scale != self.embed_scale:
             raise ValueError("Different encoder and decoder embed scales are not supported")
 
+    def get_forward_output(
+        self,
+        attributed_tensors: AttributionForwardInputs,
+        encoder_attention_mask: Optional[IdsTensor] = None,
+        decoder_input_embeds: Optional[EmbeddingsTensor] = None,
+        decoder_attention_mask: Optional[IdsTensor] = None,
+        use_embeddings: bool = True,
+    ) -> Seq2SeqLMOutput:
+        encoder_embeds = attributed_tensors if use_embeddings else None
+        encoder_ids = None if use_embeddings else attributed_tensors
+        return self.model(
+            input_ids=encoder_ids,
+            inputs_embeds=encoder_embeds,
+            attention_mask=encoder_attention_mask,
+            decoder_inputs_embeds=decoder_input_embeds,
+            decoder_attention_mask=decoder_attention_mask,
+        )
+
     def forward(
         self,
         encoder_tensors: AttributionForwardInputs,
@@ -390,28 +411,54 @@ class HuggingfaceEncoderDecoderModel(HuggingfaceModel, EncoderDecoderAttribution
     ) -> FullLogitsTensor:
         assert len(args) == len(attributed_fn_argnames), "Number of arguments and number of argnames must match"
         target_ids = target_ids.squeeze(-1)
-        encoder_embeds = encoder_tensors if use_embeddings else None
-        encoder_ids = None if use_embeddings else encoder_tensors
-        output = self.model(
-            input_ids=encoder_ids,
-            inputs_embeds=encoder_embeds,
-            attention_mask=encoder_attention_mask,
-            decoder_inputs_embeds=decoder_input_embeds,
+        output = self.get_forward_output(
+            attributed_tensors=encoder_tensors,
+            encoder_attention_mask=encoder_attention_mask,
+            decoder_input_embeds=decoder_input_embeds,
             decoder_attention_mask=decoder_attention_mask,
+            use_embeddings=use_embeddings,
         )
         logger.debug(f"logits: {pretty_tensor(output.logits)}")
-        return attributed_fn(
+        step_function_args = self.format_step_function_args(
             attribution_model=self,
             forward_output=output,
             encoder_input_ids=encoder_input_ids,
             decoder_input_ids=decoder_input_ids,
-            encoder_input_embeds=encoder_embeds,
+            encoder_input_embeds=encoder_tensors if use_embeddings else None,
             decoder_input_embeds=decoder_input_embeds,
             target_ids=target_ids,
             encoder_attention_mask=encoder_attention_mask,
             decoder_attention_mask=decoder_attention_mask,
             **{k: v for k, v in zip(attributed_fn_argnames, args) if v is not None},
         )
+        return attributed_fn(**step_function_args)
+
+    def format_step_function_args(
+        self,
+        forward_output: Seq2SeqLMOutput,
+        target_ids: ExpandedTargetIdsTensor,
+        encoder_input_ids: Optional[IdsTensor] = None,
+        decoder_input_ids: Optional[IdsTensor] = None,
+        encoder_input_embeds: Optional[EmbeddingsTensor] = None,
+        decoder_input_embeds: Optional[EmbeddingsTensor] = None,
+        encoder_attention_mask: Optional[IdsTensor] = None,
+        decoder_attention_mask: Optional[IdsTensor] = None,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        return {
+            **kwargs,
+            **{
+                "attribution_model": self,
+                "forward_output": forward_output,
+                "encoder_input_ids": encoder_input_ids,
+                "decoder_input_ids": decoder_input_ids,
+                "encoder_input_embeds": encoder_input_embeds,
+                "decoder_input_embeds": decoder_input_embeds,
+                "target_ids": target_ids,
+                "encoder_attention_mask": encoder_attention_mask,
+                "decoder_attention_mask": decoder_attention_mask,
+            },
+        }
 
 
 class HuggingfaceDecoderOnlyModel(HuggingfaceModel, DecoderOnlyAttributionModel):
@@ -444,6 +491,20 @@ class HuggingfaceDecoderOnlyModel(HuggingfaceModel, DecoderOnlyAttributionModel)
         if hasattr(self.model, "embed_scale"):
             self.embed_scale = self.model.embed_scale
 
+    def get_forward_output(
+        self,
+        attributed_tensors: AttributionForwardInputs,
+        attention_mask: Optional[IdsTensor] = None,
+        use_embeddings: bool = True,
+    ) -> CausalLMOutput:
+        embeds = attributed_tensors if use_embeddings else None
+        ids = None if use_embeddings else attributed_tensors
+        return self.model(
+            input_ids=ids,
+            inputs_embeds=embeds,
+            attention_mask=attention_mask,
+        )
+
     def forward(
         self,
         attributed_tensors: AttributionForwardInputs,
@@ -457,23 +518,47 @@ class HuggingfaceDecoderOnlyModel(HuggingfaceModel, DecoderOnlyAttributionModel)
     ) -> FullLogitsTensor:
         assert len(args) == len(attributed_fn_argnames), "Number of arguments and number of argnames must match"
         target_ids = target_ids.squeeze(-1)
-        embeds = attributed_tensors if use_embeddings else None
-        ids = None if use_embeddings else attributed_tensors
-        output = self.model(
-            input_ids=ids,
-            inputs_embeds=embeds,
+        output = self.get_forward_output(
+            attributed_tensors=attributed_tensors,
             attention_mask=attention_mask,
+            use_embeddings=use_embeddings,
         )
         logger.debug(f"logits: {pretty_tensor(output.logits)}")
-        return attributed_fn(
+        step_function_args = self.format_step_function_args(
             attribution_model=self,
             forward_output=output,
-            encoder_input_ids=None,
             decoder_input_ids=input_ids,
-            encoder_input_embeds=None,
-            decoder_input_embeds=embeds,
+            decoder_input_embeds=attributed_tensors if use_embeddings else None,
             target_ids=target_ids,
-            encoder_attention_mask=None,
             decoder_attention_mask=attention_mask,
             **{k: v for k, v in zip(attributed_fn_argnames, args) if v is not None},
         )
+        return attributed_fn(**step_function_args)
+
+    def format_step_function_args(
+        self,
+        forward_output: Seq2SeqLMOutput,
+        target_ids: ExpandedTargetIdsTensor,
+        encoder_input_ids: Optional[IdsTensor] = None,
+        decoder_input_ids: Optional[IdsTensor] = None,
+        encoder_input_embeds: Optional[EmbeddingsTensor] = None,
+        decoder_input_embeds: Optional[EmbeddingsTensor] = None,
+        encoder_attention_mask: Optional[IdsTensor] = None,
+        decoder_attention_mask: Optional[IdsTensor] = None,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        return {
+            **kwargs,
+            **{
+                "attribution_model": self,
+                "forward_output": forward_output,
+                "encoder_input_ids": None,
+                "decoder_input_ids": decoder_input_ids,
+                "encoder_input_embeds": None,
+                "decoder_input_embeds": decoder_input_embeds,
+                "target_ids": target_ids,
+                "encoder_attention_mask": None,
+                "decoder_attention_mask": decoder_attention_mask,
+                **kwargs,
+            },
+        }

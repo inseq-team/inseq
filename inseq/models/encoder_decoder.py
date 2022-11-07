@@ -110,6 +110,17 @@ class EncoderDecoderAttributionModel(AttributionModel):
         return EncoderDecoderBatch(source_batch, target_batch)
 
     @staticmethod
+    def format_forward_args(
+        inputs: EncoderDecoderBatch,
+    ) -> Dict[str, Any]:
+        return {
+            "attributed_tensors": inputs.sources.input_embeds,
+            "decoder_inputs_embeds": inputs.targets.input_embeds,
+            "attention_mask": inputs.sources.attention_mask,
+            "decoder_attention_mask": inputs.targets.attention_mask,
+        }
+
+    @staticmethod
     def format_attribution_args(
         batch: EncoderDecoderBatch,
         target_ids: TargetIdsTensor,
@@ -155,7 +166,7 @@ class EncoderDecoderAttributionModel(AttributionModel):
             ]
         return attribute_fn_args, baselines
 
-    def get_sequences(self, batch: EncoderDecoderBatch) -> TextSequences:
+    def get_text_sequences(self, batch: EncoderDecoderBatch) -> TextSequences:
         return TextSequences(
             sources=self.convert_tokens_to_string(batch.sources.input_tokens),
             targets=self.convert_tokens_to_string(batch.targets.input_tokens, as_targets=True),

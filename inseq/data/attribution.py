@@ -73,7 +73,7 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
 
     source: List[TokenWithId]
     target: List[TokenWithId]
-    source_attributions: SequenceAttributionTensor
+    source_attributions: Optional[SequenceAttributionTensor] = None
     target_attributions: Optional[SequenceAttributionTensor] = None
     step_scores: Optional[Dict[str, SingleScoresPerSequenceTensor]] = None
     sequence_scores: Optional[Dict[str, MultipleScoresPerSequenceTensor]] = None
@@ -106,12 +106,13 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
     ) -> List["FeatureAttributionSequenceOutput"]:
         attr = attributions[0]
         seq_attr_cls = attr._sequence_cls
-        num_sequences = len(attr.source_attributions)
-        if not all([len(att.source_attributions) == num_sequences for att in attributions]):
+        num_sequences = len(attr.prefix)
+        if not all([len(attr.prefix) == num_sequences for att in attributions]):
             raise ValueError("All the attributions must include the same number of sequences.")
-        source_attributions = get_sequences_from_batched_steps([att.source_attributions for att in attributions])
         seq_attributions = []
-        sources = [drop_padding(attr.source[seq_id], pad_id) for seq_id in range(num_sequences)]
+        sources = None
+        if attr.source_attributions is not None:
+            sources = [drop_padding(attr.source[seq_id], pad_id) for seq_id in range(num_sequences)]
         targets = [
             drop_padding([a.target[seq_id][0] for a in attributions], pad_id) for seq_id in range(num_sequences)
         ]
@@ -120,19 +121,22 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
         if attr_pos_end is None:
             attr_pos_end = max([len(t) for t in tokenized_target_sentences])
         for seq_id in range(num_sequences):
-            # Remove padding from tensor
-            filtered_source_attribution = source_attributions[seq_id][
-                : len(sources[seq_id]), : len(targets[seq_id]), ...
-            ]
             seq_attributions.append(
                 seq_attr_cls(
-                    source=sources[seq_id],
+                    source=sources[seq_id] if sources is not None else None,
                     target=tokenized_target_sentences[seq_id],
-                    source_attributions=filtered_source_attribution,
                     attr_pos_start=attr_pos_start,
                     attr_pos_end=attr_pos_end,
                 )
             )
+        if attr.source_attributions is not None:
+            source_attributions = get_sequences_from_batched_steps([att.source_attributions for att in attributions])
+            for seq_id in range(num_sequences):
+                # Remove padding from tensor
+                filtered_source_attribution = source_attributions[seq_id][
+                    : len(sources[seq_id]), : len(targets[seq_id]), ...
+                ]
+                seq_attributions[seq_id].source_attributions = filtered_source_attribution
         if attr.target_attributions is not None:
             target_attributions = get_sequences_from_batched_steps(
                 [att.target_attributions for att in attributions], pad_dims=(1,)
@@ -218,8 +222,8 @@ class FeatureAttributionStepOutput(TensorWrapper):
     extra information related to what was attributed.
     """
 
-    source_attributions: StepAttributionTensor
-    step_scores: Dict[str, SingleScorePerStepTensor]
+    source_attributions: Optional[StepAttributionTensor] = None
+    step_scores: Optional[Dict[str, SingleScorePerStepTensor]] = None
     target_attributions: Optional[StepAttributionTensor] = None
     sequence_scores: Optional[Dict[str, MultipleScoresPerStepTensor]] = None
     source: Optional[OneOrMoreTokenWithIdSequences] = None
@@ -231,11 +235,12 @@ class FeatureAttributionStepOutput(TensorWrapper):
         self,
         target_attention_mask: TargetIdsTensor,
     ) -> None:
-        self.source_attributions = remap_from_filtered(
-            original_shape=(len(self.source), *self.source_attributions.shape[1:]),
-            mask=target_attention_mask,
-            filtered=self.source_attributions,
-        )
+        if self.source is not None:
+            self.source_attributions = remap_from_filtered(
+                original_shape=(len(self.source), *self.source_attributions.shape[1:]),
+                mask=target_attention_mask,
+                filtered=self.source_attributions,
+            )
         if self.target_attributions is not None:
             self.target_attributions = remap_from_filtered(
                 original_shape=(len(self.prefix), *self.target_attributions.shape[1:]),

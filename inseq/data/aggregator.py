@@ -180,6 +180,8 @@ class SequenceAttributionAggregator(Aggregator):
 
     @staticmethod
     def aggregate_source_attributions(attr, aggregate_fn: Union[Dict[str, Callable], Callable], **kwargs):
+        if attr.source_attributions is None:
+            return attr.source_attributions
         if attr.target_attributions is None:
             return aggregate_fn(attr.source_attributions)
         else:

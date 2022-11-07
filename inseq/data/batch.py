@@ -112,8 +112,36 @@ class EncoderDecoderBatch(TensorWrapper):
         return self.targets.input_ids.shape[1]
 
     @property
+    def source_tokens(self) -> OneOrMoreTokenSequences:
+        return self.sources.input_tokens
+
+    @property
     def target_tokens(self) -> OneOrMoreTokenSequences:
         return self.targets.input_tokens
+
+    @property
+    def source_ids(self) -> IdsTensor:
+        return self.sources.input_ids
+
+    @property
+    def target_ids(self) -> IdsTensor:
+        return self.targets.input_ids
+
+    @property
+    def source_embeds(self) -> EmbeddingsTensor:
+        return self.sources.input_embeds
+
+    @property
+    def target_embeds(self) -> EmbeddingsTensor:
+        return self.targets.input_embeds
+
+    @property
+    def source_mask(self) -> IdsTensor:
+        return self.sources.attention_mask
+
+    @property
+    def target_mask(self) -> IdsTensor:
+        return self.targets.attention_mask
 
     def get_step_target(
         self, step: int, with_attention: bool = False
@@ -131,8 +159,36 @@ class DecoderOnlyBatch(Batch):
         return self.input_ids.shape[1]
 
     @property
+    def source_tokens(self) -> OneOrMoreTokenSequences:
+        return None
+
+    @property
     def target_tokens(self) -> OneOrMoreTokenSequences:
         return self.input_tokens
+
+    @property
+    def source_ids(self) -> IdsTensor:
+        return None
+
+    @property
+    def target_ids(self) -> IdsTensor:
+        return self.input_ids
+
+    @property
+    def source_embeds(self) -> EmbeddingsTensor:
+        return None
+
+    @property
+    def target_embeds(self) -> EmbeddingsTensor:
+        return self.input_embeds
+
+    @property
+    def source_mask(self) -> IdsTensor:
+        return None
+
+    @property
+    def target_mask(self) -> IdsTensor:
+        return self.attention_mask
 
     def get_step_target(
         self, step: int, with_attention: bool = False

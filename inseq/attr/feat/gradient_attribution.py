@@ -31,6 +31,7 @@ from ...data import EncoderDecoderBatch, GradientFeatureAttributionStepOutput
 from ...utils import Registry, extract_signature_args, rgetattr
 from ...utils.typing import SingleScorePerStepTensor, TargetIdsTensor
 from ..attribution_decorators import set_hook, unset_hook
+from .attribution_utils import get_source_target_attributions
 from .feature_attribution import FeatureAttribution
 from .ops import DiscretetizedIntegratedGradients
 
@@ -94,11 +95,12 @@ class GradientAttribution(FeatureAttribution, Registry):
             and self.method.has_convergence_delta()
         ):
             attr, deltas = attr
+        source_attributions, target_attributions = get_source_target_attributions(
+            attr, self.attribution_model.is_encoder_decoder
+        )
         return GradientFeatureAttributionStepOutput(
-            source_attributions=attr if not isinstance(attr, tuple) else attr[0],
-            target_attributions=None
-            if not isinstance(attr, tuple) or (isinstance(attr, tuple) and len(attr) == 1)
-            else attr[1],
+            source_attributions=source_attributions,
+            target_attributions=target_attributions,
             step_scores={"deltas": deltas} if deltas is not None else {},
         )
 

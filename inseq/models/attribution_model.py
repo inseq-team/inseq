@@ -1,4 +1,4 @@
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, TypeVar, Union
 
 import logging
 from abc import ABC, abstractmethod
@@ -17,6 +17,7 @@ from ..data import (
 from ..utils import MissingAttributionMethodError, check_device, format_input_texts, get_default_device, isnotebook
 from ..utils.typing import (
     EmbeddingsTensor,
+    ExpandedTargetIdsTensor,
     FullLogitsTensor,
     IdsTensor,
     OneOrMoreIdSequences,
@@ -29,6 +30,9 @@ from ..utils.typing import (
     VocabularyEmbeddingsTensor,
 )
 from .model_decorators import unhooked
+
+
+ModelOutput = TypeVar("ModelOutput")
 
 
 logger = logging.getLogger(__name__)
@@ -170,9 +174,8 @@ class AttributionModel(ABC, torch.nn.Module):
         # If constrained decoding is not enabled, we need to generate the
         # generated texts from the input texts.
         generation_args = kwargs.pop("generation_args", {})
-        encoded_input = None
+        encoded_input = self.encode(input_texts, return_baseline=True, include_eos_baseline=include_eos_baseline)
         if not constrained_decoding:
-            encoded_input = self.encode(input_texts, return_baseline=True, include_eos_baseline=include_eos_baseline)
             generated_texts = self.generate(encoded_input, return_generation_output=False, **generation_args)
         logger.debug(f"reference_texts={generated_texts}")
         attribution_method = self.get_attribution_method(method, override_default_attribution)
@@ -183,8 +186,9 @@ class AttributionModel(ABC, torch.nn.Module):
         if isnotebook():
             logger.debug("Pretty progress currently not supported in notebooks, falling back to tqdm.")
             pretty_progress = False
-        sources = input_texts if constrained_decoding else encoded_input
-        inputs = (sources, generated_texts) if self.is_encoder_decoder else generated_texts
+        inputs = (encoded_input, generated_texts) if self.is_encoder_decoder else generated_texts
+        if not self.is_encoder_decoder:
+            attr_pos_start = encoded_input.input_ids.shape[1]
         attribution_outputs = attribution_method.prepare_and_attribute(
             inputs,
             batch_size=batch_size,
@@ -345,6 +349,13 @@ class AttributionModel(ABC, torch.nn.Module):
 
     @staticmethod
     @abstractmethod
+    def format_forward_args(
+        inputs: Union[DecoderOnlyBatch, EncoderDecoderBatch],
+    ) -> Dict[str, Any]:
+        pass
+
+    @staticmethod
+    @abstractmethod
     def format_attribution_args(
         batch: Union[DecoderOnlyBatch, EncoderDecoderBatch],
         target_ids: TargetIdsTensor,
@@ -356,7 +367,14 @@ class AttributionModel(ABC, torch.nn.Module):
         pass
 
     @abstractmethod
-    def get_sequences(self, batch: Union[DecoderOnlyBatch, EncoderDecoderBatch]) -> TextSequences:
+    def get_text_sequences(self, batch: Union[DecoderOnlyBatch, EncoderDecoderBatch]) -> TextSequences:
+        pass
+
+    @abstractmethod
+    def get_forward_output(
+        self,
+        **kwargs,
+    ) -> ModelOutput:
         pass
 
     @staticmethod
@@ -367,4 +385,21 @@ class AttributionModel(ABC, torch.nn.Module):
         target_tokens: OneOrMoreTokenSequences,
         target_ids: TargetIdsTensor,
     ) -> FeatureAttributionStepOutput:
+        pass
+
+    # Architecture and Framework-specific methods
+
+    @abstractmethod
+    def format_step_function_args(
+        self,
+        forward_output: ModelOutput,
+        target_ids: ExpandedTargetIdsTensor,
+        encoder_input_ids: Optional[IdsTensor] = None,
+        decoder_input_ids: Optional[IdsTensor] = None,
+        encoder_input_embeds: Optional[EmbeddingsTensor] = None,
+        decoder_input_embeds: Optional[EmbeddingsTensor] = None,
+        encoder_attention_mask: Optional[IdsTensor] = None,
+        decoder_attention_mask: Optional[IdsTensor] = None,
+        **kwargs,
+    ) -> Dict[str, Any]:
         pass

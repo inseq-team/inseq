@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Union
 
 import logging
 import math
@@ -104,24 +104,19 @@ def get_step_scores(
     if attribution_model is None:
         raise ValueError("Attribution model is not set.")
     with torch.no_grad():
-        output = attribution_model.model(
-            inputs_embeds=batch.sources.input_embeds,
-            decoder_inputs_embeds=batch.targets.input_embeds,
-            attention_mask=batch.sources.attention_mask,
-            decoder_attention_mask=batch.targets.attention_mask,
-        )
-        return STEP_SCORES_MAP[score_identifier](
-            attribution_model=attribution_model,
+        output = attribution_model.get_forward_output(**attribution_model.format_forward_args(batch))
+        step_scores_args = attribution_model.format_step_function_args(
             forward_output=output,
-            encoder_input_ids=batch.sources.input_ids,
-            decoder_input_ids=batch.targets.input_ids,
-            encoder_input_embeds=batch.sources.input_embeds,
-            decoder_input_embeds=batch.targets.input_embeds,
+            encoder_input_ids=batch.source_ids,
+            decoder_input_ids=batch.target_ids,
+            encoder_input_embeds=batch.source_embeds,
+            decoder_input_embeds=batch.target_embeds,
             target_ids=target_ids,
-            encoder_attention_mask=batch.sources.attention_mask,
-            decoder_attention_mask=batch.targets.attention_mask,
+            encoder_attention_mask=batch.source_mask,
+            decoder_attention_mask=batch.target_mask,
             **step_scores_args,
         )
+        return STEP_SCORES_MAP[score_identifier](**step_scores_args)
 
 
 def join_token_ids(tokens: OneOrMoreTokenSequences, ids: OneOrMoreIdSequences) -> List[TokenWithId]:
@@ -224,3 +219,19 @@ def register_step_score(
             if agg_name not in DEFAULT_ATTRIBUTION_AGGREGATE_DICT["step_scores"]:
                 DEFAULT_ATTRIBUTION_AGGREGATE_DICT["step_scores"][agg_name] = {}
             DEFAULT_ATTRIBUTION_AGGREGATE_DICT["step_scores"][agg_name][identifier] = agg_fn
+
+
+def get_source_target_attributions(
+    attr: Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]],
+    is_encoder_decoder: bool,
+) -> Tuple[torch.Tensor, torch.Tensor]:
+    if is_encoder_decoder:
+        if isinstance(attr, tuple) and len(attr) > 1:
+            return attr[0], attr[1]
+        else:
+            return attr, None
+    else:
+        if isinstance(attr, tuple):
+            return None, attr[0]
+        else:
+            return None, attr

@@ -1,7 +1,23 @@
 from typing import Any, Callable, Dict, Tuple, Union
 
-from ..data import Batch, BatchEmbedding, BatchEncoding, DecoderOnlyBatch, FeatureAttributionInput
-from ..utils.typing import EmbeddingsTensor, IdsTensor, SingleScorePerStepTensor, TargetIdsTensor, TextSequences
+from ..attr.feat import join_token_ids
+from ..data import (
+    Batch,
+    BatchEmbedding,
+    BatchEncoding,
+    DecoderOnlyBatch,
+    FeatureAttributionInput,
+    FeatureAttributionStepOutput,
+)
+from ..utils.typing import (
+    EmbeddingsTensor,
+    IdsTensor,
+    OneOrMoreTokenSequences,
+    SingleScorePerStepTensor,
+    TargetIdsTensor,
+    TextSequences,
+    TokenWithId,
+)
 from .attribution_model import AttributionModel
 
 
@@ -45,6 +61,12 @@ class DecoderOnlyAttributionModel(AttributionModel):
         return batch
 
     @staticmethod
+    def format_forward_args(
+        inputs: DecoderOnlyBatch,
+    ) -> Dict[str, Any]:
+        return {"attributed_tensors": inputs.input_embeds, "attention_mask": inputs.attention_mask}
+
+    @staticmethod
     def format_attribution_args(
         batch: DecoderOnlyBatch,
         target_ids: TargetIdsTensor,
@@ -80,8 +102,36 @@ class DecoderOnlyAttributionModel(AttributionModel):
         }
         return attribute_fn_args, baselines
 
-    def get_sequences(self, batch: DecoderOnlyBatch) -> TextSequences:
+    def get_text_sequences(self, batch: DecoderOnlyBatch) -> TextSequences:
         return TextSequences(
             sources=None,
             targets=self.convert_tokens_to_string(batch.input_tokens, as_targets=True),
         )
+
+    @staticmethod
+    def enrich_step_output(
+        step_output: FeatureAttributionStepOutput,
+        batch: DecoderOnlyBatch,
+        target_tokens: OneOrMoreTokenSequences,
+        target_ids: TargetIdsTensor,
+    ) -> FeatureAttributionStepOutput:
+        r"""
+        Enriches the attribution output with token information, producing the finished
+        :class:`~inseq.data.FeatureAttributionStepOutput` object.
+
+        Args:
+            step_output (:class:`~inseq.data.FeatureAttributionStepOutput`): The output produced
+                by the attribution step, with missing batch information.
+            batch (:class:`~inseq.data.DecoderOnlyBatch`): The batch on which attribution was performed.
+            target_ids (:obj:`torch.Tensor`): Target token ids of size `(batch_size, 1)` corresponding to tokens
+                for which the attribution step was performed.
+
+        Returns:
+            :class:`~inseq.data.FeatureAttributionStepOutput`: The enriched attribution output.
+        """
+        if len(target_ids.shape) == 0:
+            target_ids = target_ids.unsqueeze(0)
+        step_output.source = None
+        step_output.target = [[TokenWithId(token[0], id)] for token, id in zip(target_tokens, target_ids.tolist())]
+        step_output.prefix = join_token_ids(batch.target_tokens, batch.input_ids.tolist())
+        return step_output

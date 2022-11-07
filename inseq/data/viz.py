@@ -310,10 +310,10 @@ def get_progress_bar(
 
 def update_progress_bar(
     pbar: Union[tqdm, Tuple[Progress, Live], None],
-    skipped_prefixes: List[str],
-    attributed_sentences: List[str],
-    unattributed_suffixes: List[str],
-    skipped_suffixes: List[str],
+    skipped_prefixes: Optional[List[str]] = None,
+    attributed_sentences: Optional[List[str]] = None,
+    unattributed_suffixes: Optional[List[str]] = None,
+    skipped_suffixes: Optional[List[str]] = None,
     whitespace_indexes: List[List[int]] = None,
     show: bool = False,
     pretty: bool = False,

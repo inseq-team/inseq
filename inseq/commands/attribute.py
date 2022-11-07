@@ -15,7 +15,7 @@ class AttributeBaseArgs:
     attribution_method: Optional[str] = field(
         default="integrated_gradients",
         metadata={
-            "alias": "-am",
+            "alias": "-a",
             "help": "The attribution method used to perform feature attribution.",
             "choices": list_feature_attribution_methods(),
         },
@@ -23,31 +23,29 @@ class AttributeBaseArgs:
     do_prefix_attribution: bool = field(
         default=False,
         metadata={
-            "alias": "-pa",
             "help": "Performs the attribution procedure including the generated prefix at every step.",
         },
     )
     step_scores: List[str] = field(
-        default_factory=list, metadata={"alias": "-ss", "help": "Adds step scores to the attribution output."}
+        default_factory=list, metadata={"help": "Adds step scores to the attribution output."}
     )
     output_step_attributions: bool = field(
-        default=False, metadata={"alias": "-sa", "help": "Adds step-level feature attributions to the output."}
+        default=False, metadata={"help": "Adds step-level feature attributions to the output."}
     )
     include_eos_baseline: bool = field(
         default=False,
         metadata={
-            "alias": "-eos",
+            "alias": "--eos",
             "help": "Whether the EOS token should be included in the baseline, used for some attribution methods.",
         },
     )
     n_approximation_steps: Optional[int] = field(
         default=100,
-        metadata={"alias": "-ns", "help": "Number of approximation steps, used for some attribution methods."},
+        metadata={"alias": "-n", "help": "Number of approximation steps, used for some attribution methods."},
     )
     return_convergence_delta: bool = field(
         default=False,
         metadata={
-            "alias": "-cd",
             "help": "Returns the convergence delta of the approximation, used for some attribution methods.",
         },
     )
@@ -61,24 +59,27 @@ class AttributeBaseArgs:
     attribution_batch_size: Optional[int] = field(
         default=50,
         metadata={
-            "alias": "-abs",
             "help": "The internal batch size used by the attribution method, used for some attribution methods.",
         },
     )
     device: str = field(
         default=get_default_device(),
-        metadata={"alias": "-dev", "help": "The device used for inference with Pytorch. Multi-GPU is not supported."},
+        metadata={"alias": "--dev", "help": "The device used for inference with Pytorch. Multi-GPU is not supported."},
     )
     hide_attributions: bool = field(
         default=False,
         metadata={
-            "alias": "-noshow",
+            "alias": "--hide",
             "help": "If specified, the attribution visualization are not shown in the output.",
         },
     )
     save_path: Optional[str] = field(
         default=None,
         metadata={"alias": "-o", "help": "Path where the attribution output should be saved in JSON format."},
+    )
+    max_gen_length: Optional[int] = field(
+        default=None,
+        metadata={"alias": "-l", "help": "Max generation length for model outputs. Default: 512"},
     )
 
 
@@ -90,7 +91,7 @@ class AttributeArgs(AttributeBaseArgs):
     generated_texts: Optional[List[str]] = field(
         default=None,
         metadata={
-            "alias": "-gen",
+            "alias": "-g",
             "help": "If specified, constrains the decoding procedure to the specified outputs.",
         },
     )
@@ -105,7 +106,11 @@ class AttributeArgs(AttributeBaseArgs):
 
 
 def attribute(input_texts, generated_texts, args: AttributeBaseArgs):
-    model = load_model(args.model_name_or_path, attribution_method=args.attribution_method)
+    model = load_model(
+        args.model_name_or_path,
+        attribution_method=args.attribution_method,
+        device=args.device,
+    )
     out = model.attribute(
         input_texts,
         generated_texts,
@@ -118,6 +123,7 @@ def attribute(input_texts, generated_texts, args: AttributeBaseArgs):
         internal_batch_size=args.attribution_batch_size,
         return_convergence_delta=args.return_convergence_delta,
         device=args.device,
+        generation_args={"max_new_tokens": args.max_gen_length},
     )
     if not args.hide_attributions:
         out.show()
