@@ -115,8 +115,8 @@ class EncoderDecoderAttributionModel(AttributionModel):
     ) -> Dict[str, Any]:
         return {
             "attributed_tensors": inputs.sources.input_embeds,
-            "decoder_inputs_embeds": inputs.targets.input_embeds,
-            "attention_mask": inputs.sources.attention_mask,
+            "decoder_input_embeds": inputs.targets.input_embeds,
+            "encoder_attention_mask": inputs.sources.attention_mask,
             "decoder_attention_mask": inputs.targets.attention_mask,
         }
 

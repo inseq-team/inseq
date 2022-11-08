@@ -228,6 +228,8 @@ def get_source_target_attributions(
     if is_encoder_decoder:
         if isinstance(attr, tuple) and len(attr) > 1:
             return attr[0], attr[1]
+        elif isinstance(attr, tuple) and len(attr) == 1:
+            return attr[0], None
         else:
             return attr, None
     else:
