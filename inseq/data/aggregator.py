@@ -166,7 +166,8 @@ class SequenceAttributionAggregator(Aggregator):
     def end_aggregation_hook(cls, attr: TensorWrapper, **kwargs):
         super().end_aggregation_hook(attr, **kwargs)
         # Needed to ensure the attribution can be visualized
-        assert len(attr.source_attributions.shape) == 2
+        if attr.source_attributions is not None:
+            assert len(attr.source_attributions.shape) == 2
         if attr.target_attributions is not None:
             assert len(attr.target_attributions.shape) == 2
 
@@ -191,6 +192,8 @@ class SequenceAttributionAggregator(Aggregator):
     def aggregate_target_attributions(attr, aggregate_fn: Callable, **kwargs):
         if attr.target_attributions is None:
             return attr.target_attributions
+        if attr.source_attributions is None:
+            return aggregate_fn(attr.target_attributions)
         else:
             return aggregate_fn((attr.source_attributions, attr.target_attributions))[1]
 
@@ -215,8 +218,9 @@ class SequenceAttributionAggregator(Aggregator):
         from .attribution import FeatureAttributionSequenceOutput
 
         assert isinstance(attr, FeatureAttributionSequenceOutput)
-        assert attr.source_attributions.shape[0] == len(attr.source)
-        assert attr.source_attributions.shape[1] == attr.attr_pos_end - attr.attr_pos_start
+        if attr.source_attributions is not None:
+            assert attr.source_attributions.shape[0] == len(attr.source)
+            assert attr.source_attributions.shape[1] == attr.attr_pos_end - attr.attr_pos_start
         if attr.target_attributions is not None:
             assert attr.target_attributions.shape[0] == min(len(attr.target), attr.attr_pos_end - 1)
             assert attr.target_attributions.shape[1] == attr.attr_pos_end - attr.attr_pos_start
@@ -321,6 +325,8 @@ class ContiguousSpanAggregator(SequenceAttributionAggregator):
 
     @staticmethod
     def aggregate_source_attributions(attr, source_spans, target_spans, aggregate_fn, **kwargs):
+        if attr.source_attributions is None:
+            return attr.source_attributions
         # First aggregate along generated target sequence, then along attributed source
         return ContiguousSpanAggregator._aggregate_sequential_scores(
             attr.source_attributions, source_spans, target_spans, aggregate_fn
@@ -448,9 +454,10 @@ class PairAggregator(SequenceAttributionAggregator):
     def validate_pair(cls, attr, paired_attr):
         assert len(attr.source) == len(paired_attr.source), "Source sequences must be the same length."
         assert len(attr.target) == len(paired_attr.target), "Target sequences must be the same length."
-        assert (
-            attr.source_attributions.shape == paired_attr.source_attributions.shape
-        ), "Source attributions must be the same shape."
+        if attr.source_attributions is not None:
+            assert (
+                attr.source_attributions.shape == paired_attr.source_attributions.shape
+            ), "Source attributions must be the same shape."
         if attr.target_attributions is not None:
             assert (
                 attr.target_attributions.shape == paired_attr.target_attributions.shape
@@ -478,6 +485,8 @@ class PairAggregator(SequenceAttributionAggregator):
 
     @staticmethod
     def aggregate_source_attributions(attr, paired_attr, aggregate_fn, **kwargs):
+        if attr.source_attributions is None:
+            return attr.source_attributions
         return aggregate_fn(attr.source_attributions, paired_attr.source_attributions)
 
     @staticmethod

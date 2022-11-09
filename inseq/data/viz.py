@@ -29,7 +29,7 @@ from rich.color import Color
 from rich.live import Live
 from rich.padding import Padding
 from rich.panel import Panel
-from rich.progress import BarColumn, Progress, TextColumn
+from rich.progress import BarColumn, Progress, TextColumn, TimeRemainingColumn
 from rich.style import Style
 from rich.table import Column, Table
 from rich.text import Text
@@ -84,24 +84,34 @@ def show_attributions(
     for ex_id, attribution in enumerate(attributions):
         instance_html = get_instance_html(ex_id)
         curr_html = ""
-        curr_html += instance_html
-        curr_html += get_heatmap_type(attribution, html_colors[idx], "Source", use_html=True)
+        curr_html_color = html_colors[idx]
+        if attribution.source_attributions is not None:
+            curr_html += instance_html
+            curr_html += get_heatmap_type(attribution, curr_html_color, "Source", use_html=True)
+            if attribution.target_attributions is not None:
+                curr_html_color = html_colors[idx + 1]
         if attribution.target_attributions is not None:
             curr_html += instance_html
-            curr_html += get_heatmap_type(attribution, html_colors[idx + 1], "Target", use_html=True)
+            curr_html += get_heatmap_type(attribution, curr_html_color, "Target", use_html=True)
         if display and isnotebook():
             from IPython.core.display import HTML, display
 
             display(HTML(curr_html))
         html_out += curr_html
         if not isnotebook():
-            rprint(get_heatmap_type(attribution, colors[idx], "Source", use_html=False))
+            curr_color = colors[idx]
+            if attribution.source_attributions is not None:
+                print("\n\n")
+                rprint(get_heatmap_type(attribution, curr_color, "Source", use_html=False))
+                if attribution.target_attributions is not None:
+                    curr_color = colors[idx + 1]
             if attribution.target_attributions is not None:
                 print("\n\n")
-                rprint(get_heatmap_type(attribution, colors[idx + 1], "Target", use_html=False))
-        idx += 1
-        if attribution.target_attributions is not None:
+                rprint(get_heatmap_type(attribution, curr_color, "Target", use_html=False))
+        if any(x is None for x in [attribution.source_attributions, attribution.target_attributions]):
             idx += 1
+        else:
+            idx += 2
     if return_html:
         return html_out
 
@@ -123,9 +133,12 @@ def get_attribution_colors(
         min_val = -max_val
     colors = []
     for attribution in attributions:
-        colors.append(
-            get_colors(attribution.source_attributions.numpy(), min_val, max_val, cmap, return_alpha, return_strings)
-        )
+        if attribution.source_attributions is not None:
+            colors.append(
+                get_colors(
+                    attribution.source_attributions.numpy(), min_val, max_val, cmap, return_alpha, return_strings
+                )
+            )
         if attribution.target_attributions is not None:
             colors.append(
                 get_colors(
@@ -278,9 +291,10 @@ def get_progress_bar(
         )
     elif show and pretty:
         job_progress = Progress(
-            "{task.description}",
-            BarColumn(),
+            TextColumn("{task.description}", table_column=Column(ratio=3, no_wrap=False)),
+            BarColumn(table_column=Column(ratio=1)),
             TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+            TimeRemainingColumn(),
         )
         for idx, (tgt, tgt_len) in enumerate(zip(sequences.targets, target_lengths)):
             job_progress.add_task(f"{idx}. {tgt}", total=tgt_len)
@@ -331,7 +345,7 @@ def update_progress_bar(
                 past_length = 0
                 for split, color in zip(split_targets, ["grey58", "green", "orange1", "grey58"]):
                     if split[job.id]:
-                        formatted_desc += f"[{color}]" + split[job.id] + "[/]"
+                        formatted_desc += f"[{color}]" + split[job.id].replace("\n", "\\n") + "[/]"
                         past_length += len(split[job.id])
                         if past_length in whitespace_indexes[job.id]:
                             formatted_desc += " "

@@ -1,5 +1,6 @@
 from typing import Any, Dict, List, Optional, Type, Union
 
+import logging
 import os
 from dataclasses import dataclass, field
 
@@ -47,6 +48,8 @@ DEFAULT_ATTRIBUTION_AGGREGATE_DICT = {
         }
     },
 }
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(eq=False, repr=False)
@@ -101,7 +104,6 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
         tokenized_target_sentences: Optional[List[List[TokenWithId]]] = None,
         pad_id: Optional[Any] = None,
         has_bos_token: bool = True,
-        attr_pos_start: int = 0,
         attr_pos_end: Optional[int] = None,
     ) -> List["FeatureAttributionSequenceOutput"]:
         attr = attributions[0]
@@ -119,13 +121,15 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
         if tokenized_target_sentences is None:
             tokenized_target_sentences = targets
         if attr_pos_end is None:
-            attr_pos_end = max([len(t) for t in tokenized_target_sentences])
+            attr_pos_end = max([len(t) + 1 for t in tokenized_target_sentences])
         for seq_id in range(num_sequences):
+            pos_start = min(len(tokenized_target_sentences[seq_id]), attr_pos_end) - len(targets[seq_id])
+            source = tokenized_target_sentences[seq_id][:pos_start] if sources is None else sources[seq_id]
             seq_attributions.append(
                 seq_attr_cls(
-                    source=sources[seq_id] if sources is not None else None,
+                    source=source,
                     target=tokenized_target_sentences[seq_id],
-                    attr_pos_start=attr_pos_start,
+                    attr_pos_start=pos_start,
                     attr_pos_end=attr_pos_end,
                 )
             )
@@ -187,27 +191,38 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
         from inseq import show_attributions
 
         aggregated = self.aggregate(aggregator, **kwargs)
-        return show_attributions(aggregated, min_val, max_val, display, return_html)
+        if (aggregated.source_attributions is not None and aggregated.source_attributions.shape[1] == 0) or (
+            aggregated.target_attributions is not None and aggregated.target_attributions.shape[1] == 0
+        ):
+            tokens = "".join(tid.token for tid in self.target)
+            logger.warning(f"Found empty attributions, skipping attribution matching generation: {tokens}")
+        else:
+            return show_attributions(aggregated, min_val, max_val, display, return_html)
 
     @property
     def minimum(self) -> float:
-        minimum = float(self.source_attributions.min())
+        minimum = 0
+        if self.source_attributions is not None:
+            minimum = min(minimum, float(self.source_attributions.min()))
         if self.target_attributions is not None:
             minimum = min(minimum, float(self.target_attributions.min()))
         return minimum
 
     @property
     def maximum(self) -> float:
-        maxmimum = float(self.source_attributions.max())
+        maximum = 0
+        if self.source_attributions is not None:
+            maximum = max(maximum, float(self.source_attributions.max()))
         if self.target_attributions is not None:
-            maxmimum = max(maxmimum, float(self.target_attributions.max()))
-        return maxmimum
+            maximum = max(maximum, float(self.target_attributions.max()))
+        return maximum
 
     def weight_attributions(self, step_score_id: str):
         aggregated_attr = self.aggregate()
         step_scores = self.step_scores[step_score_id].T.unsqueeze(1)
-        source_attr = aggregated_attr.source_attributions.float().T
-        self.source_attributions = (step_scores * source_attr).T
+        if self.source_attributions is not None:
+            source_attr = aggregated_attr.source_attributions.float().T
+            self.source_attributions = (step_scores * source_attr).T
         if self.target_attributions is not None:
             target_attr = aggregated_attr.target_attributions.float().T
             self.target_attributions = (step_scores * target_attr).T
@@ -235,7 +250,7 @@ class FeatureAttributionStepOutput(TensorWrapper):
         self,
         target_attention_mask: TargetIdsTensor,
     ) -> None:
-        if self.source is not None:
+        if self.source_attributions is not None:
             self.source_attributions = remap_from_filtered(
                 original_shape=(len(self.source), *self.source_attributions.shape[1:]),
                 mask=target_attention_mask,
@@ -376,10 +391,14 @@ class FeatureAttributionOutput:
         Returns:
             str: Attribution visualization as HTML if `return_html=True`, None otherwise.
         """
-        from inseq import show_attributions
-
-        attributions = [attr.aggregate(aggregator, **kwargs) for attr in self.sequence_attributions]
-        return show_attributions(attributions, min_val, max_val, display, return_html)
+        out_str = ""
+        for attr in self.sequence_attributions:
+            if return_html:
+                out_str += attr.show(min_val, max_val, display, return_html, aggregator, **kwargs)
+            else:
+                attr.show(min_val, max_val, display, return_html, aggregator, **kwargs)
+        if return_html:
+            return out_str
 
     @classmethod
     def merge_attributions(cls, attributions: List["FeatureAttributionOutput"]) -> "FeatureAttributionOutput":

@@ -40,6 +40,7 @@ from ...utils import (
     extract_signature_args,
     find_char_indexes,
     get_available_methods,
+    get_front_padding,
     pretty_tensor,
 )
 from ...utils.typing import ModelIdentifier, SingleScorePerStepTensor, TargetIdsTensor
@@ -295,6 +296,7 @@ class FeatureAttribution(Registry):
             batch.max_generation_length,
             attr_pos_start,
             attr_pos_end,
+            prepend_bos_token,
         )
         logger.debug("=" * 30 + f"\nfull batch: {batch}\n" + "=" * 30)
         # Sources are empty for decoder-only models
@@ -302,7 +304,17 @@ class FeatureAttribution(Registry):
         target_tokens_with_ids = self.attribution_model.tokenize_with_ids(
             sequences.targets, as_targets=True, skip_special_tokens=False
         )
-        targets_lengths = [min(attr_pos_end, len(tts)) - attr_pos_start for tts in target_tokens_with_ids]
+        # Manages front padding for decoder-only models, using 0 as lower bound
+        # when attr_pos_start exceeds target length.
+        targets_lengths = [
+            max(
+                0,
+                min(attr_pos_end, len(target_tokens_with_ids[idx]))
+                - attr_pos_start
+                + get_front_padding(batch.target_mask)[idx],
+            )
+            for idx in range(len(target_tokens_with_ids))
+        ]
         pbar = get_progress_bar(
             sequences=sequences,
             target_lengths=targets_lengths,
@@ -358,7 +370,6 @@ class FeatureAttribution(Registry):
                 tokenized_target_sentences=target_tokens_with_ids,
                 pad_id=self.attribution_model.pad_token,
                 has_bos_token=prepend_bos_token,
-                attr_pos_start=attr_pos_start,
                 attr_pos_end=attr_pos_end,
             ),
             step_attributions=attribution_outputs if output_step_attributions else None,

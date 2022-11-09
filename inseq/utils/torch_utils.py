@@ -167,6 +167,12 @@ def sum_fn(t: torch.Tensor) -> torch.Tensor:
     return t.sum(dim=1, keepdim=True)
 
 
+def get_front_padding(t: torch.Tensor, pad: int = 0, dim: int = 1) -> List[int]:
+    """Given a tensor of shape (batch, seq_len) of ids, return a list of length batch containing
+    the number of padding tokens at the beginning of each sequence."""
+    return (t != pad).int().argmax(dim).tolist()
+
+
 def get_sequences_from_batched_steps(
     bsteps: List[torch.Tensor], pad_dims: Optional[Sequence[int]] = None
 ) -> List[torch.Tensor]:
@@ -181,27 +187,23 @@ def get_sequences_from_batched_steps(
     if pad_dims:
         for dim in pad_dims:
             max_dim = max(bstep.shape[dim] for bstep in bsteps)
-            bsteps = [
-                torch.cat(
-                    [
-                        bstep,
-                        torch.ones(
-                            *bstep.shape[:dim],
-                            max_dim - bstep.shape[dim],
-                            *bstep.shape[dim + 1 :],  # noqa
-                            dtype=bstep.dtype,
-                            device=bstep.device,
-                        )
-                        * float("nan"),
-                    ],
-                    dim=dim,
+            expanded_bsteps = []
+            for bstep in bsteps:
+                padded_bstep = torch.ones(
+                    *bstep.shape[:dim],
+                    max_dim - bstep.shape[dim],
+                    *bstep.shape[dim + 1 :],  # noqa
+                    dtype=bstep.dtype,
+                    device=bstep.device,
                 )
-                for bstep in bsteps
-            ]
-    if len(bsteps[0].shape) > 1:
-        return [t.squeeze() for t in torch.stack(bsteps, dim=2).split(1, dim=0)]
+                padded_bstep = torch.cat([bstep, padded_bstep * float("nan")], dim=dim)
+                expanded_bsteps.append(padded_bstep)
     else:
-        return [t.squeeze() for t in torch.stack(bsteps, dim=1).split(1, dim=0)]
+        expanded_bsteps = bsteps
+    if len(bsteps[0].shape) > 1:
+        return [t.squeeze() for t in torch.stack(expanded_bsteps, dim=2).split(1, dim=0)]
+    else:
+        return [t.squeeze() for t in torch.stack(expanded_bsteps, dim=1).split(1, dim=0)]
 
 
 def check_device(device_name: str) -> bool:

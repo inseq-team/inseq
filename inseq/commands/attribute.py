@@ -1,5 +1,6 @@
 from typing import List, Optional
 
+import logging
 from dataclasses import dataclass, field
 
 from .. import list_feature_attribution_methods, load_model
@@ -81,6 +82,22 @@ class AttributeBaseArgs:
         default=None,
         metadata={"alias": "-l", "help": "Max generation length for model outputs. Default: 512"},
     )
+    start_pos: Optional[int] = field(
+        default=None,
+        metadata={"alias": "-s", "help": "Start position for the attribution. Default: first token"},
+    )
+    end_pos: Optional[int] = field(
+        default=None,
+        metadata={"alias": "-e", "help": "End position for the attribution. Default: last token"},
+    )
+    verbose: bool = field(
+        default=False,
+        metadata={"alias": "-v", "help": "If specified, use INFO as logging level for the attribution."},
+    )
+    very_verbose: bool = field(
+        default=False,
+        metadata={"alias": "-vv", "help": "If specified, use DEBUG as logging level for the attribution."},
+    )
 
 
 @dataclass
@@ -106,6 +123,17 @@ class AttributeArgs(AttributeBaseArgs):
 
 
 def attribute(input_texts, generated_texts, args: AttributeBaseArgs):
+    if args.very_verbose:
+        log_level = logging.DEBUG
+    elif args.verbose:
+        log_level = logging.INFO
+    else:
+        log_level = logging.WARNING
+    logging.basicConfig(
+        level=log_level,
+        format="%(asctime)s.%(msecs)03d %(levelname)s %(module)s - %(funcName)s: %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
     model = load_model(
         args.model_name_or_path,
         attribution_method=args.attribution_method,
@@ -124,6 +152,8 @@ def attribute(input_texts, generated_texts, args: AttributeBaseArgs):
         return_convergence_delta=args.return_convergence_delta,
         device=args.device,
         generation_args={"max_new_tokens": args.max_gen_length},
+        attr_pos_start=args.start_pos,
+        attr_pos_end=args.end_pos,
     )
     if not args.hide_attributions:
         out.show()
