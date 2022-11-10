@@ -17,7 +17,6 @@
         "model_name": "facebook/m2m100_418M",
         "output_step_attributions": false,
         "step_scores": ["probability"],
-        "prepend_bos_token": true,
         "tokenizer_class": "M2M100Tokenizer",
         "tokenizer_name": "facebook/m2m100_418M"
     },

@@ -27,7 +27,6 @@ class DecoderOnlyAttributionModel(AttributionModel):
     def prepare_inputs_for_attribution(
         self,
         inputs: FeatureAttributionInput,
-        prepend_bos_token: bool = True,
         include_eos_baseline: bool = False,
         use_layer_attribution: bool = False,
     ) -> DecoderOnlyBatch:
@@ -39,7 +38,6 @@ class DecoderOnlyAttributionModel(AttributionModel):
                 # since a single tokenizer is available.
                 encodings: BatchEncoding = self.encode(
                     inputs,
-                    prepend_bos_token=prepend_bos_token,
                     return_baseline=True,
                     include_eos_baseline=include_eos_baseline,
                 )

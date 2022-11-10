@@ -113,7 +113,7 @@ Now that we have our custom attribution function, integrating it in Inseq is ver
     attribution_model = inseq.load_model("Helsinki-NLP/opus-mt-en-it", "saliency")
 
     # Pre-compute ids and attention map for the contrastive target
-    contrast = attribution_model.encode("Ho salutato la manager", as_targets=True, prepend_bos_token=True)
+    contrast = attribution_model.encode("Ho salutato la manager", as_targets=True)
 
     # Perform the contrastive attribution:
     # Regular (forced) target -> "Non posso crederci."

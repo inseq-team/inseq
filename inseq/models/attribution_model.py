@@ -143,7 +143,7 @@ class AttributionModel(ABC, torch.nn.Module):
         generated_texts: Optional[TextInput] = None,
         method: Optional[str] = None,
         override_default_attribution: Optional[bool] = False,
-        attr_pos_start: Optional[int] = 1,
+        attr_pos_start: Optional[int] = None,
         attr_pos_end: Optional[int] = None,
         show_progress: bool = True,
         pretty_progress: bool = True,
@@ -151,7 +151,6 @@ class AttributionModel(ABC, torch.nn.Module):
         attribute_target: bool = False,
         step_scores: List[str] = [],
         include_eos_baseline: bool = False,
-        prepend_bos_token: bool = True,
         attributed_fn: Union[str, Callable[..., SingleScorePerStepTensor], None] = None,
         device: Optional[str] = None,
         batch_size: Optional[int] = None,
@@ -174,6 +173,11 @@ class AttributionModel(ABC, torch.nn.Module):
         # If constrained decoding is not enabled, we need to generate the
         # generated texts from the input texts.
         generation_args = kwargs.pop("generation_args", {})
+        if constrained_decoding and generation_args:
+            logger.warning(
+                f"Generation arguments {generation_args} are provided, but constrained decoding is enabled. "
+                "Generation arguments will be ignored."
+            )
         encoded_input = self.encode(input_texts, return_baseline=True, include_eos_baseline=include_eos_baseline)
         if not constrained_decoding:
             generated_texts = self.generate(encoded_input, return_generation_output=False, **generation_args)
@@ -189,6 +193,9 @@ class AttributionModel(ABC, torch.nn.Module):
         inputs = (encoded_input, generated_texts) if self.is_encoder_decoder else generated_texts
         if not self.is_encoder_decoder:
             attr_pos_start = encoded_input.input_ids.shape[1]
+            assert all(
+                generated_texts[idx].startswith(input_texts[idx]) for idx in range(len(input_texts))
+            ), "Forced generations with decoder-only models must start with the input texts."
         attribution_outputs = attribution_method.prepare_and_attribute(
             inputs,
             batch_size=batch_size,
@@ -200,7 +207,6 @@ class AttributionModel(ABC, torch.nn.Module):
             attribute_target=attribute_target,
             step_scores=step_scores,
             include_eos_baseline=include_eos_baseline,
-            prepend_bos_token=prepend_bos_token,
             attributed_fn=attributed_fn,
             attribution_args=attribution_args,
             attributed_fn_args=attributed_fn_args,
@@ -256,7 +262,6 @@ class AttributionModel(ABC, torch.nn.Module):
         self,
         texts: TextInput,
         as_targets: bool = False,
-        prepend_bos_token: bool = True,
         return_baseline: bool = False,
         include_eos_baseline: bool = False,
     ) -> BatchEncoding:
@@ -341,7 +346,6 @@ class AttributionModel(ABC, torch.nn.Module):
     def prepare_inputs_for_attribution(
         self,
         inputs: Any,
-        prepend_bos_token: bool = True,
         include_eos_baseline: bool = False,
         use_layer_attribution: bool = False,
     ) -> Union[DecoderOnlyBatch, EncoderDecoderBatch]:

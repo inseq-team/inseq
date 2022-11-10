@@ -94,8 +94,8 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
             self._dict_aggregate_fn = aggregate_dict
         if self._aggregator is None:
             self._aggregator = SequenceAttributionAggregator
-        if self.attr_pos_end is None or self.attr_pos_end > len(self.target) + 1:
-            self.attr_pos_end = len(self.target) + 1
+        if self.attr_pos_end is None or self.attr_pos_end > len(self.target):
+            self.attr_pos_end = len(self.target)
 
     @classmethod
     def from_step_attributions(
@@ -109,7 +109,7 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
         attr = attributions[0]
         seq_attr_cls = attr._sequence_cls
         num_sequences = len(attr.prefix)
-        if not all([len(attr.prefix) == num_sequences for att in attributions]):
+        if not all([len(attr.prefix) == num_sequences for attr in attributions]):
             raise ValueError("All the attributions must include the same number of sequences.")
         seq_attributions = []
         sources = None
@@ -121,15 +121,18 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
         if tokenized_target_sentences is None:
             tokenized_target_sentences = targets
         if attr_pos_end is None:
-            attr_pos_end = max([len(t) + 1 for t in tokenized_target_sentences])
+            attr_pos_end = max([len(t) for t in tokenized_target_sentences])
+        pos_start = [
+            min(len(tokenized_target_sentences[seq_id]), attr_pos_end) - len(targets[seq_id])
+            for seq_id in range(num_sequences)
+        ]
         for seq_id in range(num_sequences):
-            pos_start = min(len(tokenized_target_sentences[seq_id]), attr_pos_end) - len(targets[seq_id])
-            source = tokenized_target_sentences[seq_id][:pos_start] if sources is None else sources[seq_id]
+            source = tokenized_target_sentences[seq_id][: pos_start[seq_id]] if sources is None else sources[seq_id]
             seq_attributions.append(
                 seq_attr_cls(
                     source=source,
                     target=tokenized_target_sentences[seq_id],
-                    attr_pos_start=pos_start,
+                    attr_pos_start=pos_start[seq_id],
                     attr_pos_end=attr_pos_end,
                 )
             )
@@ -148,8 +151,10 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
             for seq_id in range(num_sequences):
                 if has_bos_token:
                     target_attributions[seq_id] = target_attributions[seq_id][1:, ...]
+                start_idx = max(pos_start) - pos_start[seq_id]
+                end_idx = start_idx + len(tokenized_target_sentences[seq_id])
                 target_attributions[seq_id] = target_attributions[seq_id][
-                    : len(tokenized_target_sentences[seq_id]), : len(targets[seq_id]), ...
+                    start_idx:end_idx, : len(targets[seq_id]), ...  # noqa: E203
                 ]
                 if target_attributions[seq_id].shape[0] != len(tokenized_target_sentences[seq_id]):
                     empty_final_row = torch.ones(1, *target_attributions[seq_id].shape[1:]) * float("nan")
@@ -303,7 +308,6 @@ class FeatureAttributionOutput:
         "model_class",
         "model_name",
         "step_scores",
-        "prepend_bos_token",
         "tokenizer_class",
         "tokenizer_name",
     ]

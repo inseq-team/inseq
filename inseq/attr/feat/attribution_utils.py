@@ -63,7 +63,6 @@ def check_attribute_positions(
     max_length: int,
     attr_pos_start: Optional[int] = None,
     attr_pos_end: Optional[int] = None,
-    prepend_bos_token: bool = False,
 ) -> Tuple[int, int]:
     r"""
     Checks whether the combination of start/end positions for attribution is valid.
@@ -74,8 +73,6 @@ def check_attribute_positions(
             sequence attribution. Defaults to 1 (0 is the default BOS token).
         attr_pos_end (:obj:`int`, `optional`): The final position for performing sequence
             attribution. Defaults to None (full string).
-        prepend_bos_token (:obj:`bool`, `optional`): Whether the BOS token is prepended or not
-            to the input sequence. Defaults to False. If True, position 0 is reserved for the BOS token.
 
     Raises:
         ValueError: If the start position is greater or equal than the end position or < 0.
@@ -84,10 +81,10 @@ def check_attribute_positions(
         `tuple[int, int]`: The start and end positions for attribution.
     """
     if attr_pos_start is None:
-        attr_pos_start = 1 if prepend_bos_token else 0
+        attr_pos_start = 0
     if attr_pos_end is None or attr_pos_end > max_length:
         attr_pos_end = max_length
-    if attr_pos_start > attr_pos_end or attr_pos_start < 0:
+    if attr_pos_start > attr_pos_end:
         raise ValueError("Invalid starting position for attribution")
     if attr_pos_start == attr_pos_end:
         raise ValueError("Start and end attribution positions cannot be the same.")

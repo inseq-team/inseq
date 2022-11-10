@@ -149,7 +149,7 @@ class FeatureAttribution(Registry):
     def prepare_and_attribute(
         self,
         inputs: Union[FeatureAttributionInput, Tuple[FeatureAttributionInput, FeatureAttributionInput]],
-        attr_pos_start: Optional[int] = 1,
+        attr_pos_start: Optional[int] = None,
         attr_pos_end: Optional[int] = None,
         show_progress: bool = True,
         pretty_progress: bool = True,
@@ -157,7 +157,6 @@ class FeatureAttribution(Registry):
         attribute_target: bool = False,
         step_scores: List[str] = [],
         include_eos_baseline: bool = False,
-        prepend_bos_token: bool = True,
         attributed_fn: Union[str, Callable[..., SingleScorePerStepTensor], None] = None,
         attribution_args: Dict[str, Any] = {},
         attributed_fn_args: Dict[str, Any] = {},
@@ -187,8 +186,6 @@ class FeatureAttribution(Registry):
                 step scores can be added by using the :meth:`~inseq.register_step_score` function.
             include_eos_baseline (:obj:`bool`, `optional`): Whether to include the EOS token in the baseline for
                 attribution. By default the EOS token is not used for attribution. Defaults to False.
-            prepend_bos_token (:obj:`bool`, `optional`): Whether to prepend the BOS token to the input sequence.
-                Defaults to True.
             attributed_fn (:obj:`str` or :obj:`Callable[..., SingleScorePerStepTensor]`, `optional`): The identifier or
                 function of model outputs representing what should be attributed (e.g. output probits of model best
                 prediction after softmax). If it is a string, it must be a valid function.
@@ -205,7 +202,6 @@ class FeatureAttribution(Registry):
         """
         batch = self.attribution_model.prepare_inputs_for_attribution(
             inputs,
-            prepend_bos_token,
             include_eos_baseline,
             self.is_layer_attribution,
         )
@@ -223,14 +219,12 @@ class FeatureAttribution(Registry):
             output_step_attributions=output_step_attributions,
             attribute_target=attribute_target,
             step_scores=step_scores,
-            prepend_bos_token=prepend_bos_token,
             attribution_args=attribution_args,
             attributed_fn_args=attributed_fn_args,
             step_scores_args=step_scores_args,
         )
         # Same here, repeated from AttributionModel.attribute
         # to allow independent usage
-        attribution_output.info["prepend_bos_token"] = prepend_bos_token
         attribution_output.info["include_eos_baseline"] = include_eos_baseline
         attribution_output.info["attributed_fn"] = attributed_fn.__name__
         attribution_output.info["attribution_args"] = attribution_args
@@ -242,14 +236,13 @@ class FeatureAttribution(Registry):
         self,
         batch: Union[DecoderOnlyBatch, EncoderDecoderBatch],
         attributed_fn: Callable[..., SingleScorePerStepTensor],
-        attr_pos_start: Optional[int] = 1,
+        attr_pos_start: Optional[int] = None,
         attr_pos_end: Optional[int] = None,
         show_progress: bool = True,
         pretty_progress: bool = True,
         output_step_attributions: bool = False,
         attribute_target: bool = False,
         step_scores: List[str] = [],
-        prepend_bos_token: bool = True,
         attribution_args: Dict[str, Any] = {},
         attributed_fn_args: Dict[str, Any] = {},
         step_scores_args: Dict[str, Any] = {},
@@ -278,8 +271,6 @@ class FeatureAttribution(Registry):
             step_scores (:obj:`list` of `str`): List of identifiers for step scores that need to be computed during
                 attribution. The available step scores are defined in :obj:`inseq.attr.feat.STEP_SCORES_MAP` and new
                 step scores can be added by using the :meth:`~inseq.register_step_score` function.
-            prepend_bos_token (:obj:`bool`, `optional`): Whether to prepend a BOS token to the
-                targets, if they are to be encoded. Defaults to True.
             attribution_args (:obj:`dict`, `optional`): Additional arguments to pass to the attribution method.
             attributed_fn_args (:obj:`dict`, `optional`): Additional arguments to pass to the attributed function.
             step_scores_args (:obj:`dict`, `optional`): Additional arguments to pass to the step scores function.
@@ -296,7 +287,6 @@ class FeatureAttribution(Registry):
             batch.max_generation_length,
             attr_pos_start,
             attr_pos_end,
-            prepend_bos_token,
         )
         logger.debug("=" * 30 + f"\nfull batch: {batch}\n" + "=" * 30)
         # Sources are empty for decoder-only models
@@ -326,10 +316,14 @@ class FeatureAttribution(Registry):
         )
         whitespace_indexes = find_char_indexes(sequences.targets, " ")
         attribution_outputs = []
+        if self.attribution_model.is_encoder_decoder:
+            iter_pos_start, iter_pos_end = attr_pos_start + 1, min(attr_pos_end + 1, batch.max_generation_length)
+        else:
+            iter_pos_start, iter_pos_end = attr_pos_start, attr_pos_end
         start = datetime.now()
 
         # Attribution loop for generation
-        for step in range(attr_pos_start, attr_pos_end):
+        for step in range(iter_pos_start, iter_pos_end):
             tgt_ids, tgt_mask = batch.get_step_target(step, with_attention=True)
             step_output = self.filtered_attribute_step(
                 batch[:step],
@@ -345,10 +339,10 @@ class FeatureAttribution(Registry):
             attribution_outputs.append(step_output)
             if pretty_progress:
                 tgt_tokens = batch.target_tokens
-                skipped_prefixes = tok2string(self.attribution_model, tgt_tokens, end=attr_pos_start)
-                attributed_sentences = tok2string(self.attribution_model, tgt_tokens, attr_pos_start, step + 1)
-                unattributed_suffixes = tok2string(self.attribution_model, tgt_tokens, step + 1, attr_pos_end)
-                skipped_suffixes = tok2string(self.attribution_model, tgt_tokens, start=attr_pos_end)
+                skipped_prefixes = tok2string(self.attribution_model, tgt_tokens, end=iter_pos_start)
+                attributed_sentences = tok2string(self.attribution_model, tgt_tokens, iter_pos_start, step + 1)
+                unattributed_suffixes = tok2string(self.attribution_model, tgt_tokens, step + 1, iter_pos_end)
+                skipped_suffixes = tok2string(self.attribution_model, tgt_tokens, start=iter_pos_end)
                 update_progress_bar(
                     pbar,
                     skipped_prefixes,
@@ -369,7 +363,7 @@ class FeatureAttribution(Registry):
                 attributions=attribution_outputs,
                 tokenized_target_sentences=target_tokens_with_ids,
                 pad_id=self.attribution_model.pad_token,
-                has_bos_token=prepend_bos_token,
+                has_bos_token=self.attribution_model.is_encoder_decoder,
                 attr_pos_end=attr_pos_end,
             ),
             step_attributions=attribution_outputs if output_step_attributions else None,

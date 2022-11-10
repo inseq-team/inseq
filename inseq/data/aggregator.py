@@ -222,7 +222,7 @@ class SequenceAttributionAggregator(Aggregator):
             assert attr.source_attributions.shape[0] == len(attr.source)
             assert attr.source_attributions.shape[1] == attr.attr_pos_end - attr.attr_pos_start
         if attr.target_attributions is not None:
-            assert attr.target_attributions.shape[0] == min(len(attr.target), attr.attr_pos_end - 1)
+            assert attr.target_attributions.shape[0] == min(len(attr.target), attr.attr_pos_end)
             assert attr.target_attributions.shape[1] == attr.attr_pos_end - attr.attr_pos_start
         if attr.step_scores is not None:
             for step_score in attr.step_scores.values():

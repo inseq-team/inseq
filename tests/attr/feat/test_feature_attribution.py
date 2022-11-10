@@ -74,7 +74,7 @@ def test_contrastive_attribution(saliency_mt_model: HuggingfaceEncoderDecoderMod
     )
 
     # Pre-compute ids and attention map for the contrastive target
-    contrast = saliency_mt_model.encode("Non posso crederlo.", as_targets=True, prepend_bos_token=True)
+    contrast = saliency_mt_model.encode("Non posso crederlo.", as_targets=True)
 
     # Perform the contrastive attribution:
     # Regular (forced) target -> "Non posso crederci."

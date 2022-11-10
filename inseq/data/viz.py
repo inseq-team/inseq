@@ -161,7 +161,7 @@ def get_heatmap_type(
     if heatmap_type == "Source":
         return heatmap_func(
             attribution.source_attributions.numpy(),
-            [t.token for t in attribution.target[attribution.attr_pos_start - 1 : attribution.attr_pos_end]],  # noqa
+            [t.token for t in attribution.target[attribution.attr_pos_start : attribution.attr_pos_end]],  # noqa
             [t.token for t in attribution.source],
             colors,
             step_scores,
@@ -169,10 +169,10 @@ def get_heatmap_type(
         )
     elif heatmap_type == "Target":
         mask = np.ones_like(attribution.target_attributions.numpy()) * float("nan")
-        mask = np.tril(mask, k=1 - attribution.attr_pos_start)
+        mask = np.tril(mask, k=-attribution.attr_pos_start)
         return heatmap_func(
             attribution.target_attributions.numpy() + mask,
-            [t.token for t in attribution.target[attribution.attr_pos_start - 1 : attribution.attr_pos_end]],  # noqa
+            [t.token for t in attribution.target[attribution.attr_pos_start : attribution.attr_pos_end]],  # noqa
             [t.token for t in attribution.target],
             colors,
             step_scores,
@@ -297,7 +297,8 @@ def get_progress_bar(
             TimeRemainingColumn(),
         )
         for idx, (tgt, tgt_len) in enumerate(zip(sequences.targets, target_lengths)):
-            job_progress.add_task(f"{idx}. {tgt}", total=tgt_len)
+            clean_tgt = tgt.replace("\n", "\\n")
+            job_progress.add_task(f"{idx}. {clean_tgt}", total=tgt_len)
         progress_table = Table.grid()
         row_contents = [
             Panel.fit(
@@ -308,9 +309,13 @@ def get_progress_bar(
             )
         ]
         if sequences.sources is not None:
+            sources = []
+            for idx, src in enumerate(sequences.sources):
+                clean_src = src.replace("\n", "\\n")
+                sources.append(f"{idx}. {clean_src}")
             row_contents = [
                 Panel.fit(
-                    "\n".join([f"{idx}. {src}" for idx, src in enumerate(sequences.sources)]),
+                    "\n".join(sources),
                     title="Source sentences",
                     border_style="red",
                     padding=(1, 2),

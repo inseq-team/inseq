@@ -223,7 +223,6 @@ class HuggingfaceModel(AttributionModel):
         self,
         texts: TextInput,
         as_targets: bool = False,
-        prepend_bos_token: bool = True,
         return_baseline: bool = False,
         include_eos_baseline: bool = False,
     ) -> BatchEncoding:
@@ -261,7 +260,7 @@ class HuggingfaceModel(AttributionModel):
                     batch["input_ids"].ne(self.model.config.eos_token_id).long() * self.tokenizer.unk_token_id
                 )
         # We prepend a BOS token only when tokenizing target texts.
-        if as_targets and prepend_bos_token:
+        if as_targets and self.is_encoder_decoder:
             ones_mask = torch.ones((batch["input_ids"].shape[0], 1), device=self.device, dtype=long)
             batch["attention_mask"] = torch.cat((ones_mask, batch["attention_mask"]), dim=1)
             bos_ids = ones_mask * self.model.config.decoder_start_token_id

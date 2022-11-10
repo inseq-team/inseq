@@ -27,7 +27,6 @@ class EncoderDecoderAttributionModel(AttributionModel):
     def prepare_inputs_for_attribution(
         self,
         inputs: Tuple[FeatureAttributionInput, FeatureAttributionInput],
-        prepend_bos_token: bool = True,
         include_eos_baseline: bool = False,
         use_layer_attribution: bool = False,
     ) -> EncoderDecoderBatch:
@@ -49,8 +48,6 @@ class EncoderDecoderAttributionModel(AttributionModel):
                 :meth:`~inseq.attr.feat.FeatureAttribution.prepare` method.
             targets (:obj:`FeatureAttributionInput): The targets provided to the
                 :meth:`~inseq.attr.feat.FeatureAttribution.prepare` method.
-            prepend_bos_token (:obj:`bool`, `optional`): Whether to prepend a BOS token to the
-                targets, if they are to be encoded. Defaults to True.
             include_eos_baseline (:obj:`bool`, `optional`): Whether to include the EOS token in the baseline for
                 attribution. By default the EOS token is not used for attribution. Defaults to False.
 
@@ -88,7 +85,6 @@ class EncoderDecoderAttributionModel(AttributionModel):
                 target_encodings: BatchEncoding = self.encode(
                     targets,
                     as_targets=True,
-                    prepend_bos_token=prepend_bos_token,
                     return_baseline=True,
                     include_eos_baseline=include_eos_baseline,
                 )
