@@ -55,41 +55,52 @@ def show_attributions(
     display: bool = True,
     return_html: Optional[bool] = False,
 ) -> Optional[str]:
-    if return_html and not isnotebook():
-        raise AttributeError("return_html=True is can be used only inside an IPython environment.")
+    """_summary_
+
+    Args:
+        attributions (:class:`~inseq.data.attribution.FeatureAttributionSequenceOutput`):
+            Sequence attributions to be visualized.
+        min_val (:obj:`Optional[int]`, *optional*, defaults to None):
+            Lower attribution score threshold for color map.
+        max_val (`Optional[int]`, *optional*, defaults to None):
+            Upper attribution score threshold for color map.
+        display (`bool`, *optional*, defaults to True):
+            Whether to show the output of the visualization function.
+        return_html (`Optional[bool]`, *optional*, defaults to False):
+            If true, returns the HTML corresponding to the notebook visualization of the
+                attributions in string format, for saving purposes.
+
+    Returns:
+        `Optional[str]`: Returns the HTML output if `return_html=True`
+    """
     if isinstance(attributions, FeatureAttributionSequenceOutput):
         attributions = [attributions]
     html_out = ""
-    if isnotebook():
-        colors = get_attribution_colors(attributions, min_val, max_val, cmap=red_transparent_blue_colormap())
-    else:
+    html_colors = get_attribution_colors(attributions, min_val, max_val, cmap=red_transparent_blue_colormap())
+    if not isnotebook():
         colors = get_attribution_colors(attributions, min_val, max_val, return_alpha=False, return_strings=False)
     idx = 0
     for ex_id, attribution in enumerate(attributions):
-        if isnotebook():
+        instance_html = get_instance_html(ex_id)
+        curr_html = ""
+        curr_html += instance_html
+        curr_html += get_heatmap_type(attribution, html_colors[idx], "Source", use_html=True)
+        if attribution.target_attributions is not None:
+            curr_html += instance_html
+            curr_html += get_heatmap_type(attribution, html_colors[idx + 1], "Target", use_html=True)
+        if display and isnotebook():
             from IPython.core.display import HTML, display
 
-            instance_html = get_instance_html(ex_id)
-            curr_html = ""
-            curr_html += instance_html
-            curr_html += get_heatmap_type(attribution, colors[idx], "Source", isnotebook())
-            idx += 1
-            if attribution.target_attributions is not None:
-                curr_html += instance_html
-                curr_html += get_heatmap_type(attribution, colors[idx], "Target", isnotebook())
-                idx += 1
-            if display:
-                display(HTML(curr_html))
-            html_out += curr_html
-        else:
-            if not display:
-                raise AttributeError("display=False is not supported outside of an IPython environment.")
-            rprint(get_heatmap_type(attribution, colors[idx], "Source", isnotebook()))
-            idx += 1
+            display(HTML(curr_html))
+        html_out += curr_html
+        if not isnotebook():
+            rprint(get_heatmap_type(attribution, colors[idx], "Source", use_html=False))
             if attribution.target_attributions is not None:
                 print("\n\n")
-                rprint(get_heatmap_type(attribution, colors[idx], "Target", isnotebook()))
-                idx += 1
+                rprint(get_heatmap_type(attribution, colors[idx + 1], "Target", use_html=False))
+        idx += 1
+        if attribution.target_attributions is not None:
+            idx += 1
     if return_html:
         return html_out
 
@@ -250,14 +261,17 @@ def get_progress_bar(
     method_name: str,
     show: bool,
     pretty: bool,
+    attr_pos_start: int,
+    attr_pos_end: int,
 ) -> Union[tqdm, Tuple[Progress, Live], None]:
     sources, targets, lengths = all_sentences
     if not show:
         return None
     elif show and not pretty:
         return tqdm(
-            total=max(tgt_len for tgt_len in lengths),
+            total=attr_pos_end,
             desc=f"Attributing with {method_name}...",
+            initial=attr_pos_start,
         )
     elif show and pretty:
         job_progress = Progress(
