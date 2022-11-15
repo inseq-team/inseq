@@ -78,6 +78,12 @@ class AttributeBaseArgs:
         default=None,
         metadata={"alias": "-o", "help": "Path where the attribution output should be saved in JSON format."},
     )
+    viz_path: Optional[str] = field(
+        default=None,
+        metadata={
+            "help": "Path where the attribution visualization should be saved in HTML format.",
+        },
+    )
     max_gen_length: Optional[int] = field(
         default=None,
         metadata={"alias": "-l", "help": "Max generation length for model outputs. Default: 512"},
@@ -160,6 +166,11 @@ def attribute(input_texts, generated_texts, args: AttributeBaseArgs):
     if args.save_path:
         print(f"Saving attributions to {args.save_path}")
         out.save(args.save_path, overwrite=True)
+    if args.viz_path:
+        print(f"Saving visualization to {args.viz_path}")
+        html = out.show(return_html=True)
+        with open(args.viz_path, "w") as f:
+            f.write(html)
 
 
 class AttributeCommand(BaseCLICommand):

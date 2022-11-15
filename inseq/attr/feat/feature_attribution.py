@@ -16,7 +16,7 @@
 Todo:
     * 🟡: Allow custom arguments for model loading in the :class:`FeatureAttribution` :meth:`load` method.
 """
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import logging
 from abc import abstractmethod
@@ -148,7 +148,8 @@ class FeatureAttribution(Registry):
     @batched
     def prepare_and_attribute(
         self,
-        inputs: Union[FeatureAttributionInput, Tuple[FeatureAttributionInput, FeatureAttributionInput]],
+        sources: Sequence[str],
+        targets: FeatureAttributionInput,
         attr_pos_start: Optional[int] = None,
         attr_pos_end: Optional[int] = None,
         show_progress: bool = True,
@@ -169,8 +170,10 @@ class FeatureAttribution(Registry):
         and the :meth:`~inseq.models.AttributionModel.prepare_inputs_for_attribution` method.
 
         Args:
-            inputs (:obj:`FeatureAttributionInput` or :obj:`tuple` of :obj:`FeatureAttributionInput`): The inputs
-                provided to the :meth:`~inseq.models.AttributionModel.prepare_inputs_for_attribution` method.
+            sources (:obj:`list(str)`): The sources provided to the
+                :meth:`~inseq.attr.feat.FeatureAttribution.prepare` method.
+            targets (:obj:`FeatureAttributionInput): The targets provided to the
+                :meth:`~inseq.attr.feat.FeatureAttribution.prepare` method.
             attr_pos_start (:obj:`int`, `optional`): The initial position for performing
                 sequence attribution. Defaults to 0.
             attr_pos_end (:obj:`int`, `optional`): The final position for performing sequence
@@ -200,6 +203,11 @@ class FeatureAttribution(Registry):
                 an optional added list of single :class:`~inseq.data.FeatureAttributionStepOutput` for each step and
                 extra information regarding the attribution parameters.
         """
+        inputs = (sources, targets)
+        if not self.attribution_model.is_encoder_decoder:
+            inputs = targets
+            encoded_sources = self.attribution_model.encode(sources, return_baseline=True)
+            attr_pos_start = encoded_sources.input_ids.shape[1]
         batch = self.attribution_model.prepare_inputs_for_attribution(
             inputs,
             include_eos_baseline,

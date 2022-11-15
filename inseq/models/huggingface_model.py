@@ -208,7 +208,6 @@ class HuggingfaceModel(AttributionModel):
             generation_out.sequences,
             skip_special_tokens=True,
         )
-        texts = texts[0] if len(texts) == 1 else texts
         if return_generation_output:
             return texts, generation_out
         return texts

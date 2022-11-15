@@ -178,8 +178,8 @@ class AttributionModel(ABC, torch.nn.Module):
                 f"Generation arguments {generation_args} are provided, but constrained decoding is enabled. "
                 "Generation arguments will be ignored."
             )
-        encoded_input = self.encode(input_texts, return_baseline=True, include_eos_baseline=include_eos_baseline)
         if not constrained_decoding:
+            encoded_input = self.encode(input_texts, return_baseline=True, include_eos_baseline=include_eos_baseline)
             generated_texts = self.generate(encoded_input, return_generation_output=False, **generation_args)
         logger.debug(f"reference_texts={generated_texts}")
         attribution_method = self.get_attribution_method(method, override_default_attribution)
@@ -190,14 +190,19 @@ class AttributionModel(ABC, torch.nn.Module):
         if isnotebook():
             logger.debug("Pretty progress currently not supported in notebooks, falling back to tqdm.")
             pretty_progress = False
-        inputs = (encoded_input, generated_texts) if self.is_encoder_decoder else generated_texts
         if not self.is_encoder_decoder:
-            attr_pos_start = encoded_input.input_ids.shape[1]
             assert all(
                 generated_texts[idx].startswith(input_texts[idx]) for idx in range(len(input_texts))
             ), "Forced generations with decoder-only models must start with the input texts."
+            if constrained_decoding and len(input_texts) > 1:
+                logger.info(
+                    "Batched constrained decoding is currently not supported for decoder-only models."
+                    " Using batch size of 1."
+                )
+                batch_size = 1
         attribution_outputs = attribution_method.prepare_and_attribute(
-            inputs,
+            input_texts,
+            generated_texts,
             batch_size=batch_size,
             attr_pos_start=attr_pos_start,
             attr_pos_end=attr_pos_end,
