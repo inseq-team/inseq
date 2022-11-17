@@ -119,6 +119,12 @@ class HuggingfaceModel(AttributionModel):
             )
         if self.model.config.pad_token_id is not None:
             self.pad_token = self.tokenizer.convert_ids_to_tokens(self.model.config.pad_token_id)
+            self.tokenizer.pad_token = self.pad_token
+        self.eos_token_id = getattr(self.model.config, "eos_token_id", None)
+        if self.eos_token_id is None:
+            self.eos_token_id = self.tokenizer.pad_token_id
+        if self.tokenizer.unk_token_id is None:
+            self.tokenizer.unk_token_id = self.tokenizer.pad_token_id
         self.embed_scale = 1.0
         self.model_max_length = model_max_length
         self.encoder_int_embeds = None
@@ -256,7 +262,7 @@ class HuggingfaceModel(AttributionModel):
                 baseline_ids = torch.ones_like(batch["input_ids"]).long() * self.tokenizer.unk_token_id
             else:
                 baseline_ids = (
-                    batch["input_ids"].ne(self.model.config.eos_token_id).long() * self.tokenizer.unk_token_id
+                    batch["input_ids"].ne(self.eos_token_id).long() * self.tokenizer.unk_token_id
                 )
         # We prepend a BOS token only when tokenizing target texts.
         if as_targets and self.is_encoder_decoder:
