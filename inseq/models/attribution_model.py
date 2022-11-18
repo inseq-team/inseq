@@ -200,6 +200,12 @@ class AttributionModel(ABC, torch.nn.Module):
                     " Using batch size of 1."
                 )
                 batch_size = 1
+            if len(input_texts) > 1 and (attr_pos_start is not None or attr_pos_end is not None):
+                logger.info(
+                    "Custom attribution positions are currently not supported when batching generations for"
+                    " decoder-only models. Using batch size of 1."
+                )
+                batch_size = 1
         attribution_outputs = attribution_method.prepare_and_attribute(
             input_texts,
             generated_texts,

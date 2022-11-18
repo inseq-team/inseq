@@ -101,11 +101,12 @@ def show_attributions(
         if not isnotebook():
             curr_color = colors[idx]
             if attribution.source_attributions is not None:
-                print("\n\n")
-                rprint(get_heatmap_type(attribution, curr_color, "Source", use_html=False))
+                if display:
+                    print("\n\n")
+                    rprint(get_heatmap_type(attribution, curr_color, "Source", use_html=False))
                 if attribution.target_attributions is not None:
                     curr_color = colors[idx + 1]
-            if attribution.target_attributions is not None:
+            if attribution.target_attributions is not None and display:
                 print("\n\n")
                 rprint(get_heatmap_type(attribution, curr_color, "Target", use_html=False))
         if any(x is None for x in [attribution.source_attributions, attribution.target_attributions]):

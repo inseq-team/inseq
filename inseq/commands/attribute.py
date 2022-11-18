@@ -161,16 +161,16 @@ def attribute(input_texts, generated_texts, args: AttributeBaseArgs):
         attr_pos_start=args.start_pos,
         attr_pos_end=args.end_pos,
     )
-    if not args.hide_attributions:
-        out.show()
+    if args.viz_path:
+        print(f"Saving visualization to {args.viz_path}")
+        html = out.show(return_html=True, display=not args.hide_attributions)
+        with open(args.viz_path, "w") as f:
+            f.write(html)
+    else:
+        out.show(display=not args.hide_attributions)
     if args.save_path:
         print(f"Saving attributions to {args.save_path}")
         out.save(args.save_path, overwrite=True)
-    if args.viz_path:
-        print(f"Saving visualization to {args.viz_path}")
-        html = out.show(return_html=True)
-        with open(args.viz_path, "w") as f:
-            f.write(html)
 
 
 class AttributeCommand(BaseCLICommand):

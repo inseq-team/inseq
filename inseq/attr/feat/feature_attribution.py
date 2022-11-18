@@ -207,7 +207,8 @@ class FeatureAttribution(Registry):
         if not self.attribution_model.is_encoder_decoder:
             inputs = targets
             encoded_sources = self.attribution_model.encode(sources, return_baseline=True)
-            attr_pos_start = encoded_sources.input_ids.shape[1]
+            if attr_pos_start is None or attr_pos_start < encoded_sources.input_ids.shape[1]:
+                attr_pos_start = encoded_sources.input_ids.shape[1]
         batch = self.attribution_model.prepare_inputs_for_attribution(
             inputs,
             include_eos_baseline,
