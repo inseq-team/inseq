@@ -165,7 +165,7 @@ class AttributionModel(ABC, torch.nn.Module):
             if k in attribution_unused_args.keys() & attributed_fn_unused_args.keys() & step_scores_unused_args.keys()
         }
         if unused_args:
-            logger.warning(f"Unused arguments during attribution: {unused_args}")
+            logger.warning(f"Unused arguments during attribution: {list(unused_args.keys())}")
         attribution_args.update(extra_attribution_args)
         attributed_fn_args.update(extra_attributed_fn_args)
         step_scores_args.update(extra_step_scores_args)
@@ -175,7 +175,6 @@ class AttributionModel(ABC, torch.nn.Module):
         self,
         input_texts: TextInput,
         generated_texts: Optional[TextInput] = None,
-        generation_outputs: Optional[Dict] = {},
         method: Optional[str] = None,
         override_default_attribution: Optional[bool] = False,
         attr_pos_start: Optional[int] = 1,
@@ -209,14 +208,12 @@ class AttributionModel(ABC, torch.nn.Module):
         generation_args = kwargs.pop("generation_args", {})
         if not constrained_decoding:
             input_texts = self.encode(input_texts, return_baseline=True, include_eos_baseline=include_eos_baseline)
-            generated_texts, generation_outputs = self.generate(
-                input_texts, return_generation_output=True, **generation_args
-            )
+            generated_texts = self.generate(input_texts, return_generation_output=False, **generation_args)
         logger.debug(f"reference_texts={generated_texts}")
         attribution_method = self.get_attribution_method(method, override_default_attribution)
         attributed_fn = self.get_attributed_fn(attributed_fn)
         attribution_args, attributed_fn_args, step_scores_args = self.extract_args(
-            attribution_method, attributed_fn, step_scores, **generation_outputs, **kwargs
+            attribution_method, attributed_fn, step_scores, **kwargs
         )
         if isnotebook():
             logger.debug("Pretty progress currently not supported in notebooks, falling back to tqdm.")
