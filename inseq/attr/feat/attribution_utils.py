@@ -233,15 +233,14 @@ def register_step_score(
             DEFAULT_ATTRIBUTION_AGGREGATE_DICT["step_scores"][agg_name][identifier] = agg_fn
 
 
-def num_attention_layers(attention: tuple) -> int:
+def num_attention_heads(attention: torch.Tensor) -> int:
     """
-    Returns the number of layers an attention tuple for a given model has.
-    """
-    return len(attention)
+    Returns the number of heads an attention tensor has.
 
+    Args:
+        attention: an attention tensor of shape `(batch_size, num_heads, sequence_length, sequence_length)`
 
-def num_attention_heads(attention: tuple) -> int:
+    Returns:
+        `int`: The number of attention heads
     """
-    Returns the number of heads an attention tuple has.
-    """
-    return attention[0][0].size(0)
+    return attention.size(1)

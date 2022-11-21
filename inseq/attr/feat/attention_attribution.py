@@ -18,7 +18,7 @@ from typing import Any, Callable, Dict, Union
 import logging
 
 from ...data import EncoderDecoderBatch, FeatureAttributionStepOutput
-from ...utils import Registry
+from ...utils import Registry, pretty_tensor
 from ...utils.typing import ModelIdentifier, SingleScorePerStepTensor, TargetIdsTensor
 from ..attribution_decorators import set_hook, unset_hook
 from .feature_attribution import FeatureAttribution
@@ -73,10 +73,24 @@ class AttentionAtribution(FeatureAttribution, Registry):
                 and target attributions of size `(batch_size, source_length)` and `(batch_size, prefix length)`.
                 (target optional if attribute_target=True), plus batch information and any step score present.
         """
+        logger.debug(f"batch: {batch},\ntarget_ids: {pretty_tensor(target_ids, lpad=4)}")
+        attribute_fn_args = self.format_attribute_args(
+            batch, target_ids, attributed_fn, attribute_target, attributed_fn_args, **attribution_args
+        )
+        attr = self.method.attribute(**attribute_fn_args, **attribution_args)
+        deltas = None
+        if (
+            attribution_args.get("return_convergence_delta", False)
+            and hasattr(self.method, "has_convergence_delta")
+            and self.method.has_convergence_delta()
+        ):
+            attr, deltas = attr
         return FeatureAttributionStepOutput(
-            source_attributions=None,
-            target_attributions=None,
-            step_scores=None,
+            source_attributions=attr if not isinstance(attr, tuple) else attr[0],
+            target_attributions=None
+            if not isinstance(attr, tuple) or (isinstance(attr, tuple) and len(attr) == 1)
+            else attr[1],
+            step_scores={"deltas": deltas} if deltas is not None else {},
         )
 
     @classmethod
