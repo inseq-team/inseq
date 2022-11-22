@@ -231,16 +231,3 @@ def register_step_score(
             if agg_name not in DEFAULT_ATTRIBUTION_AGGREGATE_DICT["step_scores"]:
                 DEFAULT_ATTRIBUTION_AGGREGATE_DICT["step_scores"][agg_name] = {}
             DEFAULT_ATTRIBUTION_AGGREGATE_DICT["step_scores"][agg_name][identifier] = agg_fn
-
-
-def num_attention_heads(attention: torch.Tensor) -> int:
-    """
-    Returns the number of heads an attention tensor has.
-
-    Args:
-        attention: an attention tensor of shape `(batch_size, num_heads, sequence_length, sequence_length)`
-
-    Returns:
-        `int`: The number of attention heads
-    """
-    return attention.size(1)

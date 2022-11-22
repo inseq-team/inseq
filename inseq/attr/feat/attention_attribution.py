@@ -120,6 +120,10 @@ class AttentionAtribution(FeatureAttribution, Registry):
 
 
 class AggregatedAttentionAtribution(AttentionAtribution):
+    """
+    Aggregated attention attribution method.
+    Attention values of all layers are averaged.
+    """
 
     method_name = "aggregated_attention"
 
@@ -129,6 +133,10 @@ class AggregatedAttentionAtribution(AttentionAtribution):
 
 
 class LastLayerAttentionAttribution(AttentionAtribution):
+    """
+    Last-Layer attention attribution method.
+    Only the raw attention of the last hidden layer is retrieved.
+    """
 
     method_name = "last_layer_attention"
 
