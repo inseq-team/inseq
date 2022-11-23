@@ -21,7 +21,6 @@ from captum._utils.common import _format_output, _is_tuple
 from captum._utils.typing import TargetType, TensorOrTupleOfTensorsGeneric
 from captum.attr._utils.attribution import Attribution
 from captum.log import log_usage
-from transformers.modeling_outputs import Seq2SeqLMOutput
 
 from ....utils.typing import MultiStepEmbeddingsTensor
 
@@ -91,7 +90,6 @@ class AttentionAttribution(Attribution):
         if option == "average":
             return attention.mean(1)
 
-        # TODO: test this, I feel like this method is not doing what we want here
         elif option == "max":
             return attention.max(1)
 
@@ -126,10 +124,6 @@ class AttentionAttribution(Attribution):
             forward_pass_args["decoder_input_ids"] = forward_args[1] if is_target_attr else forward_args[2]
 
         return forward_pass_args
-
-    def _run_forward_pass(self, **forward_args: dict) -> Seq2SeqLMOutput:
-
-        pass
 
 
 class AggregatedAttention(AttentionAttribution):
