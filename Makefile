@@ -90,7 +90,7 @@ fix-style:
 .PHONY: check-safety
 check-safety:
 	poetry check
-	poetry run safety check --full-report
+	poetry run safety check --full-report -i 51457 -i 51358
 	poetry run bandit -ll --recursive inseq tests
 
 .PHONY: lint
