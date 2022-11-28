@@ -272,3 +272,38 @@ def test_attribute_decoder_forced(saliency_gpt2_model):
     assert out.info["attr_pos_end"] == 12
     aggregated = [attr.aggregate(attr._aggregator) for attr in out.sequence_attributions]
     assert all(isinstance(aggr_attr, FeatureAttributionSequenceOutput) for aggr_attr in aggregated)
+
+
+def test_attribute_decoder_forced_sliced(saliency_gpt2_model):
+    texts = [
+        "Colorless green ideas sleep",
+        "The scientist told the director that",
+    ]
+    forced_generations = [
+        "Colorless green ideas sleep furiously.",
+        "The scientist told the director that the experiment was a success.",
+    ]
+    out = saliency_gpt2_model.attribute(
+        texts,
+        forced_generations,
+        show_progress=False,
+        device=inseq.utils.get_default_device(),
+        attr_pos_start=6,
+        attr_pos_end=10,
+    )
+    assert isinstance(out, FeatureAttributionOutput)
+    assert len(out.sequence_attributions) == 2
+    assert isinstance(out.sequence_attributions[0], FeatureAttributionSequenceOutput)
+    ex1, ex2 = out.sequence_attributions[0], out.sequence_attributions[1]
+    assert ex1.attr_pos_start == 6
+    assert ex1.attr_pos_end == 7
+    assert ex1.target_attributions.shape[1] == ex1.attr_pos_end - ex1.attr_pos_start
+    assert ex1.target_attributions.shape[0] == ex1.attr_pos_end
+    assert ex2.attr_pos_start == 6
+    assert ex2.attr_pos_end == 10
+    assert ex2.target_attributions.shape[1] == ex2.attr_pos_end - ex2.attr_pos_start
+    assert ex2.target_attributions.shape[0] == ex2.attr_pos_end
+    assert out.info["attr_pos_start"] == 6
+    assert out.info["attr_pos_end"] == 10
+    aggregated = [attr.aggregate(attr._aggregator) for attr in out.sequence_attributions]
+    assert all(isinstance(aggr_attr, FeatureAttributionSequenceOutput) for aggr_attr in aggregated)

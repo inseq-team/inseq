@@ -3,13 +3,18 @@ from pytest import fixture
 from transformers import AutoModelForSeq2SeqLM
 
 import inseq
-from inseq.models.huggingface_model import HuggingfaceEncoderDecoderModel
+from inseq.models import HuggingfaceDecoderOnlyModel, HuggingfaceEncoderDecoderModel
 from inseq.utils import output2prob
 
 
 @fixture(scope="session")
 def saliency_mt_model() -> HuggingfaceEncoderDecoderModel:
     return inseq.load_model("Helsinki-NLP/opus-mt-en-it", "saliency")
+
+
+@fixture(scope="session")
+def saliency_gpt_model() -> HuggingfaceDecoderOnlyModel:
+    return inseq.load_model("gpt2", "saliency")
 
 
 @fixture(scope="session")
@@ -48,19 +53,29 @@ def attribute_contrast_logits_diff(
     # We select the next contrastive token as target
     contrast_target_ids = contrast_ids[:, decoder_input_ids.shape[1]].to(attribution_model.device)
     # Forward pass with the same model used for the main generation, but using contrastive inputs instead
-    contrast_output = attribution_model.model(
-        inputs_embeds=encoder_input_embeds,
-        attention_mask=encoder_attention_mask,
-        decoder_input_ids=contrast_decoder_input_ids,
-        decoder_attention_mask=contrast_decoder_attention_mask,
-    )
+    if isinstance(attribution_model, HuggingfaceEncoderDecoderModel):
+        contrast_decoder_input_embeds = attribution_model.embed_ids(contrast_decoder_input_ids, as_targets=True)
+        contrast_output = attribution_model.get_forward_output(
+            forward_tensor=encoder_input_embeds,
+            encoder_attention_mask=encoder_attention_mask,
+            decoder_input_embeds=contrast_decoder_input_embeds,
+            decoder_attention_mask=contrast_decoder_attention_mask,
+        )
+    elif isinstance(attribution_model, HuggingfaceDecoderOnlyModel):
+        contrast_output = attribution_model.get_forward_output(
+            forward_tensor=contrast_decoder_input_ids,
+            attention_mask=contrast_decoder_attention_mask,
+            use_embeddings=False,
+        )
+    else:
+        raise ValueError("Unsupported attribution model type")
     # Return the prob difference as target for attribution
     model_probs = output2prob(attribution_model, forward_output, target_ids)
     contrast_probs = output2prob(attribution_model, contrast_output, contrast_target_ids)
     return model_probs - contrast_probs
 
 
-def test_contrastive_attribution(saliency_mt_model: HuggingfaceEncoderDecoderModel):
+def test_contrastive_attribution_seq2seq(saliency_mt_model: HuggingfaceEncoderDecoderModel):
     """Runs a contrastive feature attribution using the method relying on logits difference
     introduced by [Yin and Neubig '22](https://arxiv.org/pdf/2202.10419.pdf), taking advantage of
     the custom feature attribution target function module.
@@ -86,6 +101,7 @@ def test_contrastive_attribution(saliency_mt_model: HuggingfaceEncoderDecoderMod
         attributed_fn="contrast_logits_diff",
         contrast_ids=contrast.input_ids,
         contrast_attention_mask=contrast.attention_mask,
+        show_progress=False,
     )
     attribution_scores = out.sequence_attributions[0].source_attributions
 
@@ -95,6 +111,25 @@ def test_contrastive_attribution(saliency_mt_model: HuggingfaceEncoderDecoderMod
 
     # Starting at the following token in which they differ, scores should diverge
     assert not attribution_scores[:, :4].sum().eq(0)
+
+
+def test_contrastive_attribution_gpt(saliency_gpt_model: HuggingfaceDecoderOnlyModel):
+    inseq.register_step_score(
+        fn=attribute_contrast_logits_diff,
+        identifier="contrast_logits_diff",
+        aggregate_map={"span_aggregate": lambda x: x.prod(dim=1, keepdim=True)},
+    )
+    contrast = saliency_gpt_model.encode("The female student didn't participate because he was sick.")
+    out = saliency_gpt_model.attribute(
+        "The female student didn't participate because",
+        "The female student didn't participate because she was sick.",
+        attributed_fn="contrast_logits_diff",
+        contrast_ids=contrast.input_ids,
+        contrast_attention_mask=contrast.attention_mask,
+        show_progress=False,
+    )
+    attribution_scores = out.sequence_attributions[0].target_attributions
+    assert attribution_scores.shape == torch.Size([11, 4, 768])
 
 
 def attribute_mcd_uncertainty_weighted(
@@ -151,6 +186,7 @@ def test_mcd_weighted_attribution(saliency_mt_model, auxiliary_saliency_mt_model
         "Hello ladies and badgers!",
         attributed_fn="mcd_uncertainty_weighted",
         attributed_fn_args={"n_mcd_steps": 5, "aux_model": auxiliary_saliency_mt_model.to(saliency_mt_model.device)},
+        show_progress=False,
     )
     attribution_scores = out.sequence_attributions[0].source_attributions
     assert isinstance(attribution_scores, torch.Tensor)

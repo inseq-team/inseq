@@ -10,7 +10,7 @@ def saliency_mt_model():
 
 def test_save_load_attribution(tmp_path, saliency_mt_model):
     out_path = tmp_path / "tmp_attr.json"
-    out = saliency_mt_model.attribute("This is a test.", device="cpu")
+    out = saliency_mt_model.attribute("This is a test.", device="cpu", show_progress=False)
     out.save(out_path)
     loaded_out = FeatureAttributionOutput.load(out_path)
     assert out == loaded_out

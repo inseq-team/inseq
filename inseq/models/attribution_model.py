@@ -402,8 +402,6 @@ class AttributionModel(ABC, torch.nn.Module):
     ) -> FeatureAttributionStepOutput:
         pass
 
-    # Architecture and Framework-specific methods
-
     @abstractmethod
     def format_step_function_args(
         self,
@@ -417,4 +415,14 @@ class AttributionModel(ABC, torch.nn.Module):
         decoder_attention_mask: Optional[IdsTensor] = None,
         **kwargs,
     ) -> Dict[str, Any]:
+        pass
+
+    @abstractmethod
+    def forward(
+        self,
+        attributed_fn: Callable[..., SingleScorePerStepTensor],
+        attributed_fn_argnames: Optional[List[str]] = None,
+        *args,
+        **kwargs,
+    ) -> FullLogitsTensor:
         pass

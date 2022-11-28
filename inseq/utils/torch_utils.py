@@ -200,10 +200,11 @@ def get_sequences_from_batched_steps(
                 expanded_bsteps.append(padded_bstep)
     else:
         expanded_bsteps = bsteps
-    if len(bsteps[0].shape) > 1:
-        return [t.squeeze() for t in torch.stack(expanded_bsteps, dim=2).split(1, dim=0)]
-    else:
-        return [t.squeeze() for t in torch.stack(expanded_bsteps, dim=1).split(1, dim=0)]
+    dim = 2 if len(bsteps[0].shape) > 1 else 1
+    sequences = torch.stack(expanded_bsteps, dim=dim)
+    sequences = sequences.split(1, dim=0)
+    squeezed_sequences = [seq.squeeze(0) for seq in sequences]
+    return squeezed_sequences
 
 
 def check_device(device_name: str) -> bool:
