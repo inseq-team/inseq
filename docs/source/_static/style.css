@@ -159,13 +159,9 @@ a {
   display: inline;
   vertical-align: middle;
   margin-right: 16px;
-  max-width: 200px;
+  max-width: 160px;
   width: 100%;
   margin-bottom: 0;
-}
-
-.wy-nav-content-wrap {
-  margin-left: 340px;
 }
 
 
@@ -181,15 +177,6 @@ a {
 
   .wy-nav-content-wrap.shift {
     left: 340px;
-    top: 75px;
-  }
-
-  .wy-nav-content-wrap {
-    z-index: 10;
-  }
-
-  .inseq_header {
-    display: inline;
   }
 
 }
@@ -336,4 +323,12 @@ a.copybtn {
 .rst-content dl:not(.docutils) .property{
   font-size: 18px;
   color: black;
+}
+
+.html-example {
+  width: 100%;
+}
+
+.html-example > iframe {
+  width: 100%;
 }

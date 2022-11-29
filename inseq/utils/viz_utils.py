@@ -16,10 +16,15 @@
 # WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
 # OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+from typing import Union
+
+import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib.colors import LinearSegmentedColormap
+from matplotlib.colors import Colormap, LinearSegmentedColormap
+from numpy.typing import NDArray
 
 from .misc import ordinal_str
+from .typing import TokenWithId
 
 
 def get_instance_html(i: int):
@@ -35,29 +40,51 @@ def red_transparent_blue_colormap():
     return LinearSegmentedColormap.from_list("red_transparent_blue", colors)
 
 
-def get_color(score, min_value, max_value, cmap):
+def get_color(
+    score: float,
+    min_value: Union[float, int],
+    max_value: Union[float, int],
+    cmap: Colormap,
+    return_alpha: bool = True,
+    return_string: bool = True,
+):
     # Normalize between 0-1 for the color scale
     scaled_value = (score - min_value) / (max_value - min_value)
     color = cmap(scaled_value)
-    color = "rgba" + str((color[0] * 255, color[1] * 255, color[2] * 255, color[3]))
+    if return_alpha:
+        color = (color[0] * 255, color[1] * 255, color[2] * 255, color[3])
+        if return_string:
+            color = "rgba" + str(color)
+    else:
+        color = (color[0] * 255, color[1] * 255, color[2] * 255)
+        if return_string:
+            color = "rgba" + str(color)
     return color
 
 
-def sanitize_html(txt: str) -> str:
+def sanitize_html(txt: Union[str, TokenWithId]) -> str:
+    if isinstance(txt, TokenWithId):
+        txt = txt.token
     return txt.replace("<", "&lt;").replace(">", "&gt;")
 
 
 def get_colors(
-    min_value,
-    max_value,
-    scores,
-    cmap,
+    scores: NDArray,
+    min_value: Union[float, int],
+    max_value: Union[float, int],
+    cmap: Union[str, Colormap, None] = None,
+    return_alpha: bool = True,
+    return_strings: bool = True,
 ):
+    if isinstance(cmap, Colormap):
+        out_cmap = cmap
+    else:
+        out_cmap: Colormap = plt.get_cmap(cmap if isinstance(cmap, str) else "coolwarm", 200)
     input_colors = []
-    for row_index in range(scores.shape[0]):
+    for row_idx in range(scores.shape[0]):
         input_colors_row = []
-        for col_index in range(scores.shape[1]):
-            color = get_color(scores[row_index, col_index], min_value, max_value, cmap)
+        for col_idx in range(scores.shape[1]):
+            color = get_color(scores[row_idx, col_idx], min_value, max_value, out_cmap, return_alpha, return_strings)
             input_colors_row.append(color)
         input_colors.append(input_colors_row)
     return input_colors
@@ -88,9 +115,9 @@ saliency_heatmap_table_header = """
 saliency_heatmap_html = """
 <div id="{uuid}_saliency_plot" class="{uuid}_viz_content">
     <div style="margin:5px;font-family:sans-serif;font-weight:bold;">
-        <span style="font-size: 20px;"> Saliency Heatmap </span>
+        <span style="font-size: 20px;">{label} Saliency Heatmap</span>
         <br>
-        x: Target, y: Source
+        x: Generated tokens, y: Attributed tokens
     </div>
     {content}
 </div>

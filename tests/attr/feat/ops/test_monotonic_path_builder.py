@@ -2,9 +2,14 @@ from typing import List, Tuple
 
 from itertools import islice
 
+from inseq.utils import is_joblib_available
+
+
+if is_joblib_available():
+    from joblib import Parallel, delayed
+
 import pytest
 import torch
-from joblib import Parallel, delayed
 
 import inseq
 from inseq.attr.feat.ops import MonotonicPathBuilder
@@ -13,7 +18,7 @@ from inseq.utils import euclidean_distance
 
 @pytest.fixture(scope="session")
 def dig_model():
-    return inseq.load("Helsinki-NLP/opus-mt-de-en", "discretized_integrated_gradients")
+    return inseq.load_model("Helsinki-NLP/opus-mt-de-en", "discretized_integrated_gradients", device="cpu")
 
 
 def original_monotonic(vec1, vec2, vec3):
@@ -50,7 +55,7 @@ def original_dummy_find_word_path(wrd_idx: int, n_steps: int):
 def walrus_operator_find_word_path(wrd_idx: int, n_steps: int):
     word_path = [wrd_idx]
     for _ in range(n_steps):
-        word_path.append((wrd_idx := hash(wrd_idx + 0.01 + len(word_path) / 1000)))
+        word_path.append(wrd_idx := hash(wrd_idx + 0.01 + len(word_path) / 1000))
     return word_path
 
 
@@ -112,6 +117,10 @@ def test_scaled_monotonic_path_embeddings(word_idx: int, dig_model) -> None:
 
 
 @pytest.mark.slow
+@pytest.mark.skipif(
+    not is_joblib_available(),
+    reason="joblib is not available",
+)
 @pytest.mark.parametrize(
     ("ids"),
     [

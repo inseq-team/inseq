@@ -24,18 +24,36 @@ Here is an example of using Inseq to attribute an English-to-Italian translation
 
     import inseq
 
-    model = inseq.load("Helsinki-NLP/opus-mt-en-it", "integrated_gradients")
-    text = "Hello world, today is a good day!"
-    out = model.attribute(txt)
+    model = inseq.load_model("Helsinki-NLP/opus-mt-en-fr", "integrated_gradients")
+    out = model.attribute(
+        "The developer argued with the designer because she did not like the design.",
+        n_steps=300,
+        return_convergence_delta=True,
+        step_scores=["probability"],
+        internal_batch_size=100,
+        include_eos_baseline=False,
+    )
+    out.show()
 
 .. raw:: html
 
-    <img alt="IntegratedGradients Example Attribution" src="_static/heatmap_helloworld_enit.png" style="max-width: 600px;">
+    <div class="html-example">
+        <iframe frameborder="0" scale="0.75" src="/_static/winomt_example.htm"></iframe>
+    </div>
 
 
 .. toctree::
     :maxdepth: 2
+    :caption: Using 🐛 Inseq
+
+    examples/pair_comparison
+    examples/custom_attribute_target
+
+.. toctree::
+    :maxdepth: 3
     :caption: Main Classes
 
+    main_classes/main_functions
+    main_classes/models
+    main_classes/data_classes
     main_classes/feature_attribution
-    main_classes/gradient_attribution

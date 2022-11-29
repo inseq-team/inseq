@@ -13,11 +13,12 @@
 # limitations under the License.
 """ Gradient-based feature attribution methods. """
 
+from typing import Any, Callable, Dict, Optional
+
 import logging
 
 from captum.attr import (
     DeepLift,
-    GradientShap,
     InputXGradient,
     IntegratedGradients,
     LayerDeepLift,
@@ -26,10 +27,11 @@ from captum.attr import (
     Saliency,
 )
 
-from ...data import EncoderDecoderBatch, FeatureAttributionStepOutput
-from ...utils import Registry, extract_signature_args, pretty_tensor, rgetattr, sum_normalize
-from ...utils.typing import TargetIdsTensor
+from ...data import EncoderDecoderBatch, GradientFeatureAttributionStepOutput
+from ...utils import Registry, extract_signature_args, rgetattr
+from ...utils.typing import SingleScorePerStepTensor, TargetIdsTensor
 from ..attribution_decorators import set_hook, unset_hook
+from .attribution_utils import get_source_target_attributions
 from .feature_attribution import FeatureAttribution
 from .ops import DiscretetizedIntegratedGradients
 
@@ -51,8 +53,8 @@ class GradientAttribution(FeatureAttribution, Registry):
             logger.debug(f"target_layer={self.target_layer}")
             if isinstance(self.target_layer, str):
                 self.target_layer = rgetattr(self.attribution_model.model, self.target_layer)
-        # For now only encoder attribution is supported
-        self.attribution_model.configure_interpretable_embeddings(do_encoder=not self.is_layer_attribution)
+        if not self.is_layer_attribution:
+            self.attribution_model.configure_interpretable_embeddings()
 
     @unset_hook
     def unhook(self, **kwargs):
@@ -61,45 +63,46 @@ class GradientAttribution(FeatureAttribution, Registry):
         """
         if self.is_layer_attribution:
             self.target_layer = None
-        self.attribution_model.remove_interpretable_embeddings(do_encoder=not self.is_layer_attribution)
+        else:
+            self.attribution_model.remove_interpretable_embeddings()
 
     def attribute_step(
         self,
-        batch: EncoderDecoderBatch,
-        target_ids: TargetIdsTensor,
-        **kwargs,
-    ) -> FeatureAttributionStepOutput:
+        attribute_fn_main_args: Dict[str, Any],
+        attribution_args: Dict[str, Any] = {},
+    ) -> GradientFeatureAttributionStepOutput:
         r"""
-        Performs a single attribution step for the specified target_ids,
-        given sources and targets in the batch.
+        Performs a single attribution step for the specified attribution arguments.
 
         Args:
-            batch (:class:`~inseq.data.EncoderDecoderBatch`): The batch of sequences on which attribution is performed.
-            target_ids (:obj:`torch.Tensor`): Target token ids of size `(batch_size)` corresponding to tokens
-                for which the attribution step must be performed.
-            kwargs: Additional keyword arguments to pass to the attribution step.
+            attribute_fn_main_args (:obj:`dict`): Main arguments used for the attribution method. These are built from
+                model inputs at the current step of the feature attribution process.
+            attribution_args (:obj:`dict`, `optional`): Additional arguments to pass to the attribution method.
+                These can be specified by the user while calling the top level `attribute` methods. Defaults to {}.
 
         Returns:
-            :obj:`FeatureAttributionStepOutput`: A tuple containing a tensor of attributions
-                of size `(batch_size, source_length)` and possibly a tensor of attribution deltas
-                of size `(batch_size)`, if the attribution step supports deltas and they are requested.
+            :class:`~inseq.data.GradientFeatureAttributionStepOutput`: A dataclass containing a tensor of source
+                attributions of size `(batch_size, source_length)`, possibly a tensor of target attributions of size
+                `(batch_size, prefix length) if attribute_target=True and possibly a tensor of deltas of size
+                `(batch_size)` if the attribution step supports deltas and they are requested. At this point the batch
+                information is empty, and will later be filled by the enrich_step_output function.
         """
-        attribute_args = self.format_attribute_args(batch, target_ids, **kwargs)
-        logger.debug(f"batch: {batch},\ntarget_ids: {pretty_tensor(target_ids, lpad=4)}")
-        attr = self.method.attribute(**attribute_args)
-        delta = None
+        attr = self.method.attribute(**attribute_fn_main_args, **attribution_args)
+        deltas = None
         if (
-            attribute_args.get("return_convergence_delta", False)
+            attribution_args.get("return_convergence_delta", False)
             and hasattr(self.method, "has_convergence_delta")
             and self.method.has_convergence_delta()
         ):
-            attr, delta = attr
-        logger.debug(
-            f"attributions prenorm: {pretty_tensor(attr)}, summed: {pretty_tensor(attr.sum(dim=-1).squeeze(0))}\n"
+            attr, deltas = attr
+        source_attributions, target_attributions = get_source_target_attributions(
+            attr, self.attribution_model.is_encoder_decoder
         )
-        attr = sum_normalize(attr, dim_sum=-1)
-        logger.debug(f"attributions: {pretty_tensor(attr)}\n" + "-" * 30)
-        return (attr, delta) if delta is not None else attr
+        return GradientFeatureAttributionStepOutput(
+            source_attributions=source_attributions,
+            target_attributions=target_attributions,
+            step_scores={"deltas": deltas} if deltas is not None else {},
+        )
 
 
 class DeepLiftAttribution(GradientAttribution):
@@ -111,29 +114,27 @@ class DeepLiftAttribution(GradientAttribution):
 
     method_name = "deeplift"
 
-    def __init__(self, attribution_model, **kwargs):
-        from ...models import HookableModelWrapper
-
+    def __init__(self, attribution_model, multiply_by_inputs: bool = True, **kwargs):
         super().__init__(attribution_model)
-        multiply_by_inputs = kwargs.pop("multiply_by_inputs", True)
-        self.method = DeepLift(HookableModelWrapper(self.attribution_model), multiply_by_inputs)
+        self.method = DeepLift(self.attribution_model, multiply_by_inputs)
         self.use_baseline = True
 
 
 class DiscretizedIntegratedGradientsAttribution(GradientAttribution):
     """Discretized Integrated Gradients attribution method
+
     Reference: https://arxiv.org/abs/2108.13654
+
     Original implementation: https://github.com/INK-USC/DIG
     """
 
     method_name = "discretized_integrated_gradients"
 
-    def __init__(self, attribution_model, **kwargs):
+    def __init__(self, attribution_model, multiply_by_inputs: bool = True, **kwargs):
         super().__init__(attribution_model, hook_to_model=False)
-        multiply_by_inputs = kwargs.pop("multiply_by_inputs", False)
         self.attribution_model = attribution_model
         self.method = DiscretetizedIntegratedGradients(
-            self.attribution_model.score_func,
+            self.attribution_model,
             multiply_by_inputs,
         )
         self.hook(**kwargs)
@@ -149,7 +150,7 @@ class DiscretizedIntegratedGradientsAttribution(GradientAttribution):
             self.attribution_model.model_name,
             vocabulary_embeddings=self.attribution_model.vocabulary_embeddings.detach(),
             special_tokens=self.attribution_model.special_tokens_ids,
-            embedding_scaling=self.attribution_model.encoder_embed_scale,
+            embedding_scaling=self.attribution_model.embed_scale,
             **load_kwargs,
         )
         super().hook(**other_kwargs)
@@ -158,25 +159,37 @@ class DiscretizedIntegratedGradientsAttribution(GradientAttribution):
         self,
         batch: EncoderDecoderBatch,
         target_ids: TargetIdsTensor,
-        **kwargs,
-    ) -> FeatureAttributionStepOutput:
-        scaled_inputs = self.method.path_builder.scale_inputs(
-            batch.sources.input_ids,
-            batch.sources.baseline_ids,
-            n_steps=kwargs.get("n_steps", None),
-            scale_strategy=kwargs.get("strategy", None),
+        attributed_fn: Callable[..., SingleScorePerStepTensor],
+        attribute_target: bool = False,
+        attributed_fn_args: Dict[str, Any] = {},
+        n_steps: Optional[int] = None,
+        strategy: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        attribute_fn_args = super().format_attribute_args(
+            batch=batch,
+            target_ids=target_ids,
+            attributed_fn=attributed_fn,
+            attribute_target=attribute_target,
+            attributed_fn_args=attributed_fn_args,
         )
-        attribute_args = {
-            "inputs": scaled_inputs,
-            "target": target_ids,
-            "additional_forward_args": (
-                batch.sources.attention_mask,
-                batch.targets.input_embeds,
-                batch.targets.attention_mask,
-                False,
+        attribute_fn_args["inputs"] = (
+            self.method.path_builder.scale_inputs(
+                batch.sources.input_ids,
+                batch.sources.baseline_ids,
+                n_steps=n_steps,
+                scale_strategy=strategy,
             ),
-        }
-        return {**attribute_args, **kwargs}
+        )
+        if attribute_target:
+            attribute_fn_args["inputs"] += (
+                self.method.path_builder.scale_inputs(
+                    batch.targets.input_ids,
+                    batch.targets.baseline_ids,
+                    n_steps=n_steps,
+                    scale_strategy=strategy,
+                ),
+            )
+        return attribute_fn_args
 
 
 class IntegratedGradientsAttribution(GradientAttribution):
@@ -188,10 +201,9 @@ class IntegratedGradientsAttribution(GradientAttribution):
 
     method_name = "integrated_gradients"
 
-    def __init__(self, attribution_model, **kwargs):
+    def __init__(self, attribution_model, multiply_by_inputs: bool = True, **kwargs):
         super().__init__(attribution_model)
-        multiply_by_inputs = kwargs.pop("multiply_by_inputs", True)
-        self.method = IntegratedGradients(self.attribution_model.score_func, multiply_by_inputs)
+        self.method = IntegratedGradients(self.attribution_model, multiply_by_inputs)
         self.use_baseline = True
 
 
@@ -206,7 +218,7 @@ class InputXGradientAttribution(GradientAttribution):
 
     def __init__(self, attribution_model):
         super().__init__(attribution_model)
-        self.method = InputXGradient(self.attribution_model.score_func)
+        self.method = InputXGradient(self.attribution_model)
 
 
 class SaliencyAttribution(GradientAttribution):
@@ -220,24 +232,7 @@ class SaliencyAttribution(GradientAttribution):
 
     def __init__(self, attribution_model):
         super().__init__(attribution_model)
-        self.method = Saliency(self.attribution_model.score_func)
-
-
-class GradientShapAttribution(GradientAttribution):
-    """GradientShap attribution method.
-
-    Reference implementation:
-    `https://captum.ai/api/gradient_shap.html <https://captum.ai/api/gradient_shap.html>`__.
-    """
-
-    method_name = "gradient_shap"
-
-    def __init__(self, attribution_model, **kwargs):
-        super().__init__(attribution_model)
-        super().__init__(attribution_model)
-        multiply_by_inputs = kwargs.pop("multiply_by_inputs", True)
-        self.method = GradientShap(self.attribution_model.score_func, multiply_by_inputs)
-        self.use_baseline = True
+        self.method = Saliency(self.attribution_model)
 
 
 # Layer methods
@@ -252,14 +247,13 @@ class LayerIntegratedGradientsAttribution(GradientAttribution):
 
     method_name = "layer_integrated_gradients"
 
-    def __init__(self, attribution_model, **kwargs):
+    def __init__(self, attribution_model, multiply_by_inputs: bool = True, **kwargs):
         super().__init__(attribution_model, hook_to_model=False)
         self.is_layer_attribution = True
         self.use_baseline = True
         self.hook(**kwargs)
-        multiply_by_inputs = kwargs.pop("multiply_by_inputs", True)
         self.method = LayerIntegratedGradients(
-            self.attribution_model.score_func,
+            self.attribution_model,
             self.target_layer,
             multiply_by_inputs=multiply_by_inputs,
         )
@@ -274,14 +268,13 @@ class LayerGradientXActivationAttribution(GradientAttribution):
 
     method_name = "layer_gradient_x_activation"
 
-    def __init__(self, attribution_model, **kwargs):
+    def __init__(self, attribution_model, multiply_by_inputs: bool = True, **kwargs):
         super().__init__(attribution_model, hook_to_model=False)
         self.is_layer_attribution = True
         self.use_baseline = False
         self.hook(**kwargs)
-        multiply_by_inputs = kwargs.pop("multiply_by_inputs", True)
         self.method = LayerGradientXActivation(
-            self.attribution_model.score_func,
+            self.attribution_model,
             self.target_layer,
             multiply_by_inputs=multiply_by_inputs,
         )
@@ -296,16 +289,13 @@ class LayerDeepLiftAttribution(GradientAttribution):
 
     method_name = "layer_deeplift"
 
-    def __init__(self, attribution_model, **kwargs):
-        from ...models import HookableModelWrapper
-
+    def __init__(self, attribution_model, multiply_by_inputs: bool = True, **kwargs):
         super().__init__(attribution_model, hook_to_model=False)
         self.is_layer_attribution = True
         self.use_baseline = True
         self.hook(**kwargs)
-        multiply_by_inputs = kwargs.pop("multiply_by_inputs", True)
         self.method = LayerDeepLift(
-            HookableModelWrapper(self.attribution_model),
+            self.attribution_model,
             self.target_layer,
             multiply_by_inputs=multiply_by_inputs,
         )

@@ -1,6 +1,10 @@
 name: build
 
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - main
+  pull_request:
 
 jobs:
   build:
@@ -8,35 +12,38 @@ jobs:
     if: github.actor != 'dependabot[bot]' && github.actor != 'dependabot-preview[bot]'
     strategy:
       matrix:
-        python-version: ["3.8", "3.9"]
+        python-version: ["3.8", "3.9", "3.10", "3.11"]
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
+
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v2.2.2
+      uses: actions/setup-python@v4.3.0
       with:
         python-version: ${{ matrix.python-version }}
 
     - name: Install poetry
-      run: make poetry-download
+      run: |
+        make poetry-download
+        export PATH="$HOME/.poetry/env:$PATH"
 
     - name: Set up cache
-      uses: actions/cache@v2.1.6
+      uses: actions/cache@v3.0.11
       with:
         path: .venv
         key: venv-${{ matrix.python-version }}-${{ hashFiles('pyproject.toml') }}-${{ hashFiles('poetry.lock') }}
     - name: Install dependencies
       run: |
         poetry config virtualenvs.in-project true
-        poetry install
+        make install-ci
 
     - name: Run style checks
       run: |
         make check-style
 
-    - name: Run tests
+    - name: Run fast tests
       run: |
-        make test
+        make fast-test
 
     - name: Run safety checks
       run: |

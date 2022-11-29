@@ -1,82 +1,107 @@
 <div align="center">
-  <img src="docs/source/images//inseq_logo.png" width="480"/>
-  <h3>Intepretability for Sequence-to-sequence Models 🔍</h3>
+  <img src="/docs/source/images/inseq_logo.png" width="300"/>
+  <h4>Intepretability for Sequence Generation Models 🔍</h4>
 </div>
 <br/>
 <div align="center">
 
 [![Build status](https://github.com/inseq-team/inseq/workflows/build/badge.svg?branch=master&event=push)](https://github.com/inseq-team/inseq/actions?query=workflow%3Abuild)
-<!-- [![Python Version](https://img.shields.io/pypi/pyversions/inseq.svg)](https://pypi.org/project/inseq/) -->
-[![Dependencies Status](https://img.shields.io/badge/dependencies-up%20to%20date-brightgreen.svg)](https://github.com/inseq-team/inseq/pulls?utf8=%E2%9C%93&q=is%3Apr%20author%3Aapp%2Fdependabot)
-
+[![Python Version](https://img.shields.io/pypi/pyversions/inseq.svg)](https://pypi.org/project/inseq/)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
-[![Security: bandit](https://img.shields.io/badge/security-bandit-green.svg)](https://github.com/PyCQA/bandit)
-[![Pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](https://github.com/inseq-team/inseq/blob/master/.pre-commit-config.yaml)
-[![Semantic Versions](https://img.shields.io/badge/%20%20%F0%9F%93%A6%F0%9F%9A%80-semantic--versions-e10079.svg)](https://github.com/inseq-team/inseq/releases)
-[![License](https://img.shields.io/github/license/inseq-team/inseq)](https://github.com/inseq-team/inseq/blob/master/LICENSE)
-
-
+[![License](https://img.shields.io/github/license/inseq-team/inseq)](https://github.com/inseq-team/inseq/blob/main/LICENSE)
 
 </div>
 
-## Example usage
+## Installation
+
+To install the package, clone the repository and run the following commands:
+
+```bash
+cd inseq
+make poetry-download # Download and install the Poetry package manager
+make install # Installs the package and all dependencies
+```
+
+If you have a GPU available, use `make install-gpu` to install the latest `torch` version with GPU support.
+
+For library developers, you can use the `make install-dev` command to install and its GPU-friendly counterpart `make install-dev-gpu` to install all development dependencies (quality, docs, extras).
+
+After installation, you should be able to run `make fast-test` and `make lint` without errors.
+
+<details>
+  <summary>FAQ Installation</summary>
+
+  - Installing the `tokenizers` package requires a Rust compiler installation. You can install Rust from [https://rustup.rs](https://rustup.rs) and add `$HOME/.cargo/env` to your PATH.
+
+  - Installing `sentencepiece` requires various packages, install with `sudo apt-get install cmake build-essential pkg-config` or `brew install cmake gperftools pkg-config`.
+</details>
+
+## Example usage in Python
+
+This example uses the Integrated Gradients attribution method to attribute the English-French translation of a sentence taken from the WinoMT corpus:
 
 ```python
-import logging
-from inseq import AttributionModel, GradientAttributionOutput, heatmap
+import inseq
 
-logger = logging.getLogger(__name__)
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(message)s",
+model = inseq.load_model("Helsinki-NLP/opus-mt-en-fr", "integrated_gradients")
+out = model.attribute(
+  "The developer argued with the designer because her idea cannot be implemented.",
+  n_steps=100
 )
-model = inseq.load("Helsinki-NLP/opus-mt-en-it", "integrated_gradients")
-sample_texts = ["Hello world, today is a good day!"]
-out = model.attribute(txt, references=None, attr_pos_end=None, return_convergence_delta=True, n_steps=300)
+out.show()
 ```
 
-![En-It Attribution Heatmap](docs/source/images/heatmap_helloworld_enit.png)
+This produces a visualization of the attribution scores for each token in the input sentence (token-level aggregation is handled automatically). Here is what the visualization looks like inside a Jupyter Notebook:
 
-## Todos
+![WinoMT Attribution Map](docs/source/images/heatmap_winomt.png)
 
-- [x] Generalize to other HF models
-- [x] Generalize to other attribution methods
-- [x] Add constrained attribution
-- [x] Allow for batched attribution
-- Integrate fairseq models
-
-## Feature attribution steps
-
-1. **Define model name or path and attribution method**
+Inseq also supports decoder-only models such as [GPT-2](https://huggingface.co/transformers/model_doc/gpt2.html), enabling usage of a variety of attribution methods and customizable settings directly from the console:
 
 ```python
-model_name = f"Helsinki-NLP/opus-mt-en-it"
-method = "integrated_gradients"
+import inseq
+
+model = inseq.load_model("gpt2", "integrated_gradients")
+model.attribute(
+    "Hello ladies and",
+    generation_args={"max_new_tokens": 9},
+    n_steps=500,
+    internal_batch_size=50
+).show()
 ```
 
-2. **Initialize model**
+![GPT-2 Attribution in the console](docs/source/images/inseq_python_console.gif)
 
-```python
-model = AttributionModel.load(model_name)
+## Using the Inseq client
+
+The Inseq library also provides useful client commands to enable repeated attribution of individual examples and even entire 🤗 datasets directly from the console. See the available options by typing `inseq -h` in the terminal after installing the package.
+
+For now, two commands are supported:
+
+- `ìnseq attribute`: Wraps the `attribute` method shown above, requires explicit inputs to be attributed.
+
+- `inseq attribute-dataset`: Enables attribution for a full dataset using Hugging Face `datasets.load_dataset`.
+
+Both commands support the full range of parameters available for `attribute`, attribution visualization in the console and saving outputs to disk.
+
+**Example:** The following command can be used to perform attribution (both source and target-side) of Italian translations for a dummy sample of 20 English sentences taken from the FLORES-101 parallel corpus, using a MarianNMT translation model from Hugging Face `transformers`. We save the visualizations in HTML format in the file `attributions.html`. See the `--help` flag for more options.
+
+```bash
+inseq attribute-dataset \
+  --model_name_or_path Helsinki-NLP/opus-mt-en-it \
+  --attribution_method saliency \
+  --do_prefix_attribution \
+  --dataset_name inseq/dummy_enit \
+  --input_text_field en \
+  --dataset_split "train[:20]" \
+  --viz_path attributions.html \
+  --batch_size 8 \
+  --hide
 ```
 
-What happens under the hood:
+### Class structure
 
-- Disambiguate whether it's a HF or a fairseq model and load it and the tokenizer.
+The following diagram provides an overview of the main classes in the library:
 
-- If the method is passed to the attribution model, perform the setup
+![Class structure](docs/source/images/classes.png)
 
-3. **Attribute a sample text**
-
-```python
-text = "The ultimate test of your knowledge is your capacity to convey it to another."
-out = model.attribute(text, method=method)
-```
-
-What happens under the hood:
-
-- Check if method parameter is defined and if it matches the one at initialization. If not, replace it for this time only. If missing, use the one at initialization. If both missing, raise an error. If not currently in use, perform the setup for the attribution method.
-
-- Check if a reference text is defined. If not, we perform a standard greedy decoding of the target (pick the highest value in the logits), else we tokenize the reference text and force the model to compute the attributions and decode the reference by picking the corresponding value in the logits.
-
-- Return one or more FeatureAttributionOutput objects.
+When `inseq.load_model` is called using a model name and feature attribution method identifier, the correct model class and the corresponding method are instantiated and tied together (the method is accessible via `model.attribution_method`).

@@ -17,8 +17,8 @@ from pathlib import Path
 
 
 _PATH_ROOT = Path(__file__).parent.parent.parent.absolute()
-_PATH_SRC = Path(_PATH_ROOT, "inseq")
-sys.path.insert(0, str(_PATH_SRC.absolute()))
+# _PATH_SRC = Path(_PATH_ROOT, "inseq")
+sys.path.insert(0, str(_PATH_ROOT.absolute()))
 
 # -- Project information -----------------------------------------------------
 
@@ -27,13 +27,13 @@ copyright = "2021, The Inseq Team, Licensed under the Apache License, Version 2.
 author = "The Inseq Team"
 
 # The short X.Y version
-version = "0.1"
+version = "0.2"
 # The full version, including alpha/beta/rc tags
-release = "0.1.0"
+release = "0.2.0"
 
 
 # Prefix link to point to master, comment this during version release and uncomment below line
-extlinks = {"prefix_link": ("https://github.com/inseq-team/inseq/blob/master/%s", "")}
+extlinks = {"prefix_link": ("https://github.com/inseq-team/inseq/blob/master/%s", "version %s")}
 
 # -- General configuration ---------------------------------------------------
 
@@ -67,7 +67,10 @@ templates_path = ["_templates"]
 
 # The suffix(es) of source filenames.
 # You can specify multiple suffix as a list of string:
-#
+source_parsers = {
+    ".md": "recommonmark.parser.CommonMarkParser",
+}
+
 source_suffix = [".rst", ".md"]
 # source_suffix = '.rst'
 
@@ -79,7 +82,7 @@ master_doc = "index"
 #
 # This is also used if you do content translation via gettext catalogs.
 # Usually you set "language" from the command line for these cases.
-language = None
+language = "en"
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
@@ -88,6 +91,9 @@ exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = None
+
+# Permalinks
+html_permalinks_icon = "<i class='fas fa-link'></i>"
 
 # If true, `todo` and `todoList` produce output, else they produce nothing.
 todo_include_todos = True
@@ -102,7 +108,7 @@ copybutton_prompt_is_regexp = True
 intersphinx_mapping = {
     "python": ("https://docs.python.org/3", None),
     "torch": ("https://pytorch.org/docs/stable/", None),
-    "numpy": ("https://docs.scipy.org/doc/numpy/", None),
+    "numpy": ("https://numpy.org/doc/stable/", None),
 }
 
 # -- Options for HTML output -------------------------------------------------
@@ -137,6 +143,7 @@ ogp_custom_meta_tags = [
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = [
     "images",
+    "html_outputs",
     "_static",
     "_static/style.css",
     "_static/hk-grotesk-pro/HKGroteskPro-Bold.woff2",

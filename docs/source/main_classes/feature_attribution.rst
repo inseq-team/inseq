@@ -10,8 +10,61 @@
     an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
     specific language governing permissions and limitations under the License.
 
-FeatureAttribution
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Feature Attribution
+=======================================================================================================================
+
 
 .. autoclass:: inseq.attr.FeatureAttribution
+    :members:
+
+
+.. autoclass:: inseq.attr.feat.GradientAttribution
+    :members:
+
+
+.. autoclass:: inseq.attr.feat.DeepLiftAttribution
+    :members:
+
+
+.. warning::
+    The DiscretizedIntegratedGradientsAttribution class is currently not functioning and needs fixing.
+
+.. autoclass:: inseq.attr.feat.DiscretizedIntegratedGradientsAttribution
+    :members:
+
+
+.. autoclass:: inseq.attr.feat.IntegratedGradientsAttribution
+    :members:
+
+
+.. autoclass:: inseq.attr.feat.InputXGradientAttribution
+    :members:
+
+
+.. autoclass:: inseq.attr.feat.SaliencyAttribution
+    :members:
+
+
+Layer Attribution Methods
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+
+LayerIntegratedGradientsAttribution
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+
+.. autoclass:: inseq.attr.feat.LayerIntegratedGradientsAttribution
+    :members:
+
+
+LayerGradientXActivationAttribution
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+.. autoclass:: inseq.attr.feat.LayerGradientXActivationAttribution
+    :members:
+
+
+LayerDeepLiftAttribution
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+
+.. autoclass:: inseq.attr.feat.LayerDeepLiftAttribution
     :members:

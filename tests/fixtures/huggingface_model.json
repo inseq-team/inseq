@@ -1,0 +1,52 @@
+{
+    "texts" : [
+        [
+            "Hello world!",
+            "Buongiorno mondo!"
+        ],
+        [
+            [
+                "Hello world!",
+                "Colorless green ideas sleep furiously."
+            ],
+            [
+                "Buongiorno mondo!",
+                "Le idee verdi senza colore dormono furiosamente"
+            ]
+        ],
+        [
+            [
+                "The manager told the hairdresser that the haircut he made her was terrible.",
+                "Colorless green ideas sleep furiously",
+                "The scientist told the director that she made a new discovery."
+            ],
+            [
+                "La direttrice ha detto al parrucchiere che il taglio di capelli che le ha fatto \u00e8 terribile.",
+                "Le idee verdi senza colore dormono furiosamente",
+                "La ricercatrice ha detto al direttore che ha fatto una nuova scoperta."
+            ]
+        ]
+    ],
+    "long_text": [
+        [
+            "Integrated gradients is a simple, yet powerful axiomatic attribution method that requires almost no modification of the original network. It can be used for augmenting accuracy metrics, model debugging and feature or rule extraction.",
+            "Integrated gradients \u00e8 un metodo di attribuzione assiomatico semplice ma potente che non richiede quasi nessuna modifica alla rete originale. Pu\u00f2 essere usato per arricchire metriche di accuratezza, per effettuare il debug di modelli e per l'estrazione di feature o regole."
+        ]
+    ],
+    "short_texts": [
+        [
+            "Hello world!",
+            "Buongiorno mondo!"
+        ],
+        [
+            [
+                "Hello world!",
+                "Colorless green ideas sleep furiously."
+            ],
+            [
+                "Buongiorno mondo!",
+                "Le idee verdi senza colore dormono furiosamente"
+            ]
+        ]
+    ]
+}
