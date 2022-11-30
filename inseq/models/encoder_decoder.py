@@ -37,7 +37,6 @@ class EncoderDecoderAttributionModel(AttributionModel):
         self,
         inputs: Tuple[FeatureAttributionInput, FeatureAttributionInput],
         include_eos_baseline: bool = False,
-        use_layer_attribution: bool = False,
     ) -> EncoderDecoderBatch:
         r"""
         Prepares sources and target to produce an :class:`~inseq.data.EncoderDecoderBatch`.
@@ -104,9 +103,7 @@ class EncoderDecoderAttributionModel(AttributionModel):
                     f"targets must be either a string, a list of strings, a BatchEncoding or a Batch, "
                     f"not {type(targets)}"
                 )
-            baseline_embeds = None
-            if not use_layer_attribution:
-                baseline_embeds = self.embed(target_encodings.baseline_ids, as_targets=True)
+            baseline_embeds = self.embed(target_encodings.baseline_ids, as_targets=True)
             target_embeddings = BatchEmbedding(
                 input_embeds=self.embed(target_encodings.input_ids, as_targets=True),
                 baseline_embeds=baseline_embeds,
@@ -132,18 +129,23 @@ class EncoderDecoderAttributionModel(AttributionModel):
         attributed_fn: Callable[..., SingleScorePerStepTensor],
         attribute_target: bool = False,
         attributed_fn_args: Dict[str, Any] = {},
-        is_layer_attribution: bool = False,
+        attribute_batch_ids: bool = False,
+        forward_batch_embeds: bool = True,
         **kwargs,
     ) -> Tuple[Dict[str, Any], Tuple[Union[IdsTensor, EmbeddingsTensor, None], ...]]:
-        if is_layer_attribution:
+        if attribute_batch_ids:
             inputs = (batch.sources.input_ids,)
             baselines = (batch.sources.baseline_ids,)
         else:
             inputs = (batch.sources.input_embeds,)
             baselines = (batch.sources.baseline_embeds,)
         if attribute_target:
-            inputs = inputs + (batch.targets.input_embeds,)
-            baselines = baselines + (batch.targets.baseline_embeds,)
+            if attribute_batch_ids:
+                inputs += (batch.targets.input_ids,)
+                baselines += (batch.targets.baseline_ids,)
+            else:
+                inputs += (batch.targets.input_embeds,)
+                baselines += (batch.targets.baseline_embeds,)
         attribute_fn_args = {
             "inputs": inputs,
             "additional_forward_args": (
@@ -160,7 +162,7 @@ class EncoderDecoderAttributionModel(AttributionModel):
                 batch.targets.attention_mask,
                 # Defines how to treat source and target tensors
                 # Maps on the use_embeddings argument of forward
-                not is_layer_attribution,
+                forward_batch_embeds,
                 list(attributed_fn_args.keys()),
             )
             + tuple(attributed_fn_args.values()),

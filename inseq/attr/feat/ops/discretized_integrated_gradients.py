@@ -28,10 +28,10 @@ from captum._utils.common import (
     _format_output,
     _is_tuple,
 )
-from captum._utils.typing import TargetType, TensorOrTupleOfTensorsGeneric
+from captum._utils.typing import BaselineType, TargetType, TensorOrTupleOfTensorsGeneric
 from captum.attr._core.integrated_gradients import IntegratedGradients
 from captum.attr._utils.batching import _batch_attribution
-from captum.attr._utils.common import _format_input, _reshape_and_sum
+from captum.attr._utils.common import _format_input_baseline, _reshape_and_sum, _validate_input
 from captum.log import log_usage
 from torch import Tensor
 
@@ -61,7 +61,7 @@ class DiscretetizedIntegratedGradients(IntegratedGradients):
         """Loads the Discretized Integrated Gradients (DIG) path builder."""
         self.path_builder = MonotonicPathBuilder.load(
             model_name,
-            vocabulary_embeddings=vocabulary_embeddings,
+            vocabulary_embeddings=vocabulary_embeddings.to("cpu"),
             special_tokens=special_tokens,
             cache_dir=cache_dir,
             embedding_scaling=embedding_scaling,
@@ -92,15 +92,31 @@ class DiscretetizedIntegratedGradients(IntegratedGradients):
     def attribute(  # type: ignore
         self,
         inputs: MultiStepEmbeddingsTensor,
+        baselines: BaselineType = None,
         target: TargetType = None,
         additional_forward_args: Any = None,
         n_steps: int = 50,
+        method: str = "greedy",
         internal_batch_size: Union[None, int] = None,
         return_convergence_delta: bool = False,
     ) -> Union[TensorOrTupleOfTensorsGeneric, Tuple[TensorOrTupleOfTensorsGeneric, Tensor]]:
-        n_examples = inputs.shape[0] // n_steps
+        n_examples = inputs[0].shape[0]
+        # Keeps track whether original input is a tuple or not before
+        # converting it into a tuple.
         is_inputs_tuple = _is_tuple(inputs)
-        scaled_features_tpl = _format_input(inputs)
+
+        inputs, baselines = _format_input_baseline(inputs, baselines)
+
+        _validate_input(inputs, baselines, n_steps)
+        scaled_features_tpl = tuple(
+            self.path_builder.scale_inputs(
+                input_tensor,
+                baseline_tensor,
+                n_steps=n_steps,
+                scale_strategy=method,
+            )
+            for input_tensor, baseline_tensor in zip(inputs, baselines)
+        )
         if internal_batch_size is not None:
             attributions = _batch_attribution(
                 self,

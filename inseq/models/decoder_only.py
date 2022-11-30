@@ -37,7 +37,6 @@ class DecoderOnlyAttributionModel(AttributionModel):
         self,
         inputs: FeatureAttributionInput,
         include_eos_baseline: bool = False,
-        use_layer_attribution: bool = False,
     ) -> DecoderOnlyBatch:
         if isinstance(inputs, Batch):
             batch = inputs
@@ -57,9 +56,7 @@ class DecoderOnlyAttributionModel(AttributionModel):
                     f"targets must be either a string, a list of strings, a BatchEncoding or a Batch, "
                     f"not {type(inputs)}"
                 )
-            baseline_embeds = None
-            if not use_layer_attribution:
-                baseline_embeds = self.embed(encodings.baseline_ids)
+            baseline_embeds = self.embed(encodings.baseline_ids)
             embeddings = BatchEmbedding(
                 input_embeds=self.embed(encodings.input_ids),
                 baseline_embeds=baseline_embeds,
@@ -79,10 +76,11 @@ class DecoderOnlyAttributionModel(AttributionModel):
         target_ids: TargetIdsTensor,
         attributed_fn: Callable[..., SingleScorePerStepTensor],
         attributed_fn_args: Dict[str, Any] = {},
-        is_layer_attribution: bool = False,
+        attribute_batch_ids: bool = False,
+        forward_batch_embeds: bool = True,
         **kwargs,
     ) -> Tuple[Dict[str, Any], Tuple[Union[IdsTensor, EmbeddingsTensor, None], ...]]:
-        if is_layer_attribution:
+        if attribute_batch_ids:
             inputs = (batch.input_ids,)
             baselines = (batch.baseline_ids,)
         else:
@@ -102,7 +100,7 @@ class DecoderOnlyAttributionModel(AttributionModel):
                 batch.attention_mask,
                 # Defines how to treat source and target tensors
                 # Maps on the use_embeddings argument of forward
-                not is_layer_attribution,
+                forward_batch_embeds,
                 list(attributed_fn_args.keys()),
             )
             + tuple(attributed_fn_args.values()),

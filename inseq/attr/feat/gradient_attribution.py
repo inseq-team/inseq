@@ -48,12 +48,12 @@ class GradientAttribution(FeatureAttribution, Registry):
         Hooks the attribution method to the model by replacing normal :obj:`nn.Embedding`
         with Captum's `InterpretableEmbeddingBase <https://captum.ai/api/utilities.html#captum.attr.InterpretableEmbeddingBase>`__.
         """  # noqa: E501
-        if self.is_layer_attribution:
+        if self.attribute_batch_ids and not self.forward_batch_embeds:
             self.target_layer = kwargs.pop("target_layer", self.attribution_model.get_embedding_layer())
             logger.debug(f"target_layer={self.target_layer}")
             if isinstance(self.target_layer, str):
                 self.target_layer = rgetattr(self.attribution_model.model, self.target_layer)
-        if not self.is_layer_attribution:
+        if not self.attribute_batch_ids:
             self.attribution_model.configure_interpretable_embeddings()
 
     @unset_hook
@@ -61,7 +61,7 @@ class GradientAttribution(FeatureAttribution, Registry):
         r"""
         Unhook the attribution method by restoring the model's original embeddings.
         """
-        if self.is_layer_attribution:
+        if self.attribute_batch_ids and not self.forward_batch_embeds:
             self.target_layer = None
         else:
             self.attribution_model.remove_interpretable_embeddings()
@@ -130,9 +130,11 @@ class DiscretizedIntegratedGradientsAttribution(GradientAttribution):
 
     method_name = "discretized_integrated_gradients"
 
-    def __init__(self, attribution_model, multiply_by_inputs: bool = True, **kwargs):
+    def __init__(self, attribution_model, multiply_by_inputs: bool = False, **kwargs):
         super().__init__(attribution_model, hook_to_model=False)
         self.attribution_model = attribution_model
+        self.attribute_batch_ids = True
+        self.use_baseline = True
         self.method = DiscretetizedIntegratedGradients(
             self.attribution_model,
             multiply_by_inputs,
@@ -155,41 +157,41 @@ class DiscretizedIntegratedGradientsAttribution(GradientAttribution):
         )
         super().hook(**other_kwargs)
 
-    def format_attribute_args(
-        self,
-        batch: EncoderDecoderBatch,
-        target_ids: TargetIdsTensor,
-        attributed_fn: Callable[..., SingleScorePerStepTensor],
-        attribute_target: bool = False,
-        attributed_fn_args: Dict[str, Any] = {},
-        n_steps: Optional[int] = None,
-        strategy: Optional[str] = None,
-    ) -> Dict[str, Any]:
-        attribute_fn_args = super().format_attribute_args(
-            batch=batch,
-            target_ids=target_ids,
-            attributed_fn=attributed_fn,
-            attribute_target=attribute_target,
-            attributed_fn_args=attributed_fn_args,
-        )
-        attribute_fn_args["inputs"] = (
-            self.method.path_builder.scale_inputs(
-                batch.sources.input_ids,
-                batch.sources.baseline_ids,
-                n_steps=n_steps,
-                scale_strategy=strategy,
-            ),
-        )
-        if attribute_target:
-            attribute_fn_args["inputs"] += (
-                self.method.path_builder.scale_inputs(
-                    batch.targets.input_ids,
-                    batch.targets.baseline_ids,
-                    n_steps=n_steps,
-                    scale_strategy=strategy,
-                ),
-            )
-        return attribute_fn_args
+    # def format_attribute_args(
+    #     self,
+    #     batch: EncoderDecoderBatch,
+    #     target_ids: TargetIdsTensor,
+    #     attributed_fn: Callable[..., SingleScorePerStepTensor],
+    #     attribute_target: bool = False,
+    #     attributed_fn_args: Dict[str, Any] = {},
+    #     n_steps: Optional[int] = None,
+    #     strategy: Optional[str] = None,
+    # ) -> Dict[str, Any]:
+    #     attribute_fn_args = super().format_attribute_args(
+    #         batch=batch,
+    #         target_ids=target_ids,
+    #         attributed_fn=attributed_fn,
+    #         attribute_target=attribute_target,
+    #         attributed_fn_args=attributed_fn_args,
+    #     )
+    #     attribute_fn_args["inputs"] = (
+    #         self.method.path_builder.scale_inputs(
+    #             batch.sources.input_ids,
+    #             batch.sources.baseline_ids,
+    #             n_steps=n_steps,
+    #             scale_strategy=strategy,
+    #         ),
+    #     )
+    #     if attribute_target:
+    #         attribute_fn_args["inputs"] += (
+    #             self.method.path_builder.scale_inputs(
+    #                 batch.targets.input_ids,
+    #                 batch.targets.baseline_ids,
+    #                 n_steps=n_steps,
+    #                 scale_strategy=strategy,
+    #             ),
+    #         )
+    #     return attribute_fn_args
 
 
 class IntegratedGradientsAttribution(GradientAttribution):
@@ -249,7 +251,8 @@ class LayerIntegratedGradientsAttribution(GradientAttribution):
 
     def __init__(self, attribution_model, multiply_by_inputs: bool = True, **kwargs):
         super().__init__(attribution_model, hook_to_model=False)
-        self.is_layer_attribution = True
+        self.attribute_batch_ids = True
+        self.forward_batch_embeds = False
         self.use_baseline = True
         self.hook(**kwargs)
         self.method = LayerIntegratedGradients(
@@ -270,7 +273,8 @@ class LayerGradientXActivationAttribution(GradientAttribution):
 
     def __init__(self, attribution_model, multiply_by_inputs: bool = True, **kwargs):
         super().__init__(attribution_model, hook_to_model=False)
-        self.is_layer_attribution = True
+        self.attribute_batch_ids = True
+        self.forward_batch_embeds = False
         self.use_baseline = False
         self.hook(**kwargs)
         self.method = LayerGradientXActivation(
@@ -291,7 +295,8 @@ class LayerDeepLiftAttribution(GradientAttribution):
 
     def __init__(self, attribution_model, multiply_by_inputs: bool = True, **kwargs):
         super().__init__(attribution_model, hook_to_model=False)
-        self.is_layer_attribution = True
+        self.attribute_batch_ids = True
+        self.forward_batch_embeds = False
         self.use_baseline = True
         self.hook(**kwargs)
         self.method = LayerDeepLift(
