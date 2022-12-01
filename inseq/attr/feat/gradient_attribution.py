@@ -13,7 +13,7 @@
 # limitations under the License.
 """ Gradient-based feature attribution methods. """
 
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Dict
 
 import logging
 
@@ -27,9 +27,8 @@ from captum.attr import (
     Saliency,
 )
 
-from ...data import EncoderDecoderBatch, GradientFeatureAttributionStepOutput
+from ...data import GradientFeatureAttributionStepOutput
 from ...utils import Registry, extract_signature_args, rgetattr
-from ...utils.typing import SingleScorePerStepTensor, TargetIdsTensor
 from ..attribution_decorators import set_hook, unset_hook
 from .attribution_utils import get_source_target_attributions
 from .feature_attribution import FeatureAttribution
@@ -45,9 +44,9 @@ class GradientAttribution(FeatureAttribution, Registry):
     @set_hook
     def hook(self, **kwargs):
         r"""
-        Hooks the attribution method to the model by replacing normal :obj:`nn.Embedding`
-        with Captum's `InterpretableEmbeddingBase <https://captum.ai/api/utilities.html#captum.attr.InterpretableEmbeddingBase>`__.
-        """  # noqa: E501
+        Hooks the attribution method to the model by replacing normal :obj:`nn.Embedding` with Captum's
+        `InterpretableEmbeddingBase <https://captum.ai/api/utilities.html#captum.attr.InterpretableEmbeddingBase>`__.
+        """
         if self.attribute_batch_ids and not self.forward_batch_embeds:
             self.target_layer = kwargs.pop("target_layer", self.attribution_model.get_embedding_layer())
             logger.debug(f"target_layer={self.target_layer}")
@@ -157,42 +156,6 @@ class DiscretizedIntegratedGradientsAttribution(GradientAttribution):
         )
         super().hook(**other_kwargs)
 
-    # def format_attribute_args(
-    #     self,
-    #     batch: EncoderDecoderBatch,
-    #     target_ids: TargetIdsTensor,
-    #     attributed_fn: Callable[..., SingleScorePerStepTensor],
-    #     attribute_target: bool = False,
-    #     attributed_fn_args: Dict[str, Any] = {},
-    #     n_steps: Optional[int] = None,
-    #     strategy: Optional[str] = None,
-    # ) -> Dict[str, Any]:
-    #     attribute_fn_args = super().format_attribute_args(
-    #         batch=batch,
-    #         target_ids=target_ids,
-    #         attributed_fn=attributed_fn,
-    #         attribute_target=attribute_target,
-    #         attributed_fn_args=attributed_fn_args,
-    #     )
-    #     attribute_fn_args["inputs"] = (
-    #         self.method.path_builder.scale_inputs(
-    #             batch.sources.input_ids,
-    #             batch.sources.baseline_ids,
-    #             n_steps=n_steps,
-    #             scale_strategy=strategy,
-    #         ),
-    #     )
-    #     if attribute_target:
-    #         attribute_fn_args["inputs"] += (
-    #             self.method.path_builder.scale_inputs(
-    #                 batch.targets.input_ids,
-    #                 batch.targets.baseline_ids,
-    #                 n_steps=n_steps,
-    #                 scale_strategy=strategy,
-    #             ),
-    #         )
-    #     return attribute_fn_args
-
 
 class IntegratedGradientsAttribution(GradientAttribution):
     """Integrated Gradients attribution method.
@@ -266,7 +229,7 @@ class LayerGradientXActivationAttribution(GradientAttribution):
     """Layer Integrated Gradients attribution method.
 
     Reference implementation:
-    `https://captum.ai/api/layer.html#layer-integrated-gradients <https://captum.ai/api/layer.html#layer-integrated-gradients>`__.
+    `https://captum.ai/api/layer.html#layer-gradient-x-activation <https://captum.ai/api/layer.html#layer-gradient-x-activation>`__.
     """  # noqa E501
 
     method_name = "layer_gradient_x_activation"
@@ -289,7 +252,7 @@ class LayerDeepLiftAttribution(GradientAttribution):
 
     Reference implementation:
     `https://captum.ai/api/layer.html#layer-deeplift <https://captum.ai/api/layer.html#layer-deeplift>`__.
-    """  # noqa E501
+    """
 
     method_name = "layer_deeplift"
 
