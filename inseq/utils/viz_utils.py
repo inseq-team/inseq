@@ -21,6 +21,7 @@ from typing import Union
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.colors import Colormap, LinearSegmentedColormap
+from numpy.typing import NDArray
 
 from .misc import ordinal_str
 from .typing import TokenWithId
@@ -43,7 +44,7 @@ def get_color(
     score: float,
     min_value: Union[float, int],
     max_value: Union[float, int],
-    cmap: Union[str, Colormap, None] = None,
+    cmap: Colormap,
     return_alpha: bool = True,
     return_string: bool = True,
 ):
@@ -68,20 +69,22 @@ def sanitize_html(txt: Union[str, TokenWithId]) -> str:
 
 
 def get_colors(
-    scores: np.array,
+    scores: NDArray,
     min_value: Union[float, int],
     max_value: Union[float, int],
     cmap: Union[str, Colormap, None] = None,
     return_alpha: bool = True,
     return_strings: bool = True,
 ):
-    if cmap is None:
-        cmap = plt.get_cmap(cmap if isinstance(cmap, str) else "coolwarm", 200)
+    if isinstance(cmap, Colormap):
+        out_cmap = cmap
+    else:
+        out_cmap: Colormap = plt.get_cmap(cmap if isinstance(cmap, str) else "coolwarm", 200)
     input_colors = []
-    for row_index in range(scores.shape[0]):
+    for row_idx in range(scores.shape[0]):
         input_colors_row = []
-        for col_index in range(scores.shape[1]):
-            color = get_color(scores[row_index, col_index], min_value, max_value, cmap, return_alpha, return_strings)
+        for col_idx in range(scores.shape[1]):
+            color = get_color(scores[row_idx, col_idx], min_value, max_value, out_cmap, return_alpha, return_strings)
             input_colors_row.append(color)
         input_colors.append(input_colors_row)
     return input_colors

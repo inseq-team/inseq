@@ -1,5 +1,6 @@
 from typing import Any, Dict, List, Optional, Type, Union
 
+import logging
 import os
 from dataclasses import dataclass, field
 
@@ -48,6 +49,8 @@ DEFAULT_ATTRIBUTION_AGGREGATE_DICT = {
     },
 }
 
+logger = logging.getLogger(__name__)
+
 
 @dataclass(eq=False, repr=False)
 class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
@@ -73,10 +76,12 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
 
     source: List[TokenWithId]
     target: List[TokenWithId]
-    source_attributions: SequenceAttributionTensor
+    source_attributions: Optional[SequenceAttributionTensor] = None
     target_attributions: Optional[SequenceAttributionTensor] = None
     step_scores: Optional[Dict[str, SingleScoresPerSequenceTensor]] = None
     sequence_scores: Optional[Dict[str, MultipleScoresPerSequenceTensor]] = None
+    attr_pos_start: int = 0
+    attr_pos_end: Optional[int] = None
     _aggregator: Union[AggregatorPipeline, Type[Aggregator]] = None
     _dict_aggregate_fn: Dict[str, Any] = None
 
@@ -89,37 +94,56 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
             self._dict_aggregate_fn = aggregate_dict
         if self._aggregator is None:
             self._aggregator = SequenceAttributionAggregator
+        if self.attr_pos_end is None or self.attr_pos_end > len(self.target):
+            self.attr_pos_end = len(self.target)
 
     @classmethod
     def from_step_attributions(
         cls,
         attributions: List["FeatureAttributionStepOutput"],
+        tokenized_target_sentences: Optional[List[List[TokenWithId]]] = None,
         pad_id: Optional[Any] = None,
         has_bos_token: bool = True,
+        attr_pos_end: Optional[int] = None,
     ) -> List["FeatureAttributionSequenceOutput"]:
         attr = attributions[0]
         seq_attr_cls = attr._sequence_cls
-        num_sequences = len(attr.source_attributions)
-        if not all([len(att.source_attributions) == num_sequences for att in attributions]):
+        num_sequences = len(attr.prefix)
+        if not all([len(attr.prefix) == num_sequences for attr in attributions]):
             raise ValueError("All the attributions must include the same number of sequences.")
-        source_attributions = get_sequences_from_batched_steps([att.source_attributions for att in attributions])
         seq_attributions = []
-        sources = [drop_padding(attr.source[seq_id], pad_id) for seq_id in range(num_sequences)]
+        sources = None
+        if attr.source_attributions is not None:
+            sources = [drop_padding(attr.source[seq_id], pad_id) for seq_id in range(num_sequences)]
         targets = [
             drop_padding([a.target[seq_id][0] for a in attributions], pad_id) for seq_id in range(num_sequences)
         ]
+        if tokenized_target_sentences is None:
+            tokenized_target_sentences = targets
+        if attr_pos_end is None:
+            attr_pos_end = max([len(t) for t in tokenized_target_sentences])
+        pos_start = [
+            min(len(tokenized_target_sentences[seq_id]), attr_pos_end) - len(targets[seq_id])
+            for seq_id in range(num_sequences)
+        ]
         for seq_id in range(num_sequences):
-            # Remove padding from tensor
-            filtered_source_attribution = source_attributions[seq_id][
-                : len(sources[seq_id]), : len(targets[seq_id]), ...
-            ]
+            source = tokenized_target_sentences[seq_id][: pos_start[seq_id]] if sources is None else sources[seq_id]
             seq_attributions.append(
                 seq_attr_cls(
-                    source=sources[seq_id],
-                    target=targets[seq_id],
-                    source_attributions=filtered_source_attribution,
+                    source=source,
+                    target=tokenized_target_sentences[seq_id],
+                    attr_pos_start=pos_start[seq_id],
+                    attr_pos_end=attr_pos_end,
                 )
             )
+        if attr.source_attributions is not None:
+            source_attributions = get_sequences_from_batched_steps([att.source_attributions for att in attributions])
+            for seq_id in range(num_sequences):
+                # Remove padding from tensor
+                filtered_source_attribution = source_attributions[seq_id][
+                    : len(sources[seq_id]), : len(targets[seq_id]), ...
+                ]
+                seq_attributions[seq_id].source_attributions = filtered_source_attribution
         if attr.target_attributions is not None:
             target_attributions = get_sequences_from_batched_steps(
                 [att.target_attributions for att in attributions], pad_dims=(1,)
@@ -127,10 +151,12 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
             for seq_id in range(num_sequences):
                 if has_bos_token:
                     target_attributions[seq_id] = target_attributions[seq_id][1:, ...]
+                start_idx = max(pos_start) - pos_start[seq_id]
+                end_idx = start_idx + len(tokenized_target_sentences[seq_id])
                 target_attributions[seq_id] = target_attributions[seq_id][
-                    : len(targets[seq_id]), : len(targets[seq_id]), ...
+                    start_idx:end_idx, : len(targets[seq_id]), ...  # noqa: E203
                 ]
-                if target_attributions[seq_id].shape[0] != len(targets[seq_id]):
+                if target_attributions[seq_id].shape[0] != len(tokenized_target_sentences[seq_id]):
                     empty_final_row = torch.ones(1, *target_attributions[seq_id].shape[1:]) * float("nan")
                     target_attributions[seq_id] = torch.cat([target_attributions[seq_id], empty_final_row], dim=0)
                 seq_attributions[seq_id].target_attributions = target_attributions[seq_id]
@@ -170,31 +196,41 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
         from inseq import show_attributions
 
         aggregated = self.aggregate(aggregator, **kwargs)
-        return show_attributions(aggregated, min_val, max_val, display, return_html)
+        if (aggregated.source_attributions is not None and aggregated.source_attributions.shape[1] == 0) or (
+            aggregated.target_attributions is not None and aggregated.target_attributions.shape[1] == 0
+        ):
+            tokens = "".join(tid.token for tid in self.target)
+            logger.warning(f"Found empty attributions, skipping attribution matching generation: {tokens}")
+        else:
+            return show_attributions(aggregated, min_val, max_val, display, return_html)
 
     @property
     def minimum(self) -> float:
-        minimum = float(self.source_attributions.min())
+        minimum = 0
+        if self.source_attributions is not None:
+            minimum = min(minimum, float(self.source_attributions.min()))
         if self.target_attributions is not None:
             minimum = min(minimum, float(self.target_attributions.min()))
         return minimum
 
     @property
     def maximum(self) -> float:
-        maxmimum = float(self.source_attributions.max())
+        maximum = 0
+        if self.source_attributions is not None:
+            maximum = max(maximum, float(self.source_attributions.max()))
         if self.target_attributions is not None:
-            maxmimum = max(maxmimum, float(self.target_attributions.max()))
-        return maxmimum
+            maximum = max(maximum, float(self.target_attributions.max()))
+        return maximum
 
     def weight_attributions(self, step_score_id: str):
         aggregated_attr = self.aggregate()
         step_scores = self.step_scores[step_score_id].T.unsqueeze(1)
-        source_attr = aggregated_attr.source_attributions.float().T
-        self.source_attributions = (step_scores * source_attr).T
+        if self.source_attributions is not None:
+            source_attr = aggregated_attr.source_attributions.float().T
+            self.source_attributions = (step_scores * source_attr).T
         if self.target_attributions is not None:
             target_attr = aggregated_attr.target_attributions.float().T
             self.target_attributions = (step_scores * target_attr).T
-        print(step_scores.shape, source_attr.shape, target_attr.shape)
         self._aggregator = AggregatorPipeline([])
         return self
 
@@ -206,9 +242,9 @@ class FeatureAttributionStepOutput(TensorWrapper):
     extra information related to what was attributed.
     """
 
-    source_attributions: StepAttributionTensor
-    target_attributions: Optional[StepAttributionTensor] = None
+    source_attributions: Optional[StepAttributionTensor] = None
     step_scores: Optional[Dict[str, SingleScorePerStepTensor]] = None
+    target_attributions: Optional[StepAttributionTensor] = None
     sequence_scores: Optional[Dict[str, MultipleScoresPerStepTensor]] = None
     source: Optional[OneOrMoreTokenWithIdSequences] = None
     prefix: Optional[OneOrMoreTokenWithIdSequences] = None
@@ -219,11 +255,12 @@ class FeatureAttributionStepOutput(TensorWrapper):
         self,
         target_attention_mask: TargetIdsTensor,
     ) -> None:
-        self.source_attributions = remap_from_filtered(
-            original_shape=(len(self.source), *self.source_attributions.shape[1:]),
-            mask=target_attention_mask,
-            filtered=self.source_attributions,
-        )
+        if self.source_attributions is not None:
+            self.source_attributions = remap_from_filtered(
+                original_shape=(len(self.source), *self.source_attributions.shape[1:]),
+                mask=target_attention_mask,
+                filtered=self.source_attributions,
+            )
         if self.target_attributions is not None:
             self.target_attributions = remap_from_filtered(
                 original_shape=(len(self.prefix), *self.target_attributions.shape[1:]),
@@ -271,7 +308,6 @@ class FeatureAttributionOutput:
         "model_class",
         "model_name",
         "step_scores",
-        "prepend_bos_token",
         "tokenizer_class",
         "tokenizer_name",
     ]
@@ -359,10 +395,14 @@ class FeatureAttributionOutput:
         Returns:
             str: Attribution visualization as HTML if `return_html=True`, None otherwise.
         """
-        from inseq import show_attributions
-
-        attributions = [attr.aggregate(aggregator, **kwargs) for attr in self.sequence_attributions]
-        return show_attributions(attributions, min_val, max_val, display, return_html)
+        out_str = ""
+        for attr in self.sequence_attributions:
+            if return_html:
+                out_str += attr.show(min_val, max_val, display, return_html, aggregator, **kwargs)
+            else:
+                attr.show(min_val, max_val, display, return_html, aggregator, **kwargs)
+        if return_html:
+            return out_str
 
     @classmethod
     def merge_attributions(cls, attributions: List["FeatureAttributionOutput"]) -> "FeatureAttributionOutput":
