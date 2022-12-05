@@ -1,12 +1,13 @@
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Union
 
+import logging
 import math
 
 import torch
 
-from ...data.attribution import DEFAULT_ATTRIBUTION_AGGREGATE_DICT, FeatureAttributionStepOutput
+from ...data.attribution import DEFAULT_ATTRIBUTION_AGGREGATE_DICT
 from ...data.batch import EncoderDecoderBatch
-from ...utils import output2ce, output2ent, output2ppl, output2prob
+from ...utils import extract_signature_args, output2ce, output2ent, output2ppl, output2prob
 from ...utils.typing import (
     OneOrMoreAttributionSequences,
     OneOrMoreIdSequences,
@@ -18,12 +19,19 @@ from ...utils.typing import (
 )
 
 
+if TYPE_CHECKING:
+    from ...models import AttributionModel
+    from .feature_attribution import FeatureAttribution
+
+
 STEP_SCORES_MAP = {
     "probability": output2prob,
     "entropy": output2ent,
     "crossentropy": output2ce,
     "perplexity": output2ppl,
 }
+
+logger = logging.getLogger(__name__)
 
 
 def tok2string(
@@ -33,44 +41,13 @@ def tok2string(
     end: Optional[int] = None,
     as_targets: bool = True,
 ) -> TextInput:
+    """Enables bounded tokenization of a list of lists of tokens with start and end positions."""
     start = [0 if start is None else start for _ in token_lists]
     end = [len(tokens) if end is None else end for tokens in token_lists]
     return attribution_model.convert_tokens_to_string(
         [tokens[start[i] : end[i]] for i, tokens in enumerate(token_lists)],  # noqa: E203
         as_targets=as_targets,
     )
-
-
-def get_attribution_sentences(
-    attribution_model: "AttributionModel",
-    batch: EncoderDecoderBatch,
-    start: int,
-    end: int,
-) -> Tuple[List[str], List[str], List[int]]:
-    source_sentences = tok2string(attribution_model, batch.sources.input_tokens, as_targets=False)
-    target_sentences = tok2string(attribution_model, batch.targets.input_tokens)
-    if isinstance(source_sentences, str):
-        source_sentences = [source_sentences]
-        target_sentences = [target_sentences]
-    tokenized_target_sentences = [
-        attribution_model.convert_string_to_tokens(sent, as_targets=True) for sent in target_sentences
-    ]
-    lengths = [min(end, len(tts) + 1) - start for tts in tokenized_target_sentences]
-    return source_sentences, target_sentences, lengths
-
-
-def get_split_targets(
-    attribution_model: "AttributionModel",
-    targets: OneOrMoreTokenSequences,
-    start: int,
-    end: int,
-    step: int,
-) -> Tuple[List[str], List[str], List[str], List[str]]:
-    skipped_prefixes = tok2string(attribution_model, targets, end=start)
-    attributed_sentences = tok2string(attribution_model, targets, start, step + 1)
-    unattributed_suffixes = tok2string(attribution_model, targets, step + 1, end)
-    skipped_suffixes = tok2string(attribution_model, targets, start=end)
-    return skipped_prefixes, attributed_sentences, unattributed_suffixes, skipped_suffixes
 
 
 def rescale_attributions_to_tokens(
@@ -104,10 +81,10 @@ def check_attribute_positions(
         `tuple[int, int]`: The start and end positions for attribution.
     """
     if attr_pos_start is None:
-        attr_pos_start = 1
+        attr_pos_start = 0
     if attr_pos_end is None or attr_pos_end > max_length:
         attr_pos_end = max_length
-    if attr_pos_start > attr_pos_end or attr_pos_start < 1:
+    if attr_pos_start > attr_pos_end:
         raise ValueError("Invalid starting position for attribution")
     if attr_pos_start == attr_pos_end:
         raise ValueError("Start and end attribution positions cannot be the same.")
@@ -127,56 +104,67 @@ def get_step_scores(
     if attribution_model is None:
         raise ValueError("Attribution model is not set.")
     with torch.no_grad():
-        output = attribution_model.model(
-            inputs_embeds=batch.sources.input_embeds,
-            decoder_inputs_embeds=batch.targets.input_embeds,
-            attention_mask=batch.sources.attention_mask,
-            decoder_attention_mask=batch.targets.attention_mask,
-        )
-        return STEP_SCORES_MAP[score_identifier](
-            attribution_model=attribution_model,
+        output = attribution_model.get_forward_output(**attribution_model.format_forward_args(batch))
+        step_scores_args = attribution_model.format_step_function_args(
             forward_output=output,
-            encoder_input_ids=batch.sources.input_ids,
-            decoder_input_ids=batch.targets.input_ids,
-            encoder_input_embeds=batch.sources.input_embeds,
-            decoder_input_embeds=batch.targets.input_embeds,
+            encoder_input_ids=batch.source_ids,
+            decoder_input_ids=batch.target_ids,
+            encoder_input_embeds=batch.source_embeds,
+            decoder_input_embeds=batch.target_embeds,
             target_ids=target_ids,
-            encoder_attention_mask=batch.sources.attention_mask,
-            decoder_attention_mask=batch.targets.attention_mask,
+            encoder_attention_mask=batch.source_mask,
+            decoder_attention_mask=batch.target_mask,
             **step_scores_args,
         )
+        return STEP_SCORES_MAP[score_identifier](**step_scores_args)
 
 
 def join_token_ids(tokens: OneOrMoreTokenSequences, ids: OneOrMoreIdSequences) -> List[TokenWithId]:
     return [[TokenWithId(token, id) for token, id in zip(tok_seq, idx_seq)] for tok_seq, idx_seq in zip(tokens, ids)]
 
 
-def enrich_step_output(
-    step_output: FeatureAttributionStepOutput,
-    batch: EncoderDecoderBatch,
-    target_tokens: OneOrMoreTokenSequences,
-    target_ids: TargetIdsTensor,
-) -> FeatureAttributionStepOutput:
-    r"""
-    Enriches the attribution output with token information, producing the finished
-    :class:`~inseq.data.FeatureAttributionStepOutput` object.
-
-    Args:
-        step_output (:class:`~inseq.data.FeatureAttributionStepOutput`): The output produced
-            by the attribution step, with missing batch information.
-        batch (:class:`~inseq.data.EncoderDecoderBatch`): The batch on which attribution was performed.
-        target_ids (:obj:`torch.Tensor`): Target token ids of size `(batch_size, 1)` corresponding to tokens
-            for which the attribution step was performed.
-
-    Returns:
-        :class:`~inseq.data.FeatureAttributionStepOutput`: The enriched attribution output.
-    """
-    if len(target_ids.shape) == 0:
-        target_ids = target_ids.unsqueeze(0)
-    step_output.source = join_token_ids(batch.sources.input_tokens, batch.sources.input_ids.tolist())
-    step_output.target = [[TokenWithId(token[0], id)] for token, id in zip(target_tokens, target_ids.tolist())]
-    step_output.prefix = join_token_ids(batch.targets.input_tokens, batch.targets.input_ids.tolist())
-    return step_output
+def extract_args(
+    attribution_method: "FeatureAttribution",
+    attributed_fn: Callable[..., SingleScorePerStepTensor],
+    step_scores: List[str],
+    default_args: List[str],
+    **kwargs,
+) -> Tuple[Dict[str, Any], Dict[str, Any], Dict[str, Any]]:
+    attribution_args = kwargs.pop("attribution_args", {})
+    attributed_fn_args = kwargs.pop("attributed_fn_args", {})
+    step_scores_args = kwargs.pop("step_scores_args", {})
+    extra_attribution_args, attribution_unused_args = attribution_method.get_attribution_args(**kwargs)
+    extra_attributed_fn_args, attributed_fn_unused_args = extract_signature_args(
+        kwargs, attributed_fn, exclude_args=default_args, return_remaining=True
+    )
+    extra_step_scores_args = {}
+    for step_score in step_scores:
+        if step_score not in STEP_SCORES_MAP:
+            raise AttributeError(
+                f"Step score {step_score} not found. Available step scores are: "
+                f"{', '.join([x for x in STEP_SCORES_MAP.keys()])}. Use the inseq.register_step_score"
+                f"function to register a custom step score."
+            )
+        extra_step_scores_args.update(
+            **extract_signature_args(
+                kwargs,
+                STEP_SCORES_MAP[step_score],
+                exclude_args=default_args,
+                return_remaining=False,
+            )
+        )
+    step_scores_unused_args = {k: v for k, v in kwargs.items() if k not in extra_step_scores_args}
+    unused_args = {
+        k: v
+        for k, v in kwargs.items()
+        if k in attribution_unused_args.keys() & attributed_fn_unused_args.keys() & step_scores_unused_args.keys()
+    }
+    if unused_args:
+        logger.warning(f"Unused arguments during attribution: {unused_args}")
+    attribution_args.update(extra_attribution_args)
+    attributed_fn_args.update(extra_attributed_fn_args)
+    step_scores_args.update(extra_step_scores_args)
+    return attribution_args, attributed_fn_args, step_scores_args
 
 
 def list_step_scores() -> List[str]:
@@ -231,3 +219,21 @@ def register_step_score(
             if agg_name not in DEFAULT_ATTRIBUTION_AGGREGATE_DICT["step_scores"]:
                 DEFAULT_ATTRIBUTION_AGGREGATE_DICT["step_scores"][agg_name] = {}
             DEFAULT_ATTRIBUTION_AGGREGATE_DICT["step_scores"][agg_name][identifier] = agg_fn
+
+
+def get_source_target_attributions(
+    attr: Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]],
+    is_encoder_decoder: bool,
+) -> Tuple[torch.Tensor, torch.Tensor]:
+    if is_encoder_decoder:
+        if isinstance(attr, tuple) and len(attr) > 1:
+            return attr[0], attr[1]
+        elif isinstance(attr, tuple) and len(attr) == 1:
+            return attr[0], None
+        else:
+            return attr, None
+    else:
+        if isinstance(attr, tuple):
+            return None, attr[0]
+        else:
+            return None, attr

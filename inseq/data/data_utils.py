@@ -137,6 +137,8 @@ class TensorWrapper:
         for field in fields(self.__class__):
             attr = getattr(self, field.name)
             setattr(self, field.name, self._to(attr, device))
+        if device == "cpu" and torch.cuda.is_available():
+            torch.cuda.empty_cache()
         return self
 
     def detach(self):
