@@ -29,7 +29,7 @@ Here is an example of using Inseq to attribute an English-to-Italian translation
         "The developer argued with the designer because she did not like the design.",
         n_steps=300,
         return_convergence_delta=True,
-        output_step_probabilities=True,
+        step_scores=["probability"],
         internal_batch_size=100,
         include_eos_baseline=False,
     )
@@ -46,13 +46,15 @@ Here is an example of using Inseq to attribute an English-to-Italian translation
     :maxdepth: 2
     :caption: Using 🐛 Inseq
 
-    examples/pair_comparison
     examples/quickstart
+    examples/pair_comparison
+    examples/custom_attribute_target
 
 .. toctree::
-    :maxdepth: 4
+    :maxdepth: 3
     :caption: Main Classes
 
+    main_classes/main_functions
     main_classes/models
     main_classes/data_classes
     main_classes/feature_attribution

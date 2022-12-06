@@ -26,12 +26,14 @@ from itertools import islice
 from pathlib import Path
 
 import torch
-from joblib import Parallel, delayed
 from scipy.sparse import csr_matrix
 from torchtyping import TensorType
 
-from ....utils import is_scikitlearn_available
+from ....utils import is_joblib_available, is_scikitlearn_available
 
+
+if is_joblib_available():
+    from joblib import Parallel, delayed
 
 if is_scikitlearn_available():
     from sklearn.neighbors import kneighbors_graph
@@ -142,6 +144,8 @@ class MonotonicPathBuilder:
         if scale_strategy is None:
             scale_strategy = "greedy"
         get_word = lambda ids, seq, tok: int(ids[seq, tok])
+        if not is_joblib_available():
+            raise ImportError("joblib is not available. Please install it to use MonotonicPathBuilder.")
         word_paths_flat = Parallel(n_jobs=3, prefer="threads")(
             delayed(self.find_path)(
                 get_word(input_ids, seq_idx, tok_idx),

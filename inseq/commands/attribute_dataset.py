@@ -22,7 +22,7 @@ class AttributeDatasetArgs:
     input_text_field: Optional[str] = field(
         metadata={"alias": "-f", "help": "Name of the field containing the input texts used for attribution."}
     )
-    generated_texts_field: Optional[str] = field(
+    generated_text_field: Optional[str] = field(
         default=None,
         metadata={
             "alias": "-fgen",
@@ -65,9 +65,9 @@ def load_fields_from_dataset(dataset_args: AttributeDatasetArgs) -> Tuple[List[s
     else:
         raise ValueError(f"The input text field {dataset_args.input_text_field} does not exist in the dataset.")
     generated_texts = None
-    if dataset_args.generated_texts_field is not None:
-        if dataset_args.generated_texts_field in df.columns:
-            generated_texts = list(df[dataset_args.generated_texts_field])
+    if dataset_args.generated_text_field is not None:
+        if dataset_args.generated_text_field in df.columns:
+            generated_texts = list(df[dataset_args.generated_text_field])
     return input_texts, generated_texts
 
 

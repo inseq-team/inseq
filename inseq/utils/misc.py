@@ -21,11 +21,13 @@ def identity_fn(x, **kwargs):
 
 
 @contextmanager
-def optional(condition, context_manager):
+def optional(condition, context_manager, alternative_fn=None, **alternative_fn_kwargs):
     if condition:
         with context_manager:
             yield
     else:
+        if alternative_fn is not None:
+            alternative_fn(**alternative_fn_kwargs)
         yield
 
 
@@ -46,12 +48,11 @@ def _pretty_list_contents(l: Sequence[Any]) -> str:
 
 def _pretty_list(l: Optional[Sequence[Any]], lpad: int = 8) -> str:
     if all([isinstance(x, list) for x in l]):
-        contents = " " * lpad + "[ " + f" ],\n{' ' * lpad}[ ".join([_pretty_list_contents(subl) for subl in l]) + " ]"
+        line_sep = f" ],\n{' ' * lpad}[ "
+        contents = " " * lpad + "[ " + line_sep.join([_pretty_list_contents(subl) for subl in l]) + " ]"
     else:
         if all([hasattr(x, "to_dict") for x in l]):
-            contents = ",\n".join(
-                [f"{' ' * lpad + x.__class__.__name__}({pretty_dict(x.to_dict(), lpad + 4)}" for x in l]
-            )
+            contents = ",\n".join([f"{' ' * lpad + x.__class__.__name__}({pretty_dict(x.to_dict(), lpad)}" for x in l])
         else:
             contents = " " * lpad + _pretty_list_contents(l)
     return "[\n" + contents + f"\n{' ' * (lpad - 4)}]"
@@ -60,6 +61,8 @@ def _pretty_list(l: Optional[Sequence[Any]], lpad: int = 8) -> str:
 def pretty_list(l: Optional[Sequence[Any]], lpad: int = 8) -> str:
     if l is None:
         return "None"
+    if len(l) == 0:
+        return "list with 0 elements"
     out_txt = f"list with {len(l)} elements of type {l[0].__class__.__name__}"
     if all([isinstance(x, list) for x in l]):
         out_txt = f"list with {len(l)} sub-lists"
@@ -88,7 +91,7 @@ def pretty_dict(d: Dict[str, Any], lpad: int = 4) -> str:
         if isinstance(v, list) or isinstance(v, tuple):
             out_txt += pretty_list(v, lpad + 4)
         elif isinstance(v, Tensor):
-            out_txt += pretty_tensor(v)
+            out_txt += pretty_tensor(v, lpad + 4)
         elif isinstance(v, dict):
             out_txt += pretty_dict(v, lpad + 4)
         elif hasattr(v, "to_dict"):
@@ -185,6 +188,8 @@ def isnotebook():
             return False  # Other type (?)
     except NameError:
         return False  # Probably standard Python interpreter
+    except ModuleNotFoundError:
+        return False  # IPython not installed
 
 
 def format_input_texts(

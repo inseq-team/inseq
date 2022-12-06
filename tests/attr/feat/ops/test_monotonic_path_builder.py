@@ -2,9 +2,14 @@ from typing import List, Tuple
 
 from itertools import islice
 
+from inseq.utils import is_joblib_available
+
+
+if is_joblib_available():
+    from joblib import Parallel, delayed
+
 import pytest
 import torch
-from joblib import Parallel, delayed
 
 import inseq
 from inseq.attr.feat.ops import MonotonicPathBuilder
@@ -112,6 +117,10 @@ def test_scaled_monotonic_path_embeddings(word_idx: int, dig_model) -> None:
 
 
 @pytest.mark.slow
+@pytest.mark.skipif(
+    not is_joblib_available(),
+    reason="joblib is not available",
+)
 @pytest.mark.parametrize(
     ("ids"),
     [

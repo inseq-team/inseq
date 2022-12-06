@@ -27,6 +27,20 @@ class TensorWrapper:
             return attr
 
     @staticmethod
+    def _slice_batch(attr, subscript):
+        if isinstance(attr, torch.Tensor):
+            if len(attr.shape) == 1:
+                return attr[subscript]
+            if len(attr.shape) >= 2:
+                return attr[subscript, ...]
+        elif isinstance(attr, TensorWrapper) or isinstance(attr, list):
+            return attr[subscript]
+        elif isinstance(attr, dict):
+            return {key: TensorWrapper._slice_batch(val, subscript) for key, val in attr.items()}
+        else:
+            return attr
+
+    @staticmethod
     def _select_active(attr, mask):
         if isinstance(attr, torch.Tensor):
             if len(attr.shape) <= 1:
@@ -70,7 +84,9 @@ class TensorWrapper:
     def _numpy(attr):
         if isinstance(attr, torch.Tensor) or isinstance(attr, TensorWrapper):
             np_array = attr.numpy()
-            return np.ascontiguousarray(np_array, dtype=np_array.dtype)
+            if isinstance(np_array, np.ndarray):
+                return np.ascontiguousarray(np_array, dtype=np_array.dtype)
+            return np_array
         elif isinstance(attr, dict):
             return {key: TensorWrapper._numpy(val) for key, val in attr.items()}
         else:
@@ -100,8 +116,16 @@ class TensorWrapper:
             return False
 
     def __getitem__(self, subscript):
+        """By default, idiomatic slicing is used for the sequence dimension across batches.
+        For batching use `slice_batch` instead.
+        """
         return self.__class__(
             **{field.name: self._getitem(getattr(self, field.name), subscript) for field in fields(self.__class__)}
+        )
+
+    def slice_batch(self, subscript):
+        return self.__class__(
+            **{field.name: self._slice_batch(getattr(self, field.name), subscript) for field in fields(self.__class__)}
         )
 
     def select_active(self, mask: TensorType["batch_size", 1, int]):
@@ -113,6 +137,8 @@ class TensorWrapper:
         for field in fields(self.__class__):
             attr = getattr(self, field.name)
             setattr(self, field.name, self._to(attr, device))
+        if device == "cpu" and torch.cuda.is_available():
+            torch.cuda.empty_cache()
         return self
 
     def detach(self):

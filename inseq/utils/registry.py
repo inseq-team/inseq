@@ -1,10 +1,15 @@
-from typing import Dict, List, Set, Type
+from __future__ import annotations
+
+from typing import TypeVar
 
 from abc import ABC
 
 
+R = TypeVar("R", bound="Registry")
+
+
 class Registry(ABC):
-    attr = "None"  # Override in child classes
+    registry_attr = "None"  # Override in child classes
 
     def __init__(self) -> None:
         if self.__class__ is Registry or self.__class__ in Registry.__subclasses__():
@@ -14,7 +19,7 @@ class Registry(ABC):
             )
 
     @classmethod
-    def subclasses(cls) -> Set[Type["Registry"]]:
+    def subclasses(cls: type[R]) -> set[type[R]]:
         registry = set()
         for subclass in cls.__subclasses__():
             if subclass not in registry and subclass not in Registry.__subclasses__():
@@ -23,12 +28,12 @@ class Registry(ABC):
         return registry
 
     @classmethod
-    def available_classes(cls) -> Dict[str, Type["Registry"]]:
-        methods = {getattr(c, cls.attr): c for c in cls.subclasses()}
+    def available_classes(cls: type[R]) -> dict[str, type[R]]:
+        methods = {getattr(c, cls.registry_attr): c for c in cls.subclasses()}
         if cls is not Registry and cls not in Registry.__subclasses__():
-            methods[str(getattr(cls, cls.attr))] = cls
+            methods[getattr(cls, cls.registry_attr)] = cls
         return methods
 
 
-def get_available_methods(cls: Type[Registry]) -> List[str]:
+def get_available_methods(cls: type[Registry]) -> list[str]:
     return [n for n in cls.available_classes().keys()]

@@ -39,7 +39,7 @@ Here is an example of using ``PairAggregator`` to produce a heatmap to visualize
         n_steps=300,
         return_convergence_delta=True,
         attribute_target=True,
-        output_step_probabilities=True,
+        step_scores=["probability"],
         internal_batch_size=100,
         include_eos_baseline=False,
     )

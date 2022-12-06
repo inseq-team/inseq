@@ -1,10 +1,10 @@
-from typing import Any, List, Optional, Sequence
+from typing import List, Optional
 
+import logging
 from dataclasses import dataclass, field
 
-import torch
-
-from .. import AttributionModel, FeatureAttributionOutput, list_feature_attribution_methods, load_model
+from .. import list_feature_attribution_methods, load_model
+from ..utils import get_default_device
 from .base import BaseCLICommand
 
 
@@ -16,7 +16,7 @@ class AttributeBaseArgs:
     attribution_method: Optional[str] = field(
         default="integrated_gradients",
         metadata={
-            "alias": "-am",
+            "alias": "-a",
             "help": "The attribution method used to perform feature attribution.",
             "choices": list_feature_attribution_methods(),
         },
@@ -24,31 +24,29 @@ class AttributeBaseArgs:
     do_prefix_attribution: bool = field(
         default=False,
         metadata={
-            "alias": "-pa",
             "help": "Performs the attribution procedure including the generated prefix at every step.",
         },
     )
-    output_step_probabilities: bool = field(
-        default=False, metadata={"alias": "-sp", "help": "Adds step decoding probabilities to the attribution output."}
+    step_scores: List[str] = field(
+        default_factory=list, metadata={"help": "Adds step scores to the attribution output."}
     )
     output_step_attributions: bool = field(
-        default=False, metadata={"alias": "-sa", "help": "Adds step-level feature attributions to the output."}
+        default=False, metadata={"help": "Adds step-level feature attributions to the output."}
     )
     include_eos_baseline: bool = field(
         default=False,
         metadata={
-            "alias": "-eos",
+            "alias": "--eos",
             "help": "Whether the EOS token should be included in the baseline, used for some attribution methods.",
         },
     )
     n_approximation_steps: Optional[int] = field(
         default=100,
-        metadata={"alias": "-ns", "help": "Number of approximation steps, used for some attribution methods."},
+        metadata={"alias": "-n", "help": "Number of approximation steps, used for some attribution methods."},
     )
     return_convergence_delta: bool = field(
         default=False,
         metadata={
-            "alias": "-cd",
             "help": "Returns the convergence delta of the approximation, used for some attribution methods.",
         },
     )
@@ -62,24 +60,49 @@ class AttributeBaseArgs:
     attribution_batch_size: Optional[int] = field(
         default=50,
         metadata={
-            "alias": "-abs",
             "help": "The internal batch size used by the attribution method, used for some attribution methods.",
         },
     )
     device: str = field(
-        default="cuda:0" if torch.cuda.is_available() else "cpu",
-        metadata={"alias": "-dev", "help": "The device used for inference with Pytorch. Multi-GPU is not supported."},
+        default=get_default_device(),
+        metadata={"alias": "--dev", "help": "The device used for inference with Pytorch. Multi-GPU is not supported."},
     )
     hide_attributions: bool = field(
         default=False,
         metadata={
-            "alias": "-noshow",
+            "alias": "--hide",
             "help": "If specified, the attribution visualization are not shown in the output.",
         },
     )
     save_path: Optional[str] = field(
         default=None,
         metadata={"alias": "-o", "help": "Path where the attribution output should be saved in JSON format."},
+    )
+    viz_path: Optional[str] = field(
+        default=None,
+        metadata={
+            "help": "Path where the attribution visualization should be saved in HTML format.",
+        },
+    )
+    max_gen_length: Optional[int] = field(
+        default=None,
+        metadata={"alias": "-l", "help": "Max generation length for model outputs. Default: 512"},
+    )
+    start_pos: Optional[int] = field(
+        default=None,
+        metadata={"alias": "-s", "help": "Start position for the attribution. Default: first token"},
+    )
+    end_pos: Optional[int] = field(
+        default=None,
+        metadata={"alias": "-e", "help": "End position for the attribution. Default: last token"},
+    )
+    verbose: bool = field(
+        default=False,
+        metadata={"alias": "-v", "help": "If specified, use INFO as logging level for the attribution."},
+    )
+    very_verbose: bool = field(
+        default=False,
+        metadata={"alias": "-vv", "help": "If specified, use DEBUG as logging level for the attribution."},
     )
 
 
@@ -91,7 +114,7 @@ class AttributeArgs(AttributeBaseArgs):
     generated_texts: Optional[List[str]] = field(
         default=None,
         metadata={
-            "alias": "-gen",
+            "alias": "-g",
             "help": "If specified, constrains the decoding procedure to the specified outputs.",
         },
     )
@@ -105,47 +128,46 @@ class AttributeArgs(AttributeBaseArgs):
             self.generated_texts = [t for t in self.generated_texts]
 
 
-def batched_attribute(
-    args: AttributeBaseArgs,
-    model: AttributionModel,
-    input_texts: List[str],
-    generated_texts: Optional[List[str]] = None,
-) -> FeatureAttributionOutput:
-    def get_batched(bs: Optional[int], seq: Sequence[Any]) -> List[List[Any]]:
-        if bs is None:
-            return [seq]
-        return [seq[i : i + bs] for i in range(0, len(seq), bs)]  # noqa
-
-    batched_inputs = get_batched(args.batch_size, input_texts)
-    batched_generated_texts = [None for _ in batched_inputs]
-    if generated_texts is not None:
-        batched_generated_texts = get_batched(args.batch_size, generated_texts)
-        assert len(batched_inputs) == len(batched_generated_texts)
-    outputs = []
-    for i, (in_batch, gen_batch) in enumerate(zip(batched_inputs, batched_generated_texts)):
-        print(f"Processing batch {i + 1} of {len(batched_inputs)}...")
-        outputs.append(
-            model.attribute(
-                in_batch,
-                gen_batch,
-                attribute_target=args.do_prefix_attribution,
-                output_step_probabilities=args.output_step_probabilities,
-                output_step_attributions=args.output_step_attributions,
-                include_eos_baseline=args.include_eos_baseline,
-                n_steps=args.n_approximation_steps,
-                internal_batch_size=args.attribution_batch_size,
-                return_convergence_delta=args.return_convergence_delta,
-                device=args.device,
-            )
-        )
-    return FeatureAttributionOutput.merge_attributions(outputs)
-
-
 def attribute(input_texts, generated_texts, args: AttributeBaseArgs):
-    model = load_model(args.model_name_or_path, attribution_method=args.attribution_method)
-    out = batched_attribute(args, model, input_texts, generated_texts)
-    if not args.hide_attributions:
-        out.show()
+    if args.very_verbose:
+        log_level = logging.DEBUG
+    elif args.verbose:
+        log_level = logging.INFO
+    else:
+        log_level = logging.WARNING
+    logging.basicConfig(
+        level=log_level,
+        format="%(asctime)s.%(msecs)03d %(levelname)s %(module)s - %(funcName)s: %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+    model = load_model(
+        args.model_name_or_path,
+        attribution_method=args.attribution_method,
+        device=args.device,
+    )
+    out = model.attribute(
+        input_texts,
+        generated_texts,
+        batch_size=args.batch_size,
+        attribute_target=args.do_prefix_attribution,
+        step_scores=args.step_scores,
+        output_step_attributions=args.output_step_attributions,
+        include_eos_baseline=args.include_eos_baseline,
+        n_steps=args.n_approximation_steps,
+        internal_batch_size=args.attribution_batch_size,
+        return_convergence_delta=args.return_convergence_delta,
+        device=args.device,
+        generation_args={"max_new_tokens": args.max_gen_length},
+        attr_pos_start=args.start_pos,
+        attr_pos_end=args.end_pos,
+    )
+    if args.viz_path:
+        print(f"Saving visualization to {args.viz_path}")
+        html = out.show(return_html=True, display=not args.hide_attributions)
+        with open(args.viz_path, "w") as f:
+            f.write(html)
+    else:
+        out.show(display=not args.hide_attributions)
     if args.save_path:
         print(f"Saving attributions to {args.save_path}")
         out.save(args.save_path, overwrite=True)
