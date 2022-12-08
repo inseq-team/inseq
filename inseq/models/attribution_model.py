@@ -78,13 +78,13 @@ class AttributionModel(ABC, torch.nn.Module):
         if self.model:
             self.model.to(self._device)
 
-    def setup(self, device: Optional[str] = None, attribution_method: Optional[str] = None) -> None:
+    def setup(self, device: Optional[str] = None, attribution_method: Optional[str] = None, **kwargs) -> None:
         """Move the model to device and in eval mode."""
         self.device = device if device is not None else get_default_device()
         if self.model:
             self.model.eval()
             self.model.zero_grad()
-            self.attribution_method = self.get_attribution_method(attribution_method)
+            self.attribution_method = self.get_attribution_method(attribution_method, **kwargs)
 
     @property
     def default_attributed_fn_id(self) -> str:
@@ -107,6 +107,7 @@ class AttributionModel(ABC, torch.nn.Module):
         self,
         method: Optional[str] = None,
         override_default_attribution: Optional[bool] = False,
+        **kwargs,
     ) -> FeatureAttribution:
         # No method present -> missing method error
         if not method:
@@ -118,10 +119,10 @@ class AttributionModel(ABC, torch.nn.Module):
             # If either the default method is missing or the override is set,
             # set the default method to the given method
             if override_default_attribution or not self.attribution_method:
-                self.attribution_method = FeatureAttribution.load(method, attribution_model=self)
+                self.attribution_method = FeatureAttribution.load(method, attribution_model=self, **kwargs)
             # Temporarily use the current method without overriding the default
             else:
-                return FeatureAttribution.load(method, attribution_model=self)
+                return FeatureAttribution.load(method, attribution_model=self, **kwargs)
         return self.attribution_method
 
     def get_attributed_fn(
@@ -376,7 +377,8 @@ class AttributionModel(ABC, torch.nn.Module):
         target_ids: TargetIdsTensor,
         attributed_fn: Callable[..., SingleScorePerStepTensor],
         attributed_fn_args: Dict[str, Any] = {},
-        is_layer_attribution: bool = False,
+        attribute_batch_ids: bool = False,
+        forward_batch_embeds: bool = True,
         **kwargs,
     ) -> Tuple[Dict[str, Any], Tuple[Union[IdsTensor, EmbeddingsTensor, None], ...]]:
         pass

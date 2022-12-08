@@ -1,4 +1,4 @@
-"""Interpretability for Sequence-to-sequence models 🔍"""
+"""Interpretability for Sequence Generation Models 🔍"""
 
 from .attr import list_feature_attribution_methods, list_step_scores, register_step_score
 from .data import FeatureAttributionOutput, show_attributions
@@ -6,6 +6,7 @@ from .models import AttributionModel, list_supported_frameworks, load_model
 
 
 def get_version() -> str:
+    """Returns the current version of the Inseq library."""
     try:
         import pkg_resources
 

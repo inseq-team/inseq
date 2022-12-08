@@ -78,7 +78,6 @@ function resizeHtmlExamples() {
     }
 }
 
-
 function onLoad() {
     addIcon();
     addCustomFooter();
@@ -86,3 +85,6 @@ function onLoad() {
 }
 
 window.addEventListener("load", onLoad);
+window.onresize = function() {
+    window.location.href = window.location.href;
+}

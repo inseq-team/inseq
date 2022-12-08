@@ -169,7 +169,10 @@ def extract_args(
 
 def list_step_scores() -> List[str]:
     """
-    Lists identifiers for all available step scores.
+    Lists identifiers for all available step scores. One or more step scores identifiers can be passed to the
+    :meth:`~inseq.models.AttributionModel.attribute` method either to compute scores while attributing (`step_scores`
+    parameter), or as target function for the attribution, if supported by the attribution method (`attributed_fn`
+    parameter).
     """
     return list(STEP_SCORES_MAP.keys())
 

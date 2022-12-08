@@ -25,6 +25,22 @@ def load_model(
     framework: str = "hf_transformers",
     **kwargs,
 ) -> AttributionModel:
+    """Factory function to load a model with or without attribution methods.
+
+    Args:
+        model (`Union[ModelIdentifier, ModelClass]`):
+            Either a model identifier (e.g. `gpt2` in HF transformers) or an instance of a model class supported by the
+            selected modeling framework.
+        attribution_method (`Optional[str]`, *optional*, defaults to None):
+            Identifier for the attribution method to use. If `None`, the model will be loaded without any attribution
+            methods, which can be added during attribution.
+        framework (`str`, *optional*, defaults to "hf_transformers"):
+            The framework to use for loading the model. Currently, only HF transformers is supported.
+
+    Returns:
+        `AttributionModel`: An instance of one of `AttributionModel` children classes matching the selected framework
+        and model architecture.
+    """
     model_name = model if isinstance(model, str) else "model"
     method_desc = f"with {attribution_method} method..." if attribution_method else " without attribution methods..."
     load_msg = f"Loading {model_name} {method_desc}"
@@ -34,7 +50,8 @@ def load_model(
 
 def list_supported_frameworks() -> List[str]:
     """
-    Lists identifiers for all available step scores.
+    Lists identifiers for all available frameworks. These can be used to load models with the `framework` argument in
+    the :meth:`~inseq.load_model` function.
     """
     return list(FRAMEWORKS_MAP.keys())
 

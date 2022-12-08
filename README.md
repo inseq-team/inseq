@@ -12,8 +12,18 @@
 
 </div>
 
+Inseq is a Pytorch-based hackable toolkit to democratize the access to common post-hoc **in**terpretability analyses of **seq**uence generation models.
+
 ## Installation
 
+Inseq is available on PyPI and can be installed with `pip`:
+
+```bash
+pip install inseq
+```
+
+<details>
+  <summary>Dev Installation</summary>
 To install the package, clone the repository and run the following commands:
 
 ```bash
@@ -27,6 +37,7 @@ If you have a GPU available, use `make install-gpu` to install the latest `torch
 For library developers, you can use the `make install-dev` command to install and its GPU-friendly counterpart `make install-dev-gpu` to install all development dependencies (quality, docs, extras).
 
 After installation, you should be able to run `make fast-test` and `make lint` without errors.
+</details>
 
 <details>
   <summary>FAQ Installation</summary>
@@ -71,6 +82,30 @@ model.attribute(
 
 ![GPT-2 Attribution in the console](docs/source/images/inseq_python_console.gif)
 
+## What does Inseq support?
+
+- Feature attribution of sequence generation for most `ForConditionalGeneration` (encoder-decoder) and `ForCausalLM` (decoder-only) models from 🤗 Transformers
+
+- Support for single and batched attribution using multiple gradient-based feature attribution methods from Captum
+
+- Post-hoc aggregation of feature attribution maps via `Aggregator` classes.
+
+- Attribution visualization in notebooks, browser and command line.
+
+- Command line interface for attributing single examples or entire 🤗 datasets.
+
+- Custom attribution of target functions, supporting advanced usage for cases such as contrastive and uncertainty-weighted feature attributions.
+
+- Extract and visualize custom scores for every generation step alongsides attribution maps.
+
+## What we plan to support in the future?
+
+- Attention-based and occlusion-based feature attribution methods
+
+- Interoperability with other interpretability libraries
+
+- Rich and interactive visualizations in a tabbed interface
+
 ## Using the Inseq client
 
 The Inseq library also provides useful client commands to enable repeated attribution of individual examples and even entire 🤗 datasets directly from the console. See the available options by typing `inseq -h` in the terminal after installing the package.
@@ -97,11 +132,3 @@ inseq attribute-dataset \
   --batch_size 8 \
   --hide
 ```
-
-### Class structure
-
-The following diagram provides an overview of the main classes in the library:
-
-![Class structure](docs/source/images/classes.png)
-
-When `inseq.load_model` is called using a model name and feature attribution method identifier, the correct model class and the corresponding method are instantiated and tied together (the method is accessible via `model.attribution_method`).

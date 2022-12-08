@@ -17,5 +17,28 @@ Models
     :members:
 
 
+Framework Classes
+-----------------------------------------------------------------------------------------------------------------------
+
 .. autoclass:: inseq.models.HuggingfaceModel
+    :members:
+
+
+.. autoclass:: inseq.models.HuggingfaceEncoderDecoderModel
+    :members:
+
+
+.. autoclass:: inseq.models.HuggingfaceDecoderOnlyModel
+    :members:
+
+
+
+Architectural Classes
+-----------------------------------------------------------------------------------------------------------------------
+
+.. autoclass:: inseq.models.EncoderDecoderAttributionModel
+    :members:
+
+
+.. autoclass:: inseq.models.DecoderOnlyAttributionModel
     :members:
