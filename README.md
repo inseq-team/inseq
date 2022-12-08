@@ -71,6 +71,30 @@ model.attribute(
 
 ![GPT-2 Attribution in the console](docs/source/images/inseq_python_console.gif)
 
+## What does Inseq support?
+
+- Feature attribution of sequence generation for most `ForConditionalGeneration` (encoder-decoder) and `ForCausalLM` (decoder-only) models from 🤗 Transformers
+
+- Support for single and batched attribution using multiple gradient-based feature attribution methods from Captum
+
+- Post-hoc aggregation of feature attribution maps via `Aggregator` classes.
+
+- Attribution visualization in notebooks, browser and command line.
+
+- Command line interface for attributing single examples or entire 🤗 datasets.
+
+- Custom attribution of target functions, supporting advanced usage for cases such as contrastive and uncertainty-weighted feature attributions.
+
+- Extract and visualize custom scores for every generation step alongsides attribution maps.
+
+## What we plan to support in the future?
+
+- Attention-based and occlusion-based feature attribution methods
+
+- Interoperability with other interpretability libraries
+
+- Rich and interactive visualizations in a tabbed interface
+
 ## Using the Inseq client
 
 The Inseq library also provides useful client commands to enable repeated attribution of individual examples and even entire 🤗 datasets directly from the console. See the available options by typing `inseq -h` in the terminal after installing the package.
