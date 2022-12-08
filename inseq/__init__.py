@@ -1,4 +1,4 @@
-"""Interpretability for Sequence-to-sequence models 🔍"""
+"""Interpretability for Sequence Generation Models 🔍"""
 
 from .attr import list_feature_attribution_methods, list_step_scores, register_step_score
 from .data import FeatureAttributionOutput, show_attributions

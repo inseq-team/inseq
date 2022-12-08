@@ -13,11 +13,9 @@
 Data Classes
 =======================================================================================================================
 
-TensorWrapper
------------------------------------------------------------------------------------------------------------------------
-
 .. autoclass:: inseq.data.data_utils.TensorWrapper
     :members:
+
 
 Batching
 -----------------------------------------------------------------------------------------------------------------------
@@ -35,6 +33,10 @@ Batching
 
 
 .. autoclass:: inseq.data.batch.EncoderDecoderBatch
+    :members:
+
+
+.. autoclass:: inseq.data.batch.DecoderOnlyBatch
     :members:
 
 
