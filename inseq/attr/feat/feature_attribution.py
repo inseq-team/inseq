@@ -84,16 +84,20 @@ class FeatureAttribution(Registry):
             **kwargs: Additional keyword arguments to pass to the hook method.
 
         Attributes:
-            is_layer_attribution (:obj:`bool`, default `False`): If True, the attribution method maps saliency
-                scores to the output of a layer instead of model inputs. Layer attribution methods do not require
-                interpretable embeddings unless intermediate features before the embedding layer are attributed.
+            attribute_batch_ids (:obj:`bool`, default `False`): If True, the attribution method will receive batch ids
+                instead of batch embeddings for attribution. Used by layer gradient-based attribution methods mapping
+                saliency scores to the output of a layer instead of model inputs.
+            forward_batch_embeds (:obj:`bool`, default `True`): If True, the model will use embeddings in the
+                forward pass instead of token ids. Using this in combination with `attribute_batch_ids` will allow for
+                custom conversion of ids into embeddings inside the attribution method.
             target_layer (:obj:`torch.nn.Module`, default `None`): The layer on which attribution should be
-                performed if is_layer_attribution is True.
+                performed for layer attribution methods.
             use_baseline (:obj:`bool`, default `False`): Whether a baseline should be used for the attribution method.
         """
         super().__init__()
         self.attribution_model = attribution_model
-        self.is_layer_attribution: bool = False
+        self.attribute_batch_ids: bool = False
+        self.forward_batch_embeds: bool = True
         self.target_layer = None
         self.use_baseline: bool = False
         if hook_to_model:
@@ -131,6 +135,9 @@ class FeatureAttribution(Registry):
         """
         from ...models import load_model
 
+        methods = cls.available_classes()
+        if method_name not in methods:
+            raise UnknownAttributionMethodError(method_name)
         if model_name_or_path is not None:
             model = load_model(model_name_or_path)
         elif attribution_model is not None:
@@ -140,9 +147,6 @@ class FeatureAttribution(Registry):
                 "Only one among an initialized model and a model identifier "
                 "must be defined when loading the attribution method."
             )
-        methods = cls.available_classes()
-        if method_name not in methods:
-            raise UnknownAttributionMethodError(method_name)
         return methods[method_name](model, **kwargs)
 
     @batched
@@ -210,11 +214,7 @@ class FeatureAttribution(Registry):
             # We do this here to support separate attr_pos_start for different sentences when batching
             if attr_pos_start is None or attr_pos_start < encoded_sources.input_ids.shape[1]:
                 attr_pos_start = encoded_sources.input_ids.shape[1]
-        batch = self.attribution_model.prepare_inputs_for_attribution(
-            inputs,
-            include_eos_baseline,
-            self.is_layer_attribution,
-        )
+        batch = self.attribution_model.prepare_inputs_for_attribution(inputs, include_eos_baseline)
         # If prepare_and_attribute was called from AttributionModel.attribute,
         # attributed_fn is already a Callable. Keep here to allow for usage independently
         # of AttributionModel.attribute.
@@ -289,9 +289,9 @@ class FeatureAttribution(Registry):
                 an optional added list of single :class:`~inseq.data.FeatureAttributionStepOutput` for each step and
                 extra information regarding the attribution parameters.
         """
-        if self.is_layer_attribution and attribute_target:
+        if self.attribute_batch_ids and not self.forward_batch_embeds and attribute_target:
             raise ValueError(
-                "Layer attribution methods do not support attribute_target=True. Use regular ones instead."
+                "Layer attribution methods do not support attribute_target=True. Use regular attributions instead."
             )
         attr_pos_start, attr_pos_end = check_attribute_positions(
             batch.max_generation_length,
@@ -525,7 +525,8 @@ class FeatureAttribution(Registry):
             target_ids=target_ids,
             attributed_fn=attributed_fn,
             attributed_fn_args=attributed_fn_args,
-            is_layer_attribution=self.is_layer_attribution,
+            attribute_batch_ids=self.attribute_batch_ids,
+            forward_batch_embeds=self.forward_batch_embeds,
             **kwargs,
         )
         if self.use_baseline:
