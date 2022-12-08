@@ -12,6 +12,8 @@
 
 </div>
 
+Inseq is a Pytorch-based hackable toolkit to democratize the access to common post-hoc **in**terpretability analyses of **seq**uence generation models.
+
 ## Installation
 
 Inseq is available on PyPI and can be installed with `pip`:
