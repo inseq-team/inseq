@@ -14,6 +14,14 @@
 
 ## Installation
 
+Inseq is available on PyPI and can be installed with `pip`:
+
+```bash
+pip install inseq
+```
+
+<details>
+  <summary>Dev Installation</summary>
 To install the package, clone the repository and run the following commands:
 
 ```bash
@@ -27,6 +35,7 @@ If you have a GPU available, use `make install-gpu` to install the latest `torch
 For library developers, you can use the `make install-dev` command to install and its GPU-friendly counterpart `make install-dev-gpu` to install all development dependencies (quality, docs, extras).
 
 After installation, you should be able to run `make fast-test` and `make lint` without errors.
+</details>
 
 <details>
   <summary>FAQ Installation</summary>
@@ -121,11 +130,3 @@ inseq attribute-dataset \
   --batch_size 8 \
   --hide
 ```
-
-### Class structure
-
-The following diagram provides an overview of the main classes in the library:
-
-![Class structure](docs/source/images/classes.png)
-
-When `inseq.load_model` is called using a model name and feature attribution method identifier, the correct model class and the corresponding method are instantiated and tied together (the method is accessible via `model.attribution_method`).

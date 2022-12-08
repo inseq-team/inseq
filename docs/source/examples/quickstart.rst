@@ -49,7 +49,9 @@ When a model is loaded with :meth:`~inseq.load_model`, a :class:`~inseq.attr.fea
 
 The following image provides a visual hierarchy of the division between ``AttributionModel`` and ``FeatureAttribution`` subclasses:
 
-
+.. image:: ../images/classes.png
+  :width: 400
+  :alt: Classes diagram for attribution models and feature attribution methods.
 
 The ``attribute`` method
 ===================================
