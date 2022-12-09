@@ -1,9 +1,14 @@
-from typing import Any, Callable, List, Optional, Sequence, Tuple, Union
+from typing import TYPE_CHECKING, Any, Callable, List, Optional, Sequence, Tuple, Union
 
 import logging
+import os
 
 import torch
 import torch.nn.functional as F
+from torch.backends.cuda import is_built as is_cuda_built
+from torch.backends.mps import is_available as is_mps_available
+from torch.backends.mps import is_built as is_mps_built
+from torch.cuda import is_available as is_cuda_available
 from torchtyping import TensorType
 
 from .typing import (
@@ -14,7 +19,15 @@ from .typing import (
 )
 
 
+if TYPE_CHECKING:
+    from ..models import AttributionModel
+
 logger = logging.getLogger(__name__)
+
+TORCH_BACKEND_DEVICE_MAP = {
+    "cuda": (is_cuda_built, is_cuda_available),
+    "mps": (is_mps_built, is_mps_available),
+}
 
 
 @torch.no_grad()
@@ -47,6 +60,8 @@ def sum_normalize_attributions(
         concat = True
         orig_sizes = [a.shape[cat_dim] for a in attributions]
         attributions = torch.cat(attributions, dim=cat_dim)
+    else:
+        orig_sizes = [attributions.shape[cat_dim]]
     # nansum is used to handle the target side sequence attribution case
     attributions = torch.nansum(attributions, dim=-1).squeeze(0)
     attributions = F.normalize(attributions, p=2, dim=norm_dim)
@@ -54,11 +69,11 @@ def sum_normalize_attributions(
         attributions = attributions.unsqueeze(0)
     if concat:
         attributions = attributions.split(orig_sizes, dim=cat_dim)
-        return attributions[0], attributions[1] + torch.tril(torch.ones_like(attributions[1]) * float("nan"))
+        return attributions[0], attributions[1]
     return attributions
 
 
-def euclidean_distance(vec_a: torch.Tensor, vec_b: torch.Tensor) -> float:
+def euclidean_distance(vec_a: torch.Tensor, vec_b: torch.Tensor) -> torch.Tensor:
     """Compute the Euclidean distance between two points."""
     return (vec_a - vec_b).pow(2).sum(-1).sqrt()
 
@@ -153,6 +168,12 @@ def sum_fn(t: torch.Tensor) -> torch.Tensor:
     return t.sum(dim=1, keepdim=True)
 
 
+def get_front_padding(t: torch.Tensor, pad: int = 0, dim: int = 1) -> List[int]:
+    """Given a tensor of shape (batch, seq_len) of ids, return a list of length batch containing
+    the number of padding tokens at the beginning of each sequence."""
+    return (t != pad).int().argmax(dim).tolist()
+
+
 def get_sequences_from_batched_steps(
     bsteps: List[torch.Tensor], pad_dims: Optional[Sequence[int]] = None
 ) -> List[torch.Tensor]:
@@ -167,24 +188,44 @@ def get_sequences_from_batched_steps(
     if pad_dims:
         for dim in pad_dims:
             max_dim = max(bstep.shape[dim] for bstep in bsteps)
-            bsteps = [
-                torch.cat(
-                    [
-                        bstep,
-                        torch.ones(
-                            *bstep.shape[:dim],
-                            max_dim - bstep.shape[dim],
-                            *bstep.shape[dim + 1 :],  # noqa
-                            dtype=bstep.dtype,
-                            device=bstep.device,
-                        )
-                        * float("nan"),
-                    ],
-                    dim=dim,
+            expanded_bsteps = []
+            for bstep in bsteps:
+                padded_bstep = torch.ones(
+                    *bstep.shape[:dim],
+                    max_dim - bstep.shape[dim],
+                    *bstep.shape[dim + 1 :],  # noqa
+                    dtype=bstep.dtype,
+                    device=bstep.device,
                 )
-                for bstep in bsteps
-            ]
-    if len(bsteps[0].shape) > 1:
-        return [t.squeeze() for t in torch.stack(bsteps, dim=2).split(1, dim=0)]
+                padded_bstep = torch.cat([bstep, padded_bstep * float("nan")], dim=dim)
+                expanded_bsteps.append(padded_bstep)
     else:
-        return [t.squeeze() for t in torch.stack(bsteps, dim=1).split(1, dim=0)]
+        expanded_bsteps = bsteps
+    dim = 2 if len(bsteps[0].shape) > 1 else 1
+    sequences = torch.stack(expanded_bsteps, dim=dim)
+    sequences = sequences.split(1, dim=0)
+    squeezed_sequences = [seq.squeeze(0) for seq in sequences]
+    return squeezed_sequences
+
+
+def check_device(device_name: str) -> bool:
+    if device_name == "cpu":
+        return True
+    if device_name not in TORCH_BACKEND_DEVICE_MAP:
+        raise ValueError(f"Unknown device {device_name}")
+    available_fn, built_fn = TORCH_BACKEND_DEVICE_MAP[device_name]
+    if not available_fn():
+        raise ValueError(f"Cannot use {device_name} device, {device_name} is not available.")
+    if not built_fn():
+        raise ValueError(f"Current Pytorch distribution does not support {device_name} execution")
+    return True
+
+
+def get_default_device() -> str:
+    if is_cuda_available() and is_cuda_built():
+        return "cuda"
+    elif is_mps_available() and is_mps_built():
+        os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
+        return "cpu"
+    else:
+        return "cpu"

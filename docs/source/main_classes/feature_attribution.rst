@@ -17,6 +17,8 @@ Feature Attribution
 .. autoclass:: inseq.attr.FeatureAttribution
     :members:
 
+Gradient Attribution Methods
+-----------------------------------------------------------------------------------------------------------------------
 
 .. autoclass:: inseq.attr.feat.GradientAttribution
     :members:
@@ -27,7 +29,7 @@ Feature Attribution
 
 
 .. warning::
-    The DiscretizedIntegratedGradientsAttribution class is currently not functioning and needs fixing.
+    The DiscretizedIntegratedGradientsAttribution class is currently exhibiting inconsistent behavior, so usage should be limited until further notice. See PR `# 114 <https://github.com/inseq-team/inseq/pull/114>`__ for additional info.
 
 .. autoclass:: inseq.attr.feat.DiscretizedIntegratedGradientsAttribution
     :members:

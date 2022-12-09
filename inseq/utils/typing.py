@@ -1,9 +1,10 @@
-from typing import Sequence, Tuple, Union
+from typing import Optional, Sequence, Tuple, Union
 
 from dataclasses import dataclass
 
 from torch import long
 from torchtyping import TensorType
+from transformers import PreTrainedModel
 
 
 TextInput = Union[str, Sequence[str]]
@@ -26,6 +27,12 @@ class TokenWithId:
             return self.token == other.token and self.id == other.id
         else:
             return False
+
+
+@dataclass
+class TextSequences:
+    targets: TextInput
+    sources: Optional[TextInput] = None
 
 
 OneOrMoreIdSequences = Sequence[Sequence[int]]
@@ -77,7 +84,8 @@ SequenceAttributionTensor = Union[GranularSequenceAttributionTensor, TokenSequen
 # For Huggingface it's a string identifier e.g. "t5-base", "Helsinki-NLP/opus-mt-en-it"
 # For Fairseq it's a tuple of strings containing repo and model name
 # e.g. ("pytorch/fairseq", "transformer.wmt14.en-fr")
-ModelIdentifier = Union[str, Tuple[str, str]]
+ModelIdentifier = str  # Union[str, Tuple[str, str]]
+ModelClass = PreTrainedModel
 
 AttributionForwardInputs = Union[IdsTensor, EmbeddingsTensor]
 AttributionForwardInputsPair = Union[

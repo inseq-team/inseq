@@ -70,7 +70,9 @@ install-ci:
 
 .PHONY: update-deps
 update-deps:
-	poetry lock && poetry export --without-hashes > requirements.txt
+	poetry lock
+	poetry export --without-hashes > requirements.txt
+	poetry export --without-hashes -E sklearn -E datasets -E notebook --with lint,docs > requirements-dev.txt
 
 #* Linting
 .PHONY: check-style
@@ -90,7 +92,7 @@ fix-style:
 .PHONY: check-safety
 check-safety:
 	poetry check
-	poetry run safety check --full-report -i 51457 -i 51358
+	poetry run safety check --full-report -i 51499 -i 51457
 	poetry run bandit -ll --recursive inseq tests
 
 .PHONY: lint

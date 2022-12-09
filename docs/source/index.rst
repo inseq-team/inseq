@@ -15,9 +15,11 @@
 Welcome to Inseq! |:bug:|
 ##############################
 
-Here is an example of using Inseq to attribute an English-to-Italian translation of the model ``Helsinki-NLP/opus-mt-en-it`` from the
-|:hugging_face:| `Transformers <https://github.com/huggingface/transformers/>`__ using the ``IntegratedGradients`` method from the
-`Captum library <https://captum.ai>`__.
+Inseq is a Pytorch-based hackable toolkit to democratize the study of **in**\terpretability for **seq**\uence generation models. At the moment, Inseq supports a wide set of models from the |:hugging_face:| `Transformers <https://github.com/huggingface/transformers/>`__ library and an ever-growing set of feature attribution methods, leveraging in part the widely-used `Captum library <https://captum.ai>`__. For a quick introduction to common use cases, see the :doc:`examples/quickstart` page.
+
+Using Inseq, feature attribution maps that can be saved, reloaded, aggregated and visualized either as HTMLs (with Jupyter notebook support) or directly in the console using `rich <https://rich.readthedocs.io/en/latest/>`__. Besides simple attribution, Inseq also supports features like step score extraction, attribution aggregation and attributed functions customization for more advanced use cases. Refer to the guides in the |:bug:| Using Inseq section for more details and examples on specific features.
+
+To give a taste of what Inseq can do in a couple lines of code, here's a snippet doing source-side attribution of an English-to-Italian translation produced by the model ``Helsinki-NLP/opus-mt-en-it`` from |:hugging_face:| Transformers  using the ``IntegratedGradients`` method with 300 integral approximation steps, and returning the attribution convergence delta and token-level prediction probabilties.
 
 
 .. code-block:: python
@@ -30,8 +32,6 @@ Here is an example of using Inseq to attribute an English-to-Italian translation
         n_steps=300,
         return_convergence_delta=True,
         step_scores=["probability"],
-        internal_batch_size=100,
-        include_eos_baseline=False,
     )
     out.show()
 
@@ -41,13 +41,16 @@ Here is an example of using Inseq to attribute an English-to-Italian translation
         <iframe frameborder="0" scale="0.75" src="/_static/winomt_example.htm"></iframe>
     </div>
 
+Inseq is still in early development and is currently maintained by a small team of graduate students based  working on interpretability for NLP/NLG led by `Gabriele Sarti <https://gsarti.com>`__. We are working hard to add more features and models. If you have any suggestions or feedback, please open an issue on our `GitHub repository <https://github.com/inseq-team/inseq/issues>`__. Happy hacking! |:bug:|
 
 .. toctree::
     :maxdepth: 2
-    :caption: Using 🐛 Inseq
+    :caption: Using Inseq 🐛
 
+    examples/quickstart
     examples/pair_comparison
     examples/custom_attribute_target
+    examples/faq
 
 .. toctree::
     :maxdepth: 3

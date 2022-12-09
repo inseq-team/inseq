@@ -10,9 +10,9 @@
     an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
     specific language governing permissions and limitations under the License.
 
-##########################################
-Using Custom Attribution Targets
-##########################################
+#######################################################################################################################
+Using Custom Attribution Targets for Contrastive Feature Attribution
+#######################################################################################################################
 
 In this tutorial we will see how to customize the target function used by Inseq to compute attributions, to enable some interesting use
 cases of feature attribution methods.
@@ -113,7 +113,7 @@ Now that we have our custom attribution function, integrating it in Inseq is ver
     attribution_model = inseq.load_model("Helsinki-NLP/opus-mt-en-it", "saliency")
 
     # Pre-compute ids and attention map for the contrastive target
-    contrast = attribution_model.encode("Ho salutato la manager", as_targets=True, prepend_bos_token=True)
+    contrast = attribution_model.encode("Ho salutato la manager", as_targets=True)
 
     # Perform the contrastive attribution:
     # Regular (forced) target -> "Non posso crederci."
