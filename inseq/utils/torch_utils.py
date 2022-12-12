@@ -224,6 +224,6 @@ def get_default_device() -> str:
     if is_cuda_available() and is_cuda_built():
         return "cuda"
     elif is_mps_available() and is_mps_built():
-        return "mps"
+        return "cpu"
     else:
         return "cpu"
