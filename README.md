@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="/docs/source/images/inseq_logo.png" width="300"/>
+  <img src="https://raw.githubusercontent.com/inseq-team/inseq/main/docs/source/images/inseq_logo.png" width="300"/>
   <h4>Intepretability for Sequence Generation Models 🔍</h4>
 </div>
 <br/>
