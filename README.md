@@ -9,7 +9,7 @@
 [![Docs status](https://img.shields.io/readthedocs/inseq)](https://inseq.readthedocs.io)
 [![Version](https://img.shields.io/pypi/v/inseq?color=blue)](https://pypi.org/project/inseq/)
 [![Python Version](https://img.shields.io/pypi/pyversions/inseq.svg?color=blue)](https://pypi.org/project/inseq/)
-[![Downloads](https://img.shields.io/github/downloads/inseq-team/inseq/total?color=purple)](https://github.com/inseq-team/inseq/releases/latest)
+[![Downloads](https://img.shields.io/pypi/dm/inseq?color=purple)](https://github.com/inseq-team/inseq/releases/latest)
 [![License](https://img.shields.io/github/license/inseq-team/inseq)](https://github.com/inseq-team/inseq/blob/main/LICENSE)
 
 </div>
