@@ -27,13 +27,13 @@ copyright = "2021, The Inseq Team, Licensed under the Apache License, Version 2.
 author = "The Inseq Team"
 
 # The short X.Y version
-version = "0.2"
+version = "0.3"
 # The full version, including alpha/beta/rc tags
-release = "0.2.0"
+release = "0.3.1"
 
 
 # Prefix link to point to master, comment this during version release and uncomment below line
-extlinks = {"prefix_link": ("https://github.com/inseq-team/inseq/blob/master/%s", "")}
+extlinks = {"prefix_link": ("https://github.com/inseq-team/inseq/blob/master/%s", "version %s")}
 
 # -- General configuration ---------------------------------------------------
 
@@ -67,7 +67,10 @@ templates_path = ["_templates"]
 
 # The suffix(es) of source filenames.
 # You can specify multiple suffix as a list of string:
-#
+source_parsers = {
+    ".md": "recommonmark.parser.CommonMarkParser",
+}
+
 source_suffix = [".rst", ".md"]
 # source_suffix = '.rst'
 
@@ -79,7 +82,7 @@ master_doc = "index"
 #
 # This is also used if you do content translation via gettext catalogs.
 # Usually you set "language" from the command line for these cases.
-language = None
+language = "en"
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
@@ -105,7 +108,7 @@ copybutton_prompt_is_regexp = True
 intersphinx_mapping = {
     "python": ("https://docs.python.org/3", None),
     "torch": ("https://pytorch.org/docs/stable/", None),
-    "numpy": ("https://docs.scipy.org/doc/numpy/", None),
+    "numpy": ("https://numpy.org/doc/stable/", None),
 }
 
 # -- Options for HTML output -------------------------------------------------
@@ -127,7 +130,7 @@ html_theme_options = {
 }
 
 ogp_image = ""
-ogp_description = "InSeq: Interpretability for Sequence-to-sequence Models"
+ogp_description = "InSeq: Interpretability for Sequence Generation Models"
 ogp_description_length = 55
 
 ogp_custom_meta_tags = [
@@ -266,7 +269,7 @@ texinfo_documents = [
         "inseq Documentation",
         author,
         "inseq",
-        "Interpretability for Sequence-to-sequence Models.",
+        "Interpretability for Sequence Generation Models.",
         "Miscellaneous",
     ),
 ]

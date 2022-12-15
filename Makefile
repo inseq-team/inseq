@@ -44,15 +44,16 @@ poetry-remove:
 .PHONY: add-torch-gpu
 add-torch-gpu:
 	poetry run poe upgrade-pip
+	poetry run pip uninstall torch -y
 	poetry run poe torch-cuda11
 
 .PHONY: install
 install:
-	poetry install --no-dev
+	poetry install
 
 .PHONY: install-dev
 install-dev:
-	poetry install --extras all
+	poetry install --all-extras --with lint,docs --sync
 #	-poetry run mypy --install-types --non-interactive ./
 	poetry run pre-commit install
 	poetry run pre-commit autoupdate
@@ -63,9 +64,15 @@ install-gpu: install add-torch-gpu
 .PHONY: install-dev-gpu
 install-dev-gpu: install-dev add-torch-gpu
 
+.PHONY: install-ci
+install-ci:
+	poetry install --with lint
+
 .PHONY: update-deps
 update-deps:
-	poetry lock && poetry export --without-hashes > requirements.txt
+	poetry lock
+	poetry export --without-hashes > requirements.txt
+	poetry export --without-hashes -E sklearn -E datasets -E notebook --with lint,docs > requirements-dev.txt
 
 #* Linting
 .PHONY: check-style
@@ -85,7 +92,7 @@ fix-style:
 .PHONY: check-safety
 check-safety:
 	poetry check
-	poetry run safety check --full-report
+	poetry run safety check --full-report -i 51499 -i 51457
 	poetry run bandit -ll --recursive inseq tests
 
 .PHONY: lint

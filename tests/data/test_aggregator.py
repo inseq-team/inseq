@@ -30,6 +30,7 @@ def test_sequence_attribution_aggregator(saliency_mt_model):
         attribute_target=True,
         output_step_attributions=True,
         device="cpu",
+        show_progress=False,
     )
     seqattr = out.sequence_attributions[0]
     assert seqattr.source_attributions.shape == (6, 7, 512)
@@ -46,7 +47,7 @@ def test_sequence_attribution_aggregator(saliency_mt_model):
 
 def test_continuous_span_aggregator(saliency_mt_model):
     out = saliency_mt_model.attribute(
-        "This is a test.", attribute_target=True, step_scores=["probability"], device="cpu"
+        "This is a test.", attribute_target=True, step_scores=["probability"], device="cpu", show_progress=False
     )
     seqattr = out.sequence_attributions[0]
     out_agg = seqattr.aggregate(ContiguousSpanAggregator, source_spans=(3, 5), target_spans=[(0, 3), (4, 6)])
@@ -57,7 +58,7 @@ def test_continuous_span_aggregator(saliency_mt_model):
 
 def test_aggregator_pipeline(saliency_mt_model):
     out = saliency_mt_model.attribute(
-        "This is a test.", attribute_target=True, step_scores=["probability"], device="cpu"
+        "This is a test.", attribute_target=True, step_scores=["probability"], device="cpu", show_progress=False
     )
     seqattr = out.sequence_attributions[0]
     squeezesum = AggregatorPipeline([ContiguousSpanAggregator, SequenceAttributionAggregator])
@@ -75,7 +76,7 @@ def test_aggregator_pipeline(saliency_mt_model):
 
 
 def test_subword_aggregator(saliency_mt_model):
-    out = saliency_mt_model.attribute(EXAMPLES["source"])
+    out = saliency_mt_model.attribute(EXAMPLES["source"], show_progress=False)
     seqattr = out.sequence_attributions[0]
     for idx, token in enumerate(seqattr.source):
         assert token.token == EXAMPLES["source_subwords"][idx]
@@ -102,7 +103,7 @@ def test_subword_aggregator(saliency_mt_model):
 
 
 def test_pair_aggregator(saliency_mt_model):
-    out = saliency_mt_model.attribute([EXAMPLES["source"], EXAMPLES["alternative_source"]])
+    out = saliency_mt_model.attribute([EXAMPLES["source"], EXAMPLES["alternative_source"]], show_progress=False)
     orig_seqattr = out.sequence_attributions[0].aggregate(aggregator=SequenceAttributionAggregator)
     alt_seqattr = out.sequence_attributions[1].aggregate(aggregator=SequenceAttributionAggregator)
     diff_seqattr = orig_seqattr.aggregate(PairAggregator, paired_attr=alt_seqattr)

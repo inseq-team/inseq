@@ -14,53 +14,34 @@ Feature Attribution
 =======================================================================================================================
 
 
-FeatureAttribution
------------------------------------------------------------------------------------------------------------------------
-
 .. autoclass:: inseq.attr.FeatureAttribution
     :members:
 
-
-Gradient Attribution
+Gradient Attribution Methods
 -----------------------------------------------------------------------------------------------------------------------
 
 .. autoclass:: inseq.attr.feat.GradientAttribution
     :members:
 
 
-DeepLiftAttribution
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 .. autoclass:: inseq.attr.feat.DeepLiftAttribution
     :members:
 
 
-DiscretizedIntegratedGradientsAttribution
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 .. warning::
-    The DiscretizedIntegratedGradientsAttribution class is currently not functioning and needs fixing.
+    The DiscretizedIntegratedGradientsAttribution class is currently exhibiting inconsistent behavior, so usage should be limited until further notice. See PR `# 114 <https://github.com/inseq-team/inseq/pull/114>`__ for additional info.
 
 .. autoclass:: inseq.attr.feat.DiscretizedIntegratedGradientsAttribution
     :members:
 
 
-IntegratedGradientsAttribution
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 .. autoclass:: inseq.attr.feat.IntegratedGradientsAttribution
     :members:
 
 
-InputXGradientAttribution
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 .. autoclass:: inseq.attr.feat.InputXGradientAttribution
     :members:
 
-
-SaliencyAttribution
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: inseq.attr.feat.SaliencyAttribution
     :members:

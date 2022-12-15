@@ -1,19 +1,38 @@
 <div align="center">
-  <img src="/docs/source/images/inseq_logo.png" width="300"/>
-  <h4>Intepretability for Sequence-to-sequence Models 🔍</h4>
+  <img src="https://raw.githubusercontent.com/inseq-team/inseq/main/docs/source/images/inseq_logo.png" width="300"/>
+  <h4>Intepretability for Sequence Generation Models 🔍</h4>
 </div>
 <br/>
 <div align="center">
-
-[![Build status](https://github.com/inseq-team/inseq/workflows/build/badge.svg?branch=master&event=push)](https://github.com/inseq-team/inseq/actions?query=workflow%3Abuild)
-[![Python Version](https://img.shields.io/pypi/pyversions/inseq.svg)](https://pypi.org/project/inseq/)
-[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+  
+[![Build status](https://img.shields.io/github/workflow/status/inseq-team/inseq/build)](https://github.com/inseq-team/inseq/actions?query=workflow%3Abuild)
+[![Docs status](https://img.shields.io/readthedocs/inseq)](https://inseq.readthedocs.io)
+[![Version](https://img.shields.io/pypi/v/inseq?color=blue)](https://pypi.org/project/inseq/)
+[![Python Version](https://img.shields.io/pypi/pyversions/inseq.svg?color=blue)](https://pypi.org/project/inseq/)
+[![Downloads](https://img.shields.io/pypi/dm/inseq?color=purple)](https://github.com/inseq-team/inseq/releases/latest)
 [![License](https://img.shields.io/github/license/inseq-team/inseq)](https://github.com/inseq-team/inseq/blob/main/LICENSE)
 
 </div>
+<div align="center">
+  
+  [![Follow Inseq on Twitter](https://img.shields.io/twitter/follow/inseqdev?label=Inseqdev&style=social)](https://twitter.com/InseqDev)
+  [![Follow Inseq on Mastodon](https://img.shields.io/mastodon/follow/109308976376923913?domain=https%3A%2F%2Fsigmoid.social&label=Inseq&style=social)](https://sigmoid.social/@inseq)
+</div>
+
+Inseq is a Pytorch-based hackable toolkit to democratize the access to common post-hoc **in**terpretability analyses of **seq**uence generation models.
 
 ## Installation
 
+Inseq is available on PyPI and can be installed with `pip`:
+
+```bash
+pip install inseq
+```
+
+Install extras for visualization in Jupyter Notebooks and 🤗 datasets attribution as `pip install inseq[notebook,datasets]`.
+
+<details>
+  <summary>Dev Installation</summary>
 To install the package, clone the repository and run the following commands:
 
 ```bash
@@ -27,6 +46,7 @@ If you have a GPU available, use `make install-gpu` to install the latest `torch
 For library developers, you can use the `make install-dev` command to install and its GPU-friendly counterpart `make install-dev-gpu` to install all development dependencies (quality, docs, extras).
 
 After installation, you should be able to run `make fast-test` and `make lint` without errors.
+</details>
 
 <details>
   <summary>FAQ Installation</summary>
@@ -46,18 +66,58 @@ import inseq
 model = inseq.load_model("Helsinki-NLP/opus-mt-en-fr", "integrated_gradients")
 out = model.attribute(
   "The developer argued with the designer because her idea cannot be implemented.",
-  return_convergence_delta=True,
   n_steps=100
 )
 out.show()
 ```
 
-![WinoMT Attribution Map](docs/source/images/heatmap_winomt.png)
+This produces a visualization of the attribution scores for each token in the input sentence (token-level aggregation is handled automatically). Here is what the visualization looks like inside a Jupyter Notebook:
 
+![WinoMT Attribution Map](https://raw.githubusercontent.com/inseq-team/inseq/main/docs/source/images/heatmap_winomt.png)
+
+Inseq also supports decoder-only models such as [GPT-2](https://huggingface.co/transformers/model_doc/gpt2.html), enabling usage of a variety of attribution methods and customizable settings directly from the console:
+
+```python
+import inseq
+
+model = inseq.load_model("gpt2", "integrated_gradients")
+model.attribute(
+    "Hello ladies and",
+    generation_args={"max_new_tokens": 9},
+    n_steps=500,
+    internal_batch_size=50
+).show()
+```
+
+![GPT-2 Attribution in the console](https://raw.githubusercontent.com/inseq-team/inseq/main/docs/source/images/inseq_python_console.gif)
+
+## Features
+
+- Feature attribution of sequence generation for most `ForConditionalGeneration` (encoder-decoder) and `ForCausalLM` (decoder-only) models from 🤗 Transformers
+
+- Support for single and batched attribution using multiple gradient-based feature attribution methods from [Captum](https://captum.ai/docs/introduction)
+
+- Post-hoc aggregation of feature attribution maps via `Aggregator` classes.
+
+- Attribution visualization in notebooks, browser and command line.
+
+- Command line interface for attributing single examples or entire 🤗 datasets.
+
+- Custom attribution of target functions, supporting advanced usage for cases such as contrastive and uncertainty-weighted feature attributions.
+
+- Extract and visualize custom scores (e.g. probability, entropy) for every generation step alongsides attribution maps.
+
+## What will be supported?
+
+- Attention-based and occlusion-based feature attribution methods (documented in [#107](https://github.com/inseq-team/inseq/issues/107) and [#108](https://github.com/inseq-team/inseq/issues/108)).
+
+- Interoperability with other interpretability libraries like [ferret](https://ferret.readthedocs.io/en/latest/).
+
+- Rich and interactive visualizations in a tabbed interface, possibly using [Gradio Blocks](https://gradio.app/docs/#blocks).
 
 ## Using the Inseq client
 
-See the available options by typing `inseq -h` in the terminal after installing the package.
+The Inseq library also provides useful client commands to enable repeated attribution of individual examples and even entire 🤗 datasets directly from the console. See the available options by typing `inseq -h` in the terminal after installing the package.
 
 For now, two commands are supported:
 
@@ -67,64 +127,17 @@ For now, two commands are supported:
 
 Both commands support the full range of parameters available for `attribute`, attribution visualization in the console and saving outputs to disk.
 
-**Example:** The following command can be used to perform attribution (both source and target-side) of Italian translations for a dummy sample of 20 English sentences taken from the FLORES-101 parallel corpus, using a MarianNMT translation model from Hugging Face `transformers`. The output is shown in the console and saved to disk to `out.json` (you can load it later using `inseq.FeatureAttributionOutput.load("out.json")`).
+**Example:** The following command can be used to perform attribution (both source and target-side) of Italian translations for a dummy sample of 20 English sentences taken from the FLORES-101 parallel corpus, using a MarianNMT translation model from Hugging Face `transformers`. We save the visualizations in HTML format in the file `attributions.html`. See the `--help` flag for more options.
 
 ```bash
 inseq attribute-dataset \
   --model_name_or_path Helsinki-NLP/opus-mt-en-it \
-  --attribution_method integrated_gradients \
+  --attribution_method saliency \
   --do_prefix_attribution \
   --dataset_name inseq/dummy_enit \
   --input_text_field en \
   --dataset_split "train[:20]" \
-  --save_path out.json \
-  --batch_size 8
+  --viz_path attributions.html \
+  --batch_size 8 \
+  --hide
 ```
-
-### Dealing with minimal pairs
-
-Inseq support minimal pair analysis via the `PairAggregator` component. Here is an example of using `PairAggregator` to produce a heatmap containing the score difference between two `FeatureAttributionSequenceOutput` objects:
-
-
-```python
-import inseq
-from inseq.data.aggregator import AggregatorPipeline, ContiguousSpanAggregator, SequenceAttributionAggregator, PairAggregator
-
-# Load the EN-FR translation model and attach the IG method
-model = inseq.load_model("Helsinki-NLP/opus-mt-en-fr", "integrated_gradients")
-
-# Perform the attribution with forced decoding. Return convergence deltas, probabilities and target attributions.
-out = model.attribute(
-    [
-        "The manager told the hairdresser that the haircut he made her was terrible.",
-        "The manager told the hairdresser that the haircut he made her was terrible.",
-    ],
-    [
-        "Le gérant a dit au coiffeur que la coupe de cheveux qu'il lui a faite était terrible.",
-        "La gérante a dit au coiffeur que la coupe de cheveux qu'il lui a faite était terrible.",
-    ],
-    n_steps=300,
-    return_convergence_delta=True,
-    attribute_target=True,
-    step_scores=["probability"],
-    internal_batch_size=100,
-    include_eos_baseline=False,
-)
-
-# Aggregation pipeline composed by two steps:
-# 1. Aggregate contiguous tokens across all attribution dimensions
-# 2. Aggregate the last dimension of the neuron-level attribution to make it token-level
-squeezesum = AggregatorPipeline([ContiguousSpanAggregator, SequenceAttributionAggregator])
-
-# Simply aggregate over the last dimension for the masculine variant
-masculine = out.sequence_attributions[0].aggregate(aggregator=SequenceAttributionAggregator)
-
-# For the feminine variant, we also use the contiguous span aggregator to merge "▁gérant" "e"
-# in a single token to match masc shape
-feminine = out.sequence_attributions[1].aggregate(aggregator=squeezesum, target_spans=(1, 3))
-
-# Take the diff of the scores of the two attribution and show it
-masculine.show(aggregator=PairAggregator, paired_attr=feminine)
-```
-
-![Minimal Pair Diff Attribution Map](docs/source/images/heatmap_pair.png)

@@ -13,80 +13,50 @@
 Data Classes
 =======================================================================================================================
 
-TensorWrapper
------------------------------------------------------------------------------------------------------------------------
-
 .. autoclass:: inseq.data.data_utils.TensorWrapper
     :members:
 
+
 Batching
 -----------------------------------------------------------------------------------------------------------------------
-
-BatchEncoding
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: inseq.data.batch.BatchEncoding
     :members:
 
 
-BatchEmbedding
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 .. autoclass:: inseq.data.batch.BatchEmbedding
     :members:
 
-
-Batch
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: inseq.data.batch.Batch
     :members:
 
 
-EncoderDecoderBatch
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 .. autoclass:: inseq.data.batch.EncoderDecoderBatch
+    :members:
+
+
+.. autoclass:: inseq.data.batch.DecoderOnlyBatch
     :members:
 
 
 Attributions
 -----------------------------------------------------------------------------------------------------------------------
 
-FeatureAttributionSequenceOutput
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 .. autoclass:: inseq.data.attribution.FeatureAttributionSequenceOutput
     :members:
 
-
-FeatureAttributionStepOutput
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: inseq.data.attribution.FeatureAttributionStepOutput
     :members:
 
 
-FeatureAttributionOutput
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 .. autoclass:: inseq.data.attribution.FeatureAttributionOutput
     :members:
-
-Gradient-based Attribution
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-
-GradientFeatureAttributionSequenceOutput
-'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
 
 
 .. autoclass:: inseq.data.attribution.GradientFeatureAttributionSequenceOutput
     :members:
-
-
-GradientFeatureAttributionStepOutput
-'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
 
 
 .. autoclass:: inseq.data.attribution.GradientFeatureAttributionStepOutput
@@ -97,57 +67,33 @@ Aggregators
 -----------------------------------------------------------------------------------------------------------------------
 
 
-DispatchableDict
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 .. autoclass:: inseq.data.aggregator.DispatchableDict
     :members:
 
-
-Aggregator
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: inseq.data.aggregator.Aggregator
     :members:
 
 
-AggregatorPipeline
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 .. autoclass:: inseq.data.aggregator.AggregatorPipeline
     :members:
 
-
-AggregableMixin
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: inseq.data.aggregator.AggregableMixin
     :members:
 
 
-SequenceAttributionAggregator
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 .. autoclass:: inseq.data.aggregator.SequenceAttributionAggregator
     :members:
 
-
-ContiguousSpanAggregator
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: inseq.data.aggregator.ContiguousSpanAggregator
     :members:
 
 
-SubwordAggregator
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 .. autoclass:: inseq.data.aggregator.SubwordAggregator
     :members:
 
-
-PairAggregator
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: inseq.data.aggregator.PairAggregator
     :members:

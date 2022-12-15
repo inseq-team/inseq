@@ -29,13 +29,14 @@ from rich.color import Color
 from rich.live import Live
 from rich.padding import Padding
 from rich.panel import Panel
-from rich.progress import BarColumn, Progress, TextColumn
+from rich.progress import BarColumn, Progress, TextColumn, TimeRemainingColumn
 from rich.style import Style
 from rich.table import Column, Table
 from rich.text import Text
 from tqdm.std import tqdm
 
 from ..utils import isnotebook
+from ..utils.typing import TextSequences
 from ..utils.viz_utils import (
     final_plot_html,
     get_colors,
@@ -55,41 +56,63 @@ def show_attributions(
     display: bool = True,
     return_html: Optional[bool] = False,
 ) -> Optional[str]:
-    if return_html and not isnotebook():
-        raise AttributeError("return_html=True is can be used only inside an IPython environment.")
+    """Core function allowing for visualization of feature attribution maps in console/HTML format.
+
+    Args:
+        attributions (:class:`~inseq.data.attribution.FeatureAttributionSequenceOutput`):
+            Sequence attributions to be visualized.
+        min_val (:obj:`Optional[int]`, *optional*, defaults to None):
+            Lower attribution score threshold for color map.
+        max_val (`Optional[int]`, *optional*, defaults to None):
+            Upper attribution score threshold for color map.
+        display (`bool`, *optional*, defaults to True):
+            Whether to show the output of the visualization function.
+        return_html (`Optional[bool]`, *optional*, defaults to False):
+            If true, returns the HTML corresponding to the notebook visualization of the attributions in string format,
+            for saving purposes.
+
+    Returns:
+        `Optional[str]`: Returns the HTML output if `return_html=True`
+    """
     if isinstance(attributions, FeatureAttributionSequenceOutput):
         attributions = [attributions]
     html_out = ""
-    if isnotebook():
-        colors = get_attribution_colors(attributions, min_val, max_val, cmap=red_transparent_blue_colormap())
-    else:
+    html_colors = get_attribution_colors(attributions, min_val, max_val, cmap=red_transparent_blue_colormap())
+    if not isnotebook():
         colors = get_attribution_colors(attributions, min_val, max_val, return_alpha=False, return_strings=False)
     idx = 0
     for ex_id, attribution in enumerate(attributions):
-        if isnotebook():
+        instance_html = get_instance_html(ex_id)
+        curr_html = ""
+        curr_html_color = html_colors[idx]
+        if attribution.source_attributions is not None:
+            curr_html += instance_html
+            curr_html += get_heatmap_type(attribution, curr_html_color, "Source", use_html=True)
+            if attribution.target_attributions is not None:
+                curr_html_color = html_colors[idx + 1]
+        if attribution.target_attributions is not None:
+            curr_html += instance_html
+            curr_html += get_heatmap_type(attribution, curr_html_color, "Target", use_html=True)
+        if display and isnotebook():
             from IPython.core.display import HTML, display
 
-            instance_html = get_instance_html(ex_id)
-            curr_html = ""
-            curr_html += instance_html
-            curr_html += get_heatmap_type(attribution, colors[idx], "Source", isnotebook())
-            idx += 1
-            if attribution.target_attributions is not None:
-                curr_html += instance_html
-                curr_html += get_heatmap_type(attribution, colors[idx], "Target", isnotebook())
-                idx += 1
-            if display:
-                display(HTML(curr_html))
-            html_out += curr_html
-        else:
-            if not display:
-                raise AttributeError("display=False is not supported outside of an IPython environment.")
-            rprint(get_heatmap_type(attribution, colors[idx], "Source", isnotebook()))
-            idx += 1
-            if attribution.target_attributions is not None:
+            display(HTML(curr_html))
+        html_out += curr_html
+        if not isnotebook():
+            curr_color = colors[idx]
+            if attribution.source_attributions is not None:
+                if display:
+                    print("\n\n")
+                    rprint(get_heatmap_type(attribution, curr_color, "Source", use_html=False))
+                if attribution.target_attributions is not None:
+                    curr_color = colors[idx + 1]
+            if attribution.target_attributions is not None and display:
                 print("\n\n")
-                rprint(get_heatmap_type(attribution, colors[idx], "Target", isnotebook()))
-                idx += 1
+                rprint(get_heatmap_type(attribution, curr_color, "Target", use_html=False))
+        if any(x is None for x in [attribution.source_attributions, attribution.target_attributions]):
+            idx += 1
+        else:
+            idx += 2
     if return_html:
         return html_out
 
@@ -111,9 +134,12 @@ def get_attribution_colors(
         min_val = -max_val
     colors = []
     for attribution in attributions:
-        colors.append(
-            get_colors(attribution.source_attributions.numpy(), min_val, max_val, cmap, return_alpha, return_strings)
-        )
+        if attribution.source_attributions is not None:
+            colors.append(
+                get_colors(
+                    attribution.source_attributions.numpy(), min_val, max_val, cmap, return_alpha, return_strings
+                )
+            )
         if attribution.target_attributions is not None:
             colors.append(
                 get_colors(
@@ -136,16 +162,18 @@ def get_heatmap_type(
     if heatmap_type == "Source":
         return heatmap_func(
             attribution.source_attributions.numpy(),
-            [t.token for t in attribution.target],
+            [t.token for t in attribution.target[attribution.attr_pos_start : attribution.attr_pos_end]],  # noqa
             [t.token for t in attribution.source],
             colors,
             step_scores,
             label="Source",
         )
     elif heatmap_type == "Target":
+        mask = np.ones_like(attribution.target_attributions.numpy()) * float("nan")
+        mask = np.tril(mask, k=-attribution.attr_pos_start)
         return heatmap_func(
-            attribution.target_attributions.numpy(),
-            [t.token for t in attribution.target],
+            attribution.target_attributions.numpy() + mask,
+            [t.token for t in attribution.target[attribution.attr_pos_start : attribution.attr_pos_end]],  # noqa
             [t.token for t in attribution.target],
             colors,
             step_scores,
@@ -246,42 +274,55 @@ def get_saliency_heatmap_rich(
 
 
 def get_progress_bar(
-    all_sentences: Tuple[List[str], List[str], List[int]],
+    sequences: TextSequences,
+    target_lengths: List[int],
     method_name: str,
     show: bool,
     pretty: bool,
+    attr_pos_start: int,
+    attr_pos_end: int,
 ) -> Union[tqdm, Tuple[Progress, Live], None]:
-    sources, targets, lengths = all_sentences
     if not show:
         return None
     elif show and not pretty:
         return tqdm(
-            total=max(tgt_len for tgt_len in lengths),
+            total=attr_pos_end,
             desc=f"Attributing with {method_name}...",
+            initial=attr_pos_start,
         )
     elif show and pretty:
         job_progress = Progress(
-            "{task.description}",
-            BarColumn(),
+            TextColumn("{task.description}", table_column=Column(ratio=3, no_wrap=False)),
+            BarColumn(table_column=Column(ratio=1)),
             TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+            TimeRemainingColumn(),
         )
-        for idx, (tgt, tgt_len) in enumerate(zip(targets, lengths)):
-            job_progress.add_task(f"{idx}. {tgt}", total=tgt_len)
+        for idx, (tgt, tgt_len) in enumerate(zip(sequences.targets, target_lengths)):
+            clean_tgt = tgt.replace("\n", "\\n")
+            job_progress.add_task(f"{idx}. {clean_tgt}", total=tgt_len)
         progress_table = Table.grid()
-        progress_table.add_row(
-            Panel.fit(
-                "\n".join([f"{idx}. {src}" for idx, src in enumerate(sources)]),
-                title="Source sentences",
-                border_style="red",
-                padding=(1, 2),
-            ),
+        row_contents = [
             Panel.fit(
                 job_progress,
                 title=f"[b]Attributing with {method_name}",
                 border_style="green",
                 padding=(1, 2),
-            ),
-        )
+            )
+        ]
+        if sequences.sources is not None:
+            sources = []
+            for idx, src in enumerate(sequences.sources):
+                clean_src = src.replace("\n", "\\n")
+                sources.append(f"{idx}. {clean_src}")
+            row_contents = [
+                Panel.fit(
+                    "\n".join(sources),
+                    title="Source sentences",
+                    border_style="red",
+                    padding=(1, 2),
+                )
+            ] + row_contents
+        progress_table.add_row(*row_contents)
         live = Live(Padding(progress_table, (1, 0, 1, 0)), refresh_per_second=10)
         live.start(refresh=live._renderable is not None)
         return job_progress, live
@@ -289,7 +330,10 @@ def get_progress_bar(
 
 def update_progress_bar(
     pbar: Union[tqdm, Tuple[Progress, Live], None],
-    split_targets: Tuple[List[str], List[str], List[str], List[str]] = None,
+    skipped_prefixes: Optional[List[str]] = None,
+    attributed_sentences: Optional[List[str]] = None,
+    unattributed_suffixes: Optional[List[str]] = None,
+    skipped_suffixes: Optional[List[str]] = None,
     whitespace_indexes: List[List[int]] = None,
     show: bool = False,
     pretty: bool = False,
@@ -299,6 +343,7 @@ def update_progress_bar(
     elif show and not pretty:
         pbar.update(1)
     else:
+        split_targets = (skipped_prefixes, attributed_sentences, unattributed_suffixes, skipped_suffixes)
         for job in pbar[0].tasks:
             if not job.finished:
                 pbar[0].advance(job.id)
@@ -306,7 +351,7 @@ def update_progress_bar(
                 past_length = 0
                 for split, color in zip(split_targets, ["grey58", "green", "orange1", "grey58"]):
                     if split[job.id]:
-                        formatted_desc += f"[{color}]" + split[job.id] + "[/]"
+                        formatted_desc += f"[{color}]" + split[job.id].replace("\n", "\\n") + "[/]"
                         past_length += len(split[job.id])
                         if past_length in whitespace_indexes[job.id]:
                             formatted_desc += " "
