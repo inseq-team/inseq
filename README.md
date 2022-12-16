@@ -5,7 +5,7 @@
 <br/>
 <div align="center">
   
-[![Build status](https://img.shields.io/github/workflow/status/inseq-team/inseq/build)](https://github.com/inseq-team/inseq/actions?query=workflow%3Abuild)
+[![Build status](https://img.shields.io/github/actions/workflow/status/inseq-team/inseq/build.yml?branch=main)](https://github.com/inseq-team/inseq/actions?query=workflow%3Abuild)
 [![Docs status](https://img.shields.io/readthedocs/inseq)](https://inseq.readthedocs.io)
 [![Version](https://img.shields.io/pypi/v/inseq?color=blue)](https://pypi.org/project/inseq/)
 [![Python Version](https://img.shields.io/pypi/pyversions/inseq.svg?color=blue)](https://pypi.org/project/inseq/)
