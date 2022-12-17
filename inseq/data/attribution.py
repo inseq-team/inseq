@@ -474,3 +474,23 @@ class GradientFeatureAttributionStepOutput(FeatureAttributionStepOutput):
     """
 
     _sequence_cls: Type["FeatureAttributionSequenceOutput"] = GradientFeatureAttributionSequenceOutput
+
+
+# Perturbation attribution classes
+
+
+@dataclass(eq=False, repr=False)
+class PerturbationFeatureAttributionSequenceOutput(FeatureAttributionSequenceOutput):
+    """Raw output of a single sequence of perturbation feature attribution."""
+
+    def __post_init__(self):
+        super().__post_init__()
+        self._dict_aggregate_fn["source_attributions"]["sequence_aggregate"] = sum_normalize_attributions
+        self._dict_aggregate_fn["target_attributions"]["sequence_aggregate"] = sum_normalize_attributions
+
+
+@dataclass(eq=False, repr=False)
+class PerturbationFeatureAttributionStepOutput(FeatureAttributionStepOutput):
+    """Raw output of a single step of perturbation feature attribution."""
+
+    _sequence_cls: Type["FeatureAttributionSequenceOutput"] = PerturbationFeatureAttributionSequenceOutput

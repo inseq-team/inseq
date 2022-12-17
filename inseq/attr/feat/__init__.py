@@ -11,7 +11,7 @@ from .gradient_attribution import (
     LayerIntegratedGradientsAttribution,
     SaliencyAttribution,
 )
-from .occlusion import OcclusionAttribution
+from .perturbation_attribution import OcclusionAttribution
 
 
 __all__ = [

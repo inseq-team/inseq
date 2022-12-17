@@ -12,6 +12,7 @@ from .attribution import (
     FeatureAttributionSequenceOutput,
     FeatureAttributionStepOutput,
     GradientFeatureAttributionStepOutput,
+    PerturbationFeatureAttributionStepOutput,
 )
 from .batch import Batch, BatchEmbedding, BatchEncoding, DecoderOnlyBatch, EncoderDecoderBatch
 from .viz import show_attributions
@@ -32,6 +33,7 @@ __all__ = [
     "FeatureAttributionInput",
     "FeatureAttributionStepOutput",
     "GradientFeatureAttributionStepOutput",
+    "PerturbationFeatureAttributionStepOutput",
     "FeatureAttributionSequenceOutput",
     "FeatureAttributionOutput",
     "ModelIdentifier",
