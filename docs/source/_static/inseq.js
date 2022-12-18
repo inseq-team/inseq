@@ -1,3 +1,5 @@
+var curr_width = $(window).width();
+
 function addIcon() {
     const inseqLogo = "/_static/inseq_logo.png";
     const link = document.createElement("a");
@@ -81,10 +83,12 @@ function resizeHtmlExamples() {
 function onLoad() {
     addIcon();
     addCustomFooter();
-    resizeHtmlExamples();
 }
 
 window.addEventListener("load", onLoad);
 window.onresize = function() {
-    window.location.href = window.location.href;
+    var wwidth = $(window).width();
+    if(curr_width!==wwidth){
+        resizeHtmlExamples();
+    }
 }
