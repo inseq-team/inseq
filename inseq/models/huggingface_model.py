@@ -65,7 +65,6 @@ class HuggingfaceModel(AttributionModel):
         attribution_method: Optional[str] = None,
         tokenizer: Union[str, PreTrainedTokenizer, None] = None,
         device: Optional[str] = None,
-        model_max_length: Optional[int] = 512,
         **kwargs,
     ) -> None:
         """
@@ -81,8 +80,6 @@ class HuggingfaceModel(AttributionModel):
             attribution_method (str, optional): The attribution method to use.
                 Passing it here reduces overhead on attribute call, since it is already
                 initialized.
-            model_max_length (int, optional): The maximum length of the model. If not provided, will be inferred from
-                the model config.
             **kwargs: additional arguments for the model and the tokenizer.
         """
         super().__init__(**kwargs)
@@ -110,9 +107,7 @@ class HuggingfaceModel(AttributionModel):
         if isinstance(tokenizer, PreTrainedTokenizer):
             self.tokenizer = tokenizer
         else:
-            self.tokenizer = AutoTokenizer.from_pretrained(
-                tokenizer, *tokenizer_inputs, model_max_length=model_max_length, **tokenizer_kwargs
-            )
+            self.tokenizer = AutoTokenizer.from_pretrained(tokenizer, *tokenizer_inputs, **tokenizer_kwargs)
         if self.model.config.pad_token_id is not None:
             self.pad_token = self.tokenizer.convert_ids_to_tokens(self.model.config.pad_token_id)
             self.tokenizer.pad_token = self.pad_token
@@ -122,7 +117,6 @@ class HuggingfaceModel(AttributionModel):
         if self.tokenizer.unk_token_id is None:
             self.tokenizer.unk_token_id = self.tokenizer.pad_token_id
         self.embed_scale = 1.0
-        self.model_max_length = model_max_length
         self.encoder_int_embeds = None
         self.decoder_int_embeds = None
         self.is_encoder_decoder = self.model.config.is_encoder_decoder
@@ -167,7 +161,6 @@ class HuggingfaceModel(AttributionModel):
         self,
         inputs: Union[TextInput, BatchEncoding],
         return_generation_output: bool = False,
-        max_new_tokens: Optional[int] = None,
         **kwargs,
     ) -> Union[List[str], Tuple[List[str], ModelOutput]]:
         """Wrapper of model.generate to handle tokenization and decoding.
@@ -186,14 +179,11 @@ class HuggingfaceModel(AttributionModel):
             isinstance(inputs, list) and len(inputs) > 0 and all([isinstance(x, str) for x in inputs])
         ):
             inputs = self.encode(inputs)
-        if max_new_tokens is None:
-            max_new_tokens = self.model_max_length - inputs.input_ids.shape[-1]
         inputs = inputs.to(self.device)
         generation_out = self.model.generate(
             input_ids=inputs.input_ids,
             attention_mask=inputs.attention_mask,
             return_dict_in_generate=True,
-            max_new_tokens=max_new_tokens,
             **kwargs,
         )
         texts = self.tokenizer.batch_decode(
