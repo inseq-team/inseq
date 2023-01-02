@@ -1,7 +1,6 @@
 from typing import TYPE_CHECKING, Any, Callable, List, Optional, Sequence, Tuple, Union
 
 import logging
-import os
 
 import torch
 import torch.nn.functional as F
@@ -225,7 +224,8 @@ def get_default_device() -> str:
     if is_cuda_available() and is_cuda_built():
         return "cuda"
     elif is_mps_available() and is_mps_built():
-        os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
+        # temporarily fix mps-enabled devices on cpu until mps is able to support all operations this package needs
+        # change this value on your own risk as it might break things depending on the attribution functions used
         return "cpu"
     else:
         return "cpu"
