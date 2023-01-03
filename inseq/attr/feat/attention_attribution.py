@@ -62,20 +62,14 @@ class AttentionAtribution(FeatureAttribution, Registry):
                 information is empty, and will later be filled by the enrich_step_output function.
         """
         attr = self.method.attribute(**attribute_fn_main_args, **attribution_args)
-        deltas = None
-        if (
-            attribution_args.get("return_convergence_delta", False)
-            and hasattr(self.method, "has_convergence_delta")
-            and self.method.has_convergence_delta()
-        ):
-            attr, deltas = attr
+
         source_attributions, target_attributions = get_source_target_attributions(
             attr, self.attribution_model.is_encoder_decoder
         )
         return FeatureAttributionStepOutput(
             source_attributions=source_attributions,
             target_attributions=target_attributions,
-            step_scores={"deltas": deltas} if deltas is not None else {},
+            step_scores={},
         )
 
     @classmethod
