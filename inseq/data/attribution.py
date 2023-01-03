@@ -251,6 +251,9 @@ class FeatureAttributionStepOutput(TensorWrapper):
     target: Optional[OneOrMoreTokenWithIdSequences] = None
     _sequence_cls: Type["FeatureAttributionSequenceOutput"] = FeatureAttributionSequenceOutput
 
+    def __post_init__(self):
+        self.to(torch.float32)
+
     def remap_from_filtered(
         self,
         target_attention_mask: TargetIdsTensor,
