@@ -492,7 +492,7 @@ class FeatureAttribution(Registry):
 
     def format_attribute_args(
         self,
-        batch: Union[Batch, EncoderDecoderBatch],
+        batch: Union[DecoderOnlyBatch, EncoderDecoderBatch],
         target_ids: TargetIdsTensor,
         attributed_fn: Callable[..., SingleScorePerStepTensor],
         attributed_fn_args: Dict[str, Any] = {},
@@ -502,7 +502,7 @@ class FeatureAttribution(Registry):
         Formats inputs for the attribution method based on the model type and the attribution method requirements.
 
         Args:
-            batch (:class:`~inseq.data.Batch` or :class:`~inseq.data.EncoderDecoderBatch`): The batch of sequences on
+            batch (:class:`~inseq.data.DecoderOnlyBatch` or :class:`~inseq.data.EncoderDecoderBatch`): The batch of sequences on
                 which attribution is performed.
             target_ids (:obj:`torch.Tensor`): Target token ids of size `(batch_size)` corresponding to tokens
                 for which the attribution step must be performed.

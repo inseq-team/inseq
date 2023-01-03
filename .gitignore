@@ -616,4 +616,4 @@ MigrationBackup/
 
 # End of https://www.gitignore.io/api/osx,python,pycharm,windows,visualstudio,visualstudiocode
 
-/examples
+/dev_examples

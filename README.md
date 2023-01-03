@@ -4,17 +4,17 @@
 </div>
 <br/>
 <div align="center">
-  
+
 [![Build status](https://img.shields.io/github/actions/workflow/status/inseq-team/inseq/build.yml?branch=main)](https://github.com/inseq-team/inseq/actions?query=workflow%3Abuild)
 [![Docs status](https://img.shields.io/readthedocs/inseq)](https://inseq.readthedocs.io)
 [![Version](https://img.shields.io/pypi/v/inseq?color=blue)](https://pypi.org/project/inseq/)
 [![Python Version](https://img.shields.io/pypi/pyversions/inseq.svg?color=blue)](https://pypi.org/project/inseq/)
-[![Downloads](https://img.shields.io/pypi/dm/inseq?color=purple)](https://github.com/inseq-team/inseq/releases/latest)
+[![Downloads](https://static.pepy.tech/badge/inseq)](https://pepy.tech/project/inseq)
 [![License](https://img.shields.io/github/license/inseq-team/inseq)](https://github.com/inseq-team/inseq/blob/main/LICENSE)
 
 </div>
 <div align="center">
-  
+
   [![Follow Inseq on Twitter](https://img.shields.io/twitter/follow/inseqdev?label=Inseqdev&style=social)](https://twitter.com/InseqDev)
   [![Follow Inseq on Mastodon](https://img.shields.io/mastodon/follow/109308976376923913?domain=https%3A%2F%2Fsigmoid.social&label=Inseq&style=social)](https://sigmoid.social/@inseq)
 </div>
@@ -91,29 +91,31 @@ model.attribute(
 
 ![GPT-2 Attribution in the console](https://raw.githubusercontent.com/inseq-team/inseq/main/docs/source/images/inseq_python_console.gif)
 
-## Features
+## Current Features
 
-- Feature attribution of sequence generation for most `ForConditionalGeneration` (encoder-decoder) and `ForCausalLM` (decoder-only) models from 🤗 Transformers
+- 🚀 Feature attribution of sequence generation for most `ForConditionalGeneration` (encoder-decoder) and `ForCausalLM` (decoder-only) models from 🤗 Transformers
 
-- Support for single and batched attribution using multiple gradient-based feature attribution methods from [Captum](https://captum.ai/docs/introduction)
+- 🚀 Support for single and batched attribution using multiple gradient-based feature attribution methods from [Captum](https://captum.ai/docs/introduction)
 
-- Post-hoc aggregation of feature attribution maps via `Aggregator` classes.
+- 🚀 Post-hoc aggregation of feature attribution maps via `Aggregator` classes.
 
-- Attribution visualization in notebooks, browser and command line.
+- 🚀 Attribution visualization in notebooks, browser and command line.
 
-- Command line interface for attributing single examples or entire 🤗 datasets.
+- 🚀 CLI for attributing single examples or entire 🤗 datasets.
 
-- Custom attribution of target functions, supporting advanced usage for cases such as contrastive and uncertainty-weighted feature attributions.
+- 🚀 Custom attribution of target functions, supporting advanced use cases such as contrastive and uncertainty-weighted feature attributions.
 
-- Extract and visualize custom scores (e.g. probability, entropy) for every generation step alongsides attribution maps.
+- 🚀 Extraction and visualization of custom step scores (e.g. probability, entropy) alongsides attribution maps.
 
-## What will be supported?
+## Planned Development
 
-- Attention-based and occlusion-based feature attribution methods (documented in [#107](https://github.com/inseq-team/inseq/issues/107) and [#108](https://github.com/inseq-team/inseq/issues/108)).
+- ⚙️ Attention-based and occlusion-based feature attribution methods (documented in [#107](https://github.com/inseq-team/inseq/issues/107) and [#108](https://github.com/inseq-team/inseq/issues/108)).
 
-- Interoperability with other interpretability libraries like [ferret](https://ferret.readthedocs.io/en/latest/).
+- ⚙️ Interoperability with [ferret](https://ferret.readthedocs.io/en/latest/) for attribution evaluation.
 
-- Rich and interactive visualizations in a tabbed interface, possibly using [Gradio Blocks](https://gradio.app/docs/#blocks).
+- ⚙️ Rich and interactive visualizations in a tabbed interface using [Gradio Blocks](https://gradio.app/docs/#blocks).
+
+- ⚙️ Baked-in advanced capabilities for contrastive and uncertainty-weighted feature attribution.
 
 ## Using the Inseq client
 
@@ -141,3 +143,7 @@ inseq attribute-dataset \
   --batch_size 8 \
   --hide
 ```
+
+## Contributing
+
+Our vision for Inseq is to create a centralized, comprehensive and robust set of tools to enable fair and reproducible comparisons in the study of sequence generation models. To achieve this goal, contributions from researchers and developers interested in these topics are more than welcome. Please see our [contributing guidelines](CONTRIBUTING.md) and our [code of conduct](CODE_OF_CONDUCT.md) for more information.
