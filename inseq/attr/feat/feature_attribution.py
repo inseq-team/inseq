@@ -25,7 +25,6 @@ from datetime import datetime
 from torchtyping import TensorType
 
 from ...data import (
-    Batch,
     DecoderOnlyBatch,
     EncoderDecoderBatch,
     FeatureAttributionInput,
@@ -502,8 +501,8 @@ class FeatureAttribution(Registry):
         Formats inputs for the attribution method based on the model type and the attribution method requirements.
 
         Args:
-            batch (:class:`~inseq.data.DecoderOnlyBatch` or :class:`~inseq.data.EncoderDecoderBatch`): The batch of sequences on
-                which attribution is performed.
+            batch (:class:`~inseq.data.DecoderOnlyBatch` or :class:`~inseq.data.EncoderDecoderBatch`): The batch of
+                sequences on which attribution is performed.
             target_ids (:obj:`torch.Tensor`): Target token ids of size `(batch_size)` corresponding to tokens
                 for which the attribution step must be performed.
             attributed_fn (:obj:`Callable[..., SingleScorePerStepTensor]`): The function of model outputs
@@ -537,7 +536,7 @@ class FeatureAttribution(Registry):
         self,
         attribute_fn_main_args: Dict[str, Any],
         attribution_args: Dict[str, Any] = {},
-    ) -> Any:
+    ) -> FeatureAttributionStepOutput:
         r"""
         Performs a single attribution step for the specified attribution arguments.
 
