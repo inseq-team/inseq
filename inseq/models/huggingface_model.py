@@ -223,7 +223,7 @@ class HuggingfaceModel(AttributionModel):
         # Some tokenizer have weird values for max_len_single_sentence
         # Cap length with max_model_input_sizes instead
         if max_length > 1e6:
-            if hasattr(self.tokenizer, "max_model_input_sizes"):
+            if hasattr(self.tokenizer, "max_model_input_sizes") and self.tokenizer.max_model_input_sizes:
                 max_length = max(v for _, v in self.tokenizer.max_model_input_sizes.items())
             else:
                 max_length = max_input_length
