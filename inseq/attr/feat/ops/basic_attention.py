@@ -226,21 +226,21 @@ class LastLayerAttention(AttentionAttribution):
 
             last_layer_cross = outputs.cross_attentions[-1]
             last_layer_cross = self._merge_attention_heads(last_layer_cross, merge_head_option, use_head)
-            last_layer_cross = torch.squeeze(last_layer_cross, 1).select(1, -1)
+            last_layer_cross = last_layer_cross.select(1, -1)
 
             attributions = (last_layer_cross,)
 
             if is_target_attribution:
                 last_layer_decoder = outputs.decoder_attentions[-1]
                 last_layer_decoder = self._merge_attention_heads(last_layer_decoder, merge_head_option, use_head)
-                last_layer_decoder = torch.squeeze(last_layer_decoder, 1).select(1, -1)
+                last_layer_decoder = last_layer_decoder.select(1, -1)
 
                 attributions = attributions + (last_layer_decoder,)
         else:
 
             aggregation = outputs.attentions[-1]
             aggregation = self._merge_attention_heads(aggregation, merge_head_option, use_head)
-            aggregation = torch.squeeze(aggregation, 1).select(1, -1)
+            aggregation = aggregation.select(1, -1)
 
             attributions = (aggregation,)
 
