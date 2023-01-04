@@ -74,7 +74,7 @@ class AttentionAttribution(Attribution):
             raise RuntimeError("An attention head has to be specified when choosing single-head attention attribution")
 
         if head is not None:
-            if head in range(-num_heads, num_heads):
+            if head not in range(-num_heads, num_heads):
                 raise IndexError(
                     f"Attention head index for attribution out of range. The model only has {num_heads} heads."
                 )
