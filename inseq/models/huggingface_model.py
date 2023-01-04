@@ -206,6 +206,7 @@ class HuggingfaceModel(AttributionModel):
         as_targets: bool = False,
         return_baseline: bool = False,
         include_eos_baseline: bool = False,
+        max_input_length: int = 512,
     ) -> BatchEncoding:
         """Encode one or multiple texts, producing a BatchEncoding
 
@@ -222,7 +223,10 @@ class HuggingfaceModel(AttributionModel):
         # Some tokenizer have weird values for max_len_single_sentence
         # Cap length with max_model_input_sizes instead
         if max_length > 1e6:
-            max_length = max(v for _, v in self.tokenizer.max_model_input_sizes.items())
+            if hasattr(self.tokenizer, "max_model_input_sizes"):
+                max_length = max(v for _, v in self.tokenizer.max_model_input_sizes.items())
+            else:
+                max_length = max_input_length
         batch = self.tokenizer(
             text=texts if not as_targets else None,
             text_target=texts if as_targets else None,
