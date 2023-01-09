@@ -12,17 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Optional, Tuple, Union
+from typing import Any, Tuple, Union
 
 import logging
 
 import torch
-from captum._utils.common import _format_output, _is_tuple
-from captum._utils.typing import TargetType, TensorOrTupleOfTensorsGeneric
+from captum._utils.typing import TensorOrTupleOfTensorsGeneric
 from captum.attr._utils.attribution import Attribution
 from captum.log import log_usage
 
-from ....utils.typing import MultiStepEmbeddingsTensor
+from ....data import Batch, EncoderDecoderBatch
 
 
 logger = logging.getLogger(__name__)
@@ -103,45 +102,6 @@ class AttentionAttribution(Attribution):
         """returns the batch size of a tensor of shape `(batch_size, heads, seq, seq)`"""
         return attention.size(0)
 
-    def _extract_forward_pass_args(
-        self,
-        inputs: MultiStepEmbeddingsTensor,
-        forward_args: Optional[Tuple],
-        is_target_attr: bool,
-        is_encoder_decoder: bool,
-    ) -> dict:
-        """extracts the arguments needed for a standard forward pass
-        from the `inputs` and `additional_forward_args` parameters used by Captum"""
-
-        if is_encoder_decoder:
-
-            use_embeddings = forward_args[6] if is_target_attr else forward_args[7]
-
-            forward_pass_args = {
-                "attention_mask": forward_args[4] if is_target_attr else forward_args[5],
-                "decoder_attention_mask": forward_args[5] if is_target_attr else forward_args[6],
-            }
-
-            if use_embeddings:
-                forward_pass_args["inputs_embeds"] = inputs[0]
-                forward_pass_args["decoder_inputs_embeds"] = inputs[1] if is_target_attr else forward_args[0]
-            else:
-                forward_pass_args["input_ids"] = forward_args[0] if is_target_attr else forward_args[1]
-                forward_pass_args["decoder_input_ids"] = forward_args[1] if is_target_attr else forward_args[2]
-
-        else:
-
-            use_embeddings = forward_args[4]
-
-            forward_pass_args = {"attention_mask": forward_args[3]}
-
-            if use_embeddings:
-                forward_pass_args["inputs_embeds"] = inputs[0]
-            else:
-                forward_pass_args["input_ids"] = forward_args[0]
-
-        return forward_pass_args
-
 
 class AggregatedAttention(AttentionAttribution):
     """
@@ -152,24 +112,17 @@ class AggregatedAttention(AttentionAttribution):
     @log_usage()
     def attribute(
         self,
-        inputs: MultiStepEmbeddingsTensor,
-        target: TargetType = None,
+        batch: Union[Batch, EncoderDecoderBatch],
         merge_head_option: str = "average",
         use_head: int = None,
         additional_forward_args: Any = None,
     ) -> Union[TensorOrTupleOfTensorsGeneric, Tuple[TensorOrTupleOfTensorsGeneric, torch.Tensor]]:
 
-        is_inputs_tuple = _is_tuple(inputs)
-
-        is_target_attribution = True if len(inputs) > 1 else False
+        is_target_attribution = additional_forward_args[0]
 
         is_encoder_decoder = self.forward_func.is_encoder_decoder
 
-        forward_pass_args = self._extract_forward_pass_args(
-            inputs, additional_forward_args, is_target_attribution, is_encoder_decoder
-        )
-
-        outputs = self.forward_func.model(**forward_pass_args)
+        outputs = self.forward_func.get_forward_output(**self.forward_func.format_forward_args(batch))
 
         if is_encoder_decoder:
             cross_aggregation = torch.stack(outputs.cross_attentions).mean(0)
@@ -191,7 +144,7 @@ class AggregatedAttention(AttentionAttribution):
 
             attributions = (aggregation,)
 
-        return _format_output(is_inputs_tuple, attributions)
+        return attributions
 
 
 class LastLayerAttention(AttentionAttribution):
@@ -203,24 +156,17 @@ class LastLayerAttention(AttentionAttribution):
     @log_usage()
     def attribute(
         self,
-        inputs: MultiStepEmbeddingsTensor,
-        target: TargetType = None,
+        batch: Union[Batch, EncoderDecoderBatch],
         merge_head_option: str = "average",
         use_head: int = None,
         additional_forward_args: Any = None,
     ) -> Union[TensorOrTupleOfTensorsGeneric, Tuple[TensorOrTupleOfTensorsGeneric, torch.Tensor]]:
 
-        is_inputs_tuple = _is_tuple(inputs)
-
-        is_target_attribution = True if len(inputs) > 1 else False
+        is_target_attribution = additional_forward_args[0]
 
         is_encoder_decoder = self.forward_func.is_encoder_decoder
 
-        forward_pass_args = self._extract_forward_pass_args(
-            inputs, additional_forward_args, is_target_attribution, is_encoder_decoder
-        )
-
-        outputs = self.forward_func.model(**forward_pass_args)
+        outputs = self.forward_func.get_forward_output(**self.forward_func.format_forward_args(batch))
 
         if is_encoder_decoder:
 
@@ -244,4 +190,4 @@ class LastLayerAttention(AttentionAttribution):
 
             attributions = (aggregation,)
 
-        return _format_output(is_inputs_tuple, attributions)
+        return attributions

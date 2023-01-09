@@ -13,13 +13,13 @@
 # limitations under the License.
 """ Attention-based feature attribution methods. """
 
-from typing import Any, Dict, Union
+from typing import Any, Callable, Dict, Union
 
 import logging
 
-from ...data import FeatureAttributionStepOutput
-from ...utils import Registry
-from ...utils.typing import ModelIdentifier
+from ...data import Batch, EncoderDecoderBatch, FeatureAttributionStepOutput
+from ...utils import Registry, pretty_tensor
+from ...utils.typing import ModelIdentifier, SingleScorePerStepTensor, TargetIdsTensor
 from ..attribution_decorators import set_hook, unset_hook
 from .attribution_utils import get_source_target_attributions
 from .feature_attribution import FeatureAttribution
@@ -39,6 +39,48 @@ class AttentionAtribution(FeatureAttribution, Registry):
     @unset_hook
     def unhook(self, **kwargs):
         pass
+
+    def format_attribute_args(
+        self,
+        batch: Union[Batch, EncoderDecoderBatch],
+        target_ids: TargetIdsTensor,
+        attributed_fn: Callable[..., SingleScorePerStepTensor],
+        attribute_target: bool = False,
+        attributed_fn_args: Dict[str, Any] = {},
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """
+        Formats inputs for the attention attribution methods
+
+        Args:
+            batch (:class:`~inseq.data.Batch` or :class:`~inseq.data.EncoderDecoderBatch`): The batch of sequences on
+                which attribution is performed.
+            target_ids (:obj:`torch.Tensor`): Target token ids of size `(batch_size)` corresponding to tokens
+                for which the attribution step must be performed.
+            attributed_fn (:obj:`Callable[..., SingleScorePerStepTensor]`): The function of model outputs
+                representing what should be attributed (e.g. output probits of model best prediction after softmax).
+                The parameter must be a function that taking multiple keyword arguments and returns a :obj:`tensor`
+                of size (batch_size,). If not provided, the default attributed function for the model will be used
+                (change attribution_model.default_attributed_fn_id).
+            attribute_target (:obj:`bool`, optional): Whether to attribute the target prefix or not. Defaults to False.
+            attributed_fn_args (:obj:`dict`, `optional`): Additional arguments to pass to the attributed function.
+                Defaults to {}.
+        Returns:
+            :obj:`dict`: A dictionary containing the formatted attribution arguments.
+        """
+        logger.debug(f"batch: {batch},\ntarget_ids: {pretty_tensor(target_ids, lpad=4)}")
+        attribute_fn_args = {
+            "batch": batch,
+            "additional_forward_args": (
+                attribute_target,
+                attributed_fn,
+                self.forward_batch_embeds,
+                list(attributed_fn_args.keys()),
+            )
+            + tuple(attributed_fn_args.values()),
+        }
+
+        return attribute_fn_args
 
     def attribute_step(
         self,

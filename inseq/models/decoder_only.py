@@ -67,8 +67,12 @@ class DecoderOnlyAttributionModel(AttributionModel):
     @staticmethod
     def format_forward_args(
         inputs: DecoderOnlyBatch,
+        use_embeddings: bool = True,
     ) -> Dict[str, Any]:
-        return {"forward_tensor": inputs.input_embeds, "attention_mask": inputs.attention_mask}
+        return {
+            "forward_tensor": inputs.input_embeds if use_embeddings else inputs.input_ids,
+            "attention_mask": inputs.attention_mask,
+        }
 
     @staticmethod
     def format_attribution_args(
