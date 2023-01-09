@@ -88,7 +88,7 @@ a {
   background: #efefef;
 }
 .wy-nav-top {
-  background: #efefef;
+  background: #fcfcfc;
   color: rgba(0, 0, 0, 0.65) !important;
   position: fixed;
   top: 16px;
@@ -162,6 +162,12 @@ a {
   max-width: 160px;
   width: 100%;
   margin-bottom: 0;
+}
+
+@media screen and (min-width: 1100px) {
+  .wy-nav-content-wrap {
+    background: #fcfcfc;
+  }
 }
 
 

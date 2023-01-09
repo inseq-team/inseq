@@ -1,3 +1,5 @@
+var curr_width = $(window).width();
+
 function addIcon() {
     const inseqLogo = "/_static/inseq_logo.png";
     const link = document.createElement("a");
@@ -59,15 +61,11 @@ function resizeHtmlExamples() {
     for (const ex of examples) {
         const iframe = ex.firstElementChild;
         const zoom = iframe.getAttribute("scale")
-        const origHeight = iframe.contentWindow.document.body.scrollHeight
-        const origWidth = iframe.contentWindow.document.body.scrollWidth
-        ex.style.height = ((origHeight * zoom) + 50) + "px";
-        const frameHeight = origHeight / zoom
-        const frameWidth = origWidth / zoom
+        ex.style.height = ((iframe.contentWindow.document.body.scrollHeight * zoom) + 50) + "px";
         // add extra 50 pixels - in reality need just a bit more
-        iframe.style.height = frameHeight + "px"
+        iframe.style.height = (iframe.contentWindow.document.body.scrollHeight / zoom) + "px"
         // set the width of the iframe as the width of the iframe content
-        iframe.style.width = frameWidth + 'px';
+        iframe.style.width = (iframe.contentWindow.document.body.scrollWidth / zoom) + 'px';
         iframe.style.zoom = zoom;
         iframe.style.MozTransform = `scale(${zoom})`;
         iframe.style.WebkitTransform = `scale(${zoom})`;
@@ -78,7 +76,6 @@ function resizeHtmlExamples() {
     }
 }
 
-
 function onLoad() {
     addIcon();
     addCustomFooter();
@@ -86,3 +83,10 @@ function onLoad() {
 }
 
 window.addEventListener("load", onLoad);
+window.onresize = function() {
+    var wwidth = $(window).width();
+    if( curr_width !== wwidth ){
+        window.location.reload();
+        curr_width = wwidth;
+    }
+}

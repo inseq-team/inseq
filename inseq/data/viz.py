@@ -56,7 +56,7 @@ def show_attributions(
     display: bool = True,
     return_html: Optional[bool] = False,
 ) -> Optional[str]:
-    """_summary_
+    """Core function allowing for visualization of feature attribution maps in console/HTML format.
 
     Args:
         attributions (:class:`~inseq.data.attribution.FeatureAttributionSequenceOutput`):
@@ -68,8 +68,8 @@ def show_attributions(
         display (`bool`, *optional*, defaults to True):
             Whether to show the output of the visualization function.
         return_html (`Optional[bool]`, *optional*, defaults to False):
-            If true, returns the HTML corresponding to the notebook visualization of the
-                attributions in string format, for saving purposes.
+            If true, returns the HTML corresponding to the notebook visualization of the attributions in string format,
+            for saving purposes.
 
     Returns:
         `Optional[str]`: Returns the HTML output if `return_html=True`

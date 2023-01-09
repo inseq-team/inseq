@@ -2,7 +2,7 @@ from importlib.util import find_spec
 
 
 _ipywidgets_available = find_spec("ipywidgets") is not None
-_scikitlearn_available = find_spec("scikit-learn") is not None
+_scikitlearn_available = find_spec("sklearn") is not None
 _transformers_available = find_spec("transformers") is not None
 _sentencepiece_available = find_spec("sentencepiece") is not None and find_spec("protobuf") is not None
 _datasets_available = find_spec("datasets") is not None
