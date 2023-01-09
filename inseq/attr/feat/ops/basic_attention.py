@@ -67,7 +67,7 @@ class AttentionAttribution(Attribution):
         Returns:
             `torch.Tensor`: The attention tensor with its attention heads merged.
         """
-        num_heads = self._num_attention_heads(attention[0])
+        num_heads = self._num_attention_heads(attention)
 
         if option == "single" and head is None:
             raise RuntimeError("An attention head has to be specified when choosing single-head attention attribution")
@@ -90,7 +90,7 @@ class AttentionAttribution(Attribution):
             return attention.mean(1)
 
         elif option == "max":
-            return attention.max(1)
+            return attention.max(1)[0]
 
         else:
             raise RuntimeError(
@@ -106,7 +106,7 @@ class AttentionAttribution(Attribution):
 class AggregatedAttention(AttentionAttribution):
     """
     A basic attention attribution approach.
-    It will return the attention values averaged across all layers.
+    It will return the attention values averaged across a range of layers (default is all layers).
     """
 
     @log_usage()
@@ -115,6 +115,7 @@ class AggregatedAttention(AttentionAttribution):
         batch: Union[Batch, EncoderDecoderBatch],
         merge_head_option: str = "average",
         use_head: int = None,
+        aggregate_layer: tuple = None,
         additional_forward_args: Any = None,
     ) -> Union[TensorOrTupleOfTensorsGeneric, Tuple[TensorOrTupleOfTensorsGeneric, torch.Tensor]]:
 
@@ -125,20 +126,30 @@ class AggregatedAttention(AttentionAttribution):
         outputs = self.forward_func.get_forward_output(**self.forward_func.format_forward_args(batch))
 
         if is_encoder_decoder:
-            cross_aggregation = torch.stack(outputs.cross_attentions).mean(0)
+
+            if aggregate_layer is None:
+                aggregate_layer = (0, len(outputs.cross_attentions))
+
+            cross_aggregation = torch.stack(outputs.cross_attentions[aggregate_layer[0] : aggregate_layer[1]]).mean(0)
             cross_aggregation = self._merge_attention_heads(cross_aggregation, merge_head_option, use_head)
             cross_aggregation = cross_aggregation.select(1, -1)
 
             attributions = (cross_aggregation,)
 
             if is_target_attribution:
-                decoder_aggregation = torch.stack(outputs.decoder_attentions).mean(0)
+                decoder_aggregation = torch.stack(
+                    outputs.decoder_attentions[aggregate_layer[0] : aggregate_layer[1]]
+                ).mean(0)
                 decoder_aggregation = self._merge_attention_heads(decoder_aggregation, merge_head_option, use_head)
                 decoder_aggregation = decoder_aggregation.select(1, -1)
 
                 attributions = attributions + (decoder_aggregation,)
         else:
-            aggregation = torch.stack(outputs.attentions).mean(0)
+
+            if aggregate_layer is None:
+                aggregate_layer = (0, len(outputs.attentions))
+
+            aggregation = torch.stack(outputs.attentions[aggregate_layer[0] : aggregate_layer[1]]).mean(0)
             aggregation = self._merge_attention_heads(aggregation, merge_head_option, use_head)
             aggregation = aggregation.select(1, -1)
 
@@ -147,10 +158,10 @@ class AggregatedAttention(AttentionAttribution):
         return attributions
 
 
-class LastLayerAttention(AttentionAttribution):
+class SingleLayerAttention(AttentionAttribution):
     """
     A basic attention attribution approach.
-    It will simply return the attention values of the last layer.
+    It will return the attention values of a single layer (default is the last layer).
     """
 
     @log_usage()
@@ -159,6 +170,7 @@ class LastLayerAttention(AttentionAttribution):
         batch: Union[Batch, EncoderDecoderBatch],
         merge_head_option: str = "average",
         use_head: int = None,
+        use_layer: int = -1,
         additional_forward_args: Any = None,
     ) -> Union[TensorOrTupleOfTensorsGeneric, Tuple[TensorOrTupleOfTensorsGeneric, torch.Tensor]]:
 
@@ -170,21 +182,21 @@ class LastLayerAttention(AttentionAttribution):
 
         if is_encoder_decoder:
 
-            last_layer_cross = outputs.cross_attentions[-1]
-            last_layer_cross = self._merge_attention_heads(last_layer_cross, merge_head_option, use_head)
-            last_layer_cross = last_layer_cross.select(1, -1)
+            layer_cross = outputs.cross_attentions[use_layer]
+            layer_cross = self._merge_attention_heads(layer_cross, merge_head_option, use_head)
+            layer_cross = layer_cross.select(1, -1)
 
-            attributions = (last_layer_cross,)
+            attributions = (layer_cross,)
 
             if is_target_attribution:
-                last_layer_decoder = outputs.decoder_attentions[-1]
-                last_layer_decoder = self._merge_attention_heads(last_layer_decoder, merge_head_option, use_head)
-                last_layer_decoder = last_layer_decoder.select(1, -1)
+                layer_decoder = outputs.decoder_attentions[use_layer]
+                layer_decoder = self._merge_attention_heads(layer_decoder, merge_head_option, use_head)
+                layer_decoder = layer_decoder.select(1, -1)
 
-                attributions = attributions + (last_layer_decoder,)
+                attributions = attributions + (layer_decoder,)
         else:
 
-            aggregation = outputs.attentions[-1]
+            aggregation = outputs.attentions[use_layer]
             aggregation = self._merge_attention_heads(aggregation, merge_head_option, use_head)
             aggregation = aggregation.select(1, -1)
 

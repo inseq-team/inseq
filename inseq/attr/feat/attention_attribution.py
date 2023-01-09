@@ -23,7 +23,7 @@ from ...utils.typing import ModelIdentifier, SingleScorePerStepTensor, TargetIds
 from ..attribution_decorators import set_hook, unset_hook
 from .attribution_utils import get_source_target_attributions
 from .feature_attribution import FeatureAttribution
-from .ops import AggregatedAttention, LastLayerAttention
+from .ops import AggregatedAttention, SingleLayerAttention
 
 
 logger = logging.getLogger(__name__)
@@ -153,14 +153,14 @@ class AggregatedAttentionAtribution(AttentionAtribution):
         self.method = AggregatedAttention(attribution_model)
 
 
-class LastLayerAttentionAttribution(AttentionAtribution):
+class SingleLayerAttentionAttribution(AttentionAtribution):
     """
-    Last-Layer attention attribution method.
+    Single-Layer attention attribution method.
     Only the raw attention of the last hidden layer is retrieved.
     """
 
-    method_name = "last_layer_attention"
+    method_name = "single_layer_attention"
 
     def __init__(self, attribution_model, **kwargs):
         super().__init__(attribution_model)
-        self.method = LastLayerAttention(attribution_model)
+        self.method = SingleLayerAttention(attribution_model)

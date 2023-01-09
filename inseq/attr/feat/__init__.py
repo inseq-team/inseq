@@ -1,4 +1,4 @@
-from .attention_attribution import AggregatedAttentionAtribution, AttentionAtribution, LastLayerAttentionAttribution
+from .attention_attribution import AggregatedAttentionAtribution, AttentionAtribution, SingleLayerAttentionAttribution
 from .attribution_utils import STEP_SCORES_MAP, extract_args, join_token_ids, list_step_scores, register_step_score
 from .feature_attribution import FeatureAttribution, list_feature_attribution_methods
 from .gradient_attribution import (
@@ -33,5 +33,5 @@ __all__ = [
     "LayerDeepLiftAttribution",
     "AttentionAtribution",
     "AggregatedAttentionAtribution",
-    "LastLayerAttentionAttribution",
+    "SingleLayerAttentionAttribution",
 ]
