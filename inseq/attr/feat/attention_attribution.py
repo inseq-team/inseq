@@ -19,17 +19,17 @@ import logging
 
 from ...data import Batch, EncoderDecoderBatch, FeatureAttributionStepOutput
 from ...utils import Registry, pretty_tensor
-from ...utils.typing import ModelIdentifier, SingleScorePerStepTensor, TargetIdsTensor
+from ...utils.typing import SingleScorePerStepTensor, TargetIdsTensor
 from ..attribution_decorators import set_hook, unset_hook
-from .attribution_utils import get_source_target_attributions
+from .attribution_utils import STEP_SCORES_MAP, get_source_target_attributions
 from .feature_attribution import FeatureAttribution
-from .ops import AggregatedAttention, SingleLayerAttention
+from .ops import Attention
 
 
 logger = logging.getLogger(__name__)
 
 
-class AttentionAtribution(FeatureAttribution, Registry):
+class AttentionAttributionRegistry(FeatureAttribution, Registry):
     r"""Attention-based attribution method registry."""
 
     @set_hook
@@ -69,6 +69,12 @@ class AttentionAtribution(FeatureAttribution, Registry):
             :obj:`dict`: A dictionary containing the formatted attribution arguments.
         """
         logger.debug(f"batch: {batch},\ntarget_ids: {pretty_tensor(target_ids, lpad=4)}")
+        if attributed_fn != STEP_SCORES_MAP[self.attribution_model.default_attributed_fn_id]:
+            logger.warning(
+                "Attention-based attribution methods are output agnostic, since they do not rely on specific output"
+                " targets to compute input saliency. As such, using a custom attributed function for attention"
+                " attribution methods does not produce any effect of the method's results."
+            )
         attribute_fn_args = {
             "batch": batch,
             "additional_forward_args": (
@@ -114,53 +120,39 @@ class AttentionAtribution(FeatureAttribution, Registry):
             step_scores={},
         )
 
-    @classmethod
-    def load(
-        cls,
-        method_name: str,
-        attribution_model=None,
-        model_name_or_path: Union[ModelIdentifier, None] = None,
-        **kwargs,
-    ) -> "FeatureAttribution":
-        from inseq import AttributionModel
 
-        if model_name_or_path is None == attribution_model is None:  # noqa
-            raise RuntimeError(
-                "Only one among an initialized model and a model identifier "
-                "must be defined when loading the attribution method."
-            )
-        if model_name_or_path:
-            attribution_model = AttributionModel.load(model_name_or_path)
-            model_name_or_path = None
-
-        if not attribution_model.model.config.output_attentions:
-            raise RuntimeError(
-                "Attention-based attribution methods require the `output_attentions` parameter to be set on the model."
-            )
-        return super().load(method_name, attribution_model, model_name_or_path, **kwargs)
-
-
-class AggregatedAttentionAtribution(AttentionAtribution):
+class AttentionAttribution(AttentionAttributionRegistry):
     """
-    Aggregated attention attribution method.
-    Attention values of all layers are averaged.
+    The basic attention attribution method, which retrieves the attention weights from the model.
+
+    Attribute Args:
+        aggregate_heads_fn (:obj:`str` or :obj:`callable`): The method to use for aggregating across heads.
+            Can be one of `average` (default if heads is tuple or None), `max`, or `single` (default if heads is
+            int), or a custom function defined by the user.
+        aggregate_layers_fn (:obj:`str` or :obj:`callable`): The method to use for aggregating across layers.
+            Can be one of `average` (default if layers is tuple), `max`, or `single` (default if layers is int or
+            None), or a custom function defined by the user.
+        heads (:obj:`int` or :obj:`tuple[int, int]` or :obj:`list(int)`, optional): If a single value is specified,
+                the head at the corresponding index is used. If a tuple of two indices is specified, all heads between
+                the indices will be aggregated using aggregate_fn. If a list of indices is specified, the respective
+                heads will be used for aggregation. If aggregate_fn is "single", a head must be specified.
+                Otherwise, all heads are passed to aggregate_fn by default.
+        layers (:obj:`int` or :obj:`tuple[int, int]` or :obj:`list(int)`, optional): If a single value is specified
+                , the layer at the corresponding index is used. If a tuple of two indices is specified, all layers
+                among the indices will be aggregated using aggregate_fn. If a list of indices is specified, the
+                respective layers will be used for aggregation. If aggregate_fn is "single", the last layer is
+                used by default. Otherwise, all available layers are passed to aggregate_fn by default.
+
+    Example:
+
+        - ``model.attribute(src)`` will return the average attention for all heads of the last layer.
+        - ``model.attribute(src, heads=0)`` will return the attention weights for the first head of the last layer.
+        - ``model.attribute(src, heads=(0, 5), aggregate_heads_fn="max", layers=[0, 2, 7])`` will return the maximum
+            attention weights for the first 5 heads averaged across the first, third, and eighth layers.
     """
 
-    method_name = "aggregated_attention"
+    method_name = "attention"
 
     def __init__(self, attribution_model, **kwargs):
         super().__init__(attribution_model)
-        self.method = AggregatedAttention(attribution_model)
-
-
-class SingleLayerAttentionAttribution(AttentionAtribution):
-    """
-    Single-Layer attention attribution method.
-    Only the raw attention of the last hidden layer is retrieved.
-    """
-
-    method_name = "single_layer_attention"
-
-    def __init__(self, attribution_model, **kwargs):
-        super().__init__(attribution_model)
-        self.method = SingleLayerAttention(attribution_model)
+        self.method = Attention(attribution_model)

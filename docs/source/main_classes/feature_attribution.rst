@@ -61,3 +61,14 @@ Layer Attribution Methods
 
 .. autoclass:: inseq.attr.feat.LayerDeepLiftAttribution
     :members:
+
+
+Attention Attribution Methods
+-----------------------------------------------------------------------------------------------------------------------
+
+.. autoclass:: inseq.attr.feat.AttentionAttributionRegistry
+    :members:
+
+
+.. autoclass:: inseq.attr.feat.AttentionAttribution
+    :members:
