@@ -763,4 +763,4 @@ FodyWeavers.xsd
 # End of https://www.toptal.com/developers/gitignore/api/osx,python,pycharm,windows,visualstudio,visualstudiocode,jupyternotebooks
 
 
-/examples
+/dev_examples

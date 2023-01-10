@@ -175,6 +175,7 @@ class DecoderOnlyAttributionModel(AttributionModel):
         forward_tensor: AttributionForwardInputs,
         attention_mask: Optional[IdsTensor] = None,
         use_embeddings: bool = True,
+        **kwargs,
     ) -> ModelOutput:
         embeds = forward_tensor if use_embeddings else None
         ids = None if use_embeddings else forward_tensor
@@ -182,6 +183,7 @@ class DecoderOnlyAttributionModel(AttributionModel):
             input_ids=ids,
             inputs_embeds=embeds,
             attention_mask=attention_mask,
+            **kwargs,
         )
 
     def forward(

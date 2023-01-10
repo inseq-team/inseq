@@ -240,22 +240,20 @@ class EncoderDecoderAttributionModel(AttributionModel):
         self,
         forward_tensor: AttributionForwardInputs,
         encoder_attention_mask: Optional[IdsTensor] = None,
-        # decoder_input_ids: Optional[IdsTensor] = None,
         decoder_input_embeds: Optional[EmbeddingsTensor] = None,
         decoder_attention_mask: Optional[IdsTensor] = None,
         use_embeddings: bool = True,
+        **kwargs,
     ) -> ModelOutput:
         encoder_embeds = forward_tensor if use_embeddings else None
         encoder_ids = None if use_embeddings else forward_tensor
-        # decoder_embeds = decoder_input_embeds if use_embeddings else None
-        # decoder_ids = None if use_embeddings else decoder_input_ids
         return self.model(
             input_ids=encoder_ids,
             inputs_embeds=encoder_embeds,
             attention_mask=encoder_attention_mask,
-            # decoder_input_ids=decoder_ids,
             decoder_inputs_embeds=decoder_input_embeds,
             decoder_attention_mask=decoder_attention_mask,
+            **kwargs,
         )
 
     def forward(
@@ -277,7 +275,6 @@ class EncoderDecoderAttributionModel(AttributionModel):
         output = self.get_forward_output(
             forward_tensor=encoder_tensors,
             encoder_attention_mask=encoder_attention_mask,
-            # decoder_input_ids=decoder_input_ids,
             decoder_input_embeds=decoder_input_embeds,
             decoder_attention_mask=decoder_attention_mask,
             use_embeddings=use_embeddings,

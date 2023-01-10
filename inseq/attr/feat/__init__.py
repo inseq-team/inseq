@@ -4,7 +4,7 @@ from .feature_attribution import FeatureAttribution, list_feature_attribution_me
 from .gradient_attribution import (
     DeepLiftAttribution,
     DiscretizedIntegratedGradientsAttribution,
-    GradientAttribution,
+    GradientAttributionRegistry,
     InputXGradientAttribution,
     IntegratedGradientsAttribution,
     LayerDeepLiftAttribution,
@@ -22,7 +22,7 @@ __all__ = [
     "register_step_score",
     "join_token_ids",
     "list_step_scores",
-    "GradientAttribution",
+    "GradientAttributionRegistry",
     "DeepLiftAttribution",
     "InputXGradientAttribution",
     "IntegratedGradientsAttribution",
