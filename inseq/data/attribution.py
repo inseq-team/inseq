@@ -208,18 +208,18 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
     def minimum(self) -> float:
         minimum = 0
         if self.source_attributions is not None:
-            minimum = min(minimum, float(self.source_attributions.min()))
+            minimum = min(minimum, float(torch.nan_to_num(self.source_attributions).min()))
         if self.target_attributions is not None:
-            minimum = min(minimum, float(self.target_attributions.min()))
+            minimum = min(minimum, float(torch.nan_to_num(self.target_attributions).min()))
         return minimum
 
     @property
     def maximum(self) -> float:
         maximum = 0
         if self.source_attributions is not None:
-            maximum = max(maximum, float(self.source_attributions.max()))
+            maximum = max(maximum, float(torch.nan_to_num(self.source_attributions).max()))
         if self.target_attributions is not None:
-            maximum = max(maximum, float(self.target_attributions.max()))
+            maximum = max(maximum, float(torch.nan_to_num(self.target_attributions).max()))
         return maximum
 
     def weight_attributions(self, step_score_id: str):
