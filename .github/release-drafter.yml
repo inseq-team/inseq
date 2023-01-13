@@ -6,11 +6,11 @@ tag-template: "v$NEXT_PATCH_VERSION"
 
 categories:
   - title: ":rocket: Features"
-    labels: [enhancement, feature]
+    labels: [enhancement, user qol]
   - title: ":wrench: Fixes & Refactoring"
-    labels: [bug, refactoring, bugfix, fix]
+    labels: [bug, dev qol]
   - title: ":package: Build System & CI/CD"
-    labels: [build, ci, testing]
+    labels: [docker]
   - title: ":boom: Breaking Changes"
     labels: [breaking]
   - title: ":pencil: Documentation"
