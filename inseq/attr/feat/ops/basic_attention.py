@@ -43,6 +43,7 @@ class BaseAttentionAttribution(Attribution):
     AGGREGATE_FN_OPTIONS: Dict[str, AggregateAttentionFunction] = {
         "average": lambda x, dim: x.mean(dim),
         "max": lambda x, dim: x.max(dim)[0],
+        "min": lambda x, dim: x.min(dim)[0],
         "single": lambda x, dim, idx: x.select(dim, idx),
     }
 
@@ -53,9 +54,9 @@ class BaseAttentionAttribution(Attribution):
         """Returns the number of heads contained in the attention tensor."""
         return attention.size(1)
 
-    def _num_layers(self, attention: Tuple[FullAttentionTensor, ...]) -> int:
+    def _num_layers(self, attention: FullAttentionTensor) -> int:
         """Returns the number of layers contained in the attention tensor."""
-        return attention.size(0)
+        return len(attention)
 
     def _aggregate_attention_heads(
         self,
@@ -67,11 +68,11 @@ class BaseAttentionAttribution(Attribution):
         Merges the attention values across the specified attention heads for the full sequence.
 
         Args:
-            attention (:obj:`tuple` of :obj:`torch.Tensor`) attention tensor of shape
+            attention (:obj:`torch.Tensor`) attention tensor of shape
                 `(batch_size, num_heads, sequence_length, sequence_length)`
             aggregate_fn (:obj:`str` or :obj:`callable`): The method to use for aggregating across heads.
-                Can be one of `average` (default if heads is tuple or None), `max`, or `single` (default if heads is
-                int), or a custom function defined by the user.
+                Can be one of `average` (default if heads is tuple or None), `max`, `min` or `single` (default if heads
+                is int), or a custom function defined by the user.
             heads (:obj:`int` or :obj:`tuple[int, int]` or :obj:`list(int)`, optional): If a single value is specified,
                 the head at the corresponding index is used. If a tuple of two indices is specified, all heads between
                 the indices will be aggregated using aggregate_fn. If a list of indices is specified, the respective
@@ -80,7 +81,7 @@ class BaseAttentionAttribution(Attribution):
 
         Returns:
             :obj:`torch.Tensor`: An aggregated attention tensor of shape
-                `(batch_size, num_heads, sequence_length, sequence_length)`
+                `(batch_size, sequence_length, sequence_length)`
         """
         n_heads = self._num_attention_heads(attention)
         aggregate_kwargs = {}
@@ -108,7 +109,7 @@ class BaseAttentionAttribution(Attribution):
                     )
             if heads is None:
                 heads = (0, n_heads)
-                logger.info("No attention head specified for attention extraction. Using all heads by default.")
+                logger.info("No attention heads specified for attention extraction. Using all heads by default.")
             if not hasattr(heads, "__iter__") or (
                 len(heads) == 2 and isinstance(heads, tuple) and heads[0] >= heads[1]
             ):
@@ -140,8 +141,8 @@ class BaseAttentionAttribution(Attribution):
             attention (:obj:`tuple` of :obj:`torch.Tensor`) attention tensor of shape
                 `(n_layers, batch_size, num_heads, sequence_length, sequence_length)`
             aggregate_fn (:obj:`str` or :obj:`callable`): The method to use for aggregating across layers.
-                Can be one of `average` (default if layers is tuple), `max`, or `single` (default if layers is int or
-                None), or a custom function defined by the user.
+                Can be one of `average` (default if layers is tuple), `max`, `min` or `single` (default if layers is
+                int or None), or a custom function defined by the user.
             layers (:obj:`int` or :obj:`tuple[int, int]` or :obj:`list(int)`, optional): If a single value is specified
                 , the layer at the corresponding index is used. If a tuple of two indices is specified, all layers
                 among the indices will be aggregated using aggregate_fn. If a list of indices is specified, the
@@ -229,21 +230,21 @@ class Attention(BaseAttentionAttribution):
             batch (`Union[Batch, EncoderDecoderBatch]`):
                 The input batch used for the forward pass to extract attention scores.
             aggregate_heads_fn (:obj:`str` or :obj:`callable`): The method to use for aggregating across heads.
-                Can be one of `average` (default if heads is list, tuple or None), `max`, or `single` (default if heads
-                is int), or a custom function defined by the user.
+                Can be one of `average` (default if heads is list, tuple or None), `max`, `min` or `single` (default
+                if heads is int), or a custom function defined by the user.
             aggregate_layers_fn (:obj:`str` or :obj:`callable`): The method to use for aggregating across layers.
-                Can be one of `average` (default if layers is tuple or list), `max`, or `single` (default if layers is
-                int or None), or a custom function defined by the user.
+                Can be one of `average` (default if layers is tuple or list), `max`, `min` or `single` (default if
+                layers is int or None), or a custom function defined by the user.
             heads (:obj:`int` or :obj:`tuple[int, int]` or :obj:`list(int)`, optional): If a single value is specified,
                 the head at the corresponding index is used. If a tuple of two indices is specified, all heads between
                 the indices will be aggregated using aggregate_fn. If a list of indices is specified, the respective
                 heads will be used for aggregation. If aggregate_fn is "single", a head must be specified.
-                Otherwise, all heads are passed to aggregate_fn by default.
+                If no value specified, all heads are passed to aggregate_fn by default.
             layers (:obj:`int` or :obj:`tuple[int, int]` or :obj:`list(int)`, optional): If a single value is specified
                 , the layer at the corresponding index is used. If a tuple of two indices is specified, all layers
                 among the indices will be aggregated using aggregate_fn. If a list of indices is specified, the
                 respective layers will be used for aggregation. If aggregate_fn is "single", the last layer is
-                used by default. Otherwise, all available layers are passed to aggregate_fn by default.
+                used by default. If no value is specified, all available layers are passed to aggregate_fn by default.
 
         Returns:
             `TensorOrTupleOfTensorsGeneric`: Attribution outputs for source-only or source + target feature attribution

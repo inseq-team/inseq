@@ -25,7 +25,7 @@ The Inseq library is a Pytorch-based toolkit inteded to democratize the access t
 
 **Interpretability Methods**
 
-- At the moment, only gradient-based feature attribution methods sourced from the `Captum <https://captum.ai>`_ library are available, but other popular occlusion and attention-based techniques will soon follow. The list of all available methods can be obtained by using the :meth:`~inseq.list_feature_attribution_methods` method. Each method either points to its original implementation, and is thoroughly documented in its docstring.
+- At the moment, only gradient-based feature attribution methods sourced from the `Captum <https://captum.ai>`_ library and basic attention attribution methods are available, but other popular occlusion and attention-based techniques will soon follow. The list of all available methods can be obtained by using the :meth:`~inseq.list_feature_attribution_methods` method. Each method either points to its original implementation, and is thoroughly documented in its docstring.
 
 Installing Inseq
 ===================================
