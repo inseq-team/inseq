@@ -51,7 +51,7 @@ VocabularyEmbeddingsTensor = TensorType["vocab_size", "embed_size", float]
 FullLogitsTensor = TensorType["batch_size", "vocab_size", float]
 FullLayerAttentionTensor = TensorType["batch_size", "n_heads", "seq_len", "seq_len", float]
 AggregatedLayerAttentionTensor = TensorType["batch_size", "seq_len", "seq_len", float]
-FullAttentionTensor = Tuple[FullLayerAttentionTensor, ...]
+FullAttentionOutput = Tuple[FullLayerAttentionTensor, ...]
 
 # Step and sequence objects used for stepwise scores (e.g. convergence deltas, probabilities)
 SingleScorePerStepTensor = TensorType["batch_size", float]

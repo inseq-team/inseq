@@ -98,7 +98,7 @@ model.attribute(
 
 - Support for single and batched attribution using multiple gradient-based feature attribution methods from [Captum](https://captum.ai/docs/introduction)
 
-- Support for basic single-layer and layer-aggregation attention attribution methods
+- Support for basic single-layer and layer-aggregation attention attribution methods with one or multiple aggregated heads.
 
 - Post-hoc aggregation of feature attribution maps via `Aggregator` classes.
 

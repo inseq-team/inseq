@@ -22,7 +22,7 @@ from captum.attr._utils.attribution import Attribution
 from captum.log import log_usage
 
 from ....data import Batch, EncoderDecoderBatch
-from ....utils.typing import AggregatedLayerAttentionTensor, FullAttentionTensor, FullLayerAttentionTensor
+from ....utils.typing import AggregatedLayerAttentionTensor, FullAttentionOutput, FullLayerAttentionTensor
 
 
 logger = logging.getLogger(__name__)
@@ -54,7 +54,7 @@ class BaseAttentionAttribution(Attribution):
         """Returns the number of heads contained in the attention tensor."""
         return attention.size(1)
 
-    def _num_layers(self, attention: FullAttentionTensor) -> int:
+    def _num_layers(self, attention: FullAttentionOutput) -> int:
         """Returns the number of layers contained in the attention tensor."""
         return len(attention)
 
@@ -86,6 +86,12 @@ class BaseAttentionAttribution(Attribution):
         n_heads = self._num_attention_heads(attention)
         aggregate_kwargs = {}
 
+        if hasattr(heads, "__iter__"):
+            if len(heads) == 0:
+                raise RuntimeError("At least two heads must be specified for aggregated attention attribution.")
+            if len(heads) == 1:
+                heads = heads[0]
+
         # If heads is not specified or an tuple, average aggregation is used by default
         if aggregate_fn is None and not isinstance(heads, int):
             aggregate_fn = "average"
@@ -110,6 +116,9 @@ class BaseAttentionAttribution(Attribution):
             if heads is None:
                 heads = (0, n_heads)
                 logger.info("No attention heads specified for attention extraction. Using all heads by default.")
+            # Convert negative indices to positive indices
+            if hasattr(heads, "__iter__"):
+                heads = type(heads)([h_idx if h_idx >= 0 else n_heads + h_idx for h_idx in heads])
             if not hasattr(heads, "__iter__") or (
                 len(heads) == 2 and isinstance(heads, tuple) and heads[0] >= heads[1]
             ):
@@ -117,10 +126,11 @@ class BaseAttentionAttribution(Attribution):
                     "A (start, end) tuple of indices representing a span or a list of individual indices"
                     " must be specified for aggregated attention attribution."
                 )
-            if (not all(h in range(-n_heads, n_heads + 1) for h in heads) and isinstance(heads, tuple)) or (
-                not all(h in range(-n_heads, n_heads) for h in heads) and isinstance(heads, list)
-            ):
+            max_idx_val = n_heads if isinstance(heads, list) else n_heads + 1
+            if not all(h in range(-n_heads, max_idx_val) for h in heads):
                 raise IndexError(f"One or more attention head index out of range. The model only has {n_heads} heads.")
+            if len(set(heads)) != len(heads):
+                raise IndexError("Duplicate head indices are not allowed.")
             if isinstance(heads, tuple):
                 attention = attention[:, heads[0] : heads[1]]
             else:
@@ -130,7 +140,7 @@ class BaseAttentionAttribution(Attribution):
 
     def _aggregate_layers(
         self,
-        attention: FullAttentionTensor,
+        attention: FullAttentionOutput,
         aggregate_fn: Union[str, AggregateAttentionFunction, None] = None,
         layers: Union[int, Tuple[int, int], List[int], None] = None,
     ) -> FullLayerAttentionTensor:
@@ -154,7 +164,14 @@ class BaseAttentionAttribution(Attribution):
                 `(batch_size, num_heads, sequence_length, sequence_length)`
         """
         n_layers = self._num_layers(attention)
+        attention = torch.stack(attention, dim=0)
         aggregate_kwargs = {}
+
+        if hasattr(layers, "__iter__"):
+            if len(layers) == 0:
+                raise RuntimeError("At least two layer must be specified for aggregated attention attribution.")
+            if len(layers) == 1:
+                layers = layers[0]
 
         # If layers is not specified or an int, single layer aggregation is used by default
         if aggregate_fn is None and not hasattr(layers, "__iter__"):
@@ -184,6 +201,9 @@ class BaseAttentionAttribution(Attribution):
             if layers is None:
                 layers = (0, n_layers)
                 logger.info("No layer specified for attention extraction. Using all layers by default.")
+            # Convert negative indices to positive indices
+            if hasattr(layers, "__iter__"):
+                layers = type(layers)([l_idx if l_idx >= 0 else n_layers + l_idx for l_idx in layers])
             if not hasattr(layers, "__iter__") or (
                 len(layers) == 2 and isinstance(layers, tuple) and layers[0] >= layers[1]
             ):
@@ -191,10 +211,11 @@ class BaseAttentionAttribution(Attribution):
                     "A (start, end) tuple of indices representing a span or a list of individual indices"
                     " must be specified for aggregated attention attribution."
                 )
-            if (not all(l in range(-n_layers, n_layers + 1) for l in layers) and isinstance(layers, tuple)) or (
-                not all(l in range(-n_layers, n_layers) for l in layers) and isinstance(layers, list)
-            ):
+            max_idx_val = n_layers if isinstance(layers, list) else n_layers + 1
+            if not all(l in range(max_idx_val) for l in layers):
                 raise IndexError(f"One or more layer index out of range. The model only has {n_layers} layers.")
+            if len(set(layers)) != len(layers):
+                raise IndexError("Duplicate layer indices are not allowed.")
             if isinstance(layers, tuple):
                 attention = attention[layers[0] : layers[1]]
             else:
@@ -258,7 +279,7 @@ class Attention(BaseAttentionAttribution):
 
         if is_encoder_decoder:
             cross_layer_aggregation = self._aggregate_layers(
-                torch.stack(outputs.cross_attentions), aggregate_layers_fn, layers
+                outputs.cross_attentions, aggregate_layers_fn, layers
             )
             cross_head_aggregation = self._aggregate_attention_heads(
                 cross_layer_aggregation, aggregate_heads_fn, heads
@@ -267,14 +288,14 @@ class Attention(BaseAttentionAttribution):
 
             if is_target_attribution:
                 decoder_layer_aggregation = self._aggregate_layers(
-                    torch.stack(outputs.decoder_attentions), aggregate_layers_fn, layers
+                    outputs.decoder_attentions, aggregate_layers_fn, layers
                 )
                 decoder_head_aggregation = self._aggregate_attention_heads(
                     decoder_layer_aggregation, aggregate_heads_fn, heads
                 )
                 attributions = attributions + (decoder_head_aggregation.select(1, -1),)
         else:
-            layer_aggregation = self._aggregate_layers(torch.stack(outputs.attentions), aggregate_layers_fn, layers)
+            layer_aggregation = self._aggregate_layers(outputs.attentions, aggregate_layers_fn, layers)
             head_aggregation = self._aggregate_attention_heads(layer_aggregation, aggregate_heads_fn, heads)
             attributions = (head_aggregation.select(1, -1),)
 
