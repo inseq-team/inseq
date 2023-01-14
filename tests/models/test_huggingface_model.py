@@ -317,7 +317,7 @@ def test_attribute_decoder_forced_sliced(saliency_gpt2_model):
 @mark.parametrize("layers", ATTENTION_IDX)
 @mark.parametrize("heads", ATTENTION_IDX)
 @mark.parametrize("aggregate_heads_fn", ATTENTION_AGGREGATE_FN)
-@mark.parametrize("aggregate_layers_fn", ATTENTION_AGGREGATE_FN) 
+@mark.parametrize("aggregate_layers_fn", ATTENTION_AGGREGATE_FN)
 def test_attention_attribution_seq2seq(
     texts,
     reference_texts,
@@ -356,7 +356,7 @@ def test_attention_attribution_seq2seq(
 @mark.parametrize("layers", ATTENTION_IDX)
 @mark.parametrize("heads", ATTENTION_IDX)
 @mark.parametrize("aggregate_heads_fn", ATTENTION_AGGREGATE_FN)
-@mark.parametrize("aggregate_layers_fn", ATTENTION_AGGREGATE_FN) 
+@mark.parametrize("aggregate_layers_fn", ATTENTION_AGGREGATE_FN)
 def test_attention_attribution_decoder(
     texts,
     reference_texts,

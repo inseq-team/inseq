@@ -278,9 +278,7 @@ class Attention(BaseAttentionAttribution):
         )
 
         if is_encoder_decoder:
-            cross_layer_aggregation = self._aggregate_layers(
-                outputs.cross_attentions, aggregate_layers_fn, layers
-            )
+            cross_layer_aggregation = self._aggregate_layers(outputs.cross_attentions, aggregate_layers_fn, layers)
             cross_head_aggregation = self._aggregate_attention_heads(
                 cross_layer_aggregation, aggregate_heads_fn, heads
             )
