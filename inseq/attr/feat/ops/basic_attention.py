@@ -47,19 +47,23 @@ class BaseAttentionAttribution(Attribution):
         "single": lambda x, dim, idx: x.select(dim, idx),
     }
 
-    def has_convergence_delta(self) -> bool:
+    @classmethod
+    def has_convergence_delta(cls) -> bool:
         return False
 
-    def _num_attention_heads(self, attention: FullLayerAttentionTensor) -> int:
+    @classmethod
+    def _num_attention_heads(cls, attention: FullLayerAttentionTensor) -> int:
         """Returns the number of heads contained in the attention tensor."""
         return attention.size(1)
 
-    def _num_layers(self, attention: FullAttentionOutput) -> int:
+    @classmethod
+    def _num_layers(cls, attention: FullAttentionOutput) -> int:
         """Returns the number of layers contained in the attention tensor."""
         return len(attention)
 
+    @classmethod
     def _aggregate_attention_heads(
-        self,
+        cls,
         attention: FullLayerAttentionTensor,
         aggregate_fn: Union[str, AggregateAttentionFunction, None] = None,
         heads: Union[int, Tuple[int, int], List[int], None] = None,
@@ -83,7 +87,7 @@ class BaseAttentionAttribution(Attribution):
             :obj:`torch.Tensor`: An aggregated attention tensor of shape
                 `(batch_size, sequence_length, sequence_length)`
         """
-        n_heads = self._num_attention_heads(attention)
+        n_heads = cls._num_attention_heads(attention)
         aggregate_kwargs = {}
 
         if hasattr(heads, "__iter__"):
@@ -106,13 +110,14 @@ class BaseAttentionAttribution(Attribution):
             if heads not in range(-n_heads, n_heads):
                 raise IndexError(f"Attention head index out of range. The model only has {n_heads} heads.")
             aggregate_kwargs = {"idx": heads}
+            aggregate_fn = cls.AGGREGATE_FN_OPTIONS[aggregate_fn]
         else:
             if isinstance(aggregate_fn, str):
-                if aggregate_fn not in self.AGGREGATE_FN_OPTIONS:
+                if aggregate_fn not in cls.AGGREGATE_FN_OPTIONS:
                     raise RuntimeError(
-                        "Invalid aggregation method specified."
-                        f"Valid methods are: {self.AGGREGATE_FN_OPTIONS.keys()}"
+                        "Invalid aggregation method specified." f"Valid methods are: {cls.AGGREGATE_FN_OPTIONS.keys()}"
                     )
+                aggregate_fn = cls.AGGREGATE_FN_OPTIONS[aggregate_fn]
             if heads is None:
                 heads = (0, n_heads)
                 logger.info("No attention heads specified for attention extraction. Using all heads by default.")
@@ -135,11 +140,11 @@ class BaseAttentionAttribution(Attribution):
                 attention = attention[:, heads[0] : heads[1]]
             else:
                 attention = torch.index_select(attention, 1, torch.tensor(heads, device=attention.device))
-        aggregate_fn = self.AGGREGATE_FN_OPTIONS[aggregate_fn]
         return aggregate_fn(attention, 1, **aggregate_kwargs)
 
+    @classmethod
     def _aggregate_layers(
-        self,
+        cls,
         attention: FullAttentionOutput,
         aggregate_fn: Union[str, AggregateAttentionFunction, None] = None,
         layers: Union[int, Tuple[int, int], List[int], None] = None,
@@ -148,7 +153,7 @@ class BaseAttentionAttribution(Attribution):
         Merges the attention values of every attention head across the specified layers for the full sequence.
 
         Args:
-            attention (:obj:`tuple` of :obj:`torch.Tensor`) attention tensor of shape
+            attention (:obj:`torch.Tensor`) attention tensor of shape
                 `(n_layers, batch_size, num_heads, sequence_length, sequence_length)`
             aggregate_fn (:obj:`str` or :obj:`callable`): The method to use for aggregating across layers.
                 Can be one of `average` (default if layers is tuple), `max`, `min` or `single` (default if layers is
@@ -163,7 +168,7 @@ class BaseAttentionAttribution(Attribution):
             :obj:`torch.Tensor`: An aggregated attention tensor of shape
                 `(batch_size, num_heads, sequence_length, sequence_length)`
         """
-        n_layers = self._num_layers(attention)
+        n_layers = cls._num_layers(attention)
         attention = torch.stack(attention, dim=0)
         aggregate_kwargs = {}
 
@@ -191,13 +196,14 @@ class BaseAttentionAttribution(Attribution):
             if layers not in range(-n_layers, n_layers):
                 raise IndexError(f"Layer index out of range. The model only has {n_layers} layers.")
             aggregate_kwargs = {"idx": layers}
+            aggregate_fn = cls.AGGREGATE_FN_OPTIONS[aggregate_fn]
         else:
             if isinstance(aggregate_fn, str):
-                if aggregate_fn not in self.AGGREGATE_FN_OPTIONS:
+                if aggregate_fn not in cls.AGGREGATE_FN_OPTIONS:
                     raise RuntimeError(
-                        "Invalid aggregation method specified."
-                        f"Valid methods are: {self.AGGREGATE_FN_OPTIONS.keys()}"
+                        "Invalid aggregation method specified." f"Valid methods are: {cls.AGGREGATE_FN_OPTIONS.keys()}"
                     )
+                aggregate_fn = cls.AGGREGATE_FN_OPTIONS[aggregate_fn]
             if layers is None:
                 layers = (0, n_layers)
                 logger.info("No layer specified for attention extraction. Using all layers by default.")
@@ -220,7 +226,6 @@ class BaseAttentionAttribution(Attribution):
                 attention = attention[layers[0] : layers[1]]
             else:
                 attention = torch.index_select(attention, 0, torch.tensor(layers, device=attention.device))
-        aggregate_fn = self.AGGREGATE_FN_OPTIONS[aggregate_fn]
         return aggregate_fn(attention, 0, **aggregate_kwargs)
 
 
