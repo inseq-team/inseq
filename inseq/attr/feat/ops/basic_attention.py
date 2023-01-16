@@ -47,17 +47,17 @@ class BaseAttentionAttribution(Attribution):
         "single": lambda x, dim, idx: x.select(dim, idx),
     }
 
-    @classmethod
-    def has_convergence_delta(cls) -> bool:
+    @staticmethod
+    def has_convergence_delta() -> bool:
         return False
 
-    @classmethod
-    def _num_attention_heads(cls, attention: FullLayerAttentionTensor) -> int:
+    @staticmethod
+    def _num_attention_heads(attention: FullLayerAttentionTensor) -> int:
         """Returns the number of heads contained in the attention tensor."""
         return attention.size(1)
 
-    @classmethod
-    def _num_layers(cls, attention: FullAttentionOutput) -> int:
+    @staticmethod
+    def _num_layers(attention: FullAttentionOutput) -> int:
         """Returns the number of layers contained in the attention tensor."""
         return len(attention)
 
