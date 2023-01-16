@@ -367,6 +367,7 @@ class AttributionModel(ABC, torch.nn.Module):
     @abstractmethod
     def format_forward_args(
         inputs: Union[DecoderOnlyBatch, EncoderDecoderBatch],
+        use_embeddings: bool = True,
     ) -> Dict[str, Any]:
         pass
 

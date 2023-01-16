@@ -67,8 +67,12 @@ class DecoderOnlyAttributionModel(AttributionModel):
     @staticmethod
     def format_forward_args(
         inputs: DecoderOnlyBatch,
+        use_embeddings: bool = True,
     ) -> Dict[str, Any]:
-        return {"forward_tensor": inputs.input_embeds, "attention_mask": inputs.attention_mask}
+        return {
+            "forward_tensor": inputs.input_embeds if use_embeddings else inputs.input_ids,
+            "attention_mask": inputs.attention_mask,
+        }
 
     @staticmethod
     def format_attribution_args(
@@ -171,6 +175,7 @@ class DecoderOnlyAttributionModel(AttributionModel):
         forward_tensor: AttributionForwardInputs,
         attention_mask: Optional[IdsTensor] = None,
         use_embeddings: bool = True,
+        **kwargs,
     ) -> ModelOutput:
         embeds = forward_tensor if use_embeddings else None
         ids = None if use_embeddings else forward_tensor
@@ -178,6 +183,7 @@ class DecoderOnlyAttributionModel(AttributionModel):
             input_ids=ids,
             inputs_embeds=embeds,
             attention_mask=attention_mask,
+            **kwargs,
         )
 
     def forward(

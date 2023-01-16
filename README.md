@@ -4,7 +4,7 @@
 </div>
 <br/>
 <div align="center">
-  
+
 [![Build status](https://img.shields.io/github/actions/workflow/status/inseq-team/inseq/build.yml?branch=main)](https://github.com/inseq-team/inseq/actions?query=workflow%3Abuild)
 [![Docs status](https://img.shields.io/readthedocs/inseq)](https://inseq.readthedocs.io)
 [![Version](https://img.shields.io/pypi/v/inseq?color=blue)](https://pypi.org/project/inseq/)
@@ -14,7 +14,7 @@
 
 </div>
 <div align="center">
-  
+
   [![Follow Inseq on Twitter](https://img.shields.io/twitter/follow/inseqdev?label=Inseqdev&style=social)](https://twitter.com/InseqDev)
   [![Follow Inseq on Mastodon](https://img.shields.io/mastodon/follow/109308976376923913?domain=https%3A%2F%2Fsigmoid.social&label=Inseq&style=social)](https://sigmoid.social/@inseq)
 </div>
@@ -51,9 +51,10 @@ After installation, you should be able to run `make fast-test` and `make lint` w
 <details>
   <summary>FAQ Installation</summary>
 
-  - Installing the `tokenizers` package requires a Rust compiler installation. You can install Rust from [https://rustup.rs](https://rustup.rs) and add `$HOME/.cargo/env` to your PATH.
+- Installing the `tokenizers` package requires a Rust compiler installation. You can install Rust from [https://rustup.rs](https://rustup.rs) and add `$HOME/.cargo/env` to your PATH.
 
-  - Installing `sentencepiece` requires various packages, install with `sudo apt-get install cmake build-essential pkg-config` or `brew install cmake gperftools pkg-config`.
+- Installing `sentencepiece` requires various packages, install with `sudo apt-get install cmake build-essential pkg-config` or `brew install cmake gperftools pkg-config`.
+
 </details>
 
 ## Example usage in Python
@@ -96,6 +97,8 @@ model.attribute(
 - Feature attribution of sequence generation for most `ForConditionalGeneration` (encoder-decoder) and `ForCausalLM` (decoder-only) models from 🤗 Transformers
 
 - Support for single and batched attribution using multiple gradient-based feature attribution methods from [Captum](https://captum.ai/docs/introduction)
+
+- Support for basic single-layer and layer-aggregation attention attribution methods with one or multiple aggregated heads.
 
 - Post-hoc aggregation of feature attribution maps via `Aggregator` classes.
 
