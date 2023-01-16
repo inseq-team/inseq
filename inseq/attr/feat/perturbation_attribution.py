@@ -104,8 +104,8 @@ class LimeAttribution(PerturbationAttribution):
 
     @staticmethod
     def token_similarity_kernel(
-        original_input: tuple[torch.Tensor],
-        perturbed_input: tuple[torch.Tensor],
+        original_input: tuple,
+        perturbed_input: tuple,
         perturbed_interpretable_input: torch.Tensor,
         **kwargs,
     ) -> torch.Tensor:
@@ -117,9 +117,9 @@ class LimeAttribution(PerturbationAttribution):
 
     def perturb_func(
         self,
-        original_input: tuple[torch.Tensor],  # always needs to be last argument before **kwargs due to "partial"
+        original_input: tuple,  # always needs to be last argument before **kwargs due to "partial"
         **kwargs: Any,
-    ) -> tuple[torch.Tensor]:
+    ) -> tuple:
         """
         Sampling function
         """
