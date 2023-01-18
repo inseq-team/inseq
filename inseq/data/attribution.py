@@ -509,8 +509,27 @@ class FeatureAttributionOutput:
         for i, attr in enumerate(self.sequence_attributions):
             self.sequence_attributions[i] = attr.weight_attributions(step_score_id)
 
-    def get_scores_dicts(self):
-        return [attr.get_scores_dicts() for attr in self.sequence_attributions]
+    def get_scores_dicts(
+        self, aggregator: Union[AggregatorPipeline, Type[Aggregator]] = None, do_aggregation: bool = True, **kwargs
+    ) -> List[Dict[str, Dict[str, Dict[str, float]]]]:
+        """Get all computed scores (attributions and step scores) for all sequences as a list of dictionaries.
+
+        Returns:
+            :obj:`list(dict)`: List containing one dictionary per sequence. Every dictionary contains the keys
+            "source_attributions", "target_attributions" and "step_scores". For each of these keys, the value is a
+            dictionary with generated tokens as keys, and for values a final dictionary. For  "step_scores", the keys
+            of the final dictionary are the step score ids, and the values are the scores.
+            For "source_attributions" and "target_attributions", the keys of the final dictionary are respectively
+            source and target tokens, and the values are the attribution scores.
+
+        This output is intended to be easily converted to a pandas DataFrame. The following example produces a list of
+        DataFrames, one for each sequence, matching the source attributions that would be visualized by out.show().
+
+        ```python
+        dfs = [pd.DataFrame(x["source_attributions"]) for x in out.get_scores_dicts()]
+        ```
+        """
+        return [attr.get_scores_dicts(aggregator, do_aggregation, **kwargs) for attr in self.sequence_attributions]
 
 
 # Gradient attribution classes
