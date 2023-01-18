@@ -121,7 +121,11 @@ def get_step_scores(
     if attribution_model is None:
         raise ValueError("Attribution model is not set.")
     with torch.no_grad():
-        output = attribution_model.get_forward_output(**attribution_model.format_forward_args(batch))
+        output = attribution_model.get_forward_output(
+            **attribution_model.format_forward_args(
+                batch, use_embeddings=attribution_model.attribution_method.forward_batch_embeds
+            )
+        )
         step_scores_args = attribution_model.format_step_function_args(
             forward_output=output,
             encoder_input_ids=batch.source_ids,

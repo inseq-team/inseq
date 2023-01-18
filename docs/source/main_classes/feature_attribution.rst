@@ -20,7 +20,7 @@ Feature Attribution
 Gradient Attribution Methods
 -----------------------------------------------------------------------------------------------------------------------
 
-.. autoclass:: inseq.attr.feat.GradientAttribution
+.. autoclass:: inseq.attr.feat.GradientAttributionRegistry
     :members:
 
 
@@ -51,22 +51,24 @@ Layer Attribution Methods
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
-
-LayerIntegratedGradientsAttribution
-'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
-
 .. autoclass:: inseq.attr.feat.LayerIntegratedGradientsAttribution
     :members:
 
 
-LayerGradientXActivationAttribution
-'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
 .. autoclass:: inseq.attr.feat.LayerGradientXActivationAttribution
     :members:
 
 
-LayerDeepLiftAttribution
-'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
-
 .. autoclass:: inseq.attr.feat.LayerDeepLiftAttribution
+    :members:
+
+
+Attention Attribution Methods
+-----------------------------------------------------------------------------------------------------------------------
+
+.. autoclass:: inseq.attr.feat.AttentionAttributionRegistry
+    :members:
+
+
+.. autoclass:: inseq.attr.feat.AttentionAttribution
     :members:
