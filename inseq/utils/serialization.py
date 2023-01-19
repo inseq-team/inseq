@@ -1,7 +1,37 @@
+# Code adapted from json-tricks codebase (https://github.com/mverleg/pyjson_tricks)
+#
+# LICENSE: BSD-3-Clause
+#
+# Copyright (c) 2022 Mark V. All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without modification,
+# are permitted provided that the following conditions are met:
+#
+# 1. Redistributions of source code must retain the above copyright notice,
+# this list of conditions and the following disclaimer.
+#
+# 2. Redistributions in binary form must reproduce the above copyright notice,
+# this list of conditions and the following disclaimer in the documentation
+# and/or other materials provided with the distribution.
+#
+# 3. Neither the name of the copyright holder nor the names of its contributors
+# may be used to endorse or promote products derived from this software without
+# specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+# ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+# LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
+# USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
 from typing import Any, Callable, Dict, List, Optional, TypeVar, Union
 
 import json
-import warnings
 from collections import OrderedDict
 from json import JSONEncoder
 from os import PathLike
@@ -9,7 +39,6 @@ from os import PathLike
 from numpy import generic, ndarray
 
 from ..utils import (
-    InseqDeprecationWarning,
     bin_str_to_ndarray,
     get_cls_from_instance_type,
     get_module_name_from_object,
@@ -34,28 +63,23 @@ def class_instance_encode(obj: T, use_primitives: bool = True, **kwargs):
         return obj
     if hasattr(obj, "__class__") and hasattr(obj, "__dict__"):
         if not hasattr(obj, "__new__"):
-            raise TypeError(f'class "{obj.__class__}" does not have a __new__ method; ')
+            raise TypeError(f"class '{obj.__class__}' does not have a __new__ method; ")
         if isinstance(obj, type(lambda: 0)):
-            raise TypeError(f'instance "{obj}" of class "{obj.__class__}" cannot be encoded, it is a function.')
+            raise TypeError(f"instance '{obj}' of class '{obj.__class__}' cannot be encoded, it is a function.")
         try:
             obj.__new__(obj.__class__)
         except TypeError:
             raise TypeError(
-                f'instance "{obj}" of class "{obj.__class__}" cannot be encoded, perhaps because its'
+                f"instance '{obj}' of class '{obj.__class__}' cannot be encoded, perhaps because its"
                 " __new__ method cannot be called because it requires extra parameters"
             )
         mod = get_module_name_from_object(obj)
         name = obj.__class__.__name__
         if hasattr(obj, "__json_encode__"):
             attrs = obj.__json_encode__()
-            if use_primitives:
+            if use_primitives or not isinstance(attrs, dict):
                 return attrs
             else:
-                warnings.warn(
-                    "Reloading with use_primitives=False will be deprecated in a future release. Please regenerate"
-                    " your attributions files with use_primitives=True (default setting).",
-                    InseqDeprecationWarning,
-                )
                 return hashodict((("__instance_type__", (mod, name)), ("attributes", attrs)))
         dct = hashodict([("__instance_type__", (mod, name))])
         if hasattr(obj, "__dict__"):
@@ -64,11 +88,6 @@ def class_instance_encode(obj: T, use_primitives: bool = True, **kwargs):
             attrs = dct.get("attributes", {})
             return attrs
         else:
-            warnings.warn(
-                "Reloading with use_primitives=False will be deprecated in a future release. Please regenerate"
-                " your attributions files with use_primitives=True (default setting).",
-                InseqDeprecationWarning,
-            )
             return dct
     return obj
 
@@ -244,7 +263,7 @@ def class_obj_hook(dct, cls_lookup_map: Optional[Dict[str, type]] = None, **kwar
     try:
         obj = curr_class.__new__(curr_class)
     except TypeError:
-        raise TypeError(f'problem while decoding instance of "{name}"; this instance has a special __new__ method')
+        raise TypeError(f"problem while decoding instance of '{name}'; this instance has a special __new__ method")
     if hasattr(obj, "__json_decode__"):
         properties = {}
         if "attributes" in dct:
@@ -319,7 +338,7 @@ def attribution_load(
     except UnicodeDecodeError:
         raise Exception(
             "There was a problem decoding the file content. A possible reason is that the file is not "
-            'opened  in binary mode; be sure to set file mode to something like "rb".'
+            "opened  in binary mode; be sure to set file mode to something like 'rb'."
         )
     return attribution_loads(
         string=string,

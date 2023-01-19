@@ -343,7 +343,7 @@ def save_to_file(f: Callable[[Any], Any]) -> Callable[[Any], Any]:
             except TypeError as err:
                 err.args = (
                     err.args[0] + ". A possible reason is that the file is not opened in binary mode; "
-                    'be sure to set file mode to something like "wb".',
+                    "be sure to set file mode to something like 'wb'.",
                 )
                 raise
         finally:
@@ -415,7 +415,7 @@ def get_cls_from_instance_type(mod, name, cls_lookup_map):
                 raise ImportError(
                     f"class {name} seems to have been exported from the main file, which means "
                     "it has no module/import path set; you need to provide loads argument"
-                    f'`cls_lookup_map={{"{name}": Class}}` to locate the class'
+                    f"`cls_lookup_map={{'{name}': Class}}` to locate the class"
                 )
             curr_class = cls_lookup_map[name]
     else:
@@ -424,7 +424,7 @@ def get_cls_from_instance_type(mod, name, cls_lookup_map):
             module = import_module(f"{mod}")
         except ImportError as err:
             imp_err = (
-                f'encountered import error "{err}" while importing "{mod}" to decode a json file; perhaps '
+                f"encountered import error '{err}' while importing '{mod}' to decode a json file; perhaps "
                 f"it was encoded in a different environment where {mod}.{name} was available"
             )
         else:
@@ -432,11 +432,11 @@ def get_cls_from_instance_type(mod, name, cls_lookup_map):
                 curr_class = getattr(module, name)
             else:
                 imp_err = (
-                    f'imported "{module}" but could find "{name}" inside while decoding a json file '
+                    f"imported '{module}' but could find '{name}' inside while decoding a json file "
                     f"(found {', '.join(attr for attr in dir(module) if not attr.startswith('_'))})"
                 )
         if imp_err:
             curr_class = cls_lookup_map.get(name, None)
             if curr_class is None:
-                raise ImportError(f'{imp_err}; add the class to `cls_lookup_map={{"{name}": Class}}` argument')
+                raise ImportError(f"{imp_err}; add the class to `cls_lookup_map={{'{name}': Class}}` argument")
     return curr_class
