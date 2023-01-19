@@ -1,15 +1,16 @@
 from typing import Any, Dict, List, Optional, Type, Union
 
 import logging
-import os
 from copy import deepcopy
 from dataclasses import dataclass, field
+from pathlib import Path
 
-import json_tricks
 import torch
 
 from ..utils import (
     abs_max,
+    attribution_dump,
+    attribution_load,
     drop_padding,
     get_sequences_from_batched_steps,
     identity_fn,
@@ -374,7 +375,15 @@ class FeatureAttributionOutput:
             return False
         return True
 
-    def save(self, path: str, overwrite: bool = False, compress: bool = False) -> None:
+    def save(
+        self,
+        path: str,
+        overwrite: bool = False,
+        compress: bool = False,
+        ndarray_compact: bool = True,
+        use_primitives: bool = False,
+        split_sequences: bool = False,
+    ) -> None:
         """
         Save class contents to a JSON file.
 
@@ -382,21 +391,41 @@ class FeatureAttributionOutput:
             path (str): Path to the folder where attributions and their configuration will be stored.
             overwrite (bool): If True, overwrite the file if it exists, raise error otherwise.
         """
-        if not overwrite and os.path.exists(path):
+        if not overwrite and Path(path).exists():
             raise ValueError(f"{path} already exists. Override with overwrite=True.")
-        with open(path, "w") as f:
-            json_tricks.dump(
-                self,
-                f,
-                allow_nan=True,
-                indent=4,
-                sort_keys=True,
-                compression=compress,
-                properties={"ndarray_compact": True},
-            )
+        save_outs = []
+        paths = []
+        if split_sequences:
+            for i, seq in enumerate(self.sequence_attributions):
+                attr_out = deepcopy(self)
+                attr_out.sequence_attributions = [seq]
+                attr_out.step_attributions = None
+                attr_out.info["input_texts"] = [attr_out.info["input_texts"][i]]
+                attr_out.info["generated_texts"] = [attr_out.info["generated_texts"][i]]
+                save_outs.append(attr_out)
+                paths.append(f"{path.split('.json')[0]}_{i}.json{'.gz' if compress else ''}")
+        else:
+            save_outs.append(self)
+            paths.append(path)
+        for attr_out, path_out in zip(save_outs, paths):
+            with open(path_out, f"w{'b' if compress else ''}") as f:
+                attribution_dump(
+                    attr_out,
+                    f,
+                    allow_nan=True,
+                    indent=4,
+                    sort_keys=True,
+                    ndarray_compact=ndarray_compact,
+                    compression=compress,
+                    use_primitives=use_primitives,
+                )
 
     @staticmethod
-    def load(path: str) -> "FeatureAttributionOutput":
+    def load(
+        path: str,
+        ordered: bool = False,
+        decompress: bool = False,
+    ) -> "FeatureAttributionOutput":
         """Load saved attribution outputs into a new FeatureAttributionOutput object.
 
         Args:
@@ -405,8 +434,7 @@ class FeatureAttributionOutput:
         Returns:
             :class:`~inseq.data.FeatureAttributionOutput`: Loaded attribution output
         """
-        with open(path) as f:
-            out = json_tricks.load(f)
+        out = attribution_load(path, ordered=ordered, decompression=decompress)
         out.sequence_attributions = [seq.torch() for seq in out.sequence_attributions]
         if out.step_attributions is not None:
             out.step_attributions = [step.torch() for step in out.step_attributions]
