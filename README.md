@@ -152,3 +152,20 @@ inseq attribute-dataset \
 ## Contributing
 
 Our vision for Inseq is to create a centralized, comprehensive and robust set of tools to enable fair and reproducible comparisons in the study of sequence generation models. To achieve this goal, contributions from researchers and developers interested in these topics are more than welcome. Please see our [contributing guidelines](CONTRIBUTING.md) and our [code of conduct](CODE_OF_CONDUCT.md) for more information.
+
+## Citing Inseq
+
+A demo paper showcasing the Inseq library is presently in the works. In the meantime, if you use Inseq we kindly ask you to include the link `https://github.com/inseq-team/inseq` as a footnote and cite it as:
+
+```bibtex
+@software{inseq,
+  author    = {Sarti, Gabriele and Sickert, Ludwig and Feldhus, Nils and van der Wal, Oskar},
+  title     = {Inseq: An Interpretability Toolkit for Sequence Generation Models},
+  month     = jan,
+  year      = 2023,
+  publisher = {Zenodo},
+  version   = {0.3.3},
+  doi       = {10.5281/zenodo.7550249},
+  url       = {https://doi.org/10.5281/zenodo.7550249}
+}
+```
