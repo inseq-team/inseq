@@ -2,7 +2,7 @@ from typing import Optional, Sequence, Tuple, Union
 
 from dataclasses import dataclass
 
-from torch import long
+from torch import float32, long
 from torchtyping import TensorType
 from transformers import PreTrainedModel
 
@@ -54,12 +54,12 @@ AggregatedLayerAttentionTensor = TensorType["batch_size", "seq_len", "seq_len", 
 FullAttentionOutput = Tuple[FullLayerAttentionTensor, ...]
 
 # Step and sequence objects used for stepwise scores (e.g. convergence deltas, probabilities)
-SingleScorePerStepTensor = TensorType["batch_size", float]
-SingleScoresPerSequenceTensor = TensorType["generated_seq_len", float]
+SingleScorePerStepTensor = TensorType["batch_size", float32]
+SingleScoresPerSequenceTensor = TensorType["generated_seq_len", float32]
 
 # Step and sequence objects used for sequence scores (e.g. attributions over tokens)
-MultipleScoresPerStepTensor = TensorType["batch_size", "attributed_seq_len", float]
-MultipleScoresPerSequenceTensor = TensorType["attributed_seq_len", "generated_seq_len", float]
+MultipleScoresPerStepTensor = TensorType["batch_size", "attributed_seq_len", float32]
+MultipleScoresPerSequenceTensor = TensorType["attributed_seq_len", "generated_seq_len", float32]
 
 # One attribution score per embedding value for every attributed token
 # in a single attribution step. Produced by gradient attribution methods.
@@ -75,7 +75,7 @@ StepAttributionTensor = Union[GranularStepAttributionTensor, TokenStepAttributio
 # One attribution score per embedding value for every attributed token in attributed_seq
 # for all generated tokens in generated_seq. Produced by aggregating GranularStepAttributionTensor
 # across multiple steps and separating batches.
-GranularSequenceAttributionTensor = TensorType["attributed_seq_len", "generated_seq_len", "embed_size", float]
+GranularSequenceAttributionTensor = TensorType["attributed_seq_len", "generated_seq_len", "embed_size", float32]
 
 # One attribution score for every token in attributed_seq for every generated token
 # in generated_seq. Produced by aggregating GranularSequenceAttributionTensor over the last dimension,

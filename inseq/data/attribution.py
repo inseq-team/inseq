@@ -1,10 +1,10 @@
 from typing import Any, Dict, List, Optional, Type, Union
 
 import logging
-import os
+from copy import deepcopy
 from dataclasses import dataclass, field
+from pathlib import Path
 
-import json_tricks
 import torch
 
 from ..utils import (
@@ -12,6 +12,8 @@ from ..utils import (
     drop_padding,
     get_sequences_from_batched_steps,
     identity_fn,
+    json_advanced_dump,
+    json_advanced_load,
     pretty_dict,
     prod_fn,
     remap_from_filtered,
@@ -191,11 +193,13 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
         display: bool = True,
         return_html: Optional[bool] = False,
         aggregator: Union[AggregatorPipeline, Type[Aggregator]] = None,
+        do_aggregation: bool = True,
         **kwargs,
     ) -> Optional[str]:
         from inseq import show_attributions
 
-        aggregated = self.aggregate(aggregator, **kwargs)
+        # If no aggregator is specified, the default aggregator for the class is used
+        aggregated = self.aggregate(aggregator, **kwargs) if do_aggregation else self
         if (aggregated.source_attributions is not None and aggregated.source_attributions.shape[1] == 0) or (
             aggregated.target_attributions is not None and aggregated.target_attributions.shape[1] == 0
         ):
@@ -234,6 +238,40 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
         self._aggregator = AggregatorPipeline([])
         return self
 
+    def get_scores_dicts(
+        self,
+        aggregator: Union[AggregatorPipeline, Type[Aggregator]] = None,
+        do_aggregation: bool = True,
+        **kwargs,
+    ) -> Dict[str, Dict[str, Dict[str, float]]]:
+        # If no aggregator is specified, the default aggregator for the class is used
+        aggr = self.aggregate(aggregator, **kwargs) if do_aggregation else self
+        return_dict = {"source_attributions": {}, "target_attributions": {}, "step_scores": {}}
+        if aggr.source_attributions is not None:
+            score_map_source = {}
+            for tgt_idx, tgt_tok in enumerate(aggr.target):
+                score_map_source[tgt_tok.token] = {}
+                for src_idx, src_tok in enumerate(aggr.source):
+                    score_map_source[tgt_tok.token][src_tok.token] = aggr.source_attributions[src_idx, tgt_idx].item()
+            return_dict["source_attributions"] = score_map_source
+        if aggr.target_attributions is not None:
+            score_map_target = {}
+            for tgt_idx_b, tgt_tok_b in enumerate(aggr.target):
+                score_map_target[tgt_tok_b.token] = {}
+                for tgt_idx_a, tgt_tok_a in enumerate(aggr.target):
+                    score_map_target[tgt_tok_b.token][tgt_tok_a.token] = aggr.target_attributions[
+                        tgt_idx_a, tgt_idx_b
+                    ].item()
+            return_dict["target_attributions"] = score_map_target
+        if aggr.step_scores is not None:
+            step_scores_map = {}
+            for tgt_idx, tgt_tok in enumerate(aggr.target):
+                step_scores_map[tgt_tok.token] = {}
+                for step_score_id, step_score in aggr.step_scores.items():
+                    step_scores_map[tgt_tok.token][step_score_id] = step_score[tgt_idx].item()
+            return_dict["step_scores"] = step_scores_map
+        return return_dict
+
 
 @dataclass(eq=False, repr=False)
 class FeatureAttributionStepOutput(TensorWrapper):
@@ -250,6 +288,9 @@ class FeatureAttributionStepOutput(TensorWrapper):
     prefix: Optional[OneOrMoreTokenWithIdSequences] = None
     target: Optional[OneOrMoreTokenWithIdSequences] = None
     _sequence_cls: Type["FeatureAttributionSequenceOutput"] = FeatureAttributionSequenceOutput
+
+    def __post_init__(self):
+        self.to(torch.float32)
 
     def remap_from_filtered(
         self,
@@ -334,43 +375,107 @@ class FeatureAttributionOutput:
             return False
         return True
 
-    def save(self, path: str, overwrite: bool = False, compress: bool = False) -> None:
+    def save(
+        self,
+        path: str,
+        overwrite: bool = False,
+        compress: bool = False,
+        ndarray_compact: bool = True,
+        use_primitives: bool = False,
+        split_sequences: bool = False,
+    ) -> None:
         """
         Save class contents to a JSON file.
 
         Args:
-            path (str): Path to the folder where attributions and their configuration will be stored.
-            overwrite (bool): If True, overwrite the file if it exists, raise error otherwise.
+            path (:obj:`str`): Path to the folder where the attribution output will be stored (e.g. ``./out.json``).
+            overwrite (:obj:`bool`, *optional*, defaults to False):
+                If True, overwrite the file if it exists, raise error otherwise.
+            compress (:obj:`bool`, *optional*, defaults to False):
+                If True, the output file is compressed using gzip. Especially useful for large sequences and granular
+                attributions with umerged hidden dimensions.
+            ndarray_compact (:obj:`bool`, *optional*, defaults to True):
+                If True, the arrays for scores and attributions are stored in a compact b64 format. Otherwise, they are
+                stored as plain lists of floats.
+            use_primitives (:obj:`bool`, *optional*, defaults to False):
+                If True, the output is stored as a list of dictionaries with primitive types (e.g. int, float, str).
+                Note that an attribution saved with this option cannot be loaded with the `load` method.
+            split_sequences (:obj:`bool`, *optional*, defaults to False):
+                If True, the output is split into multiple files, one per sequence. The file names are generated by
+                appending the sequence index to the given path (e.g. ``./out.json`` with two sequences ->
+                ``./out_0.json``, ``./out_1.json``)
         """
-        if not overwrite and os.path.exists(path):
+        if not overwrite and Path(path).exists():
             raise ValueError(f"{path} already exists. Override with overwrite=True.")
-        with open(path, "w") as f:
-            json_tricks.dump(
-                self,
-                f,
-                allow_nan=True,
-                indent=4,
-                sort_keys=True,
-                compression=compress,
-                properties={"ndarray_compact": True},
-            )
+        save_outs = []
+        paths = []
+        if split_sequences:
+            for i, seq in enumerate(self.sequence_attributions):
+                attr_out = deepcopy(self)
+                attr_out.sequence_attributions = [seq]
+                attr_out.step_attributions = None
+                attr_out.info["input_texts"] = [attr_out.info["input_texts"][i]]
+                attr_out.info["generated_texts"] = [attr_out.info["generated_texts"][i]]
+                save_outs.append(attr_out)
+                paths.append(f"{str(path).split('.json')[0]}_{i}.json{'.gz' if compress else ''}")
+        else:
+            save_outs.append(self)
+            paths.append(path)
+        for attr_out, path_out in zip(save_outs, paths):
+            with open(path_out, f"w{'b' if compress else ''}") as f:
+                json_advanced_dump(
+                    attr_out,
+                    f,
+                    allow_nan=True,
+                    indent=4,
+                    sort_keys=True,
+                    ndarray_compact=ndarray_compact,
+                    compression=compress,
+                    use_primitives=use_primitives,
+                )
 
     @staticmethod
-    def load(path: str) -> "FeatureAttributionOutput":
-        """Load saved attribution outputs into a new FeatureAttributionOutput object.
+    def load(
+        path: str,
+        decompress: bool = False,
+    ) -> "FeatureAttributionOutput":
+        """Load saved attribution output into a new :class:`~inseq.data.FeatureAttributionOutput` object.
 
         Args:
-            path (str): Path to the folder containing the saved attribution outputs.
+            path (:obj:`str`): Path to the JSON file containing the saved attribution output.
+                Note that the file must have been saved with the :meth:`~inseq.data.FeatureAttributionOutput.save`
+                method with ``use_primitives=False`` in order to be loaded correctly.
+            decompress (:obj:`bool`, *optional*, defaults to False):
+                If True, the input file is decompressed using gzip.
 
         Returns:
             :class:`~inseq.data.FeatureAttributionOutput`: Loaded attribution output
         """
-        with open(path) as f:
-            out = json_tricks.load(f)
+        out = json_advanced_load(path, decompression=decompress)
         out.sequence_attributions = [seq.torch() for seq in out.sequence_attributions]
         if out.step_attributions is not None:
             out.step_attributions = [step.torch() for step in out.step_attributions]
         return out
+
+    def aggregate(
+        self,
+        aggregator: Union[AggregatorPipeline, Type[Aggregator]] = None,
+        **kwargs,
+    ) -> "FeatureAttributionOutput":
+        """Aggregate the sequence attributions.
+
+        Args:
+            aggregator (:obj:`AggregatorPipeline` or :obj:`Type[Aggregator]`, optional): Aggregator
+                or pipeline to use. If not provided, the default aggregator for every sequence attribution
+                is used.
+
+        Returns:
+            :class:`~inseq.data.FeatureAttributionOutput`: Aggregated attribution output
+        """
+        aggregated = deepcopy(self)
+        for idx, seq in enumerate(aggregated.sequence_attributions):
+            aggregated.sequence_attributions[idx] = seq.aggregate(aggregator, **kwargs)
+        return aggregated
 
     def show(
         self,
@@ -448,6 +553,28 @@ class FeatureAttributionOutput:
     def weight_attributions(self, step_score_id: str):
         for i, attr in enumerate(self.sequence_attributions):
             self.sequence_attributions[i] = attr.weight_attributions(step_score_id)
+
+    def get_scores_dicts(
+        self, aggregator: Union[AggregatorPipeline, Type[Aggregator]] = None, do_aggregation: bool = True, **kwargs
+    ) -> List[Dict[str, Dict[str, Dict[str, float]]]]:
+        """Get all computed scores (attributions and step scores) for all sequences as a list of dictionaries.
+
+        Returns:
+            :obj:`list(dict)`: List containing one dictionary per sequence. Every dictionary contains the keys
+            "source_attributions", "target_attributions" and "step_scores". For each of these keys, the value is a
+            dictionary with generated tokens as keys, and for values a final dictionary. For  "step_scores", the keys
+            of the final dictionary are the step score ids, and the values are the scores.
+            For "source_attributions" and "target_attributions", the keys of the final dictionary are respectively
+            source and target tokens, and the values are the attribution scores.
+
+        This output is intended to be easily converted to a pandas DataFrame. The following example produces a list of
+        DataFrames, one for each sequence, matching the source attributions that would be visualized by out.show().
+
+        ```python
+        dfs = [pd.DataFrame(x["source_attributions"]) for x in out.get_scores_dicts()]
+        ```
+        """
+        return [attr.get_scores_dicts(aggregator, do_aggregation, **kwargs) for attr in self.sequence_attributions]
 
 
 # Gradient attribution classes
