@@ -21,6 +21,7 @@ help:
 	@echo "check-safety    : run safety checks on all tests."
 	@echo "lint            : run linting on all files (check-style + check-safety)"
 	@echo "test            : run all tests."
+	@echo "test-cpu        : run all tests that do not depend on Torch GPU support."
 	@echo "fast-test       : run all quick tests."
 	@echo "codecov         : check coverage of all the code."
 	@echo "build-docs      : build sphinx documentation."
@@ -99,6 +100,10 @@ lint: fix-style check-safety
 .PHONY: test
 test:
 	poetry run pytest -c pyproject.toml -v
+
+.PHONY: test-cpu
+test-cpu:
+	poetry run pytest -c pyproject.toml -v -m "not require_cuda_gpu"
 
 .PHONY: fast-test
 fast-test:

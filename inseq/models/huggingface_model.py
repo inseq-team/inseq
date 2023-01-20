@@ -92,6 +92,10 @@ class HuggingfaceModel(AttributionModel):
         if isinstance(model, PreTrainedModel):
             self.model = model
         else:
+
+            if "output_attentions" not in model_kwargs:
+                model_kwargs["output_attentions"] = True
+
             self.model = self._autoclass.from_pretrained(model, *model_args, **model_kwargs)
         self.model_name = self.model.config.name_or_path
         self.tokenizer_name = tokenizer if isinstance(tokenizer, str) else None
@@ -104,6 +108,7 @@ class HuggingfaceModel(AttributionModel):
                 )
         tokenizer_inputs = kwargs.pop("tokenizer_inputs", {})
         tokenizer_kwargs = kwargs.pop("tokenizer_kwargs", {})
+
         if isinstance(tokenizer, PreTrainedTokenizer):
             self.tokenizer = tokenizer
         else:
@@ -206,6 +211,7 @@ class HuggingfaceModel(AttributionModel):
         as_targets: bool = False,
         return_baseline: bool = False,
         include_eos_baseline: bool = False,
+        max_input_length: int = 512,
     ) -> BatchEncoding:
         """Encode one or multiple texts, producing a BatchEncoding
 
@@ -222,7 +228,10 @@ class HuggingfaceModel(AttributionModel):
         # Some tokenizer have weird values for max_len_single_sentence
         # Cap length with max_model_input_sizes instead
         if max_length > 1e6:
-            max_length = max(v for _, v in self.tokenizer.max_model_input_sizes.items())
+            if hasattr(self.tokenizer, "max_model_input_sizes") and self.tokenizer.max_model_input_sizes:
+                max_length = max(v for _, v in self.tokenizer.max_model_input_sizes.items())
+            else:
+                max_length = max_input_length
         batch = self.tokenizer(
             text=texts if not as_targets else None,
             text_target=texts if as_targets else None,

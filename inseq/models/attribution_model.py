@@ -367,6 +367,7 @@ class AttributionModel(ABC, torch.nn.Module):
     @abstractmethod
     def format_forward_args(
         inputs: Union[DecoderOnlyBatch, EncoderDecoderBatch],
+        use_embeddings: bool = True,
     ) -> Dict[str, Any]:
         pass
 
@@ -398,7 +399,7 @@ class AttributionModel(ABC, torch.nn.Module):
     @abstractmethod
     def enrich_step_output(
         step_output: FeatureAttributionStepOutput,
-        batch: EncoderDecoderBatch,
+        batch: Union[DecoderOnlyBatch, EncoderDecoderBatch],
         target_tokens: OneOrMoreTokenSequences,
         target_ids: TargetIdsTensor,
     ) -> FeatureAttributionStepOutput:

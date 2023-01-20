@@ -114,10 +114,12 @@ class EncoderDecoderAttributionModel(AttributionModel):
     @staticmethod
     def format_forward_args(
         inputs: EncoderDecoderBatch,
+        use_embeddings: bool = True,
     ) -> Dict[str, Any]:
         return {
-            "forward_tensor": inputs.sources.input_embeds,
+            "forward_tensor": inputs.sources.input_embeds if use_embeddings else inputs.sources.input_ids,
             "decoder_input_embeds": inputs.targets.input_embeds,
+            # "decoder_input_ids": inputs.targets.input_ids,
             "encoder_attention_mask": inputs.sources.attention_mask,
             "decoder_attention_mask": inputs.targets.attention_mask,
         }
@@ -238,22 +240,20 @@ class EncoderDecoderAttributionModel(AttributionModel):
         self,
         forward_tensor: AttributionForwardInputs,
         encoder_attention_mask: Optional[IdsTensor] = None,
-        # decoder_input_ids: Optional[IdsTensor] = None,
         decoder_input_embeds: Optional[EmbeddingsTensor] = None,
         decoder_attention_mask: Optional[IdsTensor] = None,
         use_embeddings: bool = True,
+        **kwargs,
     ) -> ModelOutput:
         encoder_embeds = forward_tensor if use_embeddings else None
         encoder_ids = None if use_embeddings else forward_tensor
-        # decoder_embeds = decoder_input_embeds if decoder_input_ids is None else None
-        # decoder_ids = decoder_input_ids if decoder_input_ids is not None else None
         return self.model(
             input_ids=encoder_ids,
             inputs_embeds=encoder_embeds,
             attention_mask=encoder_attention_mask,
-            # decoder_input_ids=decoder_input_ids,
             decoder_inputs_embeds=decoder_input_embeds,
             decoder_attention_mask=decoder_attention_mask,
+            **kwargs,
         )
 
     def forward(
@@ -275,7 +275,6 @@ class EncoderDecoderAttributionModel(AttributionModel):
         output = self.get_forward_output(
             forward_tensor=encoder_tensors,
             encoder_attention_mask=encoder_attention_mask,
-            # decoder_input_ids=decoder_input_ids,
             decoder_input_embeds=decoder_input_embeds,
             decoder_attention_mask=decoder_attention_mask,
             use_embeddings=use_embeddings,

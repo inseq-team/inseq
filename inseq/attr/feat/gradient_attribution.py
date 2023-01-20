@@ -38,7 +38,7 @@ from .ops import DiscretetizedIntegratedGradients
 logger = logging.getLogger(__name__)
 
 
-class GradientAttribution(FeatureAttribution, Registry):
+class GradientAttributionRegistry(FeatureAttribution, Registry):
     r"""Gradient-based attribution method registry."""
 
     @set_hook
@@ -104,7 +104,7 @@ class GradientAttribution(FeatureAttribution, Registry):
         )
 
 
-class DeepLiftAttribution(GradientAttribution):
+class DeepLiftAttribution(GradientAttributionRegistry):
     """DeepLIFT attribution method.
 
     Reference implementation:
@@ -119,7 +119,7 @@ class DeepLiftAttribution(GradientAttribution):
         self.use_baseline = True
 
 
-class DiscretizedIntegratedGradientsAttribution(GradientAttribution):
+class DiscretizedIntegratedGradientsAttribution(GradientAttributionRegistry):
     """Discretized Integrated Gradients attribution method
 
     Reference: https://arxiv.org/abs/2108.13654
@@ -157,7 +157,7 @@ class DiscretizedIntegratedGradientsAttribution(GradientAttribution):
         super().hook(**other_kwargs)
 
 
-class IntegratedGradientsAttribution(GradientAttribution):
+class IntegratedGradientsAttribution(GradientAttributionRegistry):
     """Integrated Gradients attribution method.
 
     Reference implementation:
@@ -172,7 +172,7 @@ class IntegratedGradientsAttribution(GradientAttribution):
         self.use_baseline = True
 
 
-class InputXGradientAttribution(GradientAttribution):
+class InputXGradientAttribution(GradientAttributionRegistry):
     """Input x Gradient attribution method.
 
     Reference implementation:
@@ -186,7 +186,7 @@ class InputXGradientAttribution(GradientAttribution):
         self.method = InputXGradient(self.attribution_model)
 
 
-class SaliencyAttribution(GradientAttribution):
+class SaliencyAttribution(GradientAttributionRegistry):
     """Saliency attribution method.
 
     Reference implementation:
@@ -203,7 +203,7 @@ class SaliencyAttribution(GradientAttribution):
 # Layer methods
 
 
-class LayerIntegratedGradientsAttribution(GradientAttribution):
+class LayerIntegratedGradientsAttribution(GradientAttributionRegistry):
     """Layer Integrated Gradients attribution method.
 
     Reference implementation:
@@ -225,7 +225,7 @@ class LayerIntegratedGradientsAttribution(GradientAttribution):
         )
 
 
-class LayerGradientXActivationAttribution(GradientAttribution):
+class LayerGradientXActivationAttribution(GradientAttributionRegistry):
     """Layer Integrated Gradients attribution method.
 
     Reference implementation:
@@ -247,7 +247,7 @@ class LayerGradientXActivationAttribution(GradientAttribution):
         )
 
 
-class LayerDeepLiftAttribution(GradientAttribution):
+class LayerDeepLiftAttribution(GradientAttributionRegistry):
     """Layer DeepLIFT attribution method.
 
     Reference implementation:
