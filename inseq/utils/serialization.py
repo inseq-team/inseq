@@ -51,10 +51,11 @@ from ..utils import (
 )
 
 
-T = TypeVar("T")
+EncodableObject = TypeVar("EncodableObject")
+DecodableObject = TypeVar("DecodableObject")
 
 
-def class_instance_encode(obj: T, use_primitives: bool = True, **kwargs):
+def class_instance_encode(obj: EncodableObject, use_primitives: bool = True, **kwargs):
     """
     Encodes a class instance to json. Note that it can only be recovered if the environment allows the class to be
     imported in the same way.
@@ -92,11 +93,15 @@ def class_instance_encode(obj: T, use_primitives: bool = True, **kwargs):
     return obj
 
 
-def numpy_encode(
-    obj: T, use_primitives: bool = True, ndarray_compact: Optional[bool] = None, compression: bool = False, **kwargs
+def ndarray_encode(
+    obj: EncodableObject,
+    use_primitives: bool = True,
+    ndarray_compact: Optional[bool] = None,
+    compression: bool = False,
+    **kwargs,
 ) -> Dict[str, Any]:
     """
-    Encodes numpy `ndarray`s as lists with meta data.
+    Encodes numpy ``ndarray`` as lists with meta data.
     Encodes numpy scalar types as Python equivalents. Special encoding is not possible,
     because float64 is a subclass of primitives, which never reach the encoder.
     """
@@ -128,35 +133,35 @@ def numpy_encode(
     return obj
 
 
-ENCODE_HOOKS = [class_instance_encode, numpy_encode]
+ENCODE_HOOKS = [class_instance_encode, ndarray_encode]
 
 
 class AttributionSerializer(JSONEncoder):
     def __init__(
         self,
-        obj_encoders: Optional[List[Callable]] = None,
+        encoders: Optional[List[Callable]] = None,
         use_primitives: bool = True,
         ndarray_compact: Optional[bool] = None,
         compression: bool = False,
         **json_kwargs,
     ):
-        self.obj_encoders = []
-        if obj_encoders:
-            self.obj_encoders = list(obj_encoders)
+        self.encoders = []
+        if encoders:
+            self.encoders = list(encoders)
         self.use_primitives = use_primitives
         self.ndarray_compact = ndarray_compact
         self.compression = compression
         super().__init__(**json_kwargs)
 
-    def default(self, obj, *args, **kwargs):
+    def default(self, obj: EncodableObject, *args, **kwargs):
         """
         This is the method of JSONEncoders that is called for each object; it calls all the encoders with the previous
-        one's output used as input. It works for Encoder instances, but they are expected not to throw `TypeError` for
-        unrecognized types (the super method does that by default). It never calls the `super` method so if there are
+        one's output used as input. Works for Encoder instances, but they are expected not to throw ``TypeError`` for
+        unrecognized types (the super method does that by default). It never calls the ``super`` method so if there are
         non-primitive types left at the end, you'll get an encoding error.
         """
         prev_id = id(obj)
-        for encoder in self.obj_encoders:
+        for encoder in self.encoders:
             obj = encoder(
                 obj,
                 use_primitives=self.use_primitives,
@@ -166,25 +171,47 @@ class AttributionSerializer(JSONEncoder):
         if id(obj) == prev_id:
             raise TypeError(
                 f"Object of type {type(obj)} could not be encoded by {self.__class__.__name__} using encoders"
-                f" [{', '.join(str(encoder) for encoder in self.obj_encoders)}]. You can add an encoders for this type"
-                " using `extra_obj_encoders`. If you want to skip this object, consider using `fallback_encoders` like"
-                "`str` or `lambda o: None`."
+                f" [{', '.join(str(encoder) for encoder in self.encoders)}]."
             )
         return obj
 
 
-def attribution_dumps(
-    obj: Any,
+def json_advanced_dumps(
+    obj: EncodableObject,
     sort_keys: bool = True,
-    obj_encoders: List[Callable] = ENCODE_HOOKS,
+    encoders: List[Callable] = ENCODE_HOOKS,
     use_primitives: bool = True,
     allow_nan: bool = True,
     ndarray_compact: Optional[bool] = None,
     compression: bool = False,
     **jsonkwargs,
 ) -> str:
+    """Dumps a complex object containing classes and arrays object to a string.
+
+    Args:
+        obj (:obj:`Any`):
+            Object to be dumped to file.
+        sort_keys (:obj:`bool`, *optional*, defaults to ``True``):
+            Whether to object fields should be sorted in the serialized output.
+        encoders (:obj:`list` of callables, *optional*):
+            A list of encoders to run on the object fields for encoding it to JSON-compatible format. By default,
+            encoders that serialize classes and numpy arrays are used.
+        use_primitives (:obj:`bool`, *optional*, defaults to ``False``):
+            If specified, encoders will use primitive types instead of special formats for classes and numpy arrays.
+            Note that this will not allow for decoding the object back to its original form.
+        allow_nan (:obj:`bool`, *optional*, defaults to ``True``):
+            Whether to allow NaN values in the serialized output.
+        ndarray_compact (:obj:`bool`, *optional*, defaults to ``None``):
+            Whether to use compact storage for numpy arrays. If ``None``, arrays are serialized as lists.
+        compression (:obj:`bool`, *optional*, defaults to ``False``):
+            Whether to compress the serialized output using GZip.
+        **jsonkwargs: Additional keyword arguments passed to :func:`json.dumps`.
+
+    Returns:
+        The dumped object in string format.
+    """
     combined_encoder = AttributionSerializer(
-        obj_encoders=obj_encoders,
+        encoders=encoders,
         use_primitives=use_primitives,
         sort_keys=sort_keys,
         allow_nan=allow_nan,
@@ -196,22 +223,52 @@ def attribution_dumps(
 
 
 @save_to_file
-def attribution_dump(
-    obj: Any,
+def json_advanced_dump(
+    obj: EncodableObject,
     sort_keys: bool = True,
-    obj_encoders: List[Callable] = ENCODE_HOOKS,
-    use_primitives: bool = True,
+    encoders: List[Callable] = ENCODE_HOOKS,
+    use_primitives: bool = False,
     allow_nan: bool = True,
     ndarray_compact: Optional[bool] = None,
     compression: bool = False,
     **jsonkwargs,
 ) -> str:
+    """Dumps a complex object containing classes and arrays object to a file.
+
+    Args:
+        obj (:obj:`Any`):
+            Object to be dumped to file.
+        fp (:obj:`str` or :obj:`os.PathLike`):
+            File path to which the object should be dumped.
+        sort_keys (:obj:`bool`, *optional*, defaults to ``True``):
+            Whether to object fields should be sorted in the serialized output.
+        encoders (:obj:`list` of callables, *optional*):
+            A list of encoders to run on the object fields for encoding it to JSON format. By default, encoders that
+            serialize classes and numpy arrays are used.
+        use_primitives (:obj:`bool`, *optional*, defaults to ``False``):
+            If specified, encoders will use primitive types instead of special formats for classes and numpy arrays.
+            Note that this will not allow for decoding the object back to its original form.
+        allow_nan (:obj:`bool`, *optional*, defaults to ``True``):
+            Whether to allow NaN values in the serialized output.
+        ndarray_compact (:obj:`bool`, *optional*, defaults to ``None``):
+            Whether to use compact storage for numpy arrays. If ``None``, arrays are serialized as lists.
+        compression (:obj:`bool`, *optional*, defaults to ``False``):
+            Whether to compress the serialized output using GZip.
+        force_flush (:obj:`bool`, *optional*, defaults to ``False``):
+            Whether to force flushing the file after writing.
+        return_output (:obj:`bool`, *optional*, defaults to ``True``):
+            Whether to return the serialized output as a string.
+        **jsonkwargs: Additional keyword arguments passed to :func:`json.dumps`.
+
+    Returns:
+        The dumped object in string format.
+    """
     if isinstance(obj, str) or hasattr(obj, "write"):
         raise ValueError("dump arguments are in the wrong order: provide the data to be serialized before file handle")
-    txt = attribution_dumps(
+    txt = json_advanced_dumps(
         obj,
         sort_keys=sort_keys,
-        obj_encoders=obj_encoders,
+        encoders=encoders,
         use_primitives=use_primitives,
         allow_nan=allow_nan,
         ndarray_compact=ndarray_compact,
@@ -221,12 +278,13 @@ def attribution_dump(
     return txt
 
 
-def numpy_obj_hook(dct, **kwargs):
+def ndarray_hook(dct: Any, **kwargs) -> DecodableObject:
     """
-    Replace any numpy arrays previously encoded by NumpyEncoder to their proper
-    shape, data type and data.
-    :param dct: (dict) json encoded ndarray
-    :return: (ndarray) if input was an encoded ndarray
+    Replace any numpy arrays previously encoded by NumpyEncoder to their proper shape, data type and data.
+
+    Args:
+        dct: The object to be decoded. Will be processed by the hook if it is a dictionary containing the attribute
+            ``__ndarray__`` provided by ``ndarray_encode``.
     """
     if not isinstance(dct, dict):
         return dct
@@ -249,10 +307,18 @@ def numpy_obj_hook(dct, **kwargs):
         return scalar_to_numpy(data_json, nptype)
 
 
-def class_obj_hook(dct, cls_lookup_map: Optional[Dict[str, type]] = None, **kwargs):
+def class_instance_hook(dct: Any, cls_lookup_map: Optional[Dict[str, type]] = None, **kwargs) -> DecodableObject:
     """
     This hook tries to convert json encoded by class_instance_encoder back to it's original instance.
     It only works if the environment is the same, e.g. the class is similarly importable and hasn't changed.
+
+    Args:
+        dct:
+            The object to be decoded. Will be processed by the hook if it is a dictionary containing the attribute
+            ``__instance_type__`` provided by ``class_instance_encode``.
+        cls_lookup_map (:obj:`dict`, *optional*):
+            A dictionary mapping class names to classes. This is used to look up classes when decoding class instances.
+            This is useful when the class is not directly importable in the current environment.
     """
     if not isinstance(dct, dict):
         return dct
@@ -292,16 +358,17 @@ class AttributionDeserializer:
         self.cls_lookup_map = cls_lookup_map
 
     def __call__(self, pairs):
+        """Applies all hooks to the map"""
         map = self.map_type(pairs)
         for hook in self.hooks:
             map = hook(map, cls_lookup_map=self.cls_lookup_map)
         return map
 
 
-DECODE_HOOKS = [class_obj_hook, numpy_obj_hook]
+DECODE_HOOKS = [class_instance_hook, ndarray_hook]
 
 
-def attribution_loads(
+def json_advanced_loads(
     string: str,
     ordered: bool = False,
     decompression: bool = False,
@@ -309,6 +376,26 @@ def attribution_loads(
     cls_lookup_map: Optional[Dict[str, type]] = None,
     **jsonkwargs,
 ) -> Any:
+    """Load a complex object containing classes and arrays object from a string.
+
+    Args:
+        string (:obj:`str`):
+            String to be loaded into an object.
+        ordered (:obj:`bool`, *optional*, defaults to ``True``):
+            Whether to use an :obj:`OrderedDict` to store the loaded data in the original order.
+        decompression (:obj:`bool`, *optional*, defaults to ``False``):
+            Whether to decompress the file with GZip before loading it.
+        hooks (:obj:`list` of callables, *optional*):
+            A list of hooks to run on the loaded data for decoding. By default hooks to deserialize classes and numpy
+            arrays are used.
+        cls_lookup_map (:obj:`dict`, *optional*):
+            A dictionary mapping class names to classes. This is used to look up classes when decoding class instances.
+            This is useful when the class is not directly importable in the current environment.
+        **jsonkwargs: Additional keyword arguments passed to :func:`json.loads`.
+
+    Returns:
+        The loaded object.
+    """
     if decompression:
         string = gzip_decompress(string).decode("UTF-8")
     if not isinstance(string, str):
@@ -321,7 +408,7 @@ def attribution_loads(
     return json.loads(string, object_pairs_hook=hook, **jsonkwargs)
 
 
-def attribution_load(
+def json_advanced_load(
     fp: Union[str, bytes, PathLike],
     ordered: bool = True,
     decompression: bool = False,
@@ -329,6 +416,26 @@ def attribution_load(
     cls_lookup_map: Optional[Dict[str, type]] = None,
     **jsonkwargs,
 ) -> Any:
+    """Load a complex object containing classes and arrays from a JSON file.
+
+    Args:
+        fp (:obj:`str`, :obj:`bytes`, or :obj:`os.PathLike`):
+            Path to the file to load.
+        ordered (:obj:`bool`, *optional*, defaults to ``True``):
+            Whether to use an :obj:`OrderedDict` to store the loaded data in the original order.
+        decompression (:obj:`bool`, *optional*, defaults to ``False``):
+            Whether to decompress the file with GZip before loading it.
+        hooks (:obj:`list` of callables, *optional*):
+            A list of hooks to run on the loaded data for decoding. By default hooks to deserialize classes and numpy
+            arrays are used.
+        cls_lookup_map (:obj:`dict`, *optional*):
+            A dictionary mapping class names to classes. This is used to look up classes when decoding class instances.
+            This is useful when the class is not directly importable in the current environment.
+        **jsonkwargs: Additional keyword arguments passed to :func:`json.loads`.
+
+    Returns:
+        The loaded object.
+    """
     try:
         if isinstance(fp, str) or isinstance(fp, bytes) or isinstance(fp, PathLike):
             with open(fp, "rb" if decompression else "r") as fh:
@@ -340,7 +447,7 @@ def attribution_load(
             "There was a problem decoding the file content. A possible reason is that the file is not "
             "opened  in binary mode; be sure to set file mode to something like 'rb'."
         )
-    return attribution_loads(
+    return json_advanced_loads(
         string=string,
         ordered=ordered,
         decompression=decompression,

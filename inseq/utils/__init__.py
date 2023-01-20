@@ -42,7 +42,7 @@ from .misc import (
     scalar_to_numpy,
 )
 from .registry import Registry, get_available_methods
-from .serialization import attribution_dump, attribution_dumps, attribution_load, attribution_loads
+from .serialization import json_advanced_dump, json_advanced_dumps, json_advanced_load, json_advanced_loads
 from .torch_utils import (
     abs_max,
     aggregate_contiguous,
@@ -115,12 +115,12 @@ __all__ = [
     "gzip_compress",
     "gzip_decompress",
     "save_to_file",
-    "attribution_dump",
-    "attribution_dumps",
+    "json_advanced_dump",
+    "json_advanced_dumps",
     "bin_str_to_ndarray",
     "lists_of_numbers_to_ndarray",
     "scalar_to_numpy",
     "get_cls_from_instance_type",
-    "attribution_loads",
-    "attribution_load",
+    "json_advanced_loads",
+    "json_advanced_load",
 ]
