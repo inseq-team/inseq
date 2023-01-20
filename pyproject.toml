@@ -90,7 +90,7 @@ darglint = "^1.8.1"
 pre-commit = "^2.19.0"
 pytest = "^7.2.0"
 pytest-cov = "^4.0.0"
-ruff  = "^0.0.219"
+ruff  = "^0.0.227"
 
 [tool.poetry.extras]
 sklearn = ["scikit-learn", "joblib"]
