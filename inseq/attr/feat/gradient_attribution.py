@@ -13,9 +13,8 @@
 # limitations under the License.
 """ Gradient-based feature attribution methods. """
 
-from typing import Any, Dict
-
 import logging
+from typing import Any, Dict
 
 from captum.attr import (
     DeepLift,
@@ -33,7 +32,6 @@ from ..attribution_decorators import set_hook, unset_hook
 from .attribution_utils import get_source_target_attributions
 from .feature_attribution import FeatureAttribution
 from .ops import DiscretetizedIntegratedGradients
-
 
 logger = logging.getLogger(__name__)
 

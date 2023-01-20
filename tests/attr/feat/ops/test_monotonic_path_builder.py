@@ -1,9 +1,7 @@
+from itertools import islice
 from typing import List, Tuple
 
-from itertools import islice
-
 from inseq.utils import is_joblib_available
-
 
 if is_joblib_available():
     from joblib import Parallel, delayed
@@ -60,7 +58,7 @@ def walrus_operator_find_word_path(wrd_idx: int, n_steps: int):
 
 
 @pytest.mark.parametrize(
-    ("input_dims"),
+    "input_dims",
     [
         ((512,)),
         ((512, 12)),
@@ -106,7 +104,7 @@ def test_walrus_find_word_path(wrd_idx: int, n_steps: int) -> None:
 
 @pytest.mark.slow
 @pytest.mark.parametrize(
-    ("word_idx"),
+    "word_idx",
     [(0), (1), (735), (111), (10296)],
 )
 def test_scaled_monotonic_path_embeddings(word_idx: int, dig_model) -> None:
@@ -122,7 +120,7 @@ def test_scaled_monotonic_path_embeddings(word_idx: int, dig_model) -> None:
     reason="joblib is not available",
 )
 @pytest.mark.parametrize(
-    ("ids"),
+    "ids",
     [
         (
             [

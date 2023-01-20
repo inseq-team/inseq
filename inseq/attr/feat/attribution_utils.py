@@ -1,7 +1,6 @@
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Union
-
 import logging
 import math
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Union
 
 import torch
 
@@ -19,7 +18,6 @@ from ...utils.typing import (
     TextInput,
     TokenWithId,
 )
-
 
 if TYPE_CHECKING:
     from ...models import AttributionModel
@@ -163,8 +161,8 @@ def extract_args(
         if step_score not in STEP_SCORES_MAP:
             raise AttributeError(
                 f"Step score {step_score} not found. Available step scores are: "
-                f"{', '.join([x for x in STEP_SCORES_MAP.keys()])}. Use the inseq.register_step_score"
-                f"function to register a custom step score."
+                f"{', '.join(list(STEP_SCORES_MAP.keys()))}. Use the inseq.register_step_score"
+                "function to register a custom step score."
             )
         extra_step_scores_args.update(
             **extract_signature_args(

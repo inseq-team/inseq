@@ -15,7 +15,6 @@ from inseq import list_feature_attribution_methods
 from inseq.data import FeatureAttributionOutput, FeatureAttributionSequenceOutput
 from inseq.utils import get_default_device
 
-
 EXAMPLES_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../fixtures/huggingface_model.json")
 EXAMPLES = json.load(open(EXAMPLES_FILE))
 

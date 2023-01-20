@@ -1,6 +1,5 @@
-from typing import List, Optional, Union
-
 import logging
+from typing import List, Optional, Union
 
 from rich.status import Status
 
@@ -10,7 +9,6 @@ from .attribution_model import AttributionModel
 from .decoder_only import DecoderOnlyAttributionModel
 from .encoder_decoder import EncoderDecoderAttributionModel
 from .huggingface_model import HuggingfaceDecoderOnlyModel, HuggingfaceEncoderDecoderModel, HuggingfaceModel
-
 
 logger = logging.getLogger(__name__)
 

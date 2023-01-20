@@ -5,7 +5,6 @@ from pytest import mark, skip
 
 from inseq.attr.feat.ops.basic_attention import BaseAttentionAttribution
 
-
 AGGREGATE_FN_OPTIONS = list(BaseAttentionAttribution.AGGREGATE_FN_OPTIONS.keys()) + [None]
 
 AGGREGATE_OPTIONS = ["int", "range", "list", "none"]
@@ -14,15 +13,14 @@ AGGREGATE_OPTIONS = ["int", "range", "list", "none"]
 @mark.parametrize("aggr_method", AGGREGATE_FN_OPTIONS)
 @mark.parametrize("aggr_layers", AGGREGATE_OPTIONS)
 def test_layer_aggregation(aggr_method: str, aggr_layers: str) -> None:
-
-    layerAttention = tuple()
+    layerAttention = ()
 
     shape = (5, 8, 7, 7)
 
     layers = 0
 
     max_layer = random.randint(4, 10)
-    for i in range(max_layer):
+    for _ in range(max_layer):
         attention = torch.rand(size=shape, dtype=torch.float)
         layerAttention = layerAttention + (attention,)
 
@@ -49,7 +47,6 @@ def test_layer_aggregation(aggr_method: str, aggr_layers: str) -> None:
 @mark.parametrize("aggr_method", AGGREGATE_FN_OPTIONS)
 @mark.parametrize("aggr_heads", AGGREGATE_OPTIONS)
 def test_head_aggregation(aggr_method: str, aggr_heads: str) -> None:
-
     num_heads = random.randint(4, 12)
 
     in_shape = (5, num_heads, 7, 7)

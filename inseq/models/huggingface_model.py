@@ -1,8 +1,7 @@
 """ HuggingFace Seq2seq model """
-from typing import Dict, List, NoReturn, Optional, Tuple, Union
-
 import logging
 from abc import abstractmethod
+from typing import Dict, List, NoReturn, Optional, Tuple, Union
 
 import torch
 from torch import long
@@ -30,7 +29,6 @@ from .attribution_model import AttributionModel
 from .decoder_only import DecoderOnlyAttributionModel
 from .encoder_decoder import EncoderDecoderAttributionModel
 from .model_decorators import unhooked
-
 
 logger = logging.getLogger(__name__)
 logging.getLogger("urllib3").setLevel(logging.WARNING)
@@ -92,7 +90,6 @@ class HuggingfaceModel(AttributionModel):
         if isinstance(model, PreTrainedModel):
             self.model = model
         else:
-
             if "output_attentions" not in model_kwargs:
                 model_kwargs["output_attentions"] = True
 

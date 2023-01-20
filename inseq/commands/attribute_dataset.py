@@ -1,11 +1,9 @@
-from typing import List, Optional, Tuple
-
 from dataclasses import dataclass, field
+from typing import List, Optional, Tuple
 
 from ..utils import is_datasets_available
 from .attribute import AttributeBaseArgs, attribute
 from .base import BaseCLICommand
-
 
 if is_datasets_available():
     from datasets import load_dataset

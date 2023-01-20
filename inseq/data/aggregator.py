@@ -1,6 +1,5 @@
+from abc import ABC, abstractmethod
 from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
-
-from abc import ABC
 
 from ..utils import abs_max, aggregate_contiguous, aggregate_token_pair, aggregate_token_sequence, identity_fn
 from ..utils.typing import IndexSpan, TokenWithId
@@ -22,6 +21,7 @@ class DispatchableDict(dict):
 
 class Aggregator(ABC):
     @classmethod
+    @abstractmethod
     def start_aggregation_hook(cls, tensors: TensorWrapper, **kwargs):
         """Hook called at the start of the aggregation process.
 
@@ -33,6 +33,7 @@ class Aggregator(ABC):
         pass
 
     @classmethod
+    @abstractmethod
     def pre_aggregate_hook(cls, tensors: TensorWrapper, **kwargs):
         """Hook called right before the aggregation function is called.
 
@@ -74,6 +75,7 @@ class Aggregator(ABC):
         return aggregated
 
     @classmethod
+    @abstractmethod
     def post_aggregate_hook(cls, tensors: TensorWrapper, **kwargs):
         """Hook called right after the aggregation function is called.
 
@@ -82,6 +84,7 @@ class Aggregator(ABC):
         pass
 
     @classmethod
+    @abstractmethod
     def end_aggregation_hook(cls, tensors: TensorWrapper, **kwargs):
         """Hook called at the end of the aggregation process.
 
@@ -126,6 +129,7 @@ class AggregableMixin(ABC):
             aggregator = self._aggregator
         return aggregator.aggregate(self, **kwargs)
 
+    @abstractmethod
     def __post_init__(self):
         pass
 

@@ -1,6 +1,5 @@
-from typing import TYPE_CHECKING, Any, Callable, List, Optional, Sequence, Tuple, Union
-
 import logging
+from typing import TYPE_CHECKING, Any, Callable, List, Optional, Sequence, Tuple, Union
 
 import torch
 from torch.backends.cuda import is_built as is_cuda_built
@@ -16,7 +15,6 @@ from .typing import (
     TargetIdsTensor,
     TokenSequenceAttributionTensor,
 )
-
 
 if TYPE_CHECKING:
     from ..models import AttributionModel

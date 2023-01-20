@@ -29,12 +29,11 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
 # USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-from typing import Any, Callable, Dict, List, Optional, TypeVar, Union
-
 import json
 from collections import OrderedDict
 from json import JSONEncoder
 from os import PathLike
+from typing import Any, Callable, Dict, List, Optional, TypeVar, Union
 
 from numpy import generic, ndarray
 
@@ -50,7 +49,6 @@ from ..utils import (
     scalar_to_numpy,
 )
 
-
 EncodableObject = TypeVar("EncodableObject")
 DecodableObject = TypeVar("DecodableObject")
 
@@ -60,7 +58,7 @@ def class_instance_encode(obj: EncodableObject, use_primitives: bool = True, **k
     Encodes a class instance to json. Note that it can only be recovered if the environment allows the class to be
     imported in the same way.
     """
-    if isinstance(obj, list) or isinstance(obj, dict):
+    if isinstance(obj, (list, dict)):
         return obj
     if hasattr(obj, "__class__") and hasattr(obj, "__dict__"):
         if not hasattr(obj, "__new__"):
@@ -69,11 +67,11 @@ def class_instance_encode(obj: EncodableObject, use_primitives: bool = True, **k
             raise TypeError(f"instance '{obj}' of class '{obj.__class__}' cannot be encoded, it is a function.")
         try:
             obj.__new__(obj.__class__)
-        except TypeError:
+        except TypeError as err:
             raise TypeError(
                 f"instance '{obj}' of class '{obj.__class__}' cannot be encoded, perhaps because its"
                 " __new__ method cannot be called because it requires extra parameters"
-            )
+            ) from err
         mod = get_module_name_from_object(obj)
         name = obj.__class__.__name__
         if hasattr(obj, "__json_encode__"):
@@ -328,8 +326,10 @@ def class_instance_hook(dct: Any, cls_lookup_map: Optional[Dict[str, type]] = No
     curr_class = get_cls_from_instance_type(mod, name, cls_lookup_map=cls_lookup_map)
     try:
         obj = curr_class.__new__(curr_class)
-    except TypeError:
-        raise TypeError(f"problem while decoding instance of '{name}'; this instance has a special __new__ method")
+    except TypeError as err:
+        raise TypeError(
+            f"problem while decoding instance of '{name}'; this instance has a special __new__ method"
+        ) from err
     if hasattr(obj, "__json_decode__"):
         properties = {}
         if "attributes" in dct:
@@ -437,16 +437,16 @@ def json_advanced_load(
         The loaded object.
     """
     try:
-        if isinstance(fp, str) or isinstance(fp, bytes) or isinstance(fp, PathLike):
+        if isinstance(fp, (PathLike, bytes, str)):
             with open(fp, "rb" if decompression else "r") as fh:
                 string = fh.read()
         else:
             string = fp.read()
-    except UnicodeDecodeError:
+    except UnicodeDecodeError as err:
         raise Exception(
             "There was a problem decoding the file content. A possible reason is that the file is not "
             "opened  in binary mode; be sure to set file mode to something like 'rb'."
-        )
+        ) from err
     return json_advanced_loads(
         string=string,
         ordered=ordered,

@@ -1,11 +1,9 @@
-from typing import Optional, Sequence, Tuple, Union
-
 from dataclasses import dataclass
+from typing import Optional, Sequence, Tuple, Union
 
 from torch import float32, long
 from torchtyping import TensorType
 from transformers import PreTrainedModel
-
 
 TextInput = Union[str, Sequence[str]]
 

@@ -16,11 +16,10 @@
 Todo:
     * 🟡: Allow custom arguments for model loading in the :class:`FeatureAttribution` :meth:`load` method.
 """
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
-
 import logging
 from abc import abstractmethod
 from datetime import datetime
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 from torchtyping import TensorType
 
@@ -45,7 +44,6 @@ from ...utils import (
 from ...utils.typing import ModelIdentifier, SingleScorePerStepTensor, TargetIdsTensor
 from ..attribution_decorators import batched, set_hook, unset_hook
 from .attribution_utils import STEP_SCORES_MAP, check_attribute_positions, get_step_scores, tok2string
-
 
 if TYPE_CHECKING:
     from ...models import AttributionModel
@@ -465,8 +463,8 @@ class FeatureAttribution(Registry):
             if step_score not in STEP_SCORES_MAP:
                 raise AttributeError(
                     f"Step score {step_score} not found. Available step scores are: "
-                    f"{', '.join([x for x in STEP_SCORES_MAP.keys()])}. Use the inseq.register_step_score"
-                    f"function to register a custom step score."
+                    f"{', '.join(list(STEP_SCORES_MAP.keys()))}. Use the inseq.register_step_score"
+                    "function to register a custom step score."
                 )
             step_output.step_scores[step_score] = get_step_scores(
                 self.attribution_model, batch, target_ids, step_score, step_scores_args

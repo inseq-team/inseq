@@ -13,7 +13,6 @@ from .gradient_attribution import (
     SaliencyAttribution,
 )
 
-
 __all__ = [
     "FeatureAttribution",
     "extract_args",
