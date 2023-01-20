@@ -1,6 +1,5 @@
-from typing import Any, Callable
-
 from functools import wraps
+from typing import Any, Callable
 
 
 def unhooked(f: Callable[..., Any]) -> Callable[..., Any]:

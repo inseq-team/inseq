@@ -16,9 +16,8 @@
 # WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
 # OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-from typing import Any, Callable, List, Tuple, Union
-
 from pathlib import Path
+from typing import Any, Callable, List, Tuple, Union
 
 import torch
 from captum._utils.common import (

@@ -1,6 +1,5 @@
 from importlib.util import find_spec
 
-
 _ipywidgets_available = find_spec("ipywidgets") is not None
 _scikitlearn_available = find_spec("sklearn") is not None
 _transformers_available = find_spec("transformers") is not None

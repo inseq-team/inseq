@@ -13,7 +13,6 @@ from inseq.data.aggregator import (
     SubwordAggregator,
 )
 
-
 EXAMPLES_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../fixtures/aggregator.json")
 EXAMPLES = json.load(open(EXAMPLES_FILE))
 

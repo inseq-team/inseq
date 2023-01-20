@@ -16,7 +16,6 @@ from .attribution import (
 from .batch import Batch, BatchEmbedding, BatchEncoding, DecoderOnlyBatch, EncoderDecoderBatch
 from .viz import show_attributions
 
-
 __all__ = [
     "Aggregator",
     "AggregatorPipeline",

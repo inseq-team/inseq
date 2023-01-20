@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-from typing import TypeVar
-
 from abc import ABC
-
+from typing import TypeVar
 
 R = TypeVar("R", bound="Registry")
 
@@ -36,4 +34,4 @@ class Registry(ABC):
 
 
 def get_available_methods(cls: type[Registry]) -> list[str]:
-    return [n for n in cls.available_classes().keys()]
+    return list(cls.available_classes().keys())

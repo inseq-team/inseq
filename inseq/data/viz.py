@@ -16,10 +16,9 @@
 # WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
 # OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-from typing import Dict, List, Literal, Optional, Tuple, Union
-
 import random
 import string
+from typing import Dict, List, Literal, Optional, Tuple, Union
 
 import numpy as np
 from matplotlib.colors import Colormap
@@ -214,10 +213,11 @@ def get_saliency_heatmap_html(
                 threshold = step_scores_threshold
             else:
                 threshold = step_scores_threshold.get(step_score_name, 0.5)
-            style = lambda val: abs(val) >= threshold
+            style = lambda val, limit: abs(val) >= limit
             for col_index in range(scores.shape[1]):
                 score = round(float(step_score_values[col_index]), 3)
-                out += f'<th>{"<b>" if style(score) else ""}{score}{"</b>" if style(score) else ""}</th>'
+                is_bold = style(score, threshold)
+                out += f'<th>{"<b>" if is_bold else ""}{score}{"</b>" if is_bold else ""}</th>'
     out += "</table>"
     saliency_heatmap_markup = saliency_heatmap_html.format(uuid=uuid, content=out, label=label)
     plot_uuid = "".join(random.choices(string.ascii_lowercase, k=20))
@@ -262,10 +262,12 @@ def get_saliency_heatmap_rich(
                 threshold = step_scores_threshold
             else:
                 threshold = step_scores_threshold.get(step_score_name, 0.5)
-            style = lambda val: "bold" if abs(val) >= threshold else ""
+            style = lambda val, limit: "bold" if abs(val) >= limit else ""
             score_row = [Text(step_score_name, style="bold")]
             for score in step_score_values:
-                score_row.append(Text(f"{score:.2f}", justify="center", style=style(round(float(score), 2))))
+                score_row.append(
+                    Text(f"{score:.2f}", justify="center", style=style(round(float(score), 2), threshold))
+                )
             table.add_row(*score_row, end_section=True)
     return table
 

@@ -1,6 +1,5 @@
-from typing import List, Optional, Tuple, Union
-
 from dataclasses import dataclass
+from typing import List, Optional, Tuple, Union
 
 from ..utils.typing import EmbeddingsTensor, ExpandedTargetIdsTensor, IdsTensor, OneOrMoreTokenSequences
 from .data_utils import TensorWrapper

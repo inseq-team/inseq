@@ -12,9 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Dict, List, Protocol, Tuple, Union
-
 import logging
+from typing import Any, Dict, List, Protocol, Tuple, Union
 
 import torch
 from captum._utils.typing import TensorOrTupleOfTensorsGeneric
@@ -23,7 +22,6 @@ from captum.log import log_usage
 
 from ....data import Batch, EncoderDecoderBatch
 from ....utils.typing import AggregatedLayerAttentionTensor, FullAttentionOutput, FullLayerAttentionTensor
-
 
 logger = logging.getLogger(__name__)
 
@@ -115,7 +113,7 @@ class BaseAttentionAttribution(Attribution):
             if isinstance(aggregate_fn, str):
                 if aggregate_fn not in cls.AGGREGATE_FN_OPTIONS:
                     raise RuntimeError(
-                        "Invalid aggregation method specified." f"Valid methods are: {cls.AGGREGATE_FN_OPTIONS.keys()}"
+                        f"Invalid aggregation method specified.Valid methods are: {cls.AGGREGATE_FN_OPTIONS.keys()}"
                     )
                 aggregate_fn = cls.AGGREGATE_FN_OPTIONS[aggregate_fn]
             if heads is None:
@@ -201,7 +199,7 @@ class BaseAttentionAttribution(Attribution):
             if isinstance(aggregate_fn, str):
                 if aggregate_fn not in cls.AGGREGATE_FN_OPTIONS:
                     raise RuntimeError(
-                        "Invalid aggregation method specified." f"Valid methods are: {cls.AGGREGATE_FN_OPTIONS.keys()}"
+                        f"Invalid aggregation method specified.Valid methods are: {cls.AGGREGATE_FN_OPTIONS.keys()}"
                     )
                 aggregate_fn = cls.AGGREGATE_FN_OPTIONS[aggregate_fn]
             if layers is None:

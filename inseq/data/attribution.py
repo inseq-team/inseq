@@ -1,9 +1,8 @@
-from typing import Any, Dict, List, Optional, Type, Union
-
 import logging
 from copy import deepcopy
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any, Dict, List, Optional, Type, Union
 
 import torch
 
@@ -35,7 +34,6 @@ from ..utils.typing import (
 from .aggregator import AggregableMixin, Aggregator, AggregatorPipeline, SequenceAttributionAggregator
 from .batch import Batch, BatchEncoding
 from .data_utils import TensorWrapper
-
 
 FeatureAttributionInput = Union[TextInput, BatchEncoding, Batch]
 

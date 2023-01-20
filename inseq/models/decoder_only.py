@@ -1,6 +1,5 @@
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
-
 import logging
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 from ..attr.feat import join_token_ids
 from ..data import (
@@ -26,7 +25,6 @@ from ..utils.typing import (
 )
 from .attribution_model import AttributionModel, ModelOutput
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -41,7 +39,7 @@ class DecoderOnlyAttributionModel(AttributionModel):
         if isinstance(inputs, Batch):
             batch = inputs
         else:
-            if isinstance(inputs, str) or isinstance(inputs, list):
+            if isinstance(inputs, (str, list)):
                 # Decoder-only model do not tokenize as targets,
                 # since a single tokenizer is available.
                 encodings: BatchEncoding = self.encode(
@@ -53,7 +51,7 @@ class DecoderOnlyAttributionModel(AttributionModel):
                 encodings = inputs
             else:
                 raise ValueError(
-                    f"targets must be either a string, a list of strings, a BatchEncoding or a Batch, "
+                    "targets must be either a string, a list of strings, a BatchEncoding or a Batch, "
                     f"not {type(inputs)}"
                 )
             baseline_embeds = self.embed(encodings.baseline_ids)

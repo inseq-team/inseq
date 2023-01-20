@@ -1,5 +1,3 @@
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
-
 import functools
 import gzip
 import io
@@ -14,13 +12,13 @@ from importlib import import_module
 from inspect import signature
 from itertools import dropwhile
 from os import PathLike, fsync
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 from numpy import asarray, frombuffer
 from torch import Tensor
 
 from .errors import LengthMismatchError
 from .typing import TextInput, TokenWithId
-
 
 logger = logging.getLogger(__name__)
 
@@ -97,7 +95,7 @@ def pretty_dict(d: Dict[str, Any], lpad: int = 4) -> str:
     out_txt = "{\n"
     for k, v in d.items():
         out_txt += f"{' ' * lpad}{k}: "
-        if isinstance(v, list) or isinstance(v, tuple):
+        if isinstance(v, (list, tuple)):
             out_txt += pretty_list(v, lpad + 4)
         elif isinstance(v, Tensor):
             out_txt += pretty_tensor(v, lpad + 4)
@@ -209,8 +207,9 @@ def format_input_texts(
     reference_texts = [ref_texts] if isinstance(ref_texts, str) else ref_texts
     if reference_texts and len(texts) != len(reference_texts):
         raise LengthMismatchError(
-            "Length mismatch for texts and reference_texts."
-            "Input length: {}, reference length: {} ".format(len(texts), len(reference_texts))
+            "Length mismatch for texts and reference_texts.Input length: {}, reference length: {} ".format(
+                len(texts), len(reference_texts)
+            )
         )
     return texts, reference_texts
 
@@ -337,12 +336,13 @@ def save_to_file(f: Callable[[Any], Any]) -> Callable[[Any], Any]:
             fh = fp
         try:
             if compression and "b" not in getattr(fh, "mode", "b?") and not isinstance(txt, str):
-                raise IOError("If compression is enabled, the file must be opened in binary mode.")
+                raise OSError("If compression is enabled, the file must be opened in binary mode.")
             try:
                 fh.write(txt)
             except TypeError as err:
                 err.args = (
-                    err.args[0] + ". A possible reason is that the file is not opened in binary mode; "
+                    err.args[0]
+                    + ". A possible reason is that the file is not opened in binary mode; "
                     "be sure to set file mode to something like 'wb'.",
                 )
                 raise
@@ -352,7 +352,7 @@ def save_to_file(f: Callable[[Any], Any]) -> Callable[[Any], Any]:
                 try:
                     if fh.fileno() is not None:
                         fsync(fh.fileno())
-                except (ValueError,):
+                except ValueError:
                     pass
             if isinstance(fp, str):
                 fh.close()
@@ -369,7 +369,7 @@ def bin_str_to_ndarray(data, order, shape, dtype):
     assert order in [
         None,
         "C",
-    ], "specifying different memory order is not (yet) supported " "for binary numpy format (got order = {})".format(
+    ], "specifying different memory order is not (yet) supported for binary numpy format (got order = {})".format(
         order
     )
     if data.startswith("b64.gz:"):
@@ -410,13 +410,13 @@ def get_cls_from_instance_type(mod, name, cls_lookup_map):
     if mod is None:
         try:
             curr_class = getattr((__import__("__main__")), name)
-        except (ImportError, AttributeError):
+        except (ImportError, AttributeError) as err:
             if name not in cls_lookup_map:
                 raise ImportError(
                     f"class {name} seems to have been exported from the main file, which means "
                     "it has no module/import path set; you need to provide loads argument"
                     f"`cls_lookup_map={{'{name}': Class}}` to locate the class"
-                )
+                ) from err
             curr_class = cls_lookup_map[name]
     else:
         imp_err = None
