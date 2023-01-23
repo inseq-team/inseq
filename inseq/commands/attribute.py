@@ -1,7 +1,6 @@
-from typing import List, Optional
-
 import logging
 from dataclasses import dataclass, field
+from typing import List, Optional
 
 from .. import list_feature_attribution_methods, load_model
 from ..utils import get_default_device
@@ -123,9 +122,9 @@ class AttributeArgs(AttributeBaseArgs):
         if self.input_texts is None:
             raise RuntimeError("Input texts must be specified.")
         if isinstance(self.input_texts, str):
-            self.input_texts = [t for t in self.input_texts]
+            self.input_texts = list(self.input_texts)
         if isinstance(self.generated_texts, str):
-            self.generated_texts = [t for t in self.generated_texts]
+            self.generated_texts = list(self.generated_texts)
 
 
 def attribute(input_texts, generated_texts, args: AttributeBaseArgs):

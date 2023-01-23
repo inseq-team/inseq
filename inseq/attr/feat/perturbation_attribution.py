@@ -1,7 +1,6 @@
-from typing import Any, Dict
-
 import logging
 from functools import partial
+from typing import Any, Dict
 
 import torch
 from captum._utils.models.linear_model import SkLearnLinearModel
@@ -13,11 +12,10 @@ from ..attribution_decorators import set_hook, unset_hook
 from .attribution_utils import get_source_target_attributions
 from .gradient_attribution import FeatureAttribution
 
-
 logger = logging.getLogger(__name__)
 
 
-class PerturbationAttribution(FeatureAttribution, Registry):
+class PerturbationAttributionRegistry(FeatureAttribution, Registry):
     """Perturbation-based attribution method registry."""
 
     @set_hook
@@ -29,7 +27,7 @@ class PerturbationAttribution(FeatureAttribution, Registry):
         pass
 
 
-class OcclusionAttribution(PerturbationAttribution):
+class OcclusionAttribution(PerturbationAttributionRegistry):
     """Occlusion-based attribution method.
     Reference implementation:
     `https://captum.ai/api/occlusion.html <https://captum.ai/api/occlusion.html>`__.
@@ -55,7 +53,6 @@ class OcclusionAttribution(PerturbationAttribution):
         attribute_fn_main_args: Dict[str, Any],
         attribution_args: Dict[str, Any] = {},
     ) -> PerturbationFeatureAttributionStepOutput:
-
         if "sliding_window_shapes" not in attribution_args:
             # Sliding window shapes is defined as a tuple
             # First entry is between 1 and length of input
@@ -78,7 +75,7 @@ class OcclusionAttribution(PerturbationAttribution):
         )
 
 
-class LimeAttribution(PerturbationAttribution):
+class LimeAttribution(PerturbationAttributionRegistry):
     """LIME-based attribution method.
     Reference implementations:
     `https://captum.ai/api/lime.html <https://captum.ai/api/lime.html>`__.
@@ -110,9 +107,9 @@ class LimeAttribution(PerturbationAttribution):
         **kwargs,
     ) -> torch.Tensor:
         original_input_tensor = original_input[0]
-        perturbed_input_tensor = perturbed_input
+        perturbed_input_tensor = perturbed_input[0]
         assert original_input_tensor.shape == perturbed_input_tensor.shape
-        similarity = torch.sum(original_input_tensor == perturbed_input_tensor)  # / len(original_input_tensor)
+        similarity = torch.sum(original_input_tensor == perturbed_input_tensor) / len(original_input_tensor)
         return similarity
 
     def perturb_func(
@@ -123,13 +120,11 @@ class LimeAttribution(PerturbationAttribution):
         """
         Sampling function
         """
-
         original_input_tensor = original_input[0]
         mask = torch.randint(low=0, high=2, size=original_input_tensor.size()).to(self.attribution_model.device)
-        perturbed_input_tensor = (
-            original_input_tensor * mask + (1 - mask) * self.attribution_model.tokenizer.pad_token_id
-        )
-        return perturbed_input_tensor
+        perturbed_input = original_input_tensor * mask + (1 - mask) * self.attribution_model.tokenizer.pad_token_id
+        perturbed_input_tuple = tuple({perturbed_input})
+        return perturbed_input_tuple
 
     @staticmethod
     def to_interp_rep_transform(sample, original_input, **kwargs: Any):
@@ -140,11 +135,32 @@ class LimeAttribution(PerturbationAttribution):
         attribute_fn_main_args: Dict[str, Any],
         attribution_args: Dict[str, Any] = {},
     ) -> PerturbationFeatureAttributionStepOutput:
+        """Run on each example in a batch at a time
+        LimeBase does not accept attribution for more than one example at a time:
+        https://github.com/pytorch/captum/issues/905#issuecomment-1075384565#
+        """
+        attrs = []
+        for b, _batch in enumerate(attribute_fn_main_args["inputs"][0]):
+            single_input = tuple(
+                [inp[b] if type(inp) == torch.Tensor else inp for inp in attribute_fn_main_args["inputs"]]
+            )
+            single_additional_forward_args = tuple(
+                [
+                    arg[b] if type(arg) == torch.Tensor else arg
+                    for arg in attribute_fn_main_args["additional_forward_args"]
+                ]
+            )
+            single_attribute_fn_main_args = {
+                "inputs": single_input,
+                "additional_forward_args": single_additional_forward_args,
+            }
 
-        attr = self.method.attribute(
-            **attribute_fn_main_args,
-            **attribution_args,
-        )
+            single_attr = self.method.attribute(
+                **single_attribute_fn_main_args,
+                **attribution_args,
+            )
+            attrs.append(single_attr)
+        attr = torch.stack(list(attrs), dim=0)
 
         source_attributions, target_attributions = get_source_target_attributions(
             attr, self.attribution_model.is_encoder_decoder
@@ -155,7 +171,7 @@ class LimeAttribution(PerturbationAttribution):
         )
 
 
-class ShapAttribution(PerturbationAttribution):
+class ShapAttribution(PerturbationAttributionRegistry):
     """SHAP-based attribution method.
     Reference implementation:
     `https://captum.ai/api/gradient_shap.html <https://captum.ai/api/gradient_shap.html>`__.
@@ -173,7 +189,6 @@ class ShapAttribution(PerturbationAttribution):
         attribute_fn_main_args: Dict[str, Any],
         attribution_args: Dict[str, Any] = {},
     ) -> PerturbationFeatureAttributionStepOutput:
-
         attr = self.method.attribute(
             **attribute_fn_main_args,
             **attribution_args,

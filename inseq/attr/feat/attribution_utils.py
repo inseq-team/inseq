@@ -1,14 +1,15 @@
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Union
-
 import logging
 import math
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Union
 
 import torch
 
 from ...data.attribution import DEFAULT_ATTRIBUTION_AGGREGATE_DICT
-from ...data.batch import EncoderDecoderBatch
+from ...data.batch import DecoderOnlyBatch, EncoderDecoderBatch
 from ...utils import extract_signature_args, output2ce, output2ent, output2ppl, output2prob
 from ...utils.typing import (
+    EmbeddingsTensor,
+    IdsTensor,
     OneOrMoreAttributionSequences,
     OneOrMoreIdSequences,
     OneOrMoreTokenSequences,
@@ -18,11 +19,25 @@ from ...utils.typing import (
     TokenWithId,
 )
 
-
 if TYPE_CHECKING:
     from ...models import AttributionModel
     from .feature_attribution import FeatureAttribution
 
+
+StepScoreInput = Callable[
+    [
+        "AttributionModel",
+        Union[EncoderDecoderBatch, DecoderOnlyBatch],
+        IdsTensor,
+        IdsTensor,
+        EmbeddingsTensor,
+        EmbeddingsTensor,
+        IdsTensor,
+        IdsTensor,
+        TargetIdsTensor,
+    ],
+    SingleScorePerStepTensor,
+]
 
 STEP_SCORES_MAP = {
     "probability": output2prob,
@@ -93,7 +108,7 @@ def check_attribute_positions(
 
 def get_step_scores(
     attribution_model: "AttributionModel",
-    batch: EncoderDecoderBatch,
+    batch: Union[EncoderDecoderBatch, DecoderOnlyBatch],
     target_ids: TargetIdsTensor,
     score_identifier: str = "probability",
     step_scores_args: Dict[str, Any] = {},
@@ -104,7 +119,11 @@ def get_step_scores(
     if attribution_model is None:
         raise ValueError("Attribution model is not set.")
     with torch.no_grad():
-        output = attribution_model.get_forward_output(**attribution_model.format_forward_args(batch))
+        output = attribution_model.get_forward_output(
+            **attribution_model.format_forward_args(
+                batch, use_embeddings=attribution_model.attribution_method.forward_batch_embeds
+            )
+        )
         step_scores_args = attribution_model.format_step_function_args(
             forward_output=output,
             encoder_input_ids=batch.source_ids,
@@ -142,8 +161,8 @@ def extract_args(
         if step_score not in STEP_SCORES_MAP:
             raise AttributeError(
                 f"Step score {step_score} not found. Available step scores are: "
-                f"{', '.join([x for x in STEP_SCORES_MAP.keys()])}. Use the inseq.register_step_score"
-                f"function to register a custom step score."
+                f"{', '.join(list(STEP_SCORES_MAP.keys()))}. Use the inseq.register_step_score"
+                "function to register a custom step score."
             )
         extra_step_scores_args.update(
             **extract_signature_args(
@@ -178,7 +197,7 @@ def list_step_scores() -> List[str]:
 
 
 def register_step_score(
-    fn: Callable[["AttributionModel", EncoderDecoderBatch, TargetIdsTensor], SingleScorePerStepTensor],
+    fn: StepScoreInput,
     identifier: str,
     aggregate_map: Optional[Dict[str, Callable[[torch.Tensor], torch.Tensor]]] = None,
 ) -> None:
@@ -198,7 +217,7 @@ def register_step_score(
 
             - :obj:`encoder_input_ids`, :obj:`decoder_input_ids`, :obj:`encoder_input_embeds`,
                 :obj:`decoder_input_embeds`, :obj:`encoder_attention_mask`, :obj:`decoder_attention_mask`: all the
-                elements composing the :class:`~inseq.data.EncoderDecoderBatch` used as context of the model.
+                elements composing the :class:`~inseq.data.Batch` used as context of the model.
 
             - :obj:`target_ids`: :obj:`torch.Tensor` of target token ids of size `(batch_size,)` and type long,
                 corresponding to the target predicted tokens for the next generation step.

@@ -1,7 +1,6 @@
-from typing import Any, Callable, Dict, List, Optional, Tuple, TypeVar, Union
-
 import logging
 from abc import ABC, abstractmethod
+from typing import Any, Callable, Dict, List, Optional, Tuple, TypeVar, Union
 
 import torch
 
@@ -31,7 +30,6 @@ from ..utils.typing import (
 )
 from .model_decorators import unhooked
 
-
 ModelOutput = TypeVar("ModelOutput")
 
 
@@ -39,7 +37,6 @@ logger = logging.getLogger(__name__)
 
 
 class AttributionModel(ABC, torch.nn.Module):
-
     # Default arguments for custom attributed functions
     # in the AttributionModel.forward method.
     _DEFAULT_ATTRIBUTED_FN_ARGS = [
@@ -133,7 +130,7 @@ class AttributionModel(ABC, torch.nn.Module):
         if isinstance(attributed_fn, str):
             if attributed_fn not in STEP_SCORES_MAP:
                 raise ValueError(
-                    f"Unknown function: {attributed_fn}." "Register custom functions with inseq.register_step_score"
+                    f"Unknown function: {attributed_fn}. Register custom functions with inseq.register_step_score"
                 )
             attributed_fn = STEP_SCORES_MAP[attributed_fn]
         return attributed_fn
@@ -367,6 +364,7 @@ class AttributionModel(ABC, torch.nn.Module):
     @abstractmethod
     def format_forward_args(
         inputs: Union[DecoderOnlyBatch, EncoderDecoderBatch],
+        use_embeddings: bool = True,
     ) -> Dict[str, Any]:
         pass
 
@@ -398,7 +396,7 @@ class AttributionModel(ABC, torch.nn.Module):
     @abstractmethod
     def enrich_step_output(
         step_output: FeatureAttributionStepOutput,
-        batch: EncoderDecoderBatch,
+        batch: Union[DecoderOnlyBatch, EncoderDecoderBatch],
         target_tokens: OneOrMoreTokenSequences,
         target_ids: TargetIdsTensor,
     ) -> FeatureAttributionStepOutput:

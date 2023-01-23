@@ -1,9 +1,9 @@
 """Adapted from https://github.com/huggingface/transformers/blob/main/src/transformers/commands/transformers_cli.py"""
+import sys
 
 from ..utils import InseqArgumentParser
 from .attribute import AttributeCommand
 from .attribute_dataset import AttributeDatasetCommand
-
 
 COMMANDS = [AttributeCommand, AttributeDatasetCommand]
 
@@ -19,7 +19,7 @@ def main():
 
     if not hasattr(args, "factory_method"):
         parser.print_help()
-        exit(1)
+        sys.exit(1)
 
     # Run
     command, command_args = args.factory_method(args)

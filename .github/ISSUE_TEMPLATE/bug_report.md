@@ -1,6 +1,6 @@
 ---
 name: 🐛 Bug report
-about: If something isn't working 🔧
+about: Create a report to help us improve Inseq
 title: ''
 labels: bug
 assignees:
@@ -29,14 +29,16 @@ Steps to reproduce the behavior:
 python --version
 ```
 
-### Screenshots
+* Inseq version, get it with:
 
-<!-- If applicable, add screenshots to help explain your problem. -->
+```bash
+python -c "import inseq; print(inseq.get_version())"
+```
 
-## 📈 Expected behavior
+## Expected behavior
 
 <!-- A clear and concise description of what you expected to happen. -->
 
-## 📎 Additional context
+## Additional context
 
-<!-- Add any other context about the problem here. -->
+<!-- Add any other context or screenshot about the problem here. -->

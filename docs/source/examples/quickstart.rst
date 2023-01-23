@@ -25,7 +25,7 @@ The Inseq library is a Pytorch-based toolkit inteded to democratize the access t
 
 **Interpretability Methods**
 
-- At the moment, only gradient-based feature attribution methods sourced from the `Captum <https://captum.ai>`_ library are available, but other popular occlusion and attention-based techniques will soon follow. The list of all available methods can be obtained by using the :meth:`~inseq.list_feature_attribution_methods` method. Each method either points to its original implementation, and is thoroughly documented in its docstring.
+- At the moment, only gradient-based feature attribution methods sourced from the `Captum <https://captum.ai>`_ library and basic attention attribution methods are available, but other popular occlusion and attention-based techniques will soon follow. The list of all available methods can be obtained by using the :meth:`~inseq.list_feature_attribution_methods` method. Each method either points to its original implementation, and is thoroughly documented in its docstring.
 
 Installing Inseq
 ===================================
@@ -45,7 +45,7 @@ The :class:`~inseq.models.AttributionModel` class is a ``torch.nn.Module`` inten
 
 ``AttributionModel`` children classes belong to two categories: **architectural classes** like :class:`~inseq.models.EncoderDecoderAttributionModel` defines methods that are specific to a certain model architecture, while **framework classes** like :class:`~inseq.models.HuggingfaceModel` specify methods that are specific to a certain modeling framework (e.g. encoding with a tokenizer in |:hugging_face:| transformers). The final class that will be instantiated by the user is a combination of the two, e.g. :class:`~inseq.models.HuggingfaceEncoderDecoderModel` for a sequence-to-sequence model from the |:hugging_face:| transformers library.
 
-When a model is loaded with :meth:`~inseq.load_model`, a :class:`~inseq.attr.feat.FeatureAttribution` can be attached to it to specify which feature attribution technique should be used on it. Different families of attribution methods such as :class:`~inseq.attr.feats.GradientAttribution` are made available, each containing multiple methods (e.g. :class:`~inseq.attr.feats.IntegratedGradientsAttribution`, :class:`~inseq.attr.feats.DeepLiftAttribution`).
+When a model is loaded with :meth:`~inseq.load_model`, a :class:`~inseq.attr.feat.FeatureAttribution` can be attached to it to specify which feature attribution technique should be used on it. Different families of attribution methods such as :class:`~inseq.attr.feats.GradientAttributionRegistry` are made available, each containing multiple methods (e.g. :class:`~inseq.attr.feats.IntegratedGradientsAttribution`, :class:`~inseq.attr.feats.DeepLiftAttribution`).
 
 The following image provides a visual hierarchy of the division between ``AttributionModel`` and ``FeatureAttribution`` subclasses:
 

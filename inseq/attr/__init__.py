@@ -7,7 +7,6 @@ from .feat import (
     register_step_score,
 )
 
-
 __all__ = [
     "FeatureAttribution",
     "list_feature_attribution_methods",

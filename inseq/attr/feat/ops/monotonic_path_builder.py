@@ -17,20 +17,18 @@
 # WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
 # OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-from typing import Any, List, Optional, Tuple, Union
-
 import logging
 import os
 from enum import Enum
 from itertools import islice
 from pathlib import Path
+from typing import Any, List, Optional, Tuple, Union
 
 import torch
 from scipy.sparse import csr_matrix
 from torchtyping import TensorType
 
 from ....utils import is_joblib_available, is_scikitlearn_available
-
 
 if is_joblib_available():
     from joblib import Parallel, delayed
@@ -40,7 +38,6 @@ if is_scikitlearn_available():
 
 from ....utils import INSEQ_ARTIFACTS_CACHE, cache_results, euclidean_distance
 from ....utils.typing import MultiStepEmbeddingsTensor, VocabularyEmbeddingsTensor
-
 
 logger = logging.getLogger(__name__)
 
@@ -59,8 +56,10 @@ class UnknownPathBuildingStrategy(Exception):
         *args: Tuple[Any],
     ) -> None:
         super().__init__(
-            f"Unknown strategy: {strategy}.\nAvailable strategies: "
-            f"{','.join([s.value for s in PathBuildingStrategies])}",
+            (
+                f"Unknown strategy: {strategy}.\nAvailable strategies: "
+                f"{','.join([s.value for s in PathBuildingStrategies])}"
+            ),
             *args,
         )
 

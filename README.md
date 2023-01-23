@@ -4,17 +4,19 @@
 </div>
 <br/>
 <div align="center">
-  
+
+
 [![Build status](https://img.shields.io/github/actions/workflow/status/inseq-team/inseq/build.yml?branch=main)](https://github.com/inseq-team/inseq/actions?query=workflow%3Abuild)
 [![Docs status](https://img.shields.io/readthedocs/inseq)](https://inseq.readthedocs.io)
 [![Version](https://img.shields.io/pypi/v/inseq?color=blue)](https://pypi.org/project/inseq/)
 [![Python Version](https://img.shields.io/pypi/pyversions/inseq.svg?color=blue)](https://pypi.org/project/inseq/)
-[![Downloads](https://img.shields.io/pypi/dm/inseq?color=purple)](https://github.com/inseq-team/inseq/releases/latest)
+[![Downloads](https://static.pepy.tech/badge/inseq)](https://pepy.tech/project/inseq)
 [![License](https://img.shields.io/github/license/inseq-team/inseq)](https://github.com/inseq-team/inseq/blob/main/LICENSE)
 
 </div>
 <div align="center">
-  
+
+
   [![Follow Inseq on Twitter](https://img.shields.io/twitter/follow/inseqdev?label=Inseqdev&style=social)](https://twitter.com/InseqDev)
   [![Follow Inseq on Mastodon](https://img.shields.io/mastodon/follow/109308976376923913?domain=https%3A%2F%2Fsigmoid.social&label=Inseq&style=social)](https://sigmoid.social/@inseq)
 </div>
@@ -51,9 +53,10 @@ After installation, you should be able to run `make fast-test` and `make lint` w
 <details>
   <summary>FAQ Installation</summary>
 
-  - Installing the `tokenizers` package requires a Rust compiler installation. You can install Rust from [https://rustup.rs](https://rustup.rs) and add `$HOME/.cargo/env` to your PATH.
+- Installing the `tokenizers` package requires a Rust compiler installation. You can install Rust from [https://rustup.rs](https://rustup.rs) and add `$HOME/.cargo/env` to your PATH.
 
-  - Installing `sentencepiece` requires various packages, install with `sudo apt-get install cmake build-essential pkg-config` or `brew install cmake gperftools pkg-config`.
+- Installing `sentencepiece` requires various packages, install with `sudo apt-get install cmake build-essential pkg-config` or `brew install cmake gperftools pkg-config`.
+
 </details>
 
 ## Example usage in Python
@@ -91,29 +94,33 @@ model.attribute(
 
 ![GPT-2 Attribution in the console](https://raw.githubusercontent.com/inseq-team/inseq/main/docs/source/images/inseq_python_console.gif)
 
-## Features
+## Current Features
 
-- Feature attribution of sequence generation for most `ForConditionalGeneration` (encoder-decoder) and `ForCausalLM` (decoder-only) models from 🤗 Transformers
+- 🚀 Feature attribution of sequence generation for most `ForConditionalGeneration` (encoder-decoder) and `ForCausalLM` (decoder-only) models from 🤗 Transformers
 
-- Support for single and batched attribution using multiple gradient-based feature attribution methods from [Captum](https://captum.ai/docs/introduction)
+- 🚀 Support for single and batched attribution using multiple gradient-based feature attribution methods from [Captum](https://captum.ai/docs/introduction)
 
-- Post-hoc aggregation of feature attribution maps via `Aggregator` classes.
+- 🚀 Support for basic single-layer and layer-aggregation attention attribution methods with one or multiple aggregated heads.
 
-- Attribution visualization in notebooks, browser and command line.
+- 🚀 Post-hoc aggregation of feature attribution maps via `Aggregator` classes.
 
-- Command line interface for attributing single examples or entire 🤗 datasets.
+- 🚀 Attribution visualization in notebooks, browser and command line.
 
-- Custom attribution of target functions, supporting advanced usage for cases such as contrastive and uncertainty-weighted feature attributions.
+- 🚀 CLI for attributing single examples or entire 🤗 datasets.
 
-- Extract and visualize custom scores (e.g. probability, entropy) for every generation step alongsides attribution maps.
+- 🚀 Custom attribution of target functions, supporting advanced use cases such as contrastive and uncertainty-weighted feature attributions.
 
-## What will be supported?
+- 🚀 Extraction and visualization of custom step scores (e.g. probability, entropy) alongsides attribution maps.
 
-- Attention-based and occlusion-based feature attribution methods (documented in [#107](https://github.com/inseq-team/inseq/issues/107) and [#108](https://github.com/inseq-team/inseq/issues/108)).
+## Planned Development
 
-- Interoperability with other interpretability libraries like [ferret](https://ferret.readthedocs.io/en/latest/).
+- ⚙️ Support more attention-based and occlusion-based feature attribution methods (documented in [#107](https://github.com/inseq-team/inseq/issues/107) and [#108](https://github.com/inseq-team/inseq/issues/108)).
 
-- Rich and interactive visualizations in a tabbed interface, possibly using [Gradio Blocks](https://gradio.app/docs/#blocks).
+- ⚙️ Interoperability with [ferret](https://ferret.readthedocs.io/en/latest/) for attribution plausibility and faithfulness evaluation.
+
+- ⚙️ Rich and interactive visualizations in a tabbed interface using [Gradio Blocks](https://gradio.app/docs/#blocks).
+
+- ⚙️ Baked-in advanced capabilities for contrastive and uncertainty-weighted feature attribution.
 
 ## Using the Inseq client
 
@@ -140,4 +147,25 @@ inseq attribute-dataset \
   --viz_path attributions.html \
   --batch_size 8 \
   --hide
+```
+
+## Contributing
+
+Our vision for Inseq is to create a centralized, comprehensive and robust set of tools to enable fair and reproducible comparisons in the study of sequence generation models. To achieve this goal, contributions from researchers and developers interested in these topics are more than welcome. Please see our [contributing guidelines](CONTRIBUTING.md) and our [code of conduct](CODE_OF_CONDUCT.md) for more information.
+
+## Citing Inseq
+
+A demo paper showcasing the Inseq library is presently in the works. In the meantime, if you use Inseq we kindly ask you to include the link `https://github.com/inseq-team/inseq` as a footnote and cite it as:
+
+```bibtex
+@software{inseq,
+  author    = {Sarti, Gabriele and Sickert, Ludwig and Feldhus, Nils and van der Wal, Oskar},
+  title     = {Inseq: An Interpretability Toolkit for Sequence Generation Models},
+  month     = jan,
+  year      = 2023,
+  publisher = {Zenodo},
+  version   = {0.3.3},
+  doi       = {10.5281/zenodo.7550249},
+  url       = {https://doi.org/10.5281/zenodo.7550249}
+}
 ```

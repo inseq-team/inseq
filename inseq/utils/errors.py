@@ -3,11 +3,18 @@ from typing import Any, Tuple
 from .registry import get_available_methods
 
 
+class InseqDeprecationWarning(UserWarning):
+    """Special deprecation warning because the built-in one is ignored by default"""
+
+    def __init__(self, msg):
+        super().__init__(msg)
+
+
 class UnknownAttributionMethodError(Exception):
     """Raised when an attribution method is not valid"""
 
     UNKNOWN_ATTRIBUTION_METHOD_MSG = (
-        "Unknown attribution method: {attribution_method}.\n" "Available methods: {available_methods}"
+        "Unknown attribution method: {attribution_method}.\nAvailable methods: {available_methods}"
     )
 
     def __init__(

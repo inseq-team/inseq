@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Dict, Iterable, NewType, Optional, Tuple, Union, get_type_hints
-
 import dataclasses
 import json
 import sys
@@ -22,7 +20,7 @@ from copy import copy
 from enum import Enum
 from inspect import isclass
 from pathlib import Path
-
+from typing import Any, Dict, Iterable, NewType, Optional, Tuple, Union, get_type_hints
 
 DataClass = NewType("DataClass", Any)
 DataClassType = NewType("DataClassType", Any)
@@ -154,12 +152,12 @@ class InseqArgumentParser(ArgumentParser):
 
         try:
             type_hints: Dict[str, type] = get_type_hints(dtype)
-        except NameError:
+        except NameError as err:
             raise RuntimeError(
                 f"Type resolution failed for f{dtype}. Try declaring the class in global scope or "
-                f"removing line of `from __future__ import annotations` which opts in Postponed "
-                f"Evaluation of Annotations (PEP 563)"
-            )
+                "removing line of `from __future__ import annotations` which opts in Postponed "
+                "Evaluation of Annotations (PEP 563)"
+            ) from err
 
         for field in dataclasses.fields(dtype):
             if not field.init:

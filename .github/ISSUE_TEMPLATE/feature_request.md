@@ -1,23 +1,26 @@
 ---
 name: 🚀 Feature request
-about: Suggest an idea for this project 🏖
+about: Suggest an idea or ask for a feature that you would like to have in Inseq
 title: ''
-labels: enhancement
+labels: [enhancement]
 assignees:
 ---
+<!-- Your title here -->
 
-## 🚀 Feature Request
+## Description
 
 <!-- A clear and concise description of the feature proposal. -->
 
-## 🔈 Motivation
+## Motivation
 
 <!-- Please describe the motivation for this proposal. -->
 
-## 🛰 Alternatives
-
-<!-- A clear and concise description of any alternative solutions or features you've considered. -->
-
-## 📎 Additional context
+## Additional context
 
 <!-- Add any other context or screenshots about the feature request here. -->
+
+## Commit to Help
+
+<!-- If you are interested in helping with this feature, please mark with an `x` (like `[x]`) -->
+
+- [ ] I'm willing to help with this feature.

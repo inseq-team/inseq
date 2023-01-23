@@ -1,11 +1,9 @@
-from typing import Any, Iterable, NewType, Union
-
 import dataclasses
 from abc import ABC, abstractstaticmethod
 from argparse import Namespace
+from typing import Any, Iterable, NewType, Union
 
 from ..utils import InseqArgumentParser
-
 
 DataClassType = NewType("DataClassType", Any)
 OneOrMoreDataClasses = Union[DataClassType, Iterable[DataClassType]]

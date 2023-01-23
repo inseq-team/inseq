@@ -13,13 +13,11 @@
 # limitations under the License.
 """ Decorators for attribution methods. """
 
-from typing import Any, Callable, List, Optional, Sequence
-
 import logging
 from functools import wraps
+from typing import Any, Callable, List, Optional, Sequence
 
 from ..data.data_utils import TensorWrapper
-
 
 logger = logging.getLogger(__name__)
 
