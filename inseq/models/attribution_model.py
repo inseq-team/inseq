@@ -204,6 +204,9 @@ class AttributionModel(ABC, torch.nn.Module):
                     " decoder-only models. Using batch size of 1."
                 )
                 batch_size = 1
+        if method == "lime":
+            logger.info("The LIME method enforces a batch size of 1.")
+            batch_size = 1
         attribution_outputs = attribution_method.prepare_and_attribute(
             input_texts,
             generated_texts,
