@@ -316,11 +316,13 @@ class Lime(LimeBase):
         ).int()
 
         # Merge the binary mask (12.5% masks) with the special_token_ids mask
-        torch.tensor([m + s if s == 0 else s for m, s in zip(mask_multinomial_binary, mask_special_token_ids)]).to(
-            self.attribution_model.device
-        )
+        mask = torch.tensor(
+            [m + s if s == 0 else s for m, s in zip(mask_multinomial_binary, mask_special_token_ids)]
+        ).to(self.attribution_model.device)
 
         # Apply mask to original input
+        perturbed_input = original_input * mask + (1 - mask) * self.attribution_model.tokenizer.pad_token_id
+        return perturbed_input
 
     @staticmethod
     def to_interp_rep_transform(sample, original_input, **kwargs: Any):
