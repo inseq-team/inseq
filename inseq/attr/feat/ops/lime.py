@@ -31,6 +31,7 @@ class Lime(LimeBase):
         perturb_interpretable_space: bool = False,
         from_interp_rep_transform: Optional[Callable] = None,
         to_interp_rep_transform: Optional[Callable] = None,
+        mask_prob: float = 0.3,
     ) -> None:
         if interpretable_model is None:
             interpretable_model = SkLearnLinearModel("linear_model.Ridge")
@@ -41,6 +42,7 @@ class Lime(LimeBase):
         if perturb_func is None:
             perturb_func = partial(
                 self.perturb_func,
+                mask_prob=mask_prob,
             )
 
         super().__init__(
@@ -292,17 +294,33 @@ class Lime(LimeBase):
 
     def perturb_func(
         self,
-        original_input: tuple,  # always needs to be last argument before **kwargs due to "partial"
+        mask_prob: float = 0.3,
+        original_input_tuple: tuple = (),  # always needs to be last argument before **kwargs due to "partial"
         **kwargs: Any,
     ) -> tuple:
         """
         Sampling function
         """
-        original_input_tensor = original_input[0]
-        mask = torch.randint(low=0, high=2, size=original_input_tensor.size()).to(self.attribution_model.device)
-        perturbed_input = original_input_tensor * mask + (1 - mask) * self.attribution_model.tokenizer.pad_token_id
-        perturbed_input_tuple = tuple({perturbed_input})
-        return perturbed_input_tuple  # [0][0]  # FIXME
+        original_input = original_input_tuple[0]
+
+        # Build mask for replacing random tokens with [PAD] token
+        mask_value_probs = torch.tensor([mask_prob, 1 - mask_prob])
+        mask_multinomial_binary = torch.multinomial(mask_value_probs, len(original_input[0]), replacement=True)
+
+        def detach_to_list(t):
+            return t.detach().cpu().numpy().tolist() if type(t) == torch.Tensor else t
+
+        # Additionally remove special_token_ids
+        mask_special_token_ids = torch.Tensor(
+            [1 if id_ in self.attribution_model.special_token_ids else 0 for id_ in detach_to_list(original_input[0])]
+        ).int()
+
+        # Merge the binary mask (12.5% masks) with the special_token_ids mask
+        torch.tensor([m + s if s == 0 else s for m, s in zip(mask_multinomial_binary, mask_special_token_ids)]).to(
+            self.attribution_model.device
+        )
+
+        # Apply mask to original input
 
     @staticmethod
     def to_interp_rep_transform(sample, original_input, **kwargs: Any):
