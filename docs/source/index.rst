@@ -41,7 +41,7 @@ To give a taste of what Inseq can do in a couple lines of code, here's a snippet
         <iframe frameborder="0" scale="0.75" src="/_static/winomt_example.htm"></iframe>
     </div>
 
-Inseq is still in early development and is currently maintained by a small team of graduate students based  working on interpretability for NLP/NLG led by `Gabriele Sarti <https://gsarti.com>`__. We are working hard to add more features and models. If you have any suggestions or feedback, please open an issue on our `GitHub repository <https://github.com/inseq-team/inseq/issues>`__. Happy hacking! |:bug:|
+Inseq is still in early development and is currently maintained by a small team of graduate students based working on interpretability for NLP/NLG led by `Gabriele Sarti <https://gsarti.com>`__. We are working hard to add more features and models. If you have any suggestions or feedback, please open an issue on our `GitHub repository <https://github.com/inseq-team/inseq/issues>`__. Happy hacking! |:bug:|
 
 .. toctree::
     :maxdepth: 2

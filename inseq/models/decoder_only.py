@@ -1,6 +1,5 @@
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
-
 import logging
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 from ..attr.feat import join_token_ids
 from ..data import (
@@ -26,7 +25,6 @@ from ..utils.typing import (
 )
 from .attribution_model import AttributionModel, ModelOutput
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -41,7 +39,7 @@ class DecoderOnlyAttributionModel(AttributionModel):
         if isinstance(inputs, Batch):
             batch = inputs
         else:
-            if isinstance(inputs, str) or isinstance(inputs, list):
+            if isinstance(inputs, (str, list)):
                 # Decoder-only model do not tokenize as targets,
                 # since a single tokenizer is available.
                 encodings: BatchEncoding = self.encode(
@@ -53,7 +51,7 @@ class DecoderOnlyAttributionModel(AttributionModel):
                 encodings = inputs
             else:
                 raise ValueError(
-                    f"targets must be either a string, a list of strings, a BatchEncoding or a Batch, "
+                    "targets must be either a string, a list of strings, a BatchEncoding or a Batch, "
                     f"not {type(inputs)}"
                 )
             baseline_embeds = self.embed(encodings.baseline_ids)
@@ -67,8 +65,12 @@ class DecoderOnlyAttributionModel(AttributionModel):
     @staticmethod
     def format_forward_args(
         inputs: DecoderOnlyBatch,
+        use_embeddings: bool = True,
     ) -> Dict[str, Any]:
-        return {"forward_tensor": inputs.input_embeds, "attention_mask": inputs.attention_mask}
+        return {
+            "forward_tensor": inputs.input_embeds if use_embeddings else inputs.input_ids,
+            "attention_mask": inputs.attention_mask,
+        }
 
     @staticmethod
     def format_attribution_args(
@@ -171,6 +173,7 @@ class DecoderOnlyAttributionModel(AttributionModel):
         forward_tensor: AttributionForwardInputs,
         attention_mask: Optional[IdsTensor] = None,
         use_embeddings: bool = True,
+        **kwargs,
     ) -> ModelOutput:
         embeds = forward_tensor if use_embeddings else None
         ids = None if use_embeddings else forward_tensor
@@ -178,6 +181,7 @@ class DecoderOnlyAttributionModel(AttributionModel):
             input_ids=ids,
             inputs_embeds=embeds,
             attention_mask=attention_mask,
+            **kwargs,
         )
 
     def forward(

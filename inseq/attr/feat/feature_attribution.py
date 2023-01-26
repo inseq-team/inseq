@@ -16,16 +16,14 @@
 Todo:
     * 🟡: Allow custom arguments for model loading in the :class:`FeatureAttribution` :meth:`load` method.
 """
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
-
 import logging
 from abc import abstractmethod
 from datetime import datetime
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 from torchtyping import TensorType
 
 from ...data import (
-    Batch,
     DecoderOnlyBatch,
     EncoderDecoderBatch,
     FeatureAttributionInput,
@@ -46,7 +44,6 @@ from ...utils import (
 from ...utils.typing import ModelIdentifier, SingleScorePerStepTensor, TargetIdsTensor
 from ..attribution_decorators import batched, set_hook, unset_hook
 from .attribution_utils import STEP_SCORES_MAP, check_attribute_positions, get_step_scores, tok2string
-
 
 if TYPE_CHECKING:
     from ...models import AttributionModel
@@ -466,8 +463,8 @@ class FeatureAttribution(Registry):
             if step_score not in STEP_SCORES_MAP:
                 raise AttributeError(
                     f"Step score {step_score} not found. Available step scores are: "
-                    f"{', '.join([x for x in STEP_SCORES_MAP.keys()])}. Use the inseq.register_step_score"
-                    f"function to register a custom step score."
+                    f"{', '.join(list(STEP_SCORES_MAP.keys()))}. Use the inseq.register_step_score"
+                    "function to register a custom step score."
                 )
             step_output.step_scores[step_score] = get_step_scores(
                 self.attribution_model, batch, target_ids, step_score, step_scores_args
@@ -492,7 +489,7 @@ class FeatureAttribution(Registry):
 
     def format_attribute_args(
         self,
-        batch: Union[Batch, EncoderDecoderBatch],
+        batch: Union[DecoderOnlyBatch, EncoderDecoderBatch],
         target_ids: TargetIdsTensor,
         attributed_fn: Callable[..., SingleScorePerStepTensor],
         attributed_fn_args: Dict[str, Any] = {},
@@ -502,8 +499,8 @@ class FeatureAttribution(Registry):
         Formats inputs for the attribution method based on the model type and the attribution method requirements.
 
         Args:
-            batch (:class:`~inseq.data.Batch` or :class:`~inseq.data.EncoderDecoderBatch`): The batch of sequences on
-                which attribution is performed.
+            batch (:class:`~inseq.data.DecoderOnlyBatch` or :class:`~inseq.data.EncoderDecoderBatch`): The batch of
+                sequences on which attribution is performed.
             target_ids (:obj:`torch.Tensor`): Target token ids of size `(batch_size)` corresponding to tokens
                 for which the attribution step must be performed.
             attributed_fn (:obj:`Callable[..., SingleScorePerStepTensor]`): The function of model outputs
@@ -537,7 +534,7 @@ class FeatureAttribution(Registry):
         self,
         attribute_fn_main_args: Dict[str, Any],
         attribution_args: Dict[str, Any] = {},
-    ) -> Any:
+    ) -> FeatureAttributionStepOutput:
         r"""
         Performs a single attribution step for the specified attribution arguments.
 

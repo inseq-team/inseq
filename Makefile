@@ -21,6 +21,7 @@ help:
 	@echo "check-safety    : run safety checks on all tests."
 	@echo "lint            : run linting on all files (check-style + check-safety)"
 	@echo "test            : run all tests."
+	@echo "test-cpu        : run all tests that do not depend on Torch GPU support."
 	@echo "fast-test       : run all quick tests."
 	@echo "codecov         : check coverage of all the code."
 	@echo "build-docs      : build sphinx documentation."
@@ -77,31 +78,32 @@ update-deps:
 #* Linting
 .PHONY: check-style
 check-style:
-	poetry run isort --diff --check-only --settings-path pyproject.toml ./
 	poetry run black --diff --check --config pyproject.toml ./
+	poetry run ruff  --no-fix --config pyproject.toml ./
 #   poetry run darglint --verbosity 2 inseq tests
-	poetry run flake8 --config setup.cfg ./
 #	poetry run mypy --config-file pyproject.toml ./
 
 .PHONY: fix-style
 fix-style:
-	poetry run pyupgrade --exit-zero-even-if-changed --py38-plus **/*.py
-	poetry run isort --settings-path pyproject.toml ./
 	poetry run black --config pyproject.toml ./
+	poetry run ruff --config pyproject.toml ./
 
 .PHONY: check-safety
 check-safety:
 	poetry check
 	poetry run safety check --full-report -i 51499 -i 51457
-	poetry run bandit -ll --recursive inseq tests
 
 .PHONY: lint
-lint: check-style check-safety
+lint: fix-style check-safety
 
 #* Linting
 .PHONY: test
 test:
 	poetry run pytest -c pyproject.toml -v
+
+.PHONY: test-cpu
+test-cpu:
+	poetry run pytest -c pyproject.toml -v -m "not require_cuda_gpu"
 
 .PHONY: fast-test
 fast-test:

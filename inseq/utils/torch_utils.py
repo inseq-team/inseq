@@ -1,13 +1,12 @@
+import logging
 from typing import TYPE_CHECKING, Any, Callable, List, Optional, Sequence, Tuple, Union
 
-import logging
-
 import torch
-import torch.nn.functional as F
 from torch.backends.cuda import is_built as is_cuda_built
 from torch.backends.mps import is_available as is_mps_available
 from torch.backends.mps import is_built as is_mps_built
 from torch.cuda import is_available as is_cuda_available
+from torch.linalg import vector_norm
 from torchtyping import TensorType
 
 from .typing import (
@@ -16,7 +15,6 @@ from .typing import (
     TargetIdsTensor,
     TokenSequenceAttributionTensor,
 )
-
 
 if TYPE_CHECKING:
     from ..models import AttributionModel
@@ -48,7 +46,7 @@ def sum_normalize_attributions(
         GranularSequenceAttributionTensor, Tuple[GranularSequenceAttributionTensor, GranularSequenceAttributionTensor]
     ],
     cat_dim: int = 0,
-    norm_dim: int = 0,
+    norm_dim: Optional[int] = 0,
 ) -> TokenSequenceAttributionTensor:
     """
     Sum and normalize tensors across dim_sum.
@@ -61,9 +59,10 @@ def sum_normalize_attributions(
         attributions = torch.cat(attributions, dim=cat_dim)
     else:
         orig_sizes = [attributions.shape[cat_dim]]
-    # nansum is used to handle the target side sequence attribution case
-    attributions = torch.nansum(attributions, dim=-1).squeeze(0)
-    attributions = F.normalize(attributions, p=2, dim=norm_dim)
+    attributions = vector_norm(attributions, ord=2, dim=-1)
+    if norm_dim is not None:
+        # nansum is used to handle the target side sequence attribution case
+        attributions = attributions / attributions.nansum(dim=norm_dim, keepdim=True)
     if len(attributions.shape) == 1:
         attributions = attributions.unsqueeze(0)
     if concat:
@@ -224,6 +223,8 @@ def get_default_device() -> str:
     if is_cuda_available() and is_cuda_built():
         return "cuda"
     elif is_mps_available() and is_mps_built():
-        return "mps"
+        # temporarily fix mps-enabled devices on cpu until mps is able to support all operations this package needs
+        # change this value on your own risk as it might break things depending on the attribution functions used
+        return "cpu"
     else:
         return "cpu"

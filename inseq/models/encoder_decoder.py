@@ -1,6 +1,5 @@
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
-
 import logging
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 from ..attr.feat import join_token_ids
 from ..data import (
@@ -25,7 +24,6 @@ from ..utils.typing import (
     TokenWithId,
 )
 from .attribution_model import AttributionModel, ModelOutput
-
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +65,7 @@ class EncoderDecoderAttributionModel(AttributionModel):
         if isinstance(sources, Batch):
             source_batch = sources
         else:
-            if isinstance(sources, str) or isinstance(sources, list):
+            if isinstance(sources, (str, list)):
                 source_encodings: BatchEncoding = self.encode(
                     sources, return_baseline=True, include_eos_baseline=include_eos_baseline
                 )
@@ -75,7 +73,7 @@ class EncoderDecoderAttributionModel(AttributionModel):
                 source_encodings = sources
             else:
                 raise ValueError(
-                    f"sources must be either a string, a list of strings, a BatchEncoding or a Batch, "
+                    "sources must be either a string, a list of strings, a BatchEncoding or a Batch, "
                     f"not {type(sources)}"
                 )
             # Even when we are performing layer attribution, we might need the embeddings
@@ -89,7 +87,7 @@ class EncoderDecoderAttributionModel(AttributionModel):
         if isinstance(targets, Batch):
             target_batch = targets
         else:
-            if isinstance(targets, str) or isinstance(targets, list):
+            if isinstance(targets, (str, list)):
                 target_encodings: BatchEncoding = self.encode(
                     targets,
                     as_targets=True,
@@ -100,7 +98,7 @@ class EncoderDecoderAttributionModel(AttributionModel):
                 target_encodings = targets
             else:
                 raise ValueError(
-                    f"targets must be either a string, a list of strings, a BatchEncoding or a Batch, "
+                    "targets must be either a string, a list of strings, a BatchEncoding or a Batch, "
                     f"not {type(targets)}"
                 )
             baseline_embeds = self.embed(target_encodings.baseline_ids, as_targets=True)
@@ -114,10 +112,12 @@ class EncoderDecoderAttributionModel(AttributionModel):
     @staticmethod
     def format_forward_args(
         inputs: EncoderDecoderBatch,
+        use_embeddings: bool = True,
     ) -> Dict[str, Any]:
         return {
-            "forward_tensor": inputs.sources.input_embeds,
+            "forward_tensor": inputs.sources.input_embeds if use_embeddings else inputs.sources.input_ids,
             "decoder_input_embeds": inputs.targets.input_embeds,
+            # "decoder_input_ids": inputs.targets.input_ids,
             "encoder_attention_mask": inputs.sources.attention_mask,
             "decoder_attention_mask": inputs.targets.attention_mask,
         }
@@ -238,22 +238,20 @@ class EncoderDecoderAttributionModel(AttributionModel):
         self,
         forward_tensor: AttributionForwardInputs,
         encoder_attention_mask: Optional[IdsTensor] = None,
-        # decoder_input_ids: Optional[IdsTensor] = None,
         decoder_input_embeds: Optional[EmbeddingsTensor] = None,
         decoder_attention_mask: Optional[IdsTensor] = None,
         use_embeddings: bool = True,
+        **kwargs,
     ) -> ModelOutput:
         encoder_embeds = forward_tensor if use_embeddings else None
         encoder_ids = None if use_embeddings else forward_tensor
-        # decoder_embeds = decoder_input_embeds if decoder_input_ids is None else None
-        # decoder_ids = decoder_input_ids if decoder_input_ids is not None else None
         return self.model(
             input_ids=encoder_ids,
             inputs_embeds=encoder_embeds,
             attention_mask=encoder_attention_mask,
-            # decoder_input_ids=decoder_input_ids,
             decoder_inputs_embeds=decoder_input_embeds,
             decoder_attention_mask=decoder_attention_mask,
+            **kwargs,
         )
 
     def forward(
@@ -275,7 +273,6 @@ class EncoderDecoderAttributionModel(AttributionModel):
         output = self.get_forward_output(
             forward_tensor=encoder_tensors,
             encoder_attention_mask=encoder_attention_mask,
-            # decoder_input_ids=decoder_input_ids,
             decoder_input_embeds=decoder_input_embeds,
             decoder_attention_mask=decoder_attention_mask,
             use_embeddings=use_embeddings,

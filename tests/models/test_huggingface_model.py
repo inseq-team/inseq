@@ -15,7 +15,6 @@ from inseq import list_feature_attribution_methods
 from inseq.data import FeatureAttributionOutput, FeatureAttributionSequenceOutput
 from inseq.utils import get_default_device
 
-
 EXAMPLES_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../fixtures/huggingface_model.json")
 EXAMPLES = json.load(open(EXAMPLES_FILE))
 
@@ -24,6 +23,9 @@ ATTRIBUTE_TARGET = [True, False]
 RETURN_CONVERGENCE_DELTA = [True, False]
 STEP_SCORES = [[], ["probability"]]
 ATTRIBUTION_METHODS = list_feature_attribution_methods()
+
+ATTENTION_IDX = [-2, [0, 5, 1], (1, -2), None]
+ATTENTION_AGGREGATE_FN = ["average", None]
 
 
 @fixture(scope="session")
@@ -307,3 +309,79 @@ def test_attribute_decoder_forced_sliced(saliency_gpt2_model):
     assert out.info["attr_pos_end"] == 10
     aggregated = [attr.aggregate(attr._aggregator) for attr in out.sequence_attributions]
     assert all(isinstance(aggr_attr, FeatureAttributionSequenceOutput) for aggr_attr in aggregated)
+
+
+@mark.slow
+@mark.parametrize(("texts", "reference_texts"), EXAMPLES["texts"])
+@mark.parametrize("layers", ATTENTION_IDX)
+@mark.parametrize("heads", ATTENTION_IDX)
+@mark.parametrize("aggregate_heads_fn", ATTENTION_AGGREGATE_FN)
+@mark.parametrize("aggregate_layers_fn", ATTENTION_AGGREGATE_FN)
+def test_attention_attribution_seq2seq(
+    texts,
+    reference_texts,
+    layers,
+    heads,
+    aggregate_heads_fn,
+    aggregate_layers_fn,
+    saliency_mt_model,
+):
+    if isinstance(layers, int):
+        aggregate_layers_fn = "single"
+    if isinstance(heads, int):
+        aggregate_heads_fn = "single"
+    out = saliency_mt_model.attribute(
+        texts,
+        method="attention",
+        show_progress=False,
+        attribute_target=True,
+        device=get_default_device(),
+        layers=layers,
+        heads=heads,
+        aggregate_heads_fn=aggregate_heads_fn,
+        aggregate_layers_fn=aggregate_layers_fn,
+    )
+    assert isinstance(out, FeatureAttributionOutput)
+    assert isinstance(out.sequence_attributions[0], FeatureAttributionSequenceOutput)
+    assert out.info["model_name"] == "Helsinki-NLP/opus-mt-en-it"
+    assert out.info["constrained_decoding"] is False
+    assert out.info["attribution_method"] == "attention"
+    assert out.info["attribute_target"] is True
+    assert len(out.sequence_attributions[0].source_attributions.shape) == 2
+
+
+@mark.slow
+@mark.parametrize(("texts", "reference_texts"), EXAMPLES["texts"])
+@mark.parametrize("layers", ATTENTION_IDX)
+@mark.parametrize("heads", ATTENTION_IDX)
+@mark.parametrize("aggregate_heads_fn", ATTENTION_AGGREGATE_FN)
+@mark.parametrize("aggregate_layers_fn", ATTENTION_AGGREGATE_FN)
+def test_attention_attribution_decoder(
+    texts,
+    reference_texts,
+    layers,
+    heads,
+    aggregate_heads_fn,
+    aggregate_layers_fn,
+    saliency_gpt2_model,
+):
+    if isinstance(layers, int):
+        aggregate_layers_fn = "single"
+    if isinstance(heads, int):
+        aggregate_heads_fn = "single"
+    out = saliency_gpt2_model.attribute(
+        texts,
+        method="attention",
+        show_progress=False,
+        device=get_default_device(),
+        layers=layers,
+        heads=heads,
+        aggregate_heads_fn=aggregate_heads_fn,
+        aggregate_layers_fn=aggregate_layers_fn,
+    )
+    assert isinstance(out, FeatureAttributionOutput)
+    assert isinstance(out.sequence_attributions[0], FeatureAttributionSequenceOutput)
+    assert out.info["model_name"] == "gpt2"
+    assert out.info["constrained_decoding"] is False
+    assert out.info["attribution_method"] == "attention"
+    assert len(out.sequence_attributions[0].target_attributions.shape) == 2
