@@ -92,36 +92,6 @@ class LimeAttribution(PerturbationAttributionRegistry):
         attribute_fn_main_args: Dict[str, Any],
         attribution_args: Dict[str, Any] = {},
     ) -> PerturbationFeatureAttributionStepOutput:
-        """Run on each example in a batch at a time
-        LimeBase does not accept attribution for more than one example at a time:
-        https://github.com/pytorch/captum/issues/905#issuecomment-1075384565#
-        """
-
-        """
-        attrs = []
-        for b, _batch in enumerate(attribute_fn_main_args["inputs"][0]):
-            single_input = tuple(
-                [inp[b] if type(inp) == torch.Tensor else inp for inp in attribute_fn_main_args["inputs"]]
-            )
-            single_additional_forward_args = tuple(
-                [
-                    arg[b] if type(arg) == torch.Tensor else arg
-                    for arg in attribute_fn_main_args["additional_forward_args"]
-                ]
-            )
-            single_attribute_fn_main_args = {
-                "inputs": single_input,
-                "additional_forward_args": single_additional_forward_args,
-            }
-
-            single_attr = self.method.attribute(
-                **single_attribute_fn_main_args,
-                **attribution_args,
-            )
-            attrs.append(single_attr)
-        attr = torch.stack(list(attrs), dim=0)
-        """
-
         attr = self.method.attribute(
             **attribute_fn_main_args,
             **attribution_args,

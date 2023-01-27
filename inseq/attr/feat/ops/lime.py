@@ -42,7 +42,7 @@ class Lime(LimeBase):
         if perturb_func is None:
             perturb_func = partial(
                 self.perturb_func,
-                mask_prob=mask_prob,
+                # mask_prob=mask_prob,
             )
 
         super().__init__(
@@ -282,20 +282,20 @@ class Lime(LimeBase):
     @staticmethod
     def token_similarity_kernel(
         original_input: tuple,
-        perturbed_input: tuple,
+        perturbed_input: torch.Tensor,
         perturbed_interpretable_input: torch.Tensor,
         **kwargs,
     ) -> torch.Tensor:
-        original_input_tensor = original_input[0]  # [0]
+        original_input_tensor = original_input[0][0]
         perturbed_input_tensor = perturbed_input[0]
         assert original_input_tensor.shape == perturbed_input_tensor.shape
-        similarity = torch.sum(original_input_tensor == perturbed_input_tensor) / len(original_input_tensor)
+        similarity = torch.sum(original_input_tensor[0] == perturbed_input_tensor[0]) / len(original_input_tensor[0])
         return similarity
 
     def perturb_func(
         self,
+        original_input_tuple: tuple = (),
         mask_prob: float = 0.3,
-        original_input_tuple: tuple = (),  # always needs to be last argument before **kwargs due to "partial"
         **kwargs: Any,
     ) -> tuple:
         """
@@ -312,13 +312,15 @@ class Lime(LimeBase):
 
         # Additionally remove special_token_ids
         mask_special_token_ids = torch.Tensor(
-            [1 if id_ in self.attribution_model.special_token_ids else 0 for id_ in detach_to_list(original_input[0])]
+            [1 if id_ in self.attribution_model.special_tokens_ids else 0 for id_ in detach_to_list(original_input[0])]
         ).int()
 
         # Merge the binary mask (12.5% masks) with the special_token_ids mask
-        mask = torch.tensor(
-            [m + s if s == 0 else s for m, s in zip(mask_multinomial_binary, mask_special_token_ids)]
-        ).to(self.attribution_model.device)
+        mask = (
+            torch.tensor([m + s if s == 0 else s for m, s in zip(mask_multinomial_binary, mask_special_token_ids)])
+            .to(self.attribution_model.device)
+            .unsqueeze(-1)
+        )
 
         # Apply mask to original input
         perturbed_input = original_input * mask + (1 - mask) * self.attribution_model.tokenizer.pad_token_id
@@ -326,4 +328,4 @@ class Lime(LimeBase):
 
     @staticmethod
     def to_interp_rep_transform(sample, original_input, **kwargs: Any):
-        return sample[0]  # [0]  # FIXME: Access first entry of tuple
+        return sample
