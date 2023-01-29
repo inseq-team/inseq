@@ -30,7 +30,7 @@ class OcclusionAttribution(PerturbationAttributionRegistry):
     Reference implementation:
     `https://captum.ai/api/occlusion.html <https://captum.ai/api/occlusion.html>`__.
 
-    Usages in other implementations:
+    Usage in other implementations:
     `niuzaisheng/AttExplainer <https://github.com/niuzaisheng/AttExplainer/blob/main/baseline_methods/\
     explain_baseline_captum.py>`__
     `andrewPoulton/explainable-asag <https://github.com/andrewPoulton/explainable-asag/blob/main/explanation.py>`__
@@ -43,7 +43,7 @@ class OcclusionAttribution(PerturbationAttributionRegistry):
 
     def __init__(self, attribution_model):
         super().__init__(attribution_model)
-        self.is_layer_attribution = False  # FIXME: Is this necessary?
+        self.is_layer_attribution = False
         self.method = Occlusion(self.attribution_model)
 
     def attribute_step(
@@ -51,11 +51,12 @@ class OcclusionAttribution(PerturbationAttributionRegistry):
         attribute_fn_main_args: Dict[str, Any],
         attribution_args: Dict[str, Any] = {},
     ) -> PerturbationFeatureAttributionStepOutput:
+        r"""Sliding window shapes is defined as a tuple.
+        First entry is between 1 and length of input.
+        Second entry is given by the embedding dimension of the underlying model.
+        If not explicitly given via attribution_args, the default is (1, embedding_dim).
+        """
         if "sliding_window_shapes" not in attribution_args:
-            # Sliding window shapes is defined as a tuple
-            # First entry is between 1 and length of input
-            # Second entry is given by the embedding dimension of the underlying model
-            # If not explicitly given via attribution_args, the default is (1, embedding_dim)
             embedding_layer = self.attribution_model.get_embedding_layer()
             attribution_args["sliding_window_shapes"] = (1, embedding_layer.embedding_dim)
 
@@ -79,6 +80,8 @@ class LimeAttribution(PerturbationAttributionRegistry):
     `https://captum.ai/api/lime.html <https://captum.ai/api/lime.html>`__.
     `https://github.com/DFKI-NLP/thermostat/ <https://github.com/DFKI-NLP/thermostat/>`__.
     `https://github.com/copenlu/ALPS_2021 <https://github.com/copenlu/ALPS_2021>`__.
+
+    The main part of the code is in Lime of ops/lime.py.
     """
 
     method_name = "lime"

@@ -42,7 +42,7 @@ class Lime(LimeBase):
         if perturb_func is None:
             perturb_func = partial(
                 self.perturb_func,
-                # mask_prob=mask_prob,
+                mask_prob=mask_prob,
             )
 
         super().__init__(
@@ -69,108 +69,41 @@ class Lime(LimeBase):
         show_progress: bool = False,
         **kwargs,
     ) -> Tensor:
-        r"""
-        This method attributes the output of the model with given target index
-        (in case it is provided, otherwise it assumes that output is a
-        scalar) to the inputs of the model using the approach described above.
-        It trains an interpretable model and returns a representation of the
-        interpretable model.
+        r"""Adapted from Captum: Two modifications at the end ensure that 3D
+        tensors (needed for transformers inference) are reshaped as 2D tensors
+        before being passed to the linear surrogate model, and reshaped again
+        back to their 3D equivalents.
 
-        It is recommended to only provide a single example as input (tensors
-        with first dimension or batch size = 1). This is because LIME is generally
-        used for sample-based interpretability, training a separate interpretable
-        model to explain a model's prediction on each individual example.
-
-        A batch of inputs can be provided as inputs only if forward_func
-        returns a single value per batch (e.g. loss).
-        The interpretable feature representation should still have shape
-        1 x num_interp_features, corresponding to the interpretable
-        representation for the full batch, and perturbations_per_eval
-        must be set to 1.
+        See the LimeBase (super class) docstring for a proper description of
+        LIME's functionality. What follows is an abbreviated docstring.
 
         Args:
 
             inputs (tensor or tuple of tensors):  Input for which LIME
-                        is computed. If forward_func takes a single
-                        tensor as input, a single input tensor should be provided.
-                        If forward_func takes multiple tensors as input, a tuple
-                        of the input tensors should be provided. It is assumed
-                        that for all given input tensors, dimension 0 corresponds
-                        to the number of examples, and if multiple input tensors
-                        are provided, the examples must be aligned appropriately.
+                        is computed.
             target (int, tuple, tensor or list, optional):  Output indices for
                         which surrogate model is trained
                         (for classification cases,
                         this is usually the target class).
-                        If the network returns a scalar value per example,
-                        no target index is necessary.
-                        For general 2D outputs, targets can be either:
-
-                        - a single integer or a tensor containing a single
-                          integer, which is applied to all input examples
-
-                        - a list of integers or a 1D tensor, with length matching
-                          the number of examples in inputs (dim 0). Each integer
-                          is applied as the target for the corresponding example.
-
-                        For outputs with > 2 dimensions, targets can be either:
-
-                        - A single tuple, which contains #output_dims - 1
-                          elements. This target index is applied to all examples.
-
-                        - A list of tuples with length equal to the number of
-                          examples in inputs (dim 0), and each tuple containing
-                          #output_dims - 1 elements. Each tuple is applied as the
-                          target for the corresponding example.
-
-                        Default: None
             additional_forward_args (any, optional): If the forward function
                         requires additional arguments other than the inputs for
                         which attributions should not be computed, this argument
-                        can be provided. It must be either a single additional
-                        argument of a Tensor or arbitrary (non-tuple) type or a
-                        tuple containing multiple additional arguments including
-                        tensors or any arbitrary python types. These arguments
-                        are provided to forward_func in order following the
-                        arguments in inputs.
-                        For a tensor, the first dimension of the tensor must
-                        correspond to the number of examples. For all other types,
-                        the given argument is used for all forward evaluations.
-                        Note that attributions are not computed with respect
-                        to these arguments.
-                        Default: None
+                        can be provided.
             n_samples (int, optional):  The number of samples of the original
                         model used to train the surrogate interpretable model.
                         Default: `50` if `n_samples` is not provided.
             perturbations_per_eval (int, optional): Allows multiple samples
                         to be processed simultaneously in one call to forward_fn.
-                        Each forward pass will contain a maximum of
-                        perturbations_per_eval * #examples samples.
-                        For DataParallel models, each batch is split among the
-                        available devices, so evaluations on each available
-                        device contain at most
-                        (perturbations_per_eval * #examples) / num_devices
-                        samples.
-                        If the forward function returns a single scalar per batch,
-                        perturbations_per_eval must be set to 1.
-                        Default: 1
             show_progress (bool, optional): Displays the progress of computation.
-                        It will try to use tqdm if available for advanced features
-                        (e.g. time estimation). Otherwise, it will fallback to
-                        a simple output of progress.
-                        Default: False
             **kwargs (Any, optional): Any additional arguments necessary for
                         sampling and transformation functions (provided to
                         constructor).
-                        Default: None
 
         Returns:
             **interpretable model representation**:
             - **interpretable model representation* (*Any*):
-                    A representation of the interpretable model trained. The return
-                    type matches the return type of train_interpretable_model_func.
-                    For example, this could contain coefficients of a
-                    linear surrogate model.
+                    A representation of the interpretable model trained.
+                    In this adaptation, the return is a 3D tensor.
         """
         with torch.no_grad():
             inp_tensor = cast(Tensor, inputs) if isinstance(inputs, Tensor) else inputs[0]
@@ -286,8 +219,9 @@ class Lime(LimeBase):
         perturbed_interpretable_input: torch.Tensor,
         **kwargs,
     ) -> torch.Tensor:
-        original_input_tensor = original_input[0][0]
-        perturbed_input_tensor = perturbed_input[0]
+        r"""Calculates the similarity between original and perturbed input"""
+        original_input_tensor = original_input[0][0]  # Original input is a tuple, while...
+        perturbed_input_tensor = perturbed_input[0]  # ...perturbed input is already a tensor
         assert original_input_tensor.shape == perturbed_input_tensor.shape
         similarity = torch.sum(original_input_tensor[0] == perturbed_input_tensor[0]) / len(original_input_tensor[0])
         return similarity
@@ -298,8 +232,15 @@ class Lime(LimeBase):
         mask_prob: float = 0.3,
         **kwargs: Any,
     ) -> tuple:
-        """
-        Sampling function
+        r"""Sampling function:
+
+        Args:
+
+            original_input_tuple (tuple): Tensor tuple where its first element
+                is a 3D tensor (b=1, seq_len, emb_dim)
+            mask_prob (float): probability of the MASK token (no information)
+                in the mask that the original input tensor is being multiplied
+                with.
         """
         original_input = original_input_tuple[0]
 
@@ -315,11 +256,11 @@ class Lime(LimeBase):
             [1 if id_ in self.attribution_model.special_tokens_ids else 0 for id_ in detach_to_list(original_input[0])]
         ).int()
 
-        # Merge the binary mask (12.5% masks) with the special_token_ids mask
+        # Merge the binary mask with the special_token_ids mask
         mask = (
             torch.tensor([m + s if s == 0 else s for m, s in zip(mask_multinomial_binary, mask_special_token_ids)])
             .to(self.attribution_model.device)
-            .unsqueeze(-1)
+            .unsqueeze(-1)  # 1D -> 2D
         )
 
         # Apply mask to original input
