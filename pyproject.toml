@@ -5,7 +5,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 name = "inseq"
-version = "0.3.3"
+version = "0.3.4.dev0"
 description = "Interpretability for Sequence Generation Models 🔍"
 readme = "README.md"
 authors = ["The Inseq Team"]
@@ -90,7 +90,7 @@ darglint = "^1.8.1"
 pre-commit = "^2.19.0"
 pytest = "^7.2.0"
 pytest-cov = "^4.0.0"
-ruff  = "^0.0.227"
+ruff  = "^0.0.240"
 
 [tool.poetry.extras]
 sklearn = ["scikit-learn", "joblib"]
@@ -204,7 +204,8 @@ ignore = [
     "F821",
     "C901",
     "B006",
-    "PLR2004"
+    "PLR2004",
+    "PLR0913"
 ]
 line-length = 119
 select = [

@@ -16,6 +16,7 @@ from transformers import (
 from transformers.modeling_outputs import CausalLMOutput, ModelOutput, Seq2SeqLMOutput
 
 from ..data import BatchEncoding
+from ..utils import check_device
 from ..utils.typing import (
     EmbeddingsTensor,
     FullLogitsTensor,
@@ -142,6 +143,19 @@ class HuggingfaceModel(AttributionModel):
             return HuggingfaceEncoderDecoderModel(model, attribution_method, tokenizer, device, **kwargs)
         else:
             return HuggingfaceDecoderOnlyModel(model, attribution_method, tokenizer, device, **kwargs)
+
+    @AttributionModel.device.setter
+    def device(self, new_device: str) -> None:
+        check_device(new_device)
+        self._device = new_device
+        # Enable compatibility with 8bit models
+        if self.model:
+            if not (hasattr(self.model, "is_loaded_in_8bit") and self.model.is_loaded_in_8bit):
+                self.model.to(self._device)
+            else:
+                logger.warning(
+                    "The model is loaded in 8bit mode. The device cannot be changed after loading the model."
+                )
 
     @abstractmethod
     def configure_embeddings_scale(self) -> None:
