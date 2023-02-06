@@ -17,7 +17,7 @@
 <div align="center">
 
 
-  [![Follow Inseq on Twitter](https://img.shields.io/twitter/follow/inseqdev?label=Inseqdev&style=social)](https://twitter.com/InseqDev)
+  [![Follow Inseq on Twitter](https://img.shields.io/twitter/follow/inseqlib?label=InseqLib&style=social)](https://twitter.com/InseqLib)
   [![Follow Inseq on Mastodon](https://img.shields.io/mastodon/follow/109308976376923913?domain=https%3A%2F%2Fsigmoid.social&label=Inseq&style=social)](https://sigmoid.social/@inseq)
 </div>
 
