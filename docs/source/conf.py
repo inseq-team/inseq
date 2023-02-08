@@ -6,15 +6,13 @@
 # http://www.sphinx-doc.org/en/master/config
 
 # -- Path setup --------------------------------------------------------------
-from typing import Dict
-
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
 import sys
 from pathlib import Path
-
+from typing import Dict
 
 _PATH_ROOT = Path(__file__).parent.parent.parent.absolute()
 # _PATH_SRC = Path(_PATH_ROOT, "inseq")
@@ -29,7 +27,7 @@ author = "The Inseq Team"
 # The short X.Y version
 version = "0.3"
 # The full version, including alpha/beta/rc tags
-release = "0.3.3"
+release = "0.3.4.dev0"
 
 
 # Prefix link to point to master, comment this during version release and uncomment below line
