@@ -257,7 +257,9 @@ class HuggingfaceModel(AttributionModel):
             if include_eos_baseline:
                 baseline_ids = torch.ones_like(batch["input_ids"]).long() * self.tokenizer.unk_token_id
             else:
-                baseline_ids = batch["input_ids"].ne(self.eos_token_id).long() * self.tokenizer.unk_token_id
+                baseline_ids_non_eos = batch["input_ids"].ne(self.eos_token_id).long() * self.tokenizer.unk_token_id
+                baseline_ids_eos = batch["input_ids"].eq(self.eos_token_id).long() * self.eos_token_id
+                baseline_ids = baseline_ids_non_eos + baseline_ids_eos
         # We prepend a BOS token only when tokenizing target texts.
         if as_targets and self.is_encoder_decoder:
             ones_mask = torch.ones((batch["input_ids"].shape[0], 1), device=self.device, dtype=long)
