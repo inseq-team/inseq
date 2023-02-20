@@ -16,6 +16,7 @@ from transformers import (
 from transformers.modeling_outputs import CausalLMOutput, ModelOutput, Seq2SeqLMOutput
 
 from ..data import BatchEncoding
+from ..utils import check_device
 from ..utils.typing import (
     EmbeddingsTensor,
     FullLogitsTensor,
@@ -143,6 +144,19 @@ class HuggingfaceModel(AttributionModel):
         else:
             return HuggingfaceDecoderOnlyModel(model, attribution_method, tokenizer, device, **kwargs)
 
+    @AttributionModel.device.setter
+    def device(self, new_device: str) -> None:
+        check_device(new_device)
+        self._device = new_device
+        # Enable compatibility with 8bit models
+        if self.model:
+            if not (hasattr(self.model, "is_loaded_in_8bit") and self.model.is_loaded_in_8bit):
+                self.model.to(self._device)
+            else:
+                logger.warning(
+                    "The model is loaded in 8bit mode. The device cannot be changed after loading the model."
+                )
+
     @abstractmethod
     def configure_embeddings_scale(self) -> None:
         """Configure the scale factor for embeddings."""
@@ -243,7 +257,9 @@ class HuggingfaceModel(AttributionModel):
             if include_eos_baseline:
                 baseline_ids = torch.ones_like(batch["input_ids"]).long() * self.tokenizer.unk_token_id
             else:
-                baseline_ids = batch["input_ids"].ne(self.eos_token_id).long() * self.tokenizer.unk_token_id
+                baseline_ids_non_eos = batch["input_ids"].ne(self.eos_token_id).long() * self.tokenizer.unk_token_id
+                baseline_ids_eos = batch["input_ids"].eq(self.eos_token_id).long() * self.eos_token_id
+                baseline_ids = baseline_ids_non_eos + baseline_ids_eos
         # We prepend a BOS token only when tokenizing target texts.
         if as_targets and self.is_encoder_decoder:
             ones_mask = torch.ones((batch["input_ids"].shape[0], 1), device=self.device, dtype=long)
