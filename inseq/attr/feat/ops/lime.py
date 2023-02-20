@@ -45,14 +45,20 @@ class Lime(LimeBase):
                 mask_prob=mask_prob,
             )
 
+        if to_interp_rep_transform is None:
+            to_interp_rep_transform_func = self.to_interp_rep_transform
+        else:
+            # Use custom function
+            to_interp_rep_transform_func = to_interp_rep_transform
+
         super().__init__(
             forward_func=attribution_model,
             interpretable_model=interpretable_model,
             similarity_func=similarity_func,
             perturb_func=perturb_func,
             perturb_interpretable_space=perturb_interpretable_space,
-            from_interp_rep_transform=None,
-            to_interp_rep_transform=self.to_interp_rep_transform,
+            from_interp_rep_transform=from_interp_rep_transform,
+            to_interp_rep_transform=to_interp_rep_transform_func,
         )
         self.attribution_model = attribution_model
         assert self.attribution_model.model.device is not None
@@ -196,8 +202,9 @@ class Lime(LimeBase):
             """ Modification of original attribute function:
             Squeeze the batch dimension out of interpretable_inps
             -> 2D tensor (n_samples ✕ (input_dim * embedding_dim))
+            Zero-indexed interpretable_inps elements for unpacking the tuples.
             """
-            combined_interp_inps = torch.cat([i.view(-1).unsqueeze(dim=0) for i in interpretable_inps]).double()
+            combined_interp_inps = torch.cat([i[0].view(-1).unsqueeze(dim=0) for i in interpretable_inps]).double()
 
             combined_outputs = (torch.cat(outputs) if len(outputs[0].shape) > 0 else torch.stack(outputs)).double()
             combined_sim = (
@@ -220,8 +227,8 @@ class Lime(LimeBase):
         **kwargs,
     ) -> torch.Tensor:
         r"""Calculates the similarity between original and perturbed input"""
-        original_input_tensor = original_input[0][0]  # Original input is a tuple, while...
-        perturbed_input_tensor = perturbed_input[0]  # ...perturbed input is already a tensor
+        original_input_tensor = original_input[0][0]
+        perturbed_input_tensor = perturbed_input[0][0]
         assert original_input_tensor.shape == perturbed_input_tensor.shape
         similarity = torch.sum(original_input_tensor[0] == perturbed_input_tensor[0]) / len(original_input_tensor[0])
         return similarity
@@ -230,6 +237,7 @@ class Lime(LimeBase):
         self,
         original_input_tuple: tuple = (),
         mask_prob: float = 0.3,
+        mask_token: str = "unk",
         **kwargs: Any,
     ) -> tuple:
         r"""Sampling function:
@@ -241,6 +249,8 @@ class Lime(LimeBase):
             mask_prob (float): probability of the MASK token (no information)
                 in the mask that the original input tensor is being multiplied
                 with.
+            mask_token (str): What kind of special token to use for masking the
+                input. Options: "unk" and "pad"
         """
         original_input = original_input_tuple[0]
 
@@ -263,9 +273,17 @@ class Lime(LimeBase):
             .unsqueeze(-1)  # 1D -> 2D
         )
 
+        # Set special token for masking
+        if mask_token == "unk":
+            tokenizer_mask_token = self.attribution_model.tokenizer.unk_token_id
+        elif mask_token == "pad":
+            tokenizer_mask_token = self.attribution_model.tokenizer.pad_token_id
+        else:
+            raise ValueError(f"Invalid mask token {mask_token} for tokenizer: {self.attribution_model.tokenizer}")
+
         # Apply mask to original input
-        perturbed_input = original_input * mask + (1 - mask) * self.attribution_model.tokenizer.pad_token_id
-        return perturbed_input
+        perturbed_input = original_input * mask + (1 - mask) * tokenizer_mask_token
+        return (perturbed_input,)
 
     @staticmethod
     def to_interp_rep_transform(sample, original_input, **kwargs: Any):

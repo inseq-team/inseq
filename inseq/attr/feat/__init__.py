@@ -12,7 +12,7 @@ from .gradient_attribution import (
     LayerIntegratedGradientsAttribution,
     SaliencyAttribution,
 )
-from .perturbation_attribution import LimeAttribution, OcclusionAttribution, ShapAttribution
+from .perturbation_attribution import GradientShapAttribution, LimeAttribution, OcclusionAttribution
 
 __all__ = [
     "FeatureAttribution",
@@ -35,5 +35,5 @@ __all__ = [
     "AttentionAttribution",
     "OcclusionAttribution",
     "LimeAttribution",
-    "ShapAttribution",
+    "GradientShapAttribution",
 ]

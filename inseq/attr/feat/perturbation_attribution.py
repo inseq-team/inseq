@@ -58,7 +58,18 @@ class OcclusionAttribution(PerturbationAttributionRegistry):
         """
         if "sliding_window_shapes" not in attribution_args:
             embedding_layer = self.attribution_model.get_embedding_layer()
-            attribution_args["sliding_window_shapes"] = (1, embedding_layer.embedding_dim)
+            len_input_tuple = len(attribute_fn_main_args["inputs"])
+            if len_input_tuple == 2:
+                # if attribute_target=True
+                attribution_args["sliding_window_shapes"] = (
+                    (1, embedding_layer.embedding_dim),
+                    (1, embedding_layer.embedding_dim),
+                )
+            elif len_input_tuple == 1:
+                # if attribute_target=False
+                attribution_args["sliding_window_shapes"] = (1, embedding_layer.embedding_dim)
+            else:
+                raise ValueError(f"Invalid length ({len_input_tuple}) for input tuple (has to be 1 or 2).")
 
         attr = self.method.attribute(
             **attribute_fn_main_args,
@@ -109,13 +120,13 @@ class LimeAttribution(PerturbationAttributionRegistry):
         )
 
 
-class ShapAttribution(PerturbationAttributionRegistry):
-    """SHAP-based attribution method.
+class GradientShapAttribution(PerturbationAttributionRegistry):
+    """GradientSHAP-based attribution method.
     Reference implementation:
     `https://captum.ai/api/gradient_shap.html <https://captum.ai/api/gradient_shap.html>`__.
     """
 
-    method_name = "shap"
+    method_name = "gradient_shap"
 
     def __init__(self, attribution_model, multiply_by_inputs: bool = True, **kwargs):
         super().__init__(attribution_model)
