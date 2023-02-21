@@ -71,6 +71,10 @@ class OcclusionAttribution(PerturbationAttributionRegistry):
             else:
                 raise ValueError(f"Invalid length ({len_input_tuple}) for input tuple (has to be 1 or 2).")
 
+        # By default, the UNK token from the model's tokenizer is used.
+        if "baselines" not in attribution_args:
+            attribution_args["baselines"] = self.attribution_model.tokenizer.unk_token_id
+
         attr = self.method.attribute(
             **attribute_fn_main_args,
             **attribution_args,
