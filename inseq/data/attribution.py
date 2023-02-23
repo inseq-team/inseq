@@ -43,8 +43,11 @@ DEFAULT_ATTRIBUTION_AGGREGATE_DICT = {
     "step_scores": {
         "span_aggregate": {
             "probability": prod_fn,
+            "entropy": sum_fn,
             "crossentropy": sum_fn,
             "perplexity": prod_fn,
+            "contrast_prob_diff": prod_fn,
+            "mc_dropout_prob_avg": prod_fn,
         }
     },
 }

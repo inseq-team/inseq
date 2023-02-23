@@ -60,3 +60,4 @@ Inseq is still in early development and is currently maintained by a small team 
     main_classes/models
     main_classes/data_classes
     main_classes/feature_attribution
+    main_classes/step_functions

@@ -43,7 +43,7 @@ from ...utils import (
 )
 from ...utils.typing import ModelIdentifier, SingleScorePerStepTensor, TargetIdsTensor
 from ..attribution_decorators import batched, set_hook, unset_hook
-from .attribution_utils import STEP_SCORES_MAP, check_attribute_positions, get_step_scores, tok2string
+from .attribution_utils import check_attribute_positions, get_step_scores, tok2string
 
 if TYPE_CHECKING:
     from ...models import AttributionModel
@@ -460,12 +460,6 @@ class FeatureAttribution(Registry):
         )
         # Calculate step scores
         for step_score in step_scores:
-            if step_score not in STEP_SCORES_MAP:
-                raise AttributeError(
-                    f"Step score {step_score} not found. Available step scores are: "
-                    f"{', '.join(list(STEP_SCORES_MAP.keys()))}. Use the inseq.register_step_score"
-                    "function to register a custom step score."
-                )
             step_output.step_scores[step_score] = get_step_scores(
                 self.attribution_model, batch, target_ids, step_score, step_scores_args
             )

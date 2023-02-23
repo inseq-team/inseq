@@ -98,11 +98,11 @@ model.attribute(
 
 - 🚀 Feature attribution of sequence generation for most `ForConditionalGeneration` (encoder-decoder) and `ForCausalLM` (decoder-only) models from 🤗 Transformers
 
-- 🚀 Support for single and batched attribution using multiple gradient-based feature attribution methods from [Captum](https://captum.ai/docs/introduction)
+- 🚀 Support for single and batched attribution using multiple gradient-based and perturbation-based feature attribution methods from [Captum](https://captum.ai/docs/introduction)
 
 - 🚀 Support for basic single-layer and layer-aggregation attention attribution methods with one or multiple aggregated heads.
 
-- 🚀 Post-hoc aggregation of feature attribution maps via `Aggregator` classes.
+- 🚀 Post-processing of attribution maps via `Aggregator` classes.
 
 - 🚀 Attribution visualization in notebooks, browser and command line.
 
@@ -119,8 +119,6 @@ model.attribute(
 - ⚙️ Interoperability with [ferret](https://ferret.readthedocs.io/en/latest/) for attribution plausibility and faithfulness evaluation.
 
 - ⚙️ Rich and interactive visualizations in a tabbed interface using [Gradio Blocks](https://gradio.app/docs/#blocks).
-
-- ⚙️ Baked-in advanced capabilities for contrastive and uncertainty-weighted feature attribution.
 
 ## Using the Inseq client
 

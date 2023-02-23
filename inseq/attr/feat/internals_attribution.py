@@ -20,7 +20,8 @@ from ...data import Batch, EncoderDecoderBatch, FeatureAttributionStepOutput
 from ...utils import Registry, pretty_tensor
 from ...utils.typing import SingleScorePerStepTensor, TargetIdsTensor
 from ..attribution_decorators import set_hook, unset_hook
-from .attribution_utils import STEP_SCORES_MAP, get_source_target_attributions
+from ..step_functions import STEP_SCORES_MAP
+from .attribution_utils import get_source_target_attributions
 from .feature_attribution import FeatureAttribution
 from .ops import AttentionWeights
 

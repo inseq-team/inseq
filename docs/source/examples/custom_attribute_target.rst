@@ -44,8 +44,10 @@ We can define such attribution function using the standard template adopted by I
 
 .. code-block:: python
 
-    from inseq.utils import output2prob
+    from inseq.attr.step_functions import probability_fn
 
+    # Simplified implementation of inseq.attr.step_functions.contrast_prob_diff_fn
+    # Works only for encoder-decoder models!
     def attribute_contrast_logits_diff(
         # Default arguments in attribution_model.forward
         attribution_model,
@@ -85,8 +87,8 @@ We can define such attribution function using the standard template adopted by I
             decoder_attention_mask=contrast_decoder_attention_mask,
         )
         # Return the prob difference as target for attribution
-        model_probs = output2prob(attribution_model, forward_output, target_ids)
-        contrast_probs = output2prob(attribution_model, contrast_output, contrast_target_ids)
+        model_probs = probability_fn(attribution_model, forward_output, target_ids)
+        contrast_probs = probability_fn(attribution_model, contrast_output, contrast_target_ids)
         return model_probs - contrast_probs
 
 Besides common arguments such as the attribution model, its outputs after the forward pass and all the input ids
@@ -145,6 +147,7 @@ From this example, we see that the masculine Italian determiner "il" is 70% more
 and that the model is mostly influenced by the word manager itself. A textbook example of gender bias in machine translation!
 We can also see how the divergence between the two generations has almost no impact on following tokens, if we weight them by the difference in log probabilities.
 
+The contrastive attribution function showcased above is already registered in Inseq under the name ``contrast_prob_diff``, give it a try!
 
 .. note::
     The ``aggregate_map`` argument is useful to inform the library about which functions should be used when aggregating

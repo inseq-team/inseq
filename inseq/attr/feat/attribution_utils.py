@@ -6,10 +6,8 @@ import torch
 
 from ...data.attribution import DEFAULT_ATTRIBUTION_AGGREGATE_DICT
 from ...data.batch import DecoderOnlyBatch, EncoderDecoderBatch
-from ...utils import extract_signature_args, output2ce, output2ent, output2ppl, output2prob
+from ...utils import extract_signature_args
 from ...utils.typing import (
-    EmbeddingsTensor,
-    IdsTensor,
     OneOrMoreAttributionSequences,
     OneOrMoreIdSequences,
     OneOrMoreTokenSequences,
@@ -18,33 +16,12 @@ from ...utils.typing import (
     TextInput,
     TokenWithId,
 )
+from ..step_functions import STEP_SCORES_MAP, StepScoreInput
 
 if TYPE_CHECKING:
     from ...models import AttributionModel
     from .feature_attribution import FeatureAttribution
 
-
-StepScoreInput = Callable[
-    [
-        "AttributionModel",
-        Union[EncoderDecoderBatch, DecoderOnlyBatch],
-        IdsTensor,
-        IdsTensor,
-        EmbeddingsTensor,
-        EmbeddingsTensor,
-        IdsTensor,
-        IdsTensor,
-        TargetIdsTensor,
-    ],
-    SingleScorePerStepTensor,
-]
-
-STEP_SCORES_MAP = {
-    "probability": output2prob,
-    "entropy": output2ent,
-    "crossentropy": output2ce,
-    "perplexity": output2ppl,
-}
 
 logger = logging.getLogger(__name__)
 
@@ -118,6 +95,12 @@ def get_step_scores(
     """
     if attribution_model is None:
         raise ValueError("Attribution model is not set.")
+    if score_identifier not in STEP_SCORES_MAP:
+        raise AttributeError(
+            f"Step score {score_identifier} not found. Available step scores are: "
+            f"{', '.join(list(STEP_SCORES_MAP.keys()))}. Use the inseq.register_step_score"
+            "function to register a custom step score."
+        )
     with torch.no_grad():
         output = attribution_model.get_forward_output(
             **attribution_model.format_forward_args(
