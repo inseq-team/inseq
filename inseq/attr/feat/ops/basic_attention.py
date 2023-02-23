@@ -227,7 +227,7 @@ class BaseAttentionAttribution(Attribution):
         return aggregate_fn(attention, 0, **aggregate_kwargs)
 
 
-class Attention(BaseAttentionAttribution):
+class AttentionWeights(BaseAttentionAttribution):
     """
     A basic attention attribution approach.
     It will return the attention values for the specified values or aggregated across the specified ranges of heads

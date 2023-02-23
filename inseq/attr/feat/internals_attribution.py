@@ -22,12 +22,12 @@ from ...utils.typing import SingleScorePerStepTensor, TargetIdsTensor
 from ..attribution_decorators import set_hook, unset_hook
 from .attribution_utils import STEP_SCORES_MAP, get_source_target_attributions
 from .feature_attribution import FeatureAttribution
-from .ops import Attention
+from .ops import AttentionWeights
 
 logger = logging.getLogger(__name__)
 
 
-class AttentionAttributionRegistry(FeatureAttribution, Registry):
+class InternalsAttributionRegistry(FeatureAttribution, Registry):
     r"""Attention-based attribution method registry."""
 
     @set_hook
@@ -119,7 +119,7 @@ class AttentionAttributionRegistry(FeatureAttribution, Registry):
         )
 
 
-class AttentionAttribution(AttentionAttributionRegistry):
+class AttentionWeightsAttribution(InternalsAttributionRegistry):
     """
     The basic attention attribution method, which retrieves the attention weights from the model.
 
@@ -153,4 +153,4 @@ class AttentionAttribution(AttentionAttributionRegistry):
 
     def __init__(self, attribution_model, **kwargs):
         super().__init__(attribution_model)
-        self.method = Attention(attribution_model)
+        self.method = AttentionWeights(attribution_model)
