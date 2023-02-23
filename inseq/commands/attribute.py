@@ -62,6 +62,12 @@ class AttributeBaseArgs:
             "help": "The internal batch size used by the attribution method, used for some attribution methods.",
         },
     )
+    aggregate_output: bool = field(
+        default=False,
+        metadata={
+            "help": "If specified, the attribution output is aggregated using its default aggregator before saving.",
+        },
+    )
     device: str = field(
         default=get_default_device(),
         metadata={"alias": "--dev", "help": "The device used for inference with Pytorch. Multi-GPU is not supported."},
@@ -168,7 +174,9 @@ def attribute(input_texts, generated_texts, args: AttributeBaseArgs):
     else:
         out.show(display=not args.hide_attributions)
     if args.save_path:
-        print(f"Saving attributions to {args.save_path}")
+        if args.aggregate_output:
+            out = out.aggregate()
+        print(f"Saving {'aggregated ' if args.aggregate_output else ''}attributions to {args.save_path}")
         out.save(args.save_path, overwrite=True)
 
 
