@@ -122,7 +122,8 @@ def get_step_scores(
         output = attribution_model.get_forward_output(
             **attribution_model.format_forward_args(
                 batch, use_embeddings=attribution_model.attribution_method.forward_batch_embeds
-            )
+            ),
+            use_embeddings=attribution_model.attribution_method.forward_batch_embeds,
         )
         step_scores_args = attribution_model.format_step_function_args(
             forward_output=output,
