@@ -605,6 +605,21 @@ class GradientFeatureAttributionStepOutput(FeatureAttributionStepOutput):
 
 
 @dataclass(eq=False, repr=False)
+class OcclusionFeatureAttributionSequenceOutput(FeatureAttributionSequenceOutput):
+    """Raw output of a single sequence of occlusion feature attribution."""
+
+    def __post_init__(self):
+        super().__post_init__()
+
+
+@dataclass(eq=False, repr=False)
+class OcclusionFeatureAttributionStepOutput(FeatureAttributionStepOutput):
+    """Raw output of a single step of occlusion feature attribution."""
+
+    _sequence_cls: Type["FeatureAttributionSequenceOutput"] = OcclusionFeatureAttributionSequenceOutput
+
+
+@dataclass(eq=False, repr=False)
 class PerturbationFeatureAttributionSequenceOutput(FeatureAttributionSequenceOutput):
     """Raw output of a single sequence of perturbation feature attribution."""
 

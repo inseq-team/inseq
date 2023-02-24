@@ -12,6 +12,7 @@ from .attribution import (
     FeatureAttributionSequenceOutput,
     FeatureAttributionStepOutput,
     GradientFeatureAttributionStepOutput,
+    OcclusionFeatureAttributionStepOutput,
     PerturbationFeatureAttributionStepOutput,
 )
 from .batch import Batch, BatchEmbedding, BatchEncoding, DecoderOnlyBatch, EncoderDecoderBatch
@@ -32,6 +33,7 @@ __all__ = [
     "FeatureAttributionInput",
     "FeatureAttributionStepOutput",
     "GradientFeatureAttributionStepOutput",
+    "OcclusionFeatureAttributionStepOutput",
     "PerturbationFeatureAttributionStepOutput",
     "FeatureAttributionSequenceOutput",
     "FeatureAttributionOutput",

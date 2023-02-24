@@ -3,7 +3,7 @@ from typing import Any, Dict
 
 from captum.attr import GradientShap, Occlusion
 
-from ...data import PerturbationFeatureAttributionStepOutput
+from ...data import OcclusionFeatureAttributionStepOutput, PerturbationFeatureAttributionStepOutput
 from ...utils import Registry
 from ..attribution_decorators import set_hook, unset_hook
 from .attribution_utils import get_source_target_attributions
@@ -50,7 +50,7 @@ class OcclusionAttribution(PerturbationAttributionRegistry):
         self,
         attribute_fn_main_args: Dict[str, Any],
         attribution_args: Dict[str, Any] = {},
-    ) -> PerturbationFeatureAttributionStepOutput:
+    ) -> OcclusionFeatureAttributionStepOutput:
         r"""Sliding window shapes is defined as a tuple.
         First entry is between 1 and length of input.
         Second entry is given by the embedding dimension of the underlying model.
@@ -83,7 +83,19 @@ class OcclusionAttribution(PerturbationAttributionRegistry):
         source_attributions, target_attributions = get_source_target_attributions(
             attr, self.attribution_model.is_encoder_decoder
         )
-        return PerturbationFeatureAttributionStepOutput(
+
+        # Make sure that the computed attributions are the same for every "embedding slice"
+        embedding_attributions = [
+            source_attributions[:, :, i].tolist()[0] for i in range(source_attributions.shape[2])
+        ]
+        assert all(x == embedding_attributions[0] for x in embedding_attributions)
+
+        # Access the first embedding slice, provided it's the same result as the other slices
+        source_attributions = source_attributions[:, :, 0]
+        if target_attributions:
+            target_attributions = target_attributions[:, :, 0]
+
+        return OcclusionFeatureAttributionStepOutput(
             source_attributions=source_attributions,
             target_attributions=target_attributions,
         )
