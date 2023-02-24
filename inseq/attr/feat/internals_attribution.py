@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 
 class InternalsAttributionRegistry(FeatureAttribution, Registry):
-    r"""Attention-based attribution method registry."""
+    r"""Model Internals-based attribution method registry."""
 
     @set_hook
     def hook(self, **kwargs):
@@ -135,7 +135,7 @@ class AttentionWeightsAttribution(InternalsAttributionRegistry):
                 the head at the corresponding index is used. If a tuple of two indices is specified, all heads between
                 the indices will be aggregated using aggregate_fn. If a list of indices is specified, the respective
                 heads will be used for aggregation. If aggregate_fn is "single", a head must be specified.
-                If no value specified, all heads are passed to aggregate_fn by default.
+                If no value is specified, all heads are passed to aggregate_fn by default.
             layers (:obj:`int` or :obj:`tuple[int, int]` or :obj:`list(int)`, optional): If a single value is specified
                 , the layer at the corresponding index is used. If a tuple of two indices is specified, all layers
                 among the indices will be aggregated using aggregate_fn. If a list of indices is specified, the

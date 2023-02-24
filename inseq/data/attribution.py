@@ -504,7 +504,7 @@ class FeatureAttributionOutput:
         aggregator: Union[AggregatorPipeline, Type[Aggregator]] = None,
         **kwargs,
     ) -> "FeatureAttributionOutput":
-        """Aggregate the sequence attributions. using one or more aggregators.
+        """Aggregate the sequence attributions using one or more aggregators.
 
         Args:
             aggregator (:obj:`AggregatorPipeline` or :obj:`Type[Aggregator]`, optional): Aggregator
