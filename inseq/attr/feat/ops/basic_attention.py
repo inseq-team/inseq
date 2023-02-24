@@ -73,8 +73,8 @@ class BaseAttentionAttribution(Attribution):
             attention (:obj:`torch.Tensor`) attention tensor of shape
                 `(batch_size, num_heads, sequence_length, sequence_length)`
             aggregate_fn (:obj:`str` or :obj:`callable`): The method to use for aggregating across heads.
-                Can be one of `average` (default if heads is tuple or None), `max`, `min` or `single` (default if heads
-                is int), or a custom function defined by the user.
+                Can be one of `average` (default if heads is list, tuple or None), `max`, `min` or `single` (default
+                if heads is int), or a custom function defined by the user.
             heads (:obj:`int` or :obj:`tuple[int, int]` or :obj:`list(int)`, optional): If a single value is specified,
                 the head at the corresponding index is used. If a tuple of two indices is specified, all heads between
                 the indices will be aggregated using aggregate_fn. If a list of indices is specified, the respective
@@ -154,8 +154,8 @@ class BaseAttentionAttribution(Attribution):
             attention (:obj:`torch.Tensor`) attention tensor of shape
                 `(n_layers, batch_size, num_heads, sequence_length, sequence_length)`
             aggregate_fn (:obj:`str` or :obj:`callable`): The method to use for aggregating across layers.
-                Can be one of `average` (default if layers is tuple), `max`, `min` or `single` (default if layers is
-                int or None), or a custom function defined by the user.
+                Can be one of `average` (default if layers is tuple or list), `max`, `min` or `single` (default if
+                layers is int or None), or a custom function defined by the user.
             layers (:obj:`int` or :obj:`tuple[int, int]` or :obj:`list(int)`, optional): If a single value is specified
                 , the layer at the corresponding index is used. If a tuple of two indices is specified, all layers
                 among the indices will be aggregated using aggregate_fn. If a list of indices is specified, the
@@ -172,7 +172,7 @@ class BaseAttentionAttribution(Attribution):
 
         if hasattr(layers, "__iter__"):
             if len(layers) == 0:
-                raise RuntimeError("At least two layer must be specified for aggregated attention attribution.")
+                raise RuntimeError("At least two layers must be specified for aggregated attention attribution.")
             if len(layers) == 1:
                 layers = layers[0]
 
