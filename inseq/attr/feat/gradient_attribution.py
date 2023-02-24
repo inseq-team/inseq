@@ -18,6 +18,7 @@ from typing import Any, Dict
 
 from captum.attr import (
     DeepLift,
+    GradientShap,
     InputXGradient,
     IntegratedGradients,
     LayerDeepLift,
@@ -114,6 +115,21 @@ class DeepLiftAttribution(GradientAttributionRegistry):
     def __init__(self, attribution_model, multiply_by_inputs: bool = True, **kwargs):
         super().__init__(attribution_model)
         self.method = DeepLift(self.attribution_model, multiply_by_inputs)
+        self.use_baseline = True
+
+
+class GradientShapAttribution(GradientAttributionRegistry):
+    """GradientSHAP attribution method.
+
+    Reference implementation:
+    `https://captum.ai/api/gradient_shap.html <https://captum.ai/api/gradient_shap.html>`__.
+    """
+
+    method_name = "gradient_shap"
+
+    def __init__(self, attribution_model, multiply_by_inputs: bool = True, **kwargs):
+        super().__init__(attribution_model)
+        self.method = GradientShap(self.attribution_model, multiply_by_inputs)
         self.use_baseline = True
 
 

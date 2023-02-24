@@ -55,7 +55,7 @@ numpy = "^1.21.6"
 torchtyping = "^0.1.4"
 torch = "^1.13.1"
 scipy = "^1.8.1"
-matplotlib = "^3.5.2"
+matplotlib = "~3.5.3"
 tqdm = "^4.64.0"
 poethepoet = "^0.13.1"
 

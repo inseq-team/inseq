@@ -22,6 +22,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 from torchtyping import TensorType
+from transformers import set_seed
 
 from ...data import (
     DecoderOnlyBatch,
@@ -453,6 +454,7 @@ class FeatureAttribution(Registry):
             attribute_target=attribute_target,
             attributed_fn_args=attributed_fn_args,
         )
+        set_seed(42)
         # Perform attribution step
         step_output = self.attribute_step(
             attribute_main_args,
