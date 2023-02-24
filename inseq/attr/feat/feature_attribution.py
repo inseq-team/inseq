@@ -188,7 +188,7 @@ class FeatureAttribution(Registry):
                 Defaults to False.
             step_scores (:obj:`list` of `str`): List of identifiers for step scores that need to be computed during
                 attribution. The available step scores are defined in :obj:`inseq.attr.feat.STEP_SCORES_MAP` and new
-                step scores can be added by using the :meth:`~inseq.register_step_score` function.
+                step scores can be added by using the :meth:`~inseq.register_step_function` function.
             include_eos_baseline (:obj:`bool`, `optional`): Whether to include the EOS token in the baseline for
                 attribution. By default the EOS token is not used for attribution. Defaults to False.
             attributed_fn (:obj:`str` or :obj:`Callable[..., SingleScorePerStepTensor]`, `optional`): The identifier or
@@ -278,7 +278,7 @@ class FeatureAttribution(Registry):
                 Defaults to False.
             step_scores (:obj:`list` of `str`): List of identifiers for step scores that need to be computed during
                 attribution. The available step scores are defined in :obj:`inseq.attr.feat.STEP_SCORES_MAP` and new
-                step scores can be added by using the :meth:`~inseq.register_step_score` function.
+                step scores can be added by using the :meth:`~inseq.register_step_function` function.
             attribution_args (:obj:`dict`, `optional`): Additional arguments to pass to the attribution method.
             attributed_fn_args (:obj:`dict`, `optional`): Additional arguments to pass to the attributed function.
             step_scores_args (:obj:`dict`, `optional`): Additional arguments to pass to the step scores function.
@@ -424,7 +424,7 @@ class FeatureAttribution(Registry):
                 Defaults to False.
             step_scores (:obj:`list` of `str`): List of identifiers for step scores that need to be computed during
                 attribution. The available step scores are defined in :obj:`inseq.attr.feat.STEP_SCORES_MAP` and new
-                step scores can be added by using the :meth:`~inseq.register_step_score` function.
+                step scores can be added by using the :meth:`~inseq.register_step_function` function.
             attribution_args (:obj:`dict`, `optional`): Additional arguments to pass to the attribution method.
             attributed_fn_args (:obj:`dict`, `optional`): Additional arguments to pass to the attributed function.
             step_scores_args (:obj:`dict`, `optional`): Additional arguments to pass to the step scores functions.

@@ -17,6 +17,8 @@ The following functions can be used as attribution targets or step functions in 
 
 .. currentmodule:: inseq.attr.step_functions
 
+.. autofunction:: logit_fn
+
 .. autofunction:: probability_fn
 
 .. autofunction:: entropy_fn

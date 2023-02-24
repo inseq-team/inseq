@@ -22,10 +22,10 @@ functionalities required for its usage.
 
 .. autofunction:: list_feature_attribution_methods
 
-.. autofunction:: list_step_scores
+.. autofunction:: list_step_functions
 
 .. autofunction:: load_model
 
-.. autofunction:: register_step_score
+.. autofunction:: register_step_function
 
 .. autofunction:: show_attributions

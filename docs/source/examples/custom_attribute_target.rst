@@ -21,8 +21,8 @@ cases of feature attribution methods.
 
     The Inseq library comes with a list of pre-defined step scores functions such as ``probability`` and ``entropy``. By passing one or more
     score names when using ``model.attribute``, these scores will be computed from model outputs and returned in the ``step_scores`` dictionary
-    of the output objects. The list of all available scores is available as ``inseq.list_step_scores``, and new scores can be added with
-    ``inseq.register_step_score``.
+    of the output objects. The list of all available scores is available as ``inseq.list_step_functions``, and new scores can be added with
+    ``inseq.register_step_function``.
 
 
 Besides providing useful statistics about model predictive distribution, step score functions are also used as targets when computing feature
@@ -48,7 +48,7 @@ We can define such attribution function using the standard template adopted by I
 
     # Simplified implementation of inseq.attr.step_functions.contrast_prob_diff_fn
     # Works only for encoder-decoder models!
-    def attribute_contrast_logits_diff(
+    def example_prob_diff_fn(
         # Default arguments in attribution_model.forward
         attribution_model,
         forward_output,
@@ -106,9 +106,9 @@ Now that we have our custom attribution function, integrating it in Inseq is ver
 
     # Register the function defined above
     # Since outputs are still probabilities, contiguous tokens can still be aggregated using product
-    inseq.register_step_score(
-        fn=attribute_contrast_logits_diff,
-        identifier="contrast_logits_diff",
+    inseq.register_step_function(
+        fn=example_prob_diff_fn,
+        identifier="example_prob_diff",
         aggregate_map={"span_aggregate": lambda x: x.prod(dim=1, keepdim=True)},
     )
 
@@ -124,16 +124,16 @@ Now that we have our custom attribution function, integrating it in Inseq is ver
     out = attribution_model.attribute(
         "I said hi to the manager",
         "Ho salutato il manager",
-        attributed_fn="contrast_logits_diff",
+        attributed_fn="example_prob_diff",
         contrast_ids=contrast.input_ids,
         contrast_attention_mask=contrast.attention_mask,
         attribute_target=True,
         # We also visualize the step score
-        step_scores=["contrast_logits_diff"]
+        step_scores=["example_prob_diff"]
     )
 
     # Weight attribution scores by the difference in logits
-    out.weight_attributions("contrast_logits_diff")
+    out.weight_attributions("example_prob_diff")
     out.show()
 
 

@@ -10,6 +10,8 @@ from ..utils import pretty_dict
 
 @dataclass
 class TensorWrapper:
+    """Wrapper for tensors and lists of tensors to allow for easy access to their attributes."""
+
     @staticmethod
     def _getitem(attr, subscript):
         if isinstance(attr, torch.Tensor):

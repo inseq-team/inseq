@@ -1,9 +1,10 @@
-from .attribution_utils import extract_args, join_token_ids, list_step_scores, register_step_score
+from .attribution_utils import extract_args, join_token_ids
 from .feature_attribution import FeatureAttribution, list_feature_attribution_methods
 from .gradient_attribution import (
     DeepLiftAttribution,
     DiscretizedIntegratedGradientsAttribution,
     GradientAttributionRegistry,
+    GradientShapAttribution,
     InputXGradientAttribution,
     IntegratedGradientsAttribution,
     LayerDeepLiftAttribution,
@@ -17,10 +18,9 @@ __all__ = [
     "FeatureAttribution",
     "extract_args",
     "list_feature_attribution_methods",
-    "register_step_score",
     "join_token_ids",
-    "list_step_scores",
     "GradientAttributionRegistry",
+    "GradientShapAttribution",
     "DeepLiftAttribution",
     "InputXGradientAttribution",
     "IntegratedGradientsAttribution",

@@ -34,6 +34,9 @@ Gradient Attribution Methods
 .. autoclass:: inseq.attr.feat.DiscretizedIntegratedGradientsAttribution
     :members:
 
+.. autoclass:: inseq.attr.feat.GradientShapAttribution
+    :members:
+
 
 .. autoclass:: inseq.attr.feat.IntegratedGradientsAttribution
     :members:
