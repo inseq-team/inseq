@@ -59,21 +59,28 @@ class OcclusionAttribution(PerturbationAttributionRegistry):
         if "sliding_window_shapes" not in attribution_args:
             embedding_layer = self.attribution_model.get_embedding_layer()
             len_input_tuple = len(attribute_fn_main_args["inputs"])
+            # If target is present:
             if len_input_tuple == 2:
                 # if attribute_target=True
                 attribution_args["sliding_window_shapes"] = (
                     (1, embedding_layer.embedding_dim),
                     (1, embedding_layer.embedding_dim),
                 )
+                # By default, the UNK token from the model's tokenizer is used.
+                if "baselines" not in attribution_args:
+                    attribution_args["baselines"] = (
+                        self.attribution_model.tokenizer.unk_token_id,
+                        self.attribution_model.tokenizer.unk_token_id,
+                    )
+            # If only source is present:
             elif len_input_tuple == 1:
                 # if attribute_target=False
                 attribution_args["sliding_window_shapes"] = (1, embedding_layer.embedding_dim)
+                # By default, the UNK token from the model's tokenizer is used.
+                if "baselines" not in attribution_args:
+                    attribution_args["baselines"] = self.attribution_model.tokenizer.unk_token_id
             else:
                 raise ValueError(f"Invalid length ({len_input_tuple}) for input tuple (has to be 1 or 2).")
-
-        # By default, the UNK token from the model's tokenizer is used.
-        if "baselines" not in attribution_args:
-            attribution_args["baselines"] = self.attribution_model.tokenizer.unk_token_id
 
         attr = self.method.attribute(
             **attribute_fn_main_args,
@@ -92,12 +99,13 @@ class OcclusionAttribution(PerturbationAttributionRegistry):
 
         # Access the first embedding slice, provided it's the same result as the other slices
         source_attributions = source_attributions[:, :, 0]
-        if target_attributions:
+        if target_attributions is not None:
             target_attributions = target_attributions[:, :, 0]
 
         return OcclusionFeatureAttributionStepOutput(
             source_attributions=source_attributions,
             target_attributions=target_attributions,
+            step_scores={},
         )
 
 
