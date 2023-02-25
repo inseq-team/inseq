@@ -1,7 +1,7 @@
 import logging
 from typing import Any, Dict
 
-from captum.attr import GradientShap, Occlusion
+from captum.attr import Occlusion
 
 from ...data import OcclusionFeatureAttributionStepOutput, PerturbationFeatureAttributionStepOutput
 from ...utils import Registry
@@ -130,6 +130,9 @@ class LimeAttribution(PerturbationAttributionRegistry):
         attribute_fn_main_args: Dict[str, Any],
         attribution_args: Dict[str, Any] = {},
     ) -> PerturbationFeatureAttributionStepOutput:
+        if len(attribute_fn_main_args["inputs"]) > 1:
+            raise NotImplementedError("LIME attribution for multiple inputs currently not supported.")
+
         attr = self.method.attribute(
             **attribute_fn_main_args,
             **attribution_args,
@@ -139,38 +142,5 @@ class LimeAttribution(PerturbationAttributionRegistry):
             attr, self.attribution_model.is_encoder_decoder
         )
         return PerturbationFeatureAttributionStepOutput(
-            source_attributions=source_attributions,
-            target_attributions=target_attributions,
-        )
-
-
-class GradientShapAttribution(PerturbationAttributionRegistry):
-    """GradientSHAP-based attribution method.
-    Reference implementation:
-    `https://captum.ai/api/gradient_shap.html <https://captum.ai/api/gradient_shap.html>`__.
-    """
-
-    method_name = "gradient_shap"
-
-    def __init__(self, attribution_model, multiply_by_inputs: bool = True, **kwargs):
-        super().__init__(attribution_model)
-        self.use_baseline = True
-        self.method = GradientShap(attribution_model, multiply_by_inputs=multiply_by_inputs)
-
-    def attribute_step(
-        self,
-        attribute_fn_main_args: Dict[str, Any],
-        attribution_args: Dict[str, Any] = {},
-    ) -> PerturbationFeatureAttributionStepOutput:
-        attr = self.method.attribute(
-            **attribute_fn_main_args,
-            **attribution_args,
-        )
-
-        source_attributions, target_attributions = get_source_target_attributions(
-            attr, self.attribution_model.is_encoder_decoder
-        )
-        return PerturbationFeatureAttributionStepOutput(
-            source_attributions=source_attributions,
-            target_attributions=target_attributions,
+            source_attributions=source_attributions, target_attributions=target_attributions, step_scores={}
         )

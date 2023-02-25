@@ -222,15 +222,23 @@ class Lime(LimeBase):
     @staticmethod
     def token_similarity_kernel(
         original_input: tuple,
-        perturbed_input: torch.Tensor,
-        perturbed_interpretable_input: torch.Tensor,
+        perturbed_input: tuple,
+        perturbed_interpretable_input: tuple,
         **kwargs,
     ) -> torch.Tensor:
         r"""Calculates the similarity between original and perturbed input"""
-        original_input_tensor = original_input[0][0]
-        perturbed_input_tensor = perturbed_input[0][0]
+
+        if len(original_input) == 1:
+            original_input_tensor = original_input[0][0]
+            perturbed_input_tensor = perturbed_input[0][0]
+        elif len(original_input) == 2:
+            original_input_tensor = torch.cat(original_input, dim=1)
+            perturbed_input_tensor = torch.cat(perturbed_input, dim=1)
+        else:
+            raise ValueError("Original input tuple has to be of either length 1 or 2.")
+
         assert original_input_tensor.shape == perturbed_input_tensor.shape
-        similarity = torch.sum(original_input_tensor[0] == perturbed_input_tensor[0]) / len(original_input_tensor[0])
+        similarity = torch.sum(original_input_tensor == perturbed_input_tensor)
         return similarity
 
     def perturb_func(
@@ -252,38 +260,44 @@ class Lime(LimeBase):
             mask_token (str): What kind of special token to use for masking the
                 input. Options: "unk" and "pad"
         """
-        original_input = original_input_tuple[0]
+        perturbed_inputs = []
+        for original_input_tensor in original_input_tuple:
+            # Build mask for replacing random tokens with [PAD] token
+            mask_value_probs = torch.tensor([mask_prob, 1 - mask_prob])
+            mask_multinomial_binary = torch.multinomial(
+                mask_value_probs, len(original_input_tensor[0]), replacement=True
+            )
 
-        # Build mask for replacing random tokens with [PAD] token
-        mask_value_probs = torch.tensor([mask_prob, 1 - mask_prob])
-        mask_multinomial_binary = torch.multinomial(mask_value_probs, len(original_input[0]), replacement=True)
+            def detach_to_list(t):
+                return t.detach().cpu().numpy().tolist() if type(t) == torch.Tensor else t
 
-        def detach_to_list(t):
-            return t.detach().cpu().numpy().tolist() if type(t) == torch.Tensor else t
+            # Additionally remove special_token_ids
+            mask_special_token_ids = torch.Tensor(
+                [
+                    1 if id_ in self.attribution_model.special_tokens_ids else 0
+                    for id_ in detach_to_list(original_input_tensor[0])
+                ]
+            ).int()
 
-        # Additionally remove special_token_ids
-        mask_special_token_ids = torch.Tensor(
-            [1 if id_ in self.attribution_model.special_tokens_ids else 0 for id_ in detach_to_list(original_input[0])]
-        ).int()
+            # Merge the binary mask with the special_token_ids mask
+            mask = (
+                torch.tensor([m + s if s == 0 else s for m, s in zip(mask_multinomial_binary, mask_special_token_ids)])
+                .to(self.attribution_model.device)
+                .unsqueeze(-1)  # 1D -> 2D
+            )
 
-        # Merge the binary mask with the special_token_ids mask
-        mask = (
-            torch.tensor([m + s if s == 0 else s for m, s in zip(mask_multinomial_binary, mask_special_token_ids)])
-            .to(self.attribution_model.device)
-            .unsqueeze(-1)  # 1D -> 2D
-        )
+            # Set special token for masking
+            if mask_token == "unk":
+                tokenizer_mask_token = self.attribution_model.tokenizer.unk_token_id
+            elif mask_token == "pad":
+                tokenizer_mask_token = self.attribution_model.tokenizer.pad_token_id
+            else:
+                raise ValueError(f"Invalid mask token {mask_token} for tokenizer: {self.attribution_model.tokenizer}")
 
-        # Set special token for masking
-        if mask_token == "unk":
-            tokenizer_mask_token = self.attribution_model.tokenizer.unk_token_id
-        elif mask_token == "pad":
-            tokenizer_mask_token = self.attribution_model.tokenizer.pad_token_id
-        else:
-            raise ValueError(f"Invalid mask token {mask_token} for tokenizer: {self.attribution_model.tokenizer}")
+            # Apply mask to original input
+            perturbed_inputs.append(original_input_tensor * mask + (1 - mask) * tokenizer_mask_token)
 
-        # Apply mask to original input
-        perturbed_input = original_input * mask + (1 - mask) * tokenizer_mask_token
-        return (perturbed_input,)
+        return tuple(perturbed_inputs)
 
     @staticmethod
     def to_interp_rep_transform(sample, original_input, **kwargs: Any):
