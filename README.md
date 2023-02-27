@@ -184,6 +184,8 @@ out = attribution_model.attribute(
 out.show()
 ```
 
+Refer to the [documentation](https://inseq.readthedocs.io/examples/custom_attribute_target.html) for an example including custom function registration.
+
 ## Using the Inseq client
 
 The Inseq library also provides useful client commands to enable repeated attribution of individual examples and even entire 🤗 datasets directly from the console. See the available options by typing `inseq -h` in the terminal after installing the package.
