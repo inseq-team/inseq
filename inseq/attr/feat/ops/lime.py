@@ -61,8 +61,6 @@ class Lime(LimeBase):
             to_interp_rep_transform=to_interp_rep_transform_func,
         )
         self.attribution_model = attribution_model
-        assert self.attribution_model.model.device is not None
-        assert self.attribution_model.tokenizer.pad_token_id is not None
 
     # @log_usage
     def attribute(
