@@ -58,7 +58,7 @@ class Batch(TensorWrapper):
         embedding (:class:`~inseq.data.BatchEmbedding`): Embeddings produced by the embedding process using
             :meth:`~inseq.models.AttributionModel.embed`.
 
-    All attributes fields are accessible as properties (e.g. ``batch.input_ids`` corresponds to
+    All attribute fields are accessible as properties (e.g. ``batch.input_ids`` corresponds to
         ``batch.encoding.input_ids``)
     """
 
