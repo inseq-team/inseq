@@ -13,6 +13,10 @@ from .gradient_attribution import (
     SaliencyAttribution,
 )
 from .internals_attribution import AttentionWeightsAttribution, InternalsAttributionRegistry
+from .perturbation_attribution import (
+    LimeAttribution,
+    OcclusionAttribution,
+)
 
 __all__ = [
     "FeatureAttribution",
@@ -31,4 +35,6 @@ __all__ = [
     "LayerDeepLiftAttribution",
     "InternalsAttributionRegistry",
     "AttentionWeightsAttribution",
+    "OcclusionAttribution",
+    "LimeAttribution",
 ]

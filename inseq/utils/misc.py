@@ -92,6 +92,8 @@ def pretty_tensor(t: Optional[Tensor] = None, lpad: int = 8) -> str:
 
 
 def pretty_dict(d: Dict[str, Any], lpad: int = 4) -> str:
+    if not d:
+        return "{}"
     out_txt = "{\n"
     for k, v in d.items():
         out_txt += f"{' ' * lpad}{k}: "
