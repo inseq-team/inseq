@@ -13,6 +13,7 @@ from ..utils import (
     identity_fn,
     json_advanced_dump,
     json_advanced_load,
+    normalize_attributions,
     pretty_dict,
     prod_fn,
     remap_from_filtered,
@@ -610,6 +611,8 @@ class OcclusionFeatureAttributionSequenceOutput(FeatureAttributionSequenceOutput
 
     def __post_init__(self):
         super().__post_init__()
+        self._dict_aggregate_fn["source_attributions"]["sequence_aggregate"] = normalize_attributions
+        self._dict_aggregate_fn["target_attributions"]["sequence_aggregate"] = normalize_attributions
 
 
 @dataclass(eq=False, repr=False)

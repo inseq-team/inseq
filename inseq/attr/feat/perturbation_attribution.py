@@ -43,7 +43,7 @@ class OcclusionAttribution(PerturbationAttributionRegistry):
 
     def __init__(self, attribution_model):
         super().__init__(attribution_model)
-        self.is_layer_attribution = False
+        self.use_baseline = True
         self.method = Occlusion(self.attribution_model)
 
     def attribute_step(
@@ -58,49 +58,27 @@ class OcclusionAttribution(PerturbationAttributionRegistry):
         """
         if "sliding_window_shapes" not in attribution_args:
             embedding_layer = self.attribution_model.get_embedding_layer()
-            len_input_tuple = len(attribute_fn_main_args["inputs"])
-            # If target is present:
-            if len_input_tuple == 2:
-                # if attribute_target=True
-                attribution_args["sliding_window_shapes"] = (
-                    (1, embedding_layer.embedding_dim),
-                    (1, embedding_layer.embedding_dim),
-                )
-                # By default, the UNK token from the model's tokenizer is used.
-                if "baselines" not in attribution_args:
-                    attribution_args["baselines"] = (
-                        self.attribution_model.tokenizer.unk_token_id,
-                        self.attribution_model.tokenizer.unk_token_id,
-                    )
-            # If only source is present:
-            elif len_input_tuple == 1:
-                # if attribute_target=False
-                attribution_args["sliding_window_shapes"] = (1, embedding_layer.embedding_dim)
-                # By default, the UNK token from the model's tokenizer is used.
-                if "baselines" not in attribution_args:
-                    attribution_args["baselines"] = self.attribution_model.tokenizer.unk_token_id
-            else:
-                raise ValueError(f"Invalid length ({len_input_tuple}) for input tuple (has to be 1 or 2).")
+            attribution_args["sliding_window_shapes"] = tuple(
+                (1, embedding_layer.embedding_dim) for _ in range(len(attribute_fn_main_args["inputs"]))
+            )
+            if len(attribution_args["sliding_window_shapes"]) == 1:
+                attribution_args["sliding_window_shapes"] = attribution_args["sliding_window_shapes"][0]
 
-        attr = self.method.attribute(
-            **attribute_fn_main_args,
-            **attribution_args,
-        )
-
+        attr = self.method.attribute(**attribute_fn_main_args, **attribution_args)
         source_attributions, target_attributions = get_source_target_attributions(
             attr, self.attribution_model.is_encoder_decoder
         )
 
         # Make sure that the computed attributions are the same for every "embedding slice"
-        embedding_attributions = [
-            source_attributions[:, :, i].tolist()[0] for i in range(source_attributions.shape[2])
-        ]
+        attr = source_attributions if source_attributions is not None else target_attributions
+        embedding_attributions = [attr[:, :, i].tolist()[0] for i in range(attr.shape[2])]
         assert all(x == embedding_attributions[0] for x in embedding_attributions)
 
         # Access the first embedding slice, provided it's the same result as the other slices
-        source_attributions = source_attributions[:, :, 0]
+        if source_attributions is not None:
+            source_attributions = source_attributions[:, :, 0].abs()
         if target_attributions is not None:
-            target_attributions = target_attributions[:, :, 0]
+            target_attributions = target_attributions[:, :, 0].abs()
 
         return OcclusionFeatureAttributionStepOutput(
             source_attributions=source_attributions,
@@ -136,7 +114,7 @@ class LimeAttribution(PerturbationAttributionRegistry):
             # of length one (list containing a tuple) or of length two (tuple unpacked from the list), an error is
             # raised. A workaround will be added soon.
             raise NotImplementedError(
-                "LIME attribution with encoder-decoder models and attribute_target=True currently not supported."
+                "LIME attribution with attribute_target=True currently not supported for encoder-decoder models."
             )
 
         attr = self.method.attribute(

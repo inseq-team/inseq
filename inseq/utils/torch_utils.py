@@ -71,6 +71,30 @@ def sum_normalize_attributions(
     return attributions
 
 
+def normalize_attributions(
+    attributions: Union[
+        TokenSequenceAttributionTensor, Tuple[TokenSequenceAttributionTensor, TokenSequenceAttributionTensor]
+    ],
+    cat_dim: int = 0,
+    norm_dim: int = 0,
+) -> TokenSequenceAttributionTensor:
+    concat = False
+    if isinstance(attributions, tuple):
+        concat = True
+        orig_sizes = [a.shape[cat_dim] for a in attributions]
+        attributions = torch.cat(attributions, dim=cat_dim)
+    else:
+        orig_sizes = [attributions.shape[cat_dim]]
+    # nansum is used to handle the target side sequence attribution case
+    attributions = attributions / attributions.nansum(dim=norm_dim, keepdim=True)
+    if len(attributions.shape) == 1:
+        attributions = attributions.unsqueeze(0)
+    if concat:
+        attributions = attributions.split(orig_sizes, dim=cat_dim)
+        return attributions[0], attributions[1]
+    return attributions
+
+
 def euclidean_distance(vec_a: torch.Tensor, vec_b: torch.Tensor) -> torch.Tensor:
     """Compute the Euclidean distance between two points."""
     return (vec_a - vec_b).pow(2).sum(-1).sqrt()
