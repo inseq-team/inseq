@@ -10,6 +10,8 @@ from ..utils import pretty_dict
 
 @dataclass
 class TensorWrapper:
+    """Wrapper for tensors and lists of tensors to allow for easy access to their attributes."""
+
     @staticmethod
     def _getitem(attr, subscript):
         if isinstance(attr, torch.Tensor):
@@ -174,10 +176,10 @@ class TensorWrapper:
         return {k: v for k, v in self.__dict__.items() if not k.startswith("_")}
 
     def __str__(self):
-        return f"{self.__class__.__name__}({pretty_dict(self.__dict__)})"
+        return f"{self.__class__.__name__}({pretty_dict(self.to_dict())})"
 
     def __repr__(self):
-        return self.__str__()
+        return self.__dict__
 
     def __eq__(self, other):
         equals = {field: self._eq(val, getattr(other, field)) for field, val in self.__dict__.items()}

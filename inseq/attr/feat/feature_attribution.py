@@ -22,6 +22,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 from torchtyping import TensorType
+from transformers import set_seed
 
 from ...data import (
     DecoderOnlyBatch,
@@ -43,7 +44,7 @@ from ...utils import (
 )
 from ...utils.typing import ModelIdentifier, SingleScorePerStepTensor, TargetIdsTensor
 from ..attribution_decorators import batched, set_hook, unset_hook
-from .attribution_utils import STEP_SCORES_MAP, check_attribute_positions, get_step_scores, tok2string
+from .attribution_utils import check_attribute_positions, get_step_scores, tok2string
 
 if TYPE_CHECKING:
     from ...models import AttributionModel
@@ -187,7 +188,7 @@ class FeatureAttribution(Registry):
                 Defaults to False.
             step_scores (:obj:`list` of `str`): List of identifiers for step scores that need to be computed during
                 attribution. The available step scores are defined in :obj:`inseq.attr.feat.STEP_SCORES_MAP` and new
-                step scores can be added by using the :meth:`~inseq.register_step_score` function.
+                step scores can be added by using the :meth:`~inseq.register_step_function` function.
             include_eos_baseline (:obj:`bool`, `optional`): Whether to include the EOS token in the baseline for
                 attribution. By default the EOS token is not used for attribution. Defaults to False.
             attributed_fn (:obj:`str` or :obj:`Callable[..., SingleScorePerStepTensor]`, `optional`): The identifier or
@@ -277,7 +278,7 @@ class FeatureAttribution(Registry):
                 Defaults to False.
             step_scores (:obj:`list` of `str`): List of identifiers for step scores that need to be computed during
                 attribution. The available step scores are defined in :obj:`inseq.attr.feat.STEP_SCORES_MAP` and new
-                step scores can be added by using the :meth:`~inseq.register_step_score` function.
+                step scores can be added by using the :meth:`~inseq.register_step_function` function.
             attribution_args (:obj:`dict`, `optional`): Additional arguments to pass to the attribution method.
             attributed_fn_args (:obj:`dict`, `optional`): Additional arguments to pass to the attributed function.
             step_scores_args (:obj:`dict`, `optional`): Additional arguments to pass to the step scores function.
@@ -423,7 +424,7 @@ class FeatureAttribution(Registry):
                 Defaults to False.
             step_scores (:obj:`list` of `str`): List of identifiers for step scores that need to be computed during
                 attribution. The available step scores are defined in :obj:`inseq.attr.feat.STEP_SCORES_MAP` and new
-                step scores can be added by using the :meth:`~inseq.register_step_score` function.
+                step scores can be added by using the :meth:`~inseq.register_step_function` function.
             attribution_args (:obj:`dict`, `optional`): Additional arguments to pass to the attribution method.
             attributed_fn_args (:obj:`dict`, `optional`): Additional arguments to pass to the attributed function.
             step_scores_args (:obj:`dict`, `optional`): Additional arguments to pass to the step scores functions.
@@ -453,6 +454,7 @@ class FeatureAttribution(Registry):
             attribute_target=attribute_target,
             attributed_fn_args=attributed_fn_args,
         )
+        set_seed(42)
         # Perform attribution step
         step_output = self.attribute_step(
             attribute_main_args,
@@ -460,12 +462,6 @@ class FeatureAttribution(Registry):
         )
         # Calculate step scores
         for step_score in step_scores:
-            if step_score not in STEP_SCORES_MAP:
-                raise AttributeError(
-                    f"Step score {step_score} not found. Available step scores are: "
-                    f"{', '.join(list(STEP_SCORES_MAP.keys()))}. Use the inseq.register_step_score"
-                    "function to register a custom step score."
-                )
             step_output.step_scores[step_score] = get_step_scores(
                 self.attribution_model, batch, target_ids, step_score, step_scores_args
             )

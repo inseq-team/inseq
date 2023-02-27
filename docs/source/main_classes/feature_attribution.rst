@@ -34,6 +34,9 @@ Gradient Attribution Methods
 .. autoclass:: inseq.attr.feat.DiscretizedIntegratedGradientsAttribution
     :members:
 
+.. autoclass:: inseq.attr.feat.GradientShapAttribution
+    :members:
+
 
 .. autoclass:: inseq.attr.feat.IntegratedGradientsAttribution
     :members:
@@ -66,9 +69,9 @@ Layer Attribution Methods
 Attention Attribution Methods
 -----------------------------------------------------------------------------------------------------------------------
 
-.. autoclass:: inseq.attr.feat.AttentionAttributionRegistry
+.. autoclass:: inseq.attr.feat.InternalsAttributionRegistry
     :members:
 
 
-.. autoclass:: inseq.attr.feat.AttentionAttribution
+.. autoclass:: inseq.attr.feat.AttentionWeightsAttribution
     :members:

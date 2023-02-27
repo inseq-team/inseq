@@ -7,21 +7,16 @@ from .data_utils import TensorWrapper
 
 @dataclass(eq=False, repr=False)
 class BatchEncoding(TensorWrapper):
-    """
-    Output produced by the tokenization process.
+    """Output produced by the tokenization process using :meth:`~inseq.models.AttributionModel.encode`.
 
     Attributes:
-        input_ids (torch.Tensor): Batch of token ids with shape
-            (batch_size, longest_seq_length). Extra tokens for each sentence
-            are padded, and truncation to max_seq_length is performed.
-        input_tokens (:obj:`list(list(str))`): List of lists containing tokens
-            for each sentence in the batch.
-        attention_mask (torch.Tensor): Batch of attention masks with shape
-            (batch_size, longest_seq_length). 1 for positions that are valid,
-            0 for padded positions.
-        baseline_ids (torch.Tensor, optional): Batch of reference token ids
-            with shape `(batch_size, longest_seq_length)`. Useful for attribution
-            methods requiring a reference input (e.g. integrated gradients).
+        input_ids (:obj:`torch.Tensor`): Batch of token ids with shape ``[batch_size, longest_seq_length]``.
+            Extra tokens for each sentence are padded, and truncation to ``max_seq_length`` is performed.
+        input_tokens (:obj:`list(list(str))`): List of lists containing tokens for each sentence in the batch.
+        attention_mask (:obj:`torch.Tensor`): Batch of attention masks with shape ``[batch_size, longest_seq_length]``.
+            1 for positions that are valid, 0 for padded positions.
+        baseline_ids (torch.Tensor, optional): Batch of reference token ids with shape
+            ``[batch_size, longest_seq_length]``. Used for attribution methods requiring a baseline input (e.g. IG).
     """
 
     input_ids: IdsTensor
@@ -35,6 +30,15 @@ class BatchEncoding(TensorWrapper):
 
 @dataclass(eq=False, repr=False)
 class BatchEmbedding(TensorWrapper):
+    """Embeddings produced by the embedding process using :meth:`~inseq.models.AttributionModel.embed`.
+
+    Attributes:
+        input_embeds (:obj:`torch.Tensor`): Batch of token embeddings with shape
+            ``[batch_size, longest_seq_length, embedding_size]`` for each sentence in the batch.
+        baseline_embeds (:obj:`torch.Tensor`, optional): Batch of reference token embeddings with shape
+            ``[batch_size, longest_seq_length, embedding_size]`` for each sentence in the batch.
+    """
+
     input_embeds: Optional[EmbeddingsTensor] = None
     baseline_embeds: Optional[EmbeddingsTensor] = None
 
@@ -46,6 +50,18 @@ class BatchEmbedding(TensorWrapper):
 
 @dataclass(eq=False, repr=False)
 class Batch(TensorWrapper):
+    """Batch of input data for the attribution model.
+
+    Attributes:
+        encoding (:class:`~inseq.data.BatchEncoding`): Output produced by the tokenization process using
+            :meth:`~inseq.models.AttributionModel.encode`.
+        embedding (:class:`~inseq.data.BatchEmbedding`): Embeddings produced by the embedding process using
+            :meth:`~inseq.models.AttributionModel.embed`.
+
+    All attribute fields are accessible as properties (e.g. ``batch.input_ids`` corresponds to
+        ``batch.encoding.input_ids``)
+    """
+
     encoding: BatchEncoding
     embedding: BatchEmbedding
 
@@ -100,6 +116,14 @@ class Batch(TensorWrapper):
 
 @dataclass(eq=False, repr=False)
 class EncoderDecoderBatch(TensorWrapper):
+    """Batch of input data for the encoder-decoder attribution model, including information for the source text and the
+    target prefix.
+
+    Attributes:
+        sources (:class:`~inseq.data.Batch`): Batch of input data for the source text.
+        targets (:class:`~inseq.data.Batch`): Batch of input data for the target prefix.
+    """
+
     sources: Batch
     targets: Batch
 
@@ -153,6 +177,8 @@ class EncoderDecoderBatch(TensorWrapper):
 
 @dataclass(eq=False, repr=False)
 class DecoderOnlyBatch(Batch):
+    """Input batch adapted for decoder-only attribution models, including information for the target prefix."""
+
     @property
     def max_generation_length(self) -> int:
         return self.input_ids.shape[1]

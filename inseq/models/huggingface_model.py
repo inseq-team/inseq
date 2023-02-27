@@ -47,13 +47,15 @@ class HuggingfaceModel(AttributionModel):
             Must be defined in subclasses.
         model (:obj:`transformers.AutoModelForSeq2SeqLM` or :obj:`transformers.AutoModelForSeq2SeqLM`):
             the model on which attribution is performed.
-        tokenizer (AutoTokenizer): the tokenizer associated to the model.
-        device (str): the device on which the model is run (CPU or GPU).
-        encoder_int_embeds (InterpretableEmbeddingBase): the interpretable embedding layer for the encoder, used for
-            layer attribution methods in Captum.
-        decoder_int_embeds (InterpretableEmbeddingBase): the interpretable embedding layer for the decoder, used for
-            layer attribution methods in Captum.
-        embed_scale (float, optional): scale factor for embeddings.
+        tokenizer (:obj:`transformers.AutoTokenizer`): the tokenizer associated to the model.
+        device (:obj:`str`): the device on which the model is run.
+        encoder_int_embeds (:obj:`captum.InterpretableEmbeddingBase`): the interpretable embedding layer for the
+            encoder, used for layer attribution methods in Captum.
+        decoder_int_embeds (:obj:`captum.InterpretableEmbeddingBase`): the interpretable embedding layer for the
+            decoder, used for layer attribution methods in Captum.
+        embed_scale (:obj:`float`, *optional*): scale factor for embeddings.
+        tokenizer_name (:obj:`str`, *optional*): The name of the tokenizer in the Huggingface Hub.
+            Default: use model name.
     """
 
     _autoclass = None
@@ -67,18 +69,18 @@ class HuggingfaceModel(AttributionModel):
         **kwargs,
     ) -> None:
         """
-        Initialize the AttributionModel with a Huggingface-compatible model.
-        Performs the setup for model and embeddings.
+        AttributionModel subclass for Huggingface-compatible models.
 
         Args:
             model (:obj:`str` or :obj:`transformers.PreTrainedModel`): the name of the model in the
                 Huggingface Hub or path to folder containing local model files.
-            tokenizer (:obj:`str` or :obj:`transformers.PreTrainedTokenizerBase`, optional): the name of the tokenizer
-                in the Huggingface Hub or path to folder containing local tokenizer files.
-                Default: use model name.
             attribution_method (str, optional): The attribution method to use.
                 Passing it here reduces overhead on attribute call, since it is already
                 initialized.
+            tokenizer (:obj:`str` or :obj:`transformers.PreTrainedTokenizerBase`, optional): the name of the tokenizer
+                in the Huggingface Hub or path to folder containing local tokenizer files.
+                Default: use model name.
+            device (str, optional): the Torch device on which the model is run.
             **kwargs: additional arguments for the model and the tokenizer.
         """
         super().__init__(**kwargs)

@@ -1,10 +1,10 @@
-from .attention_attribution import AttentionAttribution, AttentionAttributionRegistry
-from .attribution_utils import STEP_SCORES_MAP, extract_args, join_token_ids, list_step_scores, register_step_score
+from .attribution_utils import extract_args, join_token_ids
 from .feature_attribution import FeatureAttribution, list_feature_attribution_methods
 from .gradient_attribution import (
     DeepLiftAttribution,
     DiscretizedIntegratedGradientsAttribution,
     GradientAttributionRegistry,
+    GradientShapAttribution,
     InputXGradientAttribution,
     IntegratedGradientsAttribution,
     LayerDeepLiftAttribution,
@@ -12,6 +12,7 @@ from .gradient_attribution import (
     LayerIntegratedGradientsAttribution,
     SaliencyAttribution,
 )
+from .internals_attribution import AttentionWeightsAttribution, InternalsAttributionRegistry
 from .perturbation_attribution import (
     LimeAttribution,
     OcclusionAttribution,
@@ -21,11 +22,9 @@ __all__ = [
     "FeatureAttribution",
     "extract_args",
     "list_feature_attribution_methods",
-    "STEP_SCORES_MAP",
-    "register_step_score",
     "join_token_ids",
-    "list_step_scores",
     "GradientAttributionRegistry",
+    "GradientShapAttribution",
     "DeepLiftAttribution",
     "InputXGradientAttribution",
     "IntegratedGradientsAttribution",
@@ -34,8 +33,8 @@ __all__ = [
     "LayerIntegratedGradientsAttribution",
     "LayerGradientXActivationAttribution",
     "LayerDeepLiftAttribution",
-    "AttentionAttributionRegistry",
-    "AttentionAttribution",
+    "InternalsAttributionRegistry",
+    "AttentionWeightsAttribution",
     "OcclusionAttribution",
     "LimeAttribution",
 ]

@@ -1,5 +1,5 @@
 ..
-    Copyright 2022 The Inseq Team. All rights reserved.
+    Copyright 2023 The Inseq Team. All rights reserved.
 
     Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
     the License. You may obtain a copy of the License at
@@ -10,22 +10,23 @@
     an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
     specific language governing permissions and limitations under the License.
 
-Main Functions
+Step Functions
 =======================================================================================================================
 
-The functions described in this section can be called from the top level of the `inseq` library and implement the base
-functionalities required for its usage.
+The following functions can be used as attribution targets or step functions in the :meth:`inseq.models.AttributionModel.attribute` function call.
 
-.. currentmodule:: inseq
+.. currentmodule:: inseq.attr.step_functions
 
-.. autofunction:: get_version
+.. autofunction:: logit_fn
 
-.. autofunction:: list_feature_attribution_methods
+.. autofunction:: probability_fn
 
-.. autofunction:: list_step_functions
+.. autofunction:: entropy_fn
 
-.. autofunction:: load_model
+.. autofunction:: crossentropy_fn
 
-.. autofunction:: register_step_function
+.. autofunction:: perplexity_fn
 
-.. autofunction:: show_attributions
+.. autofunction:: contrast_prob_diff_fn
+
+.. autofunction:: mc_dropout_prob_avg_fn

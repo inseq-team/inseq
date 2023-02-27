@@ -1,6 +1,7 @@
 import logging
 from copy import deepcopy
 from dataclasses import dataclass, field
+from os import PathLike
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Type, Union
 
@@ -44,8 +45,11 @@ DEFAULT_ATTRIBUTION_AGGREGATE_DICT = {
     "step_scores": {
         "span_aggregate": {
             "probability": prod_fn,
+            "entropy": sum_fn,
             "crossentropy": sum_fn,
             "perplexity": prod_fn,
+            "contrast_prob_diff": prod_fn,
+            "mc_dropout_prob_avg": prod_fn,
         }
     },
 }
@@ -107,6 +111,17 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
         has_bos_token: bool = True,
         attr_pos_end: Optional[int] = None,
     ) -> List["FeatureAttributionSequenceOutput"]:
+        """Converts a list of :class:`~inseq.data.attribution.FeatureAttributionStepOutput` objects containing multiple
+        examples outputs per step into a list of :class:`~inseq.data.attribution.FeatureAttributionSequenceOutput` with
+        every object containing all step outputs for an individual example.
+
+        Raises:
+            `ValueError`: If the number of sequences in the attributions is not the same for all input sequences.
+
+        Returns:
+            `List[FeatureAttributionSequenceOutput]`: List of
+            :class:`~inseq.data.attribution.FeatureAttributionSequenceOutput` objects.
+        """
         attr = attributions[0]
         seq_attr_cls = attr._sequence_cls
         num_sequences = len(attr.prefix)
@@ -195,6 +210,30 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
         do_aggregation: bool = True,
         **kwargs,
     ) -> Optional[str]:
+        """Visualize the attributions.
+
+        Args:
+            min_val (:obj:`int`, *optional*, defaults to None):
+                Minimum value in the color range of the visualization. If None, the minimum value of the attributions
+                across all visualized examples is used.
+            max_val (:obj:`int`, *optional*, defaults to None):
+                Maximum value in the color range of the visualization. If None, the maximum value of the attributions
+                across all visualized examples is used.
+            display (:obj:`bool`, *optional*, defaults to True):
+                Whether to display the visualization. Can be set to False if the visualization is produced and stored
+                for later use.
+            return_html (:obj:`bool`, *optional*, defaults to False):
+                Whether to return the HTML code of the visualization.
+            aggregator (:obj:`AggregatorPipeline`, *optional*, defaults to None):
+                Aggregates attributions before visualizing them. If not specified, the default aggregator for the class
+                is used.
+            do_aggregation (:obj:`bool`, *optional*, defaults to True):
+                Whether to aggregate the attributions before visualizing them. Allows to skip aggregation if the
+                attributions are already aggregated.
+
+        Returns:
+            :obj:`str`: The HTML code of the visualization if :obj:`return_html` is set to True, otherwise None.
+        """
         from inseq import show_attributions
 
         # If no aggregator is specified, the default aggregator for the class is used
@@ -225,9 +264,15 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
             maximum = max(maximum, float(torch.nan_to_num(self.target_attributions).max()))
         return maximum
 
-    def weight_attributions(self, step_score_id: str):
+    def weight_attributions(self, step_fn_id: str):
+        """Weights attribution scores in place by the value of the selected step function for every generation step.
+
+        Args:
+            step_fn_id (`str`):
+                The id of the step function to use for weighting the attributions (e.g. ``probability``)
+        """
         aggregated_attr = self.aggregate()
-        step_scores = self.step_scores[step_score_id].T.unsqueeze(1)
+        step_scores = self.step_scores[step_fn_id].T.unsqueeze(1)
         if self.source_attributions is not None:
             source_attr = aggregated_attr.source_attributions.float().T
             self.source_attributions = (step_scores * source_attr).T
@@ -274,10 +319,7 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
 
 @dataclass(eq=False, repr=False)
 class FeatureAttributionStepOutput(TensorWrapper):
-    """
-    Output of a single step of feature attribution, plus
-    extra information related to what was attributed.
-    """
+    """Output of a single step of feature attribution, plus extra information related to what was attributed."""
 
     source_attributions: Optional[StepAttributionTensor] = None
     step_scores: Optional[Dict[str, SingleScorePerStepTensor]] = None
@@ -295,6 +337,7 @@ class FeatureAttributionStepOutput(TensorWrapper):
         self,
         target_attention_mask: TargetIdsTensor,
     ) -> None:
+        """Remaps the attributions to the original shape of the input sequence."""
         if self.source_attributions is not None:
             self.source_attributions = remap_from_filtered(
                 original_shape=(len(self.source), *self.source_attributions.shape[1:]),
@@ -330,13 +373,13 @@ class FeatureAttributionOutput:
 
     Attributes:
         sequence_attributions (list of :class:`~inseq.data.FeatureAttributionSequenceOutput`): List
-                        containing all attributions performed on input sentences (one per input sentence, including
-                        source and optionally target-side attribution).
-                step_attributions (list of :class:`~inseq.data.FeatureAttributionStepOutput`, optional): List
-                        containing all step attributions (one per generation step performed on the batch), returned if
-                        `output_step_attributions=True`.
-                info (dict with str keys and any values): Dictionary including all available parameters used to
-                        perform the attribution.
+                containing all attributions performed on input sentences (one per input sentence, including
+                source and optionally target-side attribution).
+        step_attributions (list of :class:`~inseq.data.FeatureAttributionStepOutput`, optional): List
+                containing all step attributions (one per generation step performed on the batch), returned if
+                `output_step_attributions=True`.
+        info (dict with str keys and any values): Dictionary including all available parameters used to
+                perform the attribution.
     """
 
     # These fields of the info dictionary should be matching to allow merging
@@ -376,7 +419,7 @@ class FeatureAttributionOutput:
 
     def save(
         self,
-        path: str,
+        path: PathLike,
         overwrite: bool = False,
         compress: bool = False,
         ndarray_compact: bool = True,
@@ -387,7 +430,8 @@ class FeatureAttributionOutput:
         Save class contents to a JSON file.
 
         Args:
-            path (:obj:`str`): Path to the folder where the attribution output will be stored (e.g. ``./out.json``).
+            path (:obj:`os.PathLike`): Path to the folder where the attribution output will be stored
+                (e.g. ``./out.json``).
             overwrite (:obj:`bool`, *optional*, defaults to False):
                 If True, overwrite the file if it exists, raise error otherwise.
             compress (:obj:`bool`, *optional*, defaults to False):
@@ -435,7 +479,7 @@ class FeatureAttributionOutput:
 
     @staticmethod
     def load(
-        path: str,
+        path: PathLike,
         decompress: bool = False,
     ) -> "FeatureAttributionOutput":
         """Load saved attribution output into a new :class:`~inseq.data.FeatureAttributionOutput` object.
@@ -461,7 +505,7 @@ class FeatureAttributionOutput:
         aggregator: Union[AggregatorPipeline, Type[Aggregator]] = None,
         **kwargs,
     ) -> "FeatureAttributionOutput":
-        """Aggregate the sequence attributions.
+        """Aggregate the sequence attributions using one or more aggregators.
 
         Args:
             aggregator (:obj:`AggregatorPipeline` or :obj:`Type[Aggregator]`, optional): Aggregator
@@ -510,13 +554,12 @@ class FeatureAttributionOutput:
 
     @classmethod
     def merge_attributions(cls, attributions: List["FeatureAttributionOutput"]) -> "FeatureAttributionOutput":
-        """Merges multiple FeatureAttributionOutput object into a single one.
+        """Merges multiple :class:`~inseq.data.FeatureAttributionOutput` objects into a single one.
 
-        Merging is allowed only if the attribution process was the same (by checking info).
+        Merging is allowed only if the two outputs match on the fields specified in ``_merge_match_info_fields``.
 
         Args:
-            attributions (`list(FeatureAttributionOutput)`):
-                The single FeatureAttributionOutput objects to be merged
+            attributions (`list(FeatureAttributionOutput)`): The FeatureAttributionOutput objects to be merged.
 
         Returns:
             `FeatureAttributionOutput`: Merged object
@@ -582,7 +625,7 @@ class FeatureAttributionOutput:
 @dataclass(eq=False, repr=False)
 class GradientFeatureAttributionSequenceOutput(FeatureAttributionSequenceOutput):
     """Raw output of a single sequence of gradient feature attribution.
-    Adds the convergence delta to the base class.
+    Adds the convergence delta and default L2 + normalization merging of attributions to the base class.
     """
 
     def __post_init__(self):

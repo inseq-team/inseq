@@ -4,12 +4,9 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Un
 
 import torch
 
-from ...data.attribution import DEFAULT_ATTRIBUTION_AGGREGATE_DICT
 from ...data.batch import DecoderOnlyBatch, EncoderDecoderBatch
-from ...utils import extract_signature_args, output2ce, output2ent, output2ppl, output2prob
+from ...utils import extract_signature_args
 from ...utils.typing import (
-    EmbeddingsTensor,
-    IdsTensor,
     OneOrMoreAttributionSequences,
     OneOrMoreIdSequences,
     OneOrMoreTokenSequences,
@@ -18,33 +15,12 @@ from ...utils.typing import (
     TextInput,
     TokenWithId,
 )
+from ..step_functions import STEP_SCORES_MAP
 
 if TYPE_CHECKING:
     from ...models import AttributionModel
     from .feature_attribution import FeatureAttribution
 
-
-StepScoreInput = Callable[
-    [
-        "AttributionModel",
-        Union[EncoderDecoderBatch, DecoderOnlyBatch],
-        IdsTensor,
-        IdsTensor,
-        EmbeddingsTensor,
-        EmbeddingsTensor,
-        IdsTensor,
-        IdsTensor,
-        TargetIdsTensor,
-    ],
-    SingleScorePerStepTensor,
-]
-
-STEP_SCORES_MAP = {
-    "probability": output2prob,
-    "entropy": output2ent,
-    "crossentropy": output2ce,
-    "perplexity": output2ppl,
-}
 
 logger = logging.getLogger(__name__)
 
@@ -114,15 +90,22 @@ def get_step_scores(
     step_scores_args: Dict[str, Any] = {},
 ) -> SingleScorePerStepTensor:
     """
-    Returns step scores for the target tokens.
+    Returns step scores for the target tokens in the batch.
     """
     if attribution_model is None:
         raise ValueError("Attribution model is not set.")
+    if score_identifier not in STEP_SCORES_MAP:
+        raise AttributeError(
+            f"Step score {score_identifier} not found. Available step scores are: "
+            f"{', '.join(list(STEP_SCORES_MAP.keys()))}. Use the inseq.register_step_function"
+            "function to register a custom step score."
+        )
     with torch.no_grad():
         output = attribution_model.get_forward_output(
             **attribution_model.format_forward_args(
                 batch, use_embeddings=attribution_model.attribution_method.forward_batch_embeds
-            )
+            ),
+            use_embeddings=attribution_model.attribution_method.forward_batch_embeds,
         )
         step_scores_args = attribution_model.format_step_function_args(
             forward_output=output,
@@ -139,6 +122,7 @@ def get_step_scores(
 
 
 def join_token_ids(tokens: OneOrMoreTokenSequences, ids: OneOrMoreIdSequences) -> List[TokenWithId]:
+    """Builds a list of TokenWithId objects from a list of token sequences and a list of id sequences."""
     return [[TokenWithId(token, id) for token, id in zip(tok_seq, idx_seq)] for tok_seq, idx_seq in zip(tokens, ids)]
 
 
@@ -161,7 +145,7 @@ def extract_args(
         if step_score not in STEP_SCORES_MAP:
             raise AttributeError(
                 f"Step score {step_score} not found. Available step scores are: "
-                f"{', '.join(list(STEP_SCORES_MAP.keys()))}. Use the inseq.register_step_score"
+                f"{', '.join(list(STEP_SCORES_MAP.keys()))}. Use the inseq.register_step_function"
                 "function to register a custom step score."
             )
         extra_step_scores_args.update(
@@ -184,63 +168,6 @@ def extract_args(
     attributed_fn_args.update(extra_attributed_fn_args)
     step_scores_args.update(extra_step_scores_args)
     return attribution_args, attributed_fn_args, step_scores_args
-
-
-def list_step_scores() -> List[str]:
-    """
-    Lists identifiers for all available step scores. One or more step scores identifiers can be passed to the
-    :meth:`~inseq.models.AttributionModel.attribute` method either to compute scores while attributing (`step_scores`
-    parameter), or as target function for the attribution, if supported by the attribution method (`attributed_fn`
-    parameter).
-    """
-    return list(STEP_SCORES_MAP.keys())
-
-
-def register_step_score(
-    fn: StepScoreInput,
-    identifier: str,
-    aggregate_map: Optional[Dict[str, Callable[[torch.Tensor], torch.Tensor]]] = None,
-) -> None:
-    """
-    Registers a function to be used to compute step scores and store them in the
-    :class:`~inseq.data.attribution.FeatureAttributionOutput` object. Registered step functions can also be used as
-    attribution targets by gradient-based feature attribution methods.
-
-    Args:
-        fn (:obj:`callable`): The function to be used to compute step scores. Default parameters (use kwargs to capture
-        unused ones when defining your function):
-
-            - :obj:`attribution_model`: an :class:`~inseq.models.AttributionModel` instance, corresponding to the model
-                used for computing the score.
-
-            - :obj:`forward_output`: the output of the forward pass from the attribution model.
-
-            - :obj:`encoder_input_ids`, :obj:`decoder_input_ids`, :obj:`encoder_input_embeds`,
-                :obj:`decoder_input_embeds`, :obj:`encoder_attention_mask`, :obj:`decoder_attention_mask`: all the
-                elements composing the :class:`~inseq.data.Batch` used as context of the model.
-
-            - :obj:`target_ids`: :obj:`torch.Tensor` of target token ids of size `(batch_size,)` and type long,
-                corresponding to the target predicted tokens for the next generation step.
-
-            The function can also define an arbitrary number of custom parameters that can later be provided directly
-            to the `model.attribute` function call, and it must return a :obj:`torch.Tensor` of size `(batch_size,)` of
-            float or long. If parameter names conflict with `model.attribute` ones, pass them as key-value pairs in the
-            :obj:`step_scores_args` dict parameter.
-
-        identifier (:obj:`str`): The identifier that will be used for the registered step score.
-        aggregate_map (:obj:`dict`, `optional`): An optional dictionary mapping from :class:`~inseq.data.Aggregator`
-            name identifiers to functions taking in input a tensor of shape `(batch_size, seq_len)` and producing
-            tensors of shape `(batch_size, aggregated_seq_len)` in output that will be used to aggregate the
-            registered step score when used in conjunction with the corresponding aggregator. E.g. the `probability`
-            step score uses the aggregate_map `{"span_aggregate": lambda x: t.prod(dim=1, keepdim=True)}` to aggregate
-            probabilities with a product when aggregating scores over spans.
-    """
-    STEP_SCORES_MAP[identifier] = fn
-    if isinstance(aggregate_map, dict):
-        for agg_name, agg_fn in aggregate_map.items():
-            if agg_name not in DEFAULT_ATTRIBUTION_AGGREGATE_DICT["step_scores"]:
-                DEFAULT_ATTRIBUTION_AGGREGATE_DICT["step_scores"][agg_name] = {}
-            DEFAULT_ATTRIBUTION_AGGREGATE_DICT["step_scores"][agg_name][identifier] = agg_fn
 
 
 def get_source_target_attributions(

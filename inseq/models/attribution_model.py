@@ -37,6 +37,20 @@ logger = logging.getLogger(__name__)
 
 
 class AttributionModel(ABC, torch.nn.Module):
+    """Base class for all attribution models.
+
+    Attributes:
+        model: The wrapped model to be attributed.
+        model_name (:obj:`str`): The name of the model.
+        is_encoder_decoder (:obj:`bool`): Whether the model is an encoder-decoder model.
+        pad_token (:obj:`str`): The pad token used by the model.
+        embed_scale (:obj:`float`): Value used to scale the embeddings.
+        device (:obj:`str`): The device on which the model is located.
+        attribution_method (:class:`~inseq.attr.FeatureAttribution`): The attribution method used alongside the model.
+        is_hooked (:obj:`bool`): Whether the model is currently hooked by the attribution method.
+        default_attributed_fn_id (:obj:`str`): The id for the default step function used as attribution target.
+    """
+
     # Default arguments for custom attributed functions
     # in the AttributionModel.forward method.
     _DEFAULT_ATTRIBUTED_FN_ARGS = [
@@ -90,7 +104,7 @@ class AttributionModel(ABC, torch.nn.Module):
     @default_attributed_fn_id.setter
     def set_attributed_fn(self, fn: str):
         if fn not in STEP_SCORES_MAP:
-            raise ValueError(f"Unknown function: {fn}. Register custom functions with inseq.register_step_score")
+            raise ValueError(f"Unknown function: {fn}. Register custom functions with inseq.register_step_function")
         self._default_attributed_fn_id = fn
 
     @property
@@ -130,7 +144,7 @@ class AttributionModel(ABC, torch.nn.Module):
         if isinstance(attributed_fn, str):
             if attributed_fn not in STEP_SCORES_MAP:
                 raise ValueError(
-                    f"Unknown function: {attributed_fn}. Register custom functions with inseq.register_step_score"
+                    f"Unknown function: {attributed_fn}. Register custom functions with inseq.register_step_function"
                 )
             attributed_fn = STEP_SCORES_MAP[attributed_fn]
         return attributed_fn
@@ -154,7 +168,57 @@ class AttributionModel(ABC, torch.nn.Module):
         batch_size: Optional[int] = None,
         **kwargs,
     ) -> FeatureAttributionOutput:
-        """Perform attribution for one or multiple texts."""
+        """Perform sequential attribution of input texts for every token in generated texts using the specified method.
+
+        Args:
+            input_texts (:obj:`str` or :obj:`list(str)`): One or more input texts to be attributed.
+            generated_texts (:obj:`str` or :obj:`list(str)`, `optional`): One or more generated texts to be used as
+                targets for the attribution. Must match the number of input texts. If not provided, the model will be
+                used to generate the texts from the input texts (default behavior). Specifying this argument enables
+                attribution for constrained decoding, which should be interpreted carefully in presence of
+                distributional shifts compared to natural generations (`Vamvas and Sennrich, 2021
+                <https://doi.org/10.18653/v1/2021.blackboxnlp-1.5>`__).
+            method (:obj:`str`, `optional`): The identifier associated to the attribution method to use.
+                If not provided, the default attribution method specified when initializing the model will be used.
+            override_default_attribution (:obj:`bool`, `optional`): Whether to override the default attribution method
+                specified when initializing the model permanently, or to use the method above for a single attribution.
+            attr_pos_start (:obj:`int`, `optional`): The starting position of the attribution. If not provided, the
+                whole input text will be attributed. Allows for span-targeted attribution of generated texts.
+            attr_pos_end (:obj:`int`, `optional`): The ending position of the attribution. If not provided, the
+                whole input text will be attributed. Allows for span-targeted attribution of generated texts.
+            show_progress (:obj:`bool`): Whether to show a progress bar for the attribution, default True.
+            pretty_progress (:obj:`bool`, `optional`): Whether to show a pretty progress bar for the attribution.
+                Automatically set to False for IPython environments due to visualization issues. If False, a simple
+                tqdm progress bar will be used. default: True.
+            output_step_attributions (:obj:`bool`, `optional`): Whether to fill the ``step_attributions`` field in
+                :class:`~inseq.FeatureAttributionOutput` with step-wise attributions for each generated token. default:
+                False.
+            attribute_target (:obj:`bool`, `optional`): Specific to encoder-decoder models. Whether to attribute the
+                target prefix alongside the input text. default: False. Note that an encoder-decoder attribution not
+                accounting for the target prefix does not correctly reflect the overall input importance, since part of
+                the input is not included in the attribution.
+            step_scores (:obj:`list(str)`): A list of step function identifiers specifying the step scores to be
+                computed alongside the attribution process. Available step functions are listed in
+                :func:`~inseq.list_step_functions`.
+            include_eos_baseline (:obj:`bool`, `optional`): Whether to include the EOS token in attributed tokens when
+                using an attribution method requiring a baseline. default: False.
+            attributed_fn (:obj:`str` or :obj:`Callable`, `optional`): The identifier associated to the step function
+                to be used as attribution target. If not provided, the one specified in ``default_attributed_fn_id`` (
+                model default) will be used. If the provided string is not a registered step function, an error will be
+                raised. If a callable is provided, it must be a function matching the requirements for a step function.
+            device (:obj:`str`, `optional`): The device to use for the attribution. If not provided, the default model
+                device will be used.
+            batch_size (:obj:`int`, `optional`): The batch size to use to dilute the attribution computation over the
+                set of inputs. If no batch size is provided, the full set of input texts will be attributed at once.
+            **kwargs: Additional keyword arguments. These can include keyword arguments for the attribution method, for
+                the generation process or for the attributed function. Generation arguments can be provided explicitly
+                as a dictionary named ``generation_args``.
+
+        Returns:
+            :class:`~inseq.FeatureAttributionOutput`: The attribution output object containing the attribution scores,
+            step-scores, optionally step-wise attributions and general information concerning attributed texts and the
+            attribution process.
+        """
         if not input_texts:
             raise ValueError("At least one text must be provided to perform attribution.")
         if attribute_target and not self.is_encoder_decoder:

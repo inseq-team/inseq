@@ -20,15 +20,16 @@ from ...data import Batch, EncoderDecoderBatch, FeatureAttributionStepOutput
 from ...utils import Registry, pretty_tensor
 from ...utils.typing import SingleScorePerStepTensor, TargetIdsTensor
 from ..attribution_decorators import set_hook, unset_hook
-from .attribution_utils import STEP_SCORES_MAP, get_source_target_attributions
+from ..step_functions import STEP_SCORES_MAP
+from .attribution_utils import get_source_target_attributions
 from .feature_attribution import FeatureAttribution
-from .ops import Attention
+from .ops import AttentionWeights
 
 logger = logging.getLogger(__name__)
 
 
-class AttentionAttributionRegistry(FeatureAttribution, Registry):
-    r"""Attention-based attribution method registry."""
+class InternalsAttributionRegistry(FeatureAttribution, Registry):
+    r"""Model Internals-based attribution method registry."""
 
     @set_hook
     def hook(self, **kwargs):
@@ -119,27 +120,27 @@ class AttentionAttributionRegistry(FeatureAttribution, Registry):
         )
 
 
-class AttentionAttribution(AttentionAttributionRegistry):
+class AttentionWeightsAttribution(InternalsAttributionRegistry):
     """
     The basic attention attribution method, which retrieves the attention weights from the model.
 
     Attribute Args:
-        aggregate_heads_fn (:obj:`str` or :obj:`callable`): The method to use for aggregating across heads.
-            Can be one of `average` (default if heads is tuple or None), `max`, or `single` (default if heads is
-            int), or a custom function defined by the user.
-        aggregate_layers_fn (:obj:`str` or :obj:`callable`): The method to use for aggregating across layers.
-            Can be one of `average` (default if layers is tuple), `max`, or `single` (default if layers is int or
-            None), or a custom function defined by the user.
-        heads (:obj:`int` or :obj:`tuple[int, int]` or :obj:`list(int)`, optional): If a single value is specified,
+            aggregate_heads_fn (:obj:`str` or :obj:`callable`): The method to use for aggregating across heads.
+                Can be one of `average` (default if heads is list, tuple or None), `max`, `min` or `single` (default
+                if heads is int), or a custom function defined by the user.
+            aggregate_layers_fn (:obj:`str` or :obj:`callable`): The method to use for aggregating across layers.
+                Can be one of `average` (default if layers is tuple or list), `max`, `min` or `single` (default if
+                layers is int or None), or a custom function defined by the user.
+            heads (:obj:`int` or :obj:`tuple[int, int]` or :obj:`list(int)`, optional): If a single value is specified,
                 the head at the corresponding index is used. If a tuple of two indices is specified, all heads between
                 the indices will be aggregated using aggregate_fn. If a list of indices is specified, the respective
                 heads will be used for aggregation. If aggregate_fn is "single", a head must be specified.
-                Otherwise, all heads are passed to aggregate_fn by default.
-        layers (:obj:`int` or :obj:`tuple[int, int]` or :obj:`list(int)`, optional): If a single value is specified
+                If no value is specified, all heads are passed to aggregate_fn by default.
+            layers (:obj:`int` or :obj:`tuple[int, int]` or :obj:`list(int)`, optional): If a single value is specified
                 , the layer at the corresponding index is used. If a tuple of two indices is specified, all layers
                 among the indices will be aggregated using aggregate_fn. If a list of indices is specified, the
                 respective layers will be used for aggregation. If aggregate_fn is "single", the last layer is
-                used by default. Otherwise, all available layers are passed to aggregate_fn by default.
+                used by default. If no value is specified, all available layers are passed to aggregate_fn by default.
 
     Example:
 
@@ -153,4 +154,4 @@ class AttentionAttribution(AttentionAttributionRegistry):
 
     def __init__(self, attribution_model, **kwargs):
         super().__init__(attribution_model)
-        self.method = Attention(attribution_model)
+        self.method = AttentionWeights(attribution_model)
