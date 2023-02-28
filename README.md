@@ -12,6 +12,7 @@
 [![Python Version](https://img.shields.io/pypi/pyversions/inseq.svg?color=blue)](https://pypi.org/project/inseq/)
 [![Downloads](https://static.pepy.tech/badge/inseq)](https://pepy.tech/project/inseq)
 [![License](https://img.shields.io/github/license/inseq-team/inseq)](https://github.com/inseq-team/inseq/blob/main/LICENSE)
+[![Demo Paper](https://img.shields.io/badge/arXiv-2302.13942-red)](http://arxiv.org/abs/2302.13942)
 
 </div>
 <div align="center">
@@ -23,10 +24,10 @@
 
 Inseq is a Pytorch-based hackable toolkit to democratize the access to common post-hoc **in**terpretability analyses of **seq**uence generation models.
 
-- Documentation: [https://inseq.readthedocs.io](https//inseq.readthedocs.io)
-- Paper: **Coming soon!**
-- PyPI Package: [https://pypi.org/project/inseq](https://pypi.org/project/inseq)
-- MT Gender Bias Demo: [oskarvanderwal/MT-bias-demo](https://huggingface.co/spaces/oskarvanderwal/MT-bias-demo)
+- **Paper:** [http://arxiv.org/abs/2302.13942](http://arxiv.org/abs/2302.13942)
+- **Documentation:** [https://inseq.readthedocs.io](https//inseq.readthedocs.io)
+- **PyPI Package:** [https://pypi.org/project/inseq](https://pypi.org/project/inseq)
+- **MT Gender Bias Demo:** [oskarvanderwal/MT-bias-demo](https://huggingface.co/spaces/oskarvanderwal/MT-bias-demo)
 
 ## Installation
 
@@ -227,17 +228,16 @@ Our vision for Inseq is to create a centralized, comprehensive and robust set of
 
 ## Citing Inseq
 
-A demo paper showcasing the Inseq library is presently in the works. In the meantime, if you use Inseq we kindly ask you to include the link `https://github.com/inseq-team/inseq` as a footnote and cite it as:
+If you use Inseq in your research we suggest to include a mention to the specific release (e.g. v0.4.0) and we kindly ask you to cite our reference paper as:
 
 ```bibtex
-@software{inseq,
-  author    = {Sarti, Gabriele and Sickert, Ludwig and Feldhus, Nils and van der Wal, Oskar},
-  title     = {Inseq: An Interpretability Toolkit for Sequence Generation Models},
-  month     = jan,
-  year      = 2023,
-  publisher = {Zenodo},
-  version   = {0.3.3},
-  doi       = {10.5281/zenodo.7550249},
-  url       = {https://doi.org/10.5281/zenodo.7550249}
+@article{sarti-etal-2023-inseq,
+    author = {Gabriele Sarti and Nils Feldhus and Ludwig Sickert and Oskar van der Wal},
+    title = {Inseq: An Interpretability Toolkit for Sequence Generation Models},
+    month = feb,
+    year = 2023,
+    journal = {ArXiv},
+    volume = {abs/2302.13942},
+    url = {https://arxiv.org/abs/2302.13942}
 }
 ```

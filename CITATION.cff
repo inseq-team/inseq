@@ -1,0 +1,36 @@
+cff-version: "1.2.0"
+date-released: 2023-02
+message: "If you use this software, please cite it as follows."
+title: "Inseq: An Interpretability Toolkit for Sequence Generation Models"
+url: "https://github.com/inseq-team/inseq"
+license: Apache-2.0
+authors:
+  - family-names: Sarti
+    given-names: Gabriele
+    orcid: "https://orcid.org/0000-0001-8715-2987"
+  - family-names: Feldhus
+    given-names: Nils
+  - family-names: Sickert
+    given-names: Ludwig
+  - family-names: "van der Wal"
+    given-names: Oskar
+    orcid: "https://orcid.org/0000-0003-4087-3714"
+preferred-citation:
+  type: article
+  authors:
+  - family-names: Sarti
+    given-names: Gabriele
+    orcid: "https://orcid.org/0000-0001-8715-2987"
+  - family-names: Feldhus
+    given-names: Nils
+  - family-names: Sickert
+    given-names: Ludwig
+  - family-names: "van der Wal"
+    given-names: Oskar
+    orcid: "https://orcid.org/0000-0003-4087-3714"
+  journal: "ArXiv"
+  month: 2
+  title: "Inseq: An Interpretability Toolkit for Sequence Generation Models"
+  year: 2023
+  url: "http://arxiv.org/abs/2302.13942"
+  volume: "abs/2302.13942"
