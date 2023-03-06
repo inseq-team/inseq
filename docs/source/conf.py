@@ -178,7 +178,7 @@ html_static_path = [
     "_static",
 ]
 
-html_css_files = []
+html_css_files = ["_static/inseq.css"]
 
 # Custom sidebar templates, must be a dictionary that maps document names
 # to template names.
@@ -305,3 +305,4 @@ sphinxemoji_style = "twemoji"
 
 def setup(app):
     app.add_js_file("inseq.js")
+    app.add_css_file("inseq.css")

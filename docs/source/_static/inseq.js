@@ -8,7 +8,6 @@ function resizeHtmlExamples() {
         ex.style.height = ((iframe.contentWindow.document.body.scrollHeight - 50) * zoom) + "px";
         iframe.style.height = (iframe.contentWindow.document.body.scrollHeight - 50) + "px"
         iframe.style.width = "133%";
-        iframe.style.zoom = zoom;
         iframe.style.MozTransform = `scale(${zoom})`;
         iframe.style.WebkitTransform = `scale(${zoom})`;
         iframe.style.transform = `scale(${zoom})`;
