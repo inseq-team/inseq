@@ -76,7 +76,7 @@ sphinxext-opengraph = "^0.4.2"
 sphinx-copybutton = "^0.4.0"
 sphinx-gitstamp = "^0.3.2"
 sphinx-markdown-tables = "^0.0.17"
-sphinx-rtd-theme = "^1.0.0"
+furo = "^2022.12.7"
 
 [tool.poetry.group.lint]
 optional = true
