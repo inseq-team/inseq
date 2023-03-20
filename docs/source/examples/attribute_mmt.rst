@@ -14,8 +14,8 @@
 Attributing Multilingual MT Models
 #######################################################################################################################
 
-Inseq supports attribution of multilingual MT models such as [mBART](https://arxiv.org/abs/2008.00401m),
-[M2M-100](https://dl.acm.org/doi/abs/10.5555/3546258.3546365) and [NLLB](https://arxiv.org/abs/2207.04672).
+Inseq supports attribution of multilingual MT models such as `mBART <https://arxiv.org/abs/2008.00401>`__,
+`M2M-100 <https://dl.acm.org/doi/abs/10.5555/3546258.3546365>`__ and `NLLB <https://arxiv.org/abs/2207.04672>`__.
 
 These models differ from standard encoder-decoder systems in that you will have to specify the source and target
 languages, which are used to include a flag in the input to the model. In the following example we attribute a pair
