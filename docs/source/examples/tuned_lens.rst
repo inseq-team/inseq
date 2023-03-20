@@ -136,12 +136,10 @@ Now we can simply register the function, load the lens corresponding to the mode
     inseq.register_step_function(
         fn=confidence_from_prediction_depth,
         identifier="confidence",
-        # We take the minimum confidence score when aggregating multiple tokens
-        aggregate_map={"span_aggregate": lambda x: x.min(dim=1, keepdim=True)},
     )
 
     out = model.attribute(
-        ["Hello ladies and"],
+        "Hello ladies and",
         lens=tuned_lens,
         device="cpu",
         step_scores=["confidence"],
@@ -155,13 +153,39 @@ Now we can simply register the function, load the lens corresponding to the mode
 
 We can see that the row ``confidence``, corresponding to the confidence score we defined above, is added at the end of
 the attribution matrix, showing high model confidence for function words and multiword expressions endings 
-(e.g. "Board of Directors", "ladies and gentlemen").
+(e.g. "Board of Directors", "ladies and gentlemen"). Since we are estimating model confidence on the model's naturally
+generated output, all confidence scores will be greater than 0, since this value is reserved for the case where the
+target token is not predicted at all.
+
+We can now repeat the experiment while constraining a target generation of our choice:
+
+.. code-block:: python
+
+    out = model.attribute(
+        "Hello ladies and",
+        # Custom target generation
+        "Hello ladies and gentlemen, members of the jury",
+        lens=tuned_lens,
+        device="cpu",
+        step_scores=["confidence"],
+    )
+
+.. raw:: html
+
+    <div class="html-example">
+        <iframe frameborder="0" scale="0.75" src="/_static/tuned_lens_force.htm"></iframe>
+    </div>
+
+We see that some of the forced tokens are assigned a confidence score of 0 in this case.
 
 .. warning:: 
 
     The above example aims to show a possible easy integration of ``tuned-lens`` into Inseq, but has a number of limitations.
-    First, computation using the method above is carried out entirely on CPUs. Moreover, the tuned lens library currently supports
-    only decoder-only GPT-like models, so the method cannot be used as-is for encoder-decoders like T5 and BART. Tuned lens authors
-    provide a collection of pre-tuned lenses for popular models `here <https://huggingface.co/spaces/AlignmentResearch/tuned-lens/tree/main/lens>`__.
-    If your model of interest is not available, you will need to train a tuned lens for it yourself, which can be done using the
-    `tuned-lens <https://github.com/AlignmentResearch/tuned-lens>`__ codebase.
+
+    - The entire computation using the method above is carried out on CPUs, since device placement is not handled.
+    
+    - The tuned lens library currently supports only decoder-only GPT-like models, so the method cannot be used as-is for encoder-decoders like T5 and BART. 
+    
+    - Tuned lens authors provide a collection of pre-tuned lenses for popular models `here <https://huggingface.co/spaces/AlignmentResearch/tuned-lens/tree/main/lens>`__. If your model of interest is not available, you will need to train a tuned lens for it yourself, which can be done using the `tuned-lens <https://github.com/AlignmentResearch/tuned-lens>`__ codebase.
+    
+    - While step functions can generally be also used as attribution targets, the method above does not support this use case in its current form.
