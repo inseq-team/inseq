@@ -17,6 +17,11 @@ Welcome to Inseq! |:bug:|
 
 Inseq is a Pytorch-based hackable toolkit to democratize the study of **in**\terpretability for **seq**\uence generation models. At the moment, Inseq supports a wide set of models from the |:hugging_face:| `Transformers <https://github.com/huggingface/transformers/>`__ library and an ever-growing set of feature attribution methods, leveraging in part the widely-used `Captum library <https://captum.ai>`__. For a quick introduction to common use cases, see the :doc:`examples/quickstart` page.
 
+- **Paper:** `https://arxiv.org/abs/2302.13942 <http://arxiv.org/abs/2302.13942>`__
+- **Github:** `https://github.com/inseq-team/inseq <https://github.com/inseq-team/inseq>`__
+- **PyPI Package:** `https://pypi.org/project/inseq <https://pypi.org/project/inseq>`__
+- **MT Gender Bias Demo:** `oskarvanderwal/MT-bias-demo <https://huggingface.co/spaces/oskarvanderwal/MT-bias-demo>`__
+
 Using Inseq, feature attribution maps that can be saved, reloaded, aggregated and visualized either as HTMLs (with Jupyter notebook support) or directly in the console using `rich <https://rich.readthedocs.io/en/latest/>`__. Besides simple attribution, Inseq also supports features like step score extraction, attribution aggregation and attributed functions customization for more advanced use cases. Refer to the guides in the |:bug:| Using Inseq section for more details and examples on specific features.
 
 To give a taste of what Inseq can do in a couple lines of code, here's a snippet doing source-side attribution of an English-to-Italian translation produced by the model ``Helsinki-NLP/opus-mt-en-it`` from |:hugging_face:| Transformers  using the ``IntegratedGradients`` method with 300 integral approximation steps, and returning the attribution convergence delta and token-level prediction probabilties.
@@ -57,7 +62,7 @@ Inseq is still in early development and is currently maintained by a small team 
 
 .. toctree::
     :maxdepth: 3
-    :caption: Main Classes
+    :caption: API Documentation
 
     main_classes/main_functions
     main_classes/models

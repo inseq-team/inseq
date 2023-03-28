@@ -25,7 +25,7 @@
 Inseq is a Pytorch-based hackable toolkit to democratize the access to common post-hoc **in**terpretability analyses of **seq**uence generation models.
 
 - **Paper:** [http://arxiv.org/abs/2302.13942](http://arxiv.org/abs/2302.13942)
-- **Documentation:** [https://inseq.readthedocs.io](https//inseq.readthedocs.io)
+- **Documentation:** [https://inseq.readthedocs.io](https://inseq.readthedocs.io)
 - **PyPI Package:** [https://pypi.org/project/inseq](https://pypi.org/project/inseq)
 - **MT Gender Bias Demo:** [oskarvanderwal/MT-bias-demo](https://huggingface.co/spaces/oskarvanderwal/MT-bias-demo)
 
