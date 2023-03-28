@@ -19,14 +19,15 @@ The Tuned Lens method
 
 .. note::
 
-    This tutorial adopts the "Tuned Lens" name for the proposed affine transformation method following 
-    `Belrose et al. (2023) <https://arxiv.org/abs/2303.08112>`__, but we note that "Linear Shortcut", as proposed by 
-    `Yom Din et al. (2023) <https://arxiv.org/abs/2303.09435>`__, can be used interchangeably.
+    This tutorial adopts the "Tuned Lens" name for the affine transformation proposed by 
+    `Belrose et al. (2023) <https://arxiv.org/abs/2303.08112>`__. We note that the Linear Shortcut method proposed by 
+    `Yom Din et al. (2023) <https://arxiv.org/abs/2303.09435>`__ can be used for the same purpose, training a linear
+    transformation instead.
 
 `Belrose et al. (2023) <https://arxiv.org/abs/2303.08112>`__ and 
-`Yom Din et al. (2023) <https://arxiv.org/abs/2303.09435>`__ introduced a new promising approach to inspect how 
-predictions are progressively formed across the layers of Transformers-based language models. By training linear
-projections mapping hidden states of intermediate layers to last layer's space, authors overcome the assumption of
+`Yom Din et al. (2023) <https://arxiv.org/abs/2303.09435>`__ introduced a new promising category of approaches to inspect how 
+predictions are progressively formed across the layers of Transformers-based language models. By training projections 
+mapping hidden states of intermediate layers to last layer's space, authors overcome the assumption of
 a common space shared by all Transformer layers adopted by 
 `previous work <https://www.lesswrong.com/posts/AcKRB8wDpdaN6v6ru/interpreting-gpt-the-logit-lens>`__. Tuned lens 
 predictions are more aligned to model's predictive distribution and more faithful to the internal feature importance
@@ -54,7 +55,8 @@ Adding Tuned Lens Confidence to Inseq
 -------------------------------------
 
 Thanks to Inseq extensible design, it is straightforward to integrate the tuned lens method into a new step function
-to predict model confidence at every generation step. To do so, we use the `tuned-lens <https://github.com/AlignmentResearch/tuned-lens>`__ library by Belrose et al.
+to predict model confidence at every generation step. To do so, we use the 
+`tuned-lens <https://github.com/AlignmentResearch/tuned-lens>`__ library by Belrose et al.
 to extract the tuned lens' predictions at every layer, and then convert the depth at which the model starts predicting
 the target token to a confidence score (1 = highest confidence, 0 = lowest confidence, not predicted).
 
