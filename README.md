@@ -232,7 +232,7 @@ If you use Inseq in your research we suggest to include a mention to the specifi
 
 ```bibtex
 @article{sarti-etal-2023-inseq,
-    author = {Gabriele Sarti and Nils Feldhus and Ludwig Sickert and Oskar van der Wal},
+    author = {Gabriele Sarti and Nils Feldhus and Ludwig Sickert and Oskar van der Wal and Malvina Nissim and Arianna Bisazza},
     title = {Inseq: An Interpretability Toolkit for Sequence Generation Models},
     month = feb,
     year = 2023,

@@ -15,6 +15,10 @@ authors:
   - family-names: "van der Wal"
     given-names: Oskar
     orcid: "https://orcid.org/0000-0003-4087-3714"
+  - family-names: Nissim
+    given-names: Malvina
+  - family-names: Bisazza
+    given-names: Arianna
 preferred-citation:
   type: article
   authors:
@@ -28,6 +32,10 @@ preferred-citation:
   - family-names: "van der Wal"
     given-names: Oskar
     orcid: "https://orcid.org/0000-0003-4087-3714"
+  - family-names: Nissim
+    given-names: Malvina
+  - family-names: Bisazza
+    given-names: Arianna
   journal: "ArXiv"
   month: 2
   title: "Inseq: An Interpretability Toolkit for Sequence Generation Models"
