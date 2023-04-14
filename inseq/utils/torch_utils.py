@@ -2,6 +2,7 @@ import logging
 from typing import TYPE_CHECKING, Any, Callable, List, Optional, Sequence, Tuple, Union
 
 import torch
+from torch import nn
 from torch.backends.cuda import is_built as is_cuda_built
 from torch.backends.mps import is_available as is_mps_available
 from torch.backends.mps import is_built as is_mps_built
@@ -198,3 +199,47 @@ def get_default_device() -> str:
         return "cpu"
     else:
         return "cpu"
+
+
+def get_nn_submodule(module: nn.Module, submodule_path: str):
+    """
+    Returns the submodule of a PyTorch module given its string path.
+
+    Args:
+        module: the PyTorch parent module containing the submodule
+        submodule_path: the string path to the submodule (e.g. ``transformer.h.0.ln_1``).
+
+    Returns:
+        :obj:`nn.Module`, *optional*: The submodule if it exists, or None if it doesn't.
+    """
+    for name in submodule_path.split("."):
+        module = getattr(module, name, None)
+        if module is None:
+            return None
+    return module
+
+
+def find_block_stack(module):
+    """
+    Recursively searches for the first instance of a `nn.ModuleList` submodule within a given `torch.nn.Module`.
+
+    Args:
+        module (:obj:`torch.nn.Module`): A Pytorch :obj:`nn.Module` object.
+
+    Returns:
+        :obj:`torch.nn.ModuleList`: The first instance of a :obj:`nn.Module` submodule found within the given object.
+        None: If no `nn.ModuleList` submodule is found within the given `nn.Module` object.
+    """
+
+    # Check if the current module is an instance of nn.ModuleList
+    if isinstance(module, nn.ModuleList):
+        return module
+
+    # Recursively search for nn.ModuleList in the submodules of the current module
+    for submodule in module.children():
+        module_list = find_block_stack(submodule)
+        if module_list is not None:
+            return module_list
+
+    # If nn.ModuleList is not found in any submodules, return None
+    return None

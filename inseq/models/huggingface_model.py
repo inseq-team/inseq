@@ -379,6 +379,12 @@ class HuggingfaceEncoderDecoderModel(HuggingfaceModel, EncoderDecoderAttribution
         if hasattr(decoder, "embed_scale") and decoder.embed_scale != self.embed_scale:
             raise ValueError("Different encoder and decoder embed scales are not supported")
 
+    def get_encoder(self) -> torch.nn.Module:
+        return self.model.get_encoder()
+
+    def get_decoder(self) -> torch.nn.Module:
+        return self.model.get_decoder()
+
 
 class HuggingfaceDecoderOnlyModel(HuggingfaceModel, DecoderOnlyAttributionModel):
     """Model wrapper for any ForCausalLM or LMHead model on the HuggingFace Hub used to enable

@@ -6,6 +6,7 @@ from .errors import (
     MissingAttributionMethodError,
     UnknownAttributionMethodError,
 )
+from .hooks import get_post_variable_assignment_hook
 from .import_utils import (
     is_captum_available,
     is_datasets_available,
@@ -48,8 +49,10 @@ from .torch_utils import (
     aggregate_contiguous,
     check_device,
     euclidean_distance,
+    find_block_stack,
     get_default_device,
     get_front_padding,
+    get_nn_submodule,
     get_sequences_from_batched_steps,
     normalize_attributions,
     prod_fn,
@@ -116,4 +119,7 @@ __all__ = [
     "get_cls_from_instance_type",
     "json_advanced_loads",
     "json_advanced_load",
+    "get_nn_submodule",
+    "find_block_stack",
+    "get_post_variable_assignment_hook",
 ]

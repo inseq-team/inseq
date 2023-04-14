@@ -8,7 +8,7 @@ from ...utils import Registry
 from ..attribution_decorators import set_hook, unset_hook
 from .attribution_utils import get_source_target_attributions
 from .gradient_attribution import FeatureAttribution
-from .ops.lime import Lime
+from .ops import Lime, ValueZeroing
 
 logger = logging.getLogger(__name__)
 
@@ -128,3 +128,13 @@ class LimeAttribution(PerturbationAttributionRegistry):
         return PerturbationFeatureAttributionStepOutput(
             source_attributions=source_attributions, target_attributions=target_attributions, step_scores={}
         )
+
+
+class ValueZeroingAttribution(PerturbationAttributionRegistry):
+    """Value Zeroing attribution method."""
+
+    method_name = "value_zeroing"
+
+    def __init__(self, attribution_model, **kwargs):
+        super().__init__(attribution_model)
+        self.method = ValueZeroing(attribution_model)

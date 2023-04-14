@@ -493,3 +493,11 @@ class AttributionModel(ABC, torch.nn.Module):
         **kwargs,
     ) -> FullLogitsTensor:
         pass
+
+    @abstractmethod
+    def get_encoder(self) -> torch.nn.Module:
+        pass
+
+    @abstractmethod
+    def get_decoder(self) -> torch.nn.Module:
+        pass

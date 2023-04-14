@@ -70,9 +70,9 @@ class InternalsAttributionRegistry(FeatureAttribution, Registry):
         logger.debug(f"batch: {batch},\ntarget_ids: {pretty_tensor(target_ids, lpad=4)}")
         if attributed_fn != STEP_SCORES_MAP[self.attribution_model.default_attributed_fn_id]:
             logger.warning(
-                "Attention-based attribution methods are output agnostic, since they do not rely on specific output"
-                " targets to compute input saliency. As such, using a custom attributed function for attention"
-                " attribution methods does not produce any effect of the method's results."
+                "Internals attribution methods are output agnostic, since they do not rely on specific output"
+                " targets to compute importance scores. Using a custom attributed function in this context does not"
+                " influence in any way the method's results."
             )
         attribute_fn_args = {
             "batch": batch,

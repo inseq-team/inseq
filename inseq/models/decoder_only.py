@@ -1,6 +1,8 @@
 import logging
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
+import torch
+
 from ..attr.feat import join_token_ids
 from ..data import (
     Batch,
@@ -213,3 +215,9 @@ class DecoderOnlyAttributionModel(AttributionModel):
             **{k: v for k, v in zip(attributed_fn_argnames, args) if v is not None},
         )
         return attributed_fn(**step_function_args)
+
+    def get_encoder(self) -> torch.nn.Module:
+        raise NotImplementedError("Encoder-only models do not have an encoder.")
+
+    def get_decoder(self) -> torch.nn.Module:
+        return self.model
