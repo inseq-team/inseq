@@ -13,21 +13,24 @@
 # limitations under the License.
 
 import logging
-from typing import Any, Dict, List, Protocol, Tuple, Union
+from typing import Dict, List, Optional, Protocol, Tuple, Union
 
 import torch
 from captum._utils.typing import TensorOrTupleOfTensorsGeneric
 from captum.attr._utils.attribution import Attribution
 from captum.log import log_usage
 
-from ....data import Batch, EncoderDecoderBatch
-from ....utils.typing import AggregatedLayerAttentionTensor, FullAttentionOutput, FullLayerAttentionTensor
+from ....utils.typing import (
+    AllLayersMultiHeadAttentionTensor,
+    AttentionTensor,
+    MultiHeadAttentionTensor,
+)
 
 logger = logging.getLogger(__name__)
 
 
 class AggregateAttentionFunction(Protocol):
-    def __call__(self, attention: FullLayerAttentionTensor, dim: int, **kwargs) -> AggregatedLayerAttentionTensor:
+    def __call__(self, attention: MultiHeadAttentionTensor, dim: int, **kwargs) -> AttentionTensor:
         ...
 
 
@@ -50,22 +53,22 @@ class BaseAttentionAttribution(Attribution):
         return False
 
     @staticmethod
-    def _num_attention_heads(attention: FullLayerAttentionTensor) -> int:
+    def _num_attention_heads(attention: MultiHeadAttentionTensor) -> int:
         """Returns the number of heads contained in the attention tensor."""
         return attention.size(1)
 
     @staticmethod
-    def _num_layers(attention: FullAttentionOutput) -> int:
+    def _num_layers(attention: AllLayersMultiHeadAttentionTensor) -> int:
         """Returns the number of layers contained in the attention tensor."""
-        return len(attention)
+        return attention.size(0)
 
     @classmethod
     def _aggregate_attention_heads(
         cls,
-        attention: FullLayerAttentionTensor,
+        attention: MultiHeadAttentionTensor,
         aggregate_fn: Union[str, AggregateAttentionFunction, None] = None,
         heads: Union[int, Tuple[int, int], List[int], None] = None,
-    ) -> AggregatedLayerAttentionTensor:
+    ) -> AttentionTensor:
         """
         Merges the attention values across the specified attention heads for the full sequence.
 
@@ -143,10 +146,10 @@ class BaseAttentionAttribution(Attribution):
     @classmethod
     def _aggregate_layers(
         cls,
-        attention: FullAttentionOutput,
+        attention: AllLayersMultiHeadAttentionTensor,
         aggregate_fn: Union[str, AggregateAttentionFunction, None] = None,
         layers: Union[int, Tuple[int, int], List[int], None] = None,
-    ) -> FullLayerAttentionTensor:
+    ) -> MultiHeadAttentionTensor:
         """
         Merges the attention values of every attention head across the specified layers for the full sequence.
 
@@ -167,7 +170,6 @@ class BaseAttentionAttribution(Attribution):
                 `(batch_size, num_heads, sequence_length, sequence_length)`
         """
         n_layers = cls._num_layers(attention)
-        attention = torch.stack(attention, dim=0)
         aggregate_kwargs = {}
 
         if hasattr(layers, "__iter__"):
@@ -241,18 +243,18 @@ class AttentionWeights(BaseAttentionAttribution):
     @log_usage()
     def attribute(
         self,
-        batch: Union[Batch, EncoderDecoderBatch],
+        inputs: TensorOrTupleOfTensorsGeneric,
+        additional_forward_args: TensorOrTupleOfTensorsGeneric,
         aggregate_heads_fn: Union[str, AggregateAttentionFunction, None] = None,
         aggregate_layers_fn: Union[str, AggregateAttentionFunction, None] = None,
         heads: Union[int, Tuple[int, int], List[int], None] = None,
         layers: Union[int, Tuple[int, int], List[int], None] = None,
-        additional_forward_args: Any = None,
+        decoder_self_attentions: Optional[AllLayersMultiHeadAttentionTensor] = None,
+        cross_attentions: Optional[AllLayersMultiHeadAttentionTensor] = None,
     ) -> TensorOrTupleOfTensorsGeneric:
         """Performs basic attention attribution.
 
         Args:
-            batch (`Union[Batch, EncoderDecoderBatch]`):
-                The input batch used for the forward pass to extract attention scores.
             aggregate_heads_fn (:obj:`str` or :obj:`callable`): The method to use for aggregating across heads.
                 Can be one of `average` (default if heads is list, tuple or None), `max`, `min` or `single` (default
                 if heads is int), or a custom function defined by the user.
@@ -269,34 +271,28 @@ class AttentionWeights(BaseAttentionAttribution):
                 among the indices will be aggregated using aggregate_fn. If a list of indices is specified, the
                 respective layers will be used for aggregation. If aggregate_fn is "single", the last layer is
                 used by default. If no value is specified, all available layers are passed to aggregate_fn by default.
-
+            decoder_self_attentions (:obj:`tuple(torch.Tensor)`, optional): Tensor of decoder self-attention weights
+                computed during the forward pass.
+            cross_attentions (:obj:`tuple(torch.Tensor)`, optional): Tensor of cross-attention weights computed
         Returns:
             `TensorOrTupleOfTensorsGeneric`: Attribution outputs for source-only or source + target feature attribution
         """
-
-        is_target_attribution = additional_forward_args[0]
-        is_encoder_decoder = self.forward_func.is_encoder_decoder
-        outputs = self.forward_func.get_forward_output(
-            **self.forward_func.format_forward_args(batch), output_attentions=True
-        )
-
-        if is_encoder_decoder:
-            cross_layer_aggregation = self._aggregate_layers(outputs.cross_attentions, aggregate_layers_fn, layers)
+        if self.forward_func.is_encoder_decoder:
+            cross_layer_aggregation = self._aggregate_layers(cross_attentions, aggregate_layers_fn, layers)
             cross_head_aggregation = self._aggregate_attention_heads(
                 cross_layer_aggregation, aggregate_heads_fn, heads
             )
             attributions = (cross_head_aggregation.select(1, -1),)
-
-            if is_target_attribution:
+            if decoder_self_attentions is not None:
                 decoder_layer_aggregation = self._aggregate_layers(
-                    outputs.decoder_attentions, aggregate_layers_fn, layers
+                    decoder_self_attentions, aggregate_layers_fn, layers
                 )
                 decoder_head_aggregation = self._aggregate_attention_heads(
                     decoder_layer_aggregation, aggregate_heads_fn, heads
                 )
                 attributions = attributions + (decoder_head_aggregation.select(1, -1),)
         else:
-            layer_aggregation = self._aggregate_layers(outputs.attentions, aggregate_layers_fn, layers)
+            layer_aggregation = self._aggregate_layers(decoder_self_attentions, aggregate_layers_fn, layers)
             head_aggregation = self._aggregate_attention_heads(layer_aggregation, aggregate_heads_fn, heads)
             attributions = (head_aggregation.select(1, -1),)
 

@@ -17,10 +17,10 @@ Todo:
     * 🟡: Allow custom arguments for model loading in the :class:`FeatureAttribution` :meth:`load` method.
 """
 import logging
-from abc import abstractmethod
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
+import torch
 from torchtyping import TensorType
 from transformers import set_seed
 
@@ -42,9 +42,10 @@ from ...utils import (
     get_front_padding,
     pretty_tensor,
 )
-from ...utils.typing import ModelIdentifier, SingleScorePerStepTensor, TargetIdsTensor
+from ...utils.typing import ModelIdentifier, SingleScorePerStepTensor
 from ..attribution_decorators import batched, set_hook, unset_hook
-from .attribution_utils import check_attribute_positions, get_step_scores, tok2string
+from ..step_functions import STEP_SCORES_MAP
+from .attribution_utils import check_attribute_positions, get_source_target_attributions, get_step_scores, tok2string
 
 if TYPE_CHECKING:
     from ...models import AttributionModel
@@ -90,14 +91,23 @@ class FeatureAttribution(Registry):
                 custom conversion of ids into embeddings inside the attribution method.
             target_layer (:obj:`torch.nn.Module`, default `None`): The layer on which attribution should be
                 performed for layer attribution methods.
-            use_baseline (:obj:`bool`, default `False`): Whether a baseline should be used for the attribution method.
+            use_baselines (:obj:`bool`, default `False`): Whether a baseline should be used for the attribution method.
+            use_attention_weights (:obj:`bool`, default `False`): Whether attention weights are used in the attribution
+                method.
+            use_hidden_states (:obj:`bool`, default `False`): Whether hidden states are used in the attribution method.
+            use_predicted_target (:obj:`bool`, default `True`): Whether the attribution method uses the predicted
+                target for attribution. In case it doesn't, a warning message will be shown if the target is not
+                the default one.
         """
         super().__init__()
         self.attribution_model = attribution_model
         self.attribute_batch_ids: bool = False
         self.forward_batch_embeds: bool = True
         self.target_layer = None
-        self.use_baseline: bool = False
+        self.use_baselines: bool = False
+        self.use_attention_weights: bool = False
+        self.use_hidden_states: bool = False
+        self.use_predicted_target: bool = True
         if hook_to_model:
             self.hook(**kwargs)
 
@@ -169,7 +179,7 @@ class FeatureAttribution(Registry):
         Prepares inputs and performs attribution.
 
         Wraps the attribution method :meth:`~inseq.attr.feat.FeatureAttribution.attribute` method
-        and the :meth:`~inseq.models.AttributionModel.prepare_inputs_for_attribution` method.
+        and the :meth:`~inseq.models.InputFormatter.prepare_inputs_for_attribution` method.
 
         Args:
             sources (:obj:`list(str)`): The sources provided to the
@@ -212,7 +222,9 @@ class FeatureAttribution(Registry):
             # We do this here to support separate attr_pos_start for different sentences when batching
             if attr_pos_start is None or attr_pos_start < encoded_sources.input_ids.shape[1]:
                 attr_pos_start = encoded_sources.input_ids.shape[1]
-        batch = self.attribution_model.prepare_inputs_for_attribution(inputs, include_eos_baseline)
+        batch = self.attribution_model.formatter.prepare_inputs_for_attribution(
+            self.attribution_model, inputs, include_eos_baseline
+        )
         # If prepare_and_attribute was called from AttributionModel.attribute,
         # attributed_fn is already a Callable. Keep here to allow for usage independently
         # of AttributionModel.attribute.
@@ -291,6 +303,13 @@ class FeatureAttribution(Registry):
             raise ValueError(
                 "Layer attribution methods do not support attribute_target=True. Use regular attributions instead."
             )
+        default_attributed_fn = STEP_SCORES_MAP[self.attribution_model.default_attributed_fn_id]
+        if not self.use_predicted_target and attributed_fn != default_attributed_fn:
+            logger.warning(
+                "Internals attribution methods are output agnostic, since they do not rely on specific output"
+                " targets to compute importance scores. Using a custom attributed function in this context does not"
+                " influence in any way the method's results."
+            )
         attr_pos_start, attr_pos_end = check_attribute_positions(
             batch.max_generation_length,
             attr_pos_start,
@@ -298,7 +317,7 @@ class FeatureAttribution(Registry):
         )
         logger.debug("=" * 30 + f"\nfull batch: {batch}\n" + "=" * 30)
         # Sources are empty for decoder-only models
-        sequences = self.attribution_model.get_text_sequences(batch)
+        sequences = self.attribution_model.formatter.get_text_sequences(self.attribution_model, batch)
         target_tokens_with_ids = self.attribution_model.tokenize_with_ids(
             sequences.targets, as_targets=True, skip_special_tokens=False
         )
@@ -447,26 +466,52 @@ class FeatureAttribution(Registry):
             f"\ntarget_ids: {pretty_tensor(target_ids)},\n"
             f"target_attention_mask: {pretty_tensor(target_attention_mask)}"
         )
-        attribute_main_args = self.format_attribute_args(
+        logger.debug(f"batch: {batch},\ntarget_ids: {pretty_tensor(target_ids, lpad=4)}")
+        attribute_main_args = self.attribution_model.formatter.format_attribution_args(
             batch=batch,
             target_ids=target_ids,
             attributed_fn=attributed_fn,
             attribute_target=attribute_target,
             attributed_fn_args=attributed_fn_args,
+            attribute_batch_ids=self.attribute_batch_ids,
+            forward_batch_embeds=self.forward_batch_embeds,
+            use_baselines=self.use_baselines,
         )
+        if len(step_scores) > 0 or self.use_attention_weights or self.use_hidden_states:
+            with torch.no_grad():
+                output = self.attribution_model.get_forward_output(
+                    batch,
+                    use_embeddings=self.forward_batch_embeds,
+                    output_attentions=self.use_attention_weights,
+                    output_hidden_states=self.use_hidden_states,
+                )
+            if self.use_attention_weights:
+                attentions_dict = self.attribution_model.get_attentions_dict(output, with_target=attribute_target)
+                attribution_args = {**attribution_args, **attentions_dict}
+            if self.use_hidden_states:
+                hidden_states_dict = self.attribution_model.get_hidden_states_dict(
+                    output, attribute_target=attribute_target
+                )
+                attribution_args = {**attribution_args, **hidden_states_dict}
         set_seed(42)
         # Perform attribution step
         step_output = self.attribute_step(
             attribute_main_args,
             attribution_args,
         )
-        # Calculate step scores
-        for step_score in step_scores:
-            step_output.step_scores[step_score] = get_step_scores(
-                self.attribution_model, batch, target_ids, step_score, step_scores_args
+        # Format step scores arguments and calculate step scores
+        if len(step_scores) > 0:
+            step_scores_args = self.attribution_model.formatter.format_step_function_args(
+                attribution_model=self.attribution_model,
+                forward_output=output,
+                target_ids=target_ids,
+                batch=batch,
+                **step_scores_args,
             )
+            for step_score in step_scores:
+                step_output.step_scores[step_score] = get_step_scores(step_score, step_scores_args)
         # Add batch information to output
-        step_output = self.attribution_model.enrich_step_output(
+        step_output = self.attribution_model.formatter.enrich_step_output(
             step_output,
             orig_batch,
             self.attribution_model.convert_ids_to_tokens(orig_target_ids, skip_special_tokens=False),
@@ -482,49 +527,6 @@ class FeatureAttribution(Registry):
         if hasattr(self, "method") and hasattr(self.method, "attribute"):
             return extract_signature_args(kwargs, self.method.attribute, self.ignore_extra_args, return_remaining=True)
         return {}
-
-    def format_attribute_args(
-        self,
-        batch: Union[DecoderOnlyBatch, EncoderDecoderBatch],
-        target_ids: TargetIdsTensor,
-        attributed_fn: Callable[..., SingleScorePerStepTensor],
-        attributed_fn_args: Dict[str, Any] = {},
-        **kwargs,
-    ) -> Dict[str, Any]:
-        r"""
-        Formats inputs for the attribution method based on the model type and the attribution method requirements.
-
-        Args:
-            batch (:class:`~inseq.data.DecoderOnlyBatch` or :class:`~inseq.data.EncoderDecoderBatch`): The batch of
-                sequences on which attribution is performed.
-            target_ids (:obj:`torch.Tensor`): Target token ids of size `(batch_size)` corresponding to tokens
-                for which the attribution step must be performed.
-            attributed_fn (:obj:`Callable[..., SingleScorePerStepTensor]`): The function of model outputs
-                representing what should be attributed (e.g. output probits of model best prediction after softmax).
-                The parameter must be a function that taking multiple keyword arguments and returns a :obj:`tensor`
-                of size (batch_size,). If not provided, the default attributed function for the model will be used
-                (change attribution_model.default_attributed_fn_id).
-            attribute_target (:obj:`bool`, optional): Whether to attribute the target prefix or not. Defaults to False.
-            attributed_fn_args (:obj:`dict`, `optional`): Additional arguments to pass to the attributed function.
-                Defaults to {}.
-            **kwargs: Additional arguments to pass to the model-specific
-                :meth:`inseq.models.AttributionModel.format_attribution_args` method.
-        Returns:
-            :obj:`dict`: A dictionary containing the formatted attribution arguments.
-        """
-        logger.debug(f"batch: {batch},\ntarget_ids: {pretty_tensor(target_ids, lpad=4)}")
-        attribute_fn_args, baselines = self.attribution_model.format_attribution_args(
-            batch=batch,
-            target_ids=target_ids,
-            attributed_fn=attributed_fn,
-            attributed_fn_args=attributed_fn_args,
-            attribute_batch_ids=self.attribute_batch_ids,
-            forward_batch_embeds=self.forward_batch_embeds,
-            **kwargs,
-        )
-        if self.use_baseline:
-            attribute_fn_args["baselines"] = baselines
-        return attribute_fn_args
 
     def attribute_step(
         self,
@@ -546,27 +548,28 @@ class FeatureAttribution(Registry):
                 information is empty, and will later be filled by the enrich_step_output function.
         """
         attr = self.method.attribute(**attribute_fn_main_args, **attribution_args)
-        return FeatureAttributionStepOutput(source_attributions=attr, step_scores={})
+        source_attributions, target_attributions = get_source_target_attributions(
+            attr, self.attribution_model.is_encoder_decoder
+        )
+        return FeatureAttributionStepOutput(
+            source_attributions=source_attributions,
+            target_attributions=target_attributions,
+            step_scores={},
+        )
 
-    @abstractmethod
     @set_hook
     def hook(self, **kwargs) -> None:
         r"""
         Hooks the attribution method to the model. Useful to implement pre-attribution logic
         (e.g. freezing layers, replacing embeddings, raise warnings, etc.).
-
-        Abstract method, must be implemented by subclasses.
         """
         pass
 
-    @abstractmethod
     @unset_hook
     def unhook(self, **kwargs) -> None:
         r"""
         Unhooks the attribution method from the model. If the model was modified in any way, this
         should restore its initial state.
-
-        Abstract method, must be implemented by subclasses.
         """
         pass
 

@@ -4,14 +4,12 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Un
 
 import torch
 
-from ...data.batch import DecoderOnlyBatch, EncoderDecoderBatch
 from ...utils import extract_signature_args
 from ...utils.typing import (
     OneOrMoreAttributionSequences,
     OneOrMoreIdSequences,
     OneOrMoreTokenSequences,
     SingleScorePerStepTensor,
-    TargetIdsTensor,
     TextInput,
     TokenWithId,
 )
@@ -83,42 +81,19 @@ def check_attribute_positions(
 
 
 def get_step_scores(
-    attribution_model: "AttributionModel",
-    batch: Union[EncoderDecoderBatch, DecoderOnlyBatch],
-    target_ids: TargetIdsTensor,
     score_identifier: str = "probability",
     step_scores_args: Dict[str, Any] = {},
 ) -> SingleScorePerStepTensor:
     """
     Returns step scores for the target tokens in the batch.
     """
-    if attribution_model is None:
-        raise ValueError("Attribution model is not set.")
     if score_identifier not in STEP_SCORES_MAP:
         raise AttributeError(
             f"Step score {score_identifier} not found. Available step scores are: "
             f"{', '.join(list(STEP_SCORES_MAP.keys()))}. Use the inseq.register_step_function"
             "function to register a custom step score."
         )
-    with torch.no_grad():
-        output = attribution_model.get_forward_output(
-            **attribution_model.format_forward_args(
-                batch, use_embeddings=attribution_model.attribution_method.forward_batch_embeds
-            ),
-            use_embeddings=attribution_model.attribution_method.forward_batch_embeds,
-        )
-        step_scores_args = attribution_model.format_step_function_args(
-            forward_output=output,
-            encoder_input_ids=batch.source_ids,
-            decoder_input_ids=batch.target_ids,
-            encoder_input_embeds=batch.source_embeds,
-            decoder_input_embeds=batch.target_embeds,
-            target_ids=target_ids,
-            encoder_attention_mask=batch.source_mask,
-            decoder_attention_mask=batch.target_mask,
-            **step_scores_args,
-        )
-        return STEP_SCORES_MAP[score_identifier](**step_scores_args)
+    return STEP_SCORES_MAP[score_identifier](**step_scores_args)
 
 
 def join_token_ids(tokens: OneOrMoreTokenSequences, ids: OneOrMoreIdSequences) -> List[TokenWithId]:

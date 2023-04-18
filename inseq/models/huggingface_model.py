@@ -18,9 +18,11 @@ from transformers.modeling_outputs import CausalLMOutput, ModelOutput, Seq2SeqLM
 from ..data import BatchEncoding
 from ..utils import check_device
 from ..utils.typing import (
+    AllLayersEmbeddingsTensor,
+    AllLayersMultiHeadAttentionTensor,
     EmbeddingsTensor,
-    FullLogitsTensor,
     IdsTensor,
+    LogitsTensor,
     OneOrMoreIdSequences,
     OneOrMoreTokenSequences,
     TextInput,
@@ -213,7 +215,7 @@ class HuggingfaceModel(AttributionModel):
         return texts
 
     @staticmethod
-    def output2logits(forward_output: Union[Seq2SeqLMOutput, CausalLMOutput]) -> FullLogitsTensor:
+    def output2logits(forward_output: Union[Seq2SeqLMOutput, CausalLMOutput]) -> LogitsTensor:
         # Full logits for last position of every sentence:
         # (batch_size, tgt_seq_len, vocab_size) => (batch_size, vocab_size)
         return forward_output.logits[:, -1, :].squeeze(1)
@@ -385,6 +387,25 @@ class HuggingfaceEncoderDecoderModel(HuggingfaceModel, EncoderDecoderAttribution
     def get_decoder(self) -> torch.nn.Module:
         return self.model.get_decoder()
 
+    @staticmethod
+    def get_attentions_dict(
+        output: Seq2SeqLMOutput,
+        with_target: bool = False,
+    ) -> Dict[str, AllLayersMultiHeadAttentionTensor]:
+        return {
+            "decoder_self_attentions": torch.stack(output.decoder_attentions, dim=0) if with_target else None,
+            "cross_attentions": torch.stack(output.cross_attentions, dim=0),
+        }
+
+    @staticmethod
+    def get_hidden_states_dict(
+        output: Seq2SeqLMOutput, with_target: bool = False
+    ) -> Dict[str, AllLayersEmbeddingsTensor]:
+        return {
+            "encoder_hidden_states": torch.stack(output.encoder_hidden_states, dim=0),
+            "decoder_hidden_states": torch.stack(output.decoder_hidden_states, dim=0),
+        }
+
 
 class HuggingfaceDecoderOnlyModel(HuggingfaceModel, DecoderOnlyAttributionModel):
     """Model wrapper for any ForCausalLM or LMHead model on the HuggingFace Hub used to enable
@@ -415,3 +436,19 @@ class HuggingfaceDecoderOnlyModel(HuggingfaceModel, DecoderOnlyAttributionModel)
     def configure_embeddings_scale(self):
         if hasattr(self.model, "embed_scale"):
             self.embed_scale = self.model.embed_scale
+
+    @staticmethod
+    def get_attentions_dict(
+        output: CausalLMOutput, with_target: bool = False
+    ) -> Dict[str, AllLayersMultiHeadAttentionTensor]:
+        return {
+            "decoder_self_attentions": torch.stack(output.attentions, dim=0),
+        }
+
+    @staticmethod
+    def get_hidden_states_dict(
+        output: CausalLMOutput, with_target: bool = False
+    ) -> Dict[str, AllLayersEmbeddingsTensor]:
+        return {
+            "decoder_hidden_states": torch.stack(output.hidden_states, dim=0),
+        }

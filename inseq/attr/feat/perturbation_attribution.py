@@ -5,7 +5,6 @@ from captum.attr import Occlusion
 
 from ...data import OcclusionFeatureAttributionStepOutput, PerturbationFeatureAttributionStepOutput
 from ...utils import Registry
-from ..attribution_decorators import set_hook, unset_hook
 from .attribution_utils import get_source_target_attributions
 from .gradient_attribution import FeatureAttribution
 from .ops import Lime, ValueZeroing
@@ -16,13 +15,7 @@ logger = logging.getLogger(__name__)
 class PerturbationAttributionRegistry(FeatureAttribution, Registry):
     """Perturbation-based attribution method registry."""
 
-    @set_hook
-    def hook(self, **kwargs):
-        pass
-
-    @unset_hook
-    def unhook(self, **kwargs):
-        pass
+    pass
 
 
 class OcclusionAttribution(PerturbationAttributionRegistry):
@@ -43,7 +36,7 @@ class OcclusionAttribution(PerturbationAttributionRegistry):
 
     def __init__(self, attribution_model):
         super().__init__(attribution_model)
-        self.use_baseline = True
+        self.use_baselines = True
         self.method = Occlusion(self.attribution_model)
 
     def attribute_step(
@@ -116,18 +109,7 @@ class LimeAttribution(PerturbationAttributionRegistry):
             raise NotImplementedError(
                 "LIME attribution with attribute_target=True currently not supported for encoder-decoder models."
             )
-
-        attr = self.method.attribute(
-            **attribute_fn_main_args,
-            **attribution_args,
-        )
-
-        source_attributions, target_attributions = get_source_target_attributions(
-            attr, self.attribution_model.is_encoder_decoder
-        )
-        return PerturbationFeatureAttributionStepOutput(
-            source_attributions=source_attributions, target_attributions=target_attributions, step_scores={}
-        )
+        super().attribute_step(attribute_fn_main_args, attribution_args)
 
 
 class ValueZeroingAttribution(PerturbationAttributionRegistry):

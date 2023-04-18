@@ -23,6 +23,7 @@ def test_layer_aggregation(aggr_method: str, aggr_layers: str) -> None:
     for _ in range(max_layer):
         attention = torch.rand(size=shape, dtype=torch.float)
         layerAttention = layerAttention + (attention,)
+    layerAttention = torch.stack(layerAttention, dim=0)
 
     if aggr_method == "single":
         if aggr_layers != "int" and aggr_layers != "none":

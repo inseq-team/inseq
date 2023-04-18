@@ -94,6 +94,7 @@ def perplexity_fn(
 def contrast_prob_diff_fn(
     attribution_model: "AttributionModel",
     forward_output: ModelOutput,
+    encoder_input_ids: IdsTensor,
     encoder_input_embeds: EmbeddingsTensor,
     encoder_attention_mask: IdsTensor,
     decoder_input_ids: IdsTensor,
@@ -125,20 +126,25 @@ def contrast_prob_diff_fn(
     # Forward pass with the same model used for the main generation, but using contrastive inputs instead
     if isinstance(attribution_model, EncoderDecoderAttributionModel):
         contrast_decoder_input_embeds = attribution_model.embed_ids(contrast_decoder_input_ids, as_targets=True)
-        contrast_output = attribution_model.get_forward_output(
-            forward_tensor=encoder_input_embeds,
+        contrast_batch = attribution_model.formatter.convert_args_to_batch(
+            encoder_input_ids=encoder_input_ids,
+            encoder_input_embeds=encoder_input_embeds,
+            decoder_input_ids=contrast_decoder_input_ids,
             encoder_attention_mask=encoder_attention_mask,
-            decoder_input_embeds=contrast_decoder_input_embeds,
             decoder_attention_mask=contrast_decoder_attention_mask,
+            decoder_input_embeds=contrast_decoder_input_embeds,
         )
+        use_embeddings = True
     elif isinstance(attribution_model, DecoderOnlyAttributionModel):
-        contrast_output = attribution_model.get_forward_output(
-            forward_tensor=contrast_decoder_input_ids,
+        contrast_batch = attribution_model.formatter.convert_args_to_batch(
+            input_ids=contrast_decoder_input_ids,
+            input_embeds=None,
             attention_mask=contrast_decoder_attention_mask,
-            use_embeddings=False,
         )
+        use_embeddings = False
     else:
         raise ValueError("Unsupported attribution model type")
+    contrast_output = attribution_model.get_forward_output(contrast_batch, use_embeddings=use_embeddings)
     # Return the prob difference as target for attribution
     model_probs = probability_fn(attribution_model, forward_output, target_ids)
     contrast_probs = probability_fn(attribution_model, contrast_output, contrast_target_ids)

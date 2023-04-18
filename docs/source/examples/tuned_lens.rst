@@ -89,13 +89,14 @@ The first step is to install the tuned lens library using ``pip install tuned-le
         14 is the number of layers in the model, plus the embedding layer, plus 1 to account for the case
         where the token is not predicted by the model.
         """
+        batch = attribution_model.formatter.convert_args_to_batch(
+            input_ids=decoder_input_ids,
+            input_embeds=None,
+            attention_mask=decoder_attention_mask,
+        )
         # Record activations at every model layer
         with record_residual_stream(attribution_model.model) as stream:
-            outputs = attribution_model.get_forward_output(
-                forward_tensor=decoder_input_ids,
-                attention_mask=decoder_attention_mask,
-                use_embeddings=False,
-            )
+            outputs = attribution_model.get_forward_output(batch, use_embeddings=False)
         # Select last token activations
         stream = stream.map(lambda x: x[..., -1, :])
         # Compute logits for each layer emebedding layer + n_layers

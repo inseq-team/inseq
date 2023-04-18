@@ -5,7 +5,7 @@ from rich.status import Status
 
 from ..utils import isnotebook, optional
 from ..utils.typing import ModelClass, ModelIdentifier
-from .attribution_model import AttributionModel
+from .attribution_model import AttributionModel, InputFormatter
 from .decoder_only import DecoderOnlyAttributionModel
 from .encoder_decoder import EncoderDecoderAttributionModel
 from .huggingface_model import HuggingfaceDecoderOnlyModel, HuggingfaceEncoderDecoderModel, HuggingfaceModel
@@ -56,6 +56,7 @@ def list_supported_frameworks() -> List[str]:
 
 __all__ = [
     "AttributionModel",
+    "InputFormatter",
     "HuggingfaceModel",
     "HuggingfaceEncoderDecoderModel",
     "HuggingfaceDecoderOnlyModel",

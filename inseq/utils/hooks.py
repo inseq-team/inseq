@@ -28,6 +28,7 @@ def get_last_variable_assignment_position(
         `Optional[int]`: Returns the line number in the file (not relative to the method) of the last variable
         assignment. Returns None if no assignment to the variable was found.
     """
+    # Matches any assignment of variable varname
     pattern = rf"^\s*(?:\w+\s*,\s*)*\b{varname}\b\s*(?:,.+\s*)*=\s*[^\W=]+$"
     code, startline = getsourcelines(getattr(module, fname))
     line_numbers = [i for i, line in enumerate(code) if re.match(pattern, line)]
@@ -40,8 +41,7 @@ def get_post_variable_assignment_hook(
     module: nn.Module,
     varname: str,
     fname: str = "forward",
-    hook_fn: Callable[[FrameType], None] = lambda frame, *args, **kwargs: None,
-    *args,
+    hook_fn: Callable[[FrameType], None] = lambda **kwargs: None,
     **kwargs,
 ) -> Callable[[], None]:
     """Creates a hook that is called after the last variable assignment in the specified method of a `nn.Module`.
@@ -82,11 +82,11 @@ def get_post_variable_assignment_hook(
             and frame.f_locals.get("self")._get_name() == module._get_name()
         ):
             # Call the custom hook providing the current frame and any additional arguments as context
-            hook_fn(frame, *args, **kwargs)
+            hook_fn(frame, **kwargs)
             settrace(None)
         return var_tracer
 
-    def hook(*args, **kwargs):
+    def hook(**kwargs):
         settrace(var_tracer)
 
     return hook

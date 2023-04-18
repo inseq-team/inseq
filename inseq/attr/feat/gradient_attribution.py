@@ -115,7 +115,7 @@ class DeepLiftAttribution(GradientAttributionRegistry):
     def __init__(self, attribution_model, multiply_by_inputs: bool = True, **kwargs):
         super().__init__(attribution_model)
         self.method = DeepLift(self.attribution_model, multiply_by_inputs)
-        self.use_baseline = True
+        self.use_baselines = True
 
 
 class GradientShapAttribution(GradientAttributionRegistry):
@@ -130,7 +130,7 @@ class GradientShapAttribution(GradientAttributionRegistry):
     def __init__(self, attribution_model, multiply_by_inputs: bool = True, **kwargs):
         super().__init__(attribution_model)
         self.method = GradientShap(self.attribution_model, multiply_by_inputs)
-        self.use_baseline = True
+        self.use_baselines = True
 
 
 class DiscretizedIntegratedGradientsAttribution(GradientAttributionRegistry):
@@ -147,7 +147,7 @@ class DiscretizedIntegratedGradientsAttribution(GradientAttributionRegistry):
         super().__init__(attribution_model, hook_to_model=False)
         self.attribution_model = attribution_model
         self.attribute_batch_ids = True
-        self.use_baseline = True
+        self.use_baselines = True
         self.method = DiscretetizedIntegratedGradients(
             self.attribution_model,
             multiply_by_inputs,
@@ -183,7 +183,7 @@ class IntegratedGradientsAttribution(GradientAttributionRegistry):
     def __init__(self, attribution_model, multiply_by_inputs: bool = True, **kwargs):
         super().__init__(attribution_model)
         self.method = IntegratedGradients(self.attribution_model, multiply_by_inputs)
-        self.use_baseline = True
+        self.use_baselines = True
 
 
 class InputXGradientAttribution(GradientAttributionRegistry):
@@ -230,7 +230,7 @@ class LayerIntegratedGradientsAttribution(GradientAttributionRegistry):
         super().__init__(attribution_model, hook_to_model=False)
         self.attribute_batch_ids = True
         self.forward_batch_embeds = False
-        self.use_baseline = True
+        self.use_baselines = True
         self.hook(**kwargs)
         self.method = LayerIntegratedGradients(
             self.attribution_model,
@@ -252,7 +252,7 @@ class LayerGradientXActivationAttribution(GradientAttributionRegistry):
         super().__init__(attribution_model, hook_to_model=False)
         self.attribute_batch_ids = True
         self.forward_batch_embeds = False
-        self.use_baseline = False
+        self.use_baselines = False
         self.hook(**kwargs)
         self.method = LayerGradientXActivation(
             self.attribution_model,
@@ -274,7 +274,7 @@ class LayerDeepLiftAttribution(GradientAttributionRegistry):
         super().__init__(attribution_model, hook_to_model=False)
         self.attribute_batch_ids = True
         self.forward_batch_embeds = False
-        self.use_baseline = True
+        self.use_baselines = True
         self.hook(**kwargs)
         self.method = LayerDeepLift(
             self.attribution_model,
