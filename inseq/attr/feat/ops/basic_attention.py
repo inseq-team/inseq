@@ -283,7 +283,8 @@ class AttentionWeights(BaseAttentionAttribution):
                 cross_layer_aggregation, aggregate_heads_fn, heads
             )
             attributions = (cross_head_aggregation.select(1, -1),)
-            if decoder_self_attentions is not None:
+            # Encoder-decoder with attribute_target=True
+            if len(inputs) > 1:
                 decoder_layer_aggregation = self._aggregate_layers(
                     decoder_self_attentions, aggregate_layers_fn, layers
                 )

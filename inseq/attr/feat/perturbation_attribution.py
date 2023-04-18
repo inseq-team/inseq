@@ -119,4 +119,8 @@ class ValueZeroingAttribution(PerturbationAttributionRegistry):
 
     def __init__(self, attribution_model, **kwargs):
         super().__init__(attribution_model)
+        # Hidden states will be passed to the attribute_step method
+        self.use_hidden_states = True
+        # Does not rely on predicted output (i.e. decoding strategy agnostic)
+        self.use_predicted_target = False
         self.method = ValueZeroing(attribution_model)

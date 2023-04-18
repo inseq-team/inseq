@@ -201,24 +201,6 @@ def get_default_device() -> str:
         return "cpu"
 
 
-def get_nn_submodule(module: nn.Module, submodule_path: str):
-    """
-    Returns the submodule of a PyTorch module given its string path.
-
-    Args:
-        module: the PyTorch parent module containing the submodule
-        submodule_path: the string path to the submodule (e.g. ``transformer.h.0.ln_1``).
-
-    Returns:
-        :obj:`nn.Module`, *optional*: The submodule if it exists, or None if it doesn't.
-    """
-    for name in submodule_path.split("."):
-        module = getattr(module, name, None)
-        if module is None:
-            return None
-    return module
-
-
 def find_block_stack(module):
     """
     Recursively searches for the first instance of a `nn.ModuleList` submodule within a given `torch.nn.Module`.

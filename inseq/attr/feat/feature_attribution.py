@@ -364,6 +364,13 @@ class FeatureAttribution(Registry):
                 attributed_fn_args=attributed_fn_args,
                 step_scores_args=step_scores_args,
             )
+            # Add batch information to output
+            step_output = self.attribution_model.formatter.enrich_step_output(
+                step_output,
+                batch[:step],
+                self.attribution_model.convert_ids_to_tokens(tgt_ids.unsqueeze(1), skip_special_tokens=False),
+                tgt_ids.detach().to("cpu"),
+            )
             attribution_outputs.append(step_output)
             if pretty_progress:
                 tgt_tokens = batch.target_tokens
@@ -385,7 +392,7 @@ class FeatureAttribution(Registry):
                 update_progress_bar(pbar, show=show_progress, pretty=pretty_progress)
         end = datetime.now()
         close_progress_bar(pbar, show=show_progress, pretty=pretty_progress)
-        batch.to("cpu")
+        batch.detach().to("cpu")
         out = FeatureAttributionOutput(
             sequence_attributions=FeatureAttributionSequenceOutput.from_step_attributions(
                 attributions=attribution_outputs,
@@ -453,7 +460,6 @@ class FeatureAttribution(Registry):
                 (target optional if attribute_target=True), plus batch information and any step score present.
         """
         orig_batch = batch.clone().detach().to("cpu")
-        orig_target_ids = target_ids.clone()
         is_filtered = False
         # Filter out finished sentences
         if target_attention_mask is not None and int(target_attention_mask.sum()) < target_ids.shape[0]:
@@ -486,12 +492,10 @@ class FeatureAttribution(Registry):
                     output_hidden_states=self.use_hidden_states,
                 )
             if self.use_attention_weights:
-                attentions_dict = self.attribution_model.get_attentions_dict(output, with_target=attribute_target)
+                attentions_dict = self.attribution_model.get_attentions_dict(output)
                 attribution_args = {**attribution_args, **attentions_dict}
             if self.use_hidden_states:
-                hidden_states_dict = self.attribution_model.get_hidden_states_dict(
-                    output, attribute_target=attribute_target
-                )
+                hidden_states_dict = self.attribution_model.get_hidden_states_dict(output)
                 attribution_args = {**attribution_args, **hidden_states_dict}
         set_seed(42)
         # Perform attribution step
@@ -510,16 +514,9 @@ class FeatureAttribution(Registry):
             )
             for step_score in step_scores:
                 step_output.step_scores[step_score] = get_step_scores(step_score, step_scores_args)
-        # Add batch information to output
-        step_output = self.attribution_model.formatter.enrich_step_output(
-            step_output,
-            orig_batch,
-            self.attribution_model.convert_ids_to_tokens(orig_target_ids, skip_special_tokens=False),
-            orig_target_ids.squeeze().detach().to("cpu"),
-        )
         # Reinsert finished sentences
         if target_attention_mask is not None and is_filtered:
-            step_output.remap_from_filtered(target_attention_mask)
+            step_output.remap_from_filtered(target_attention_mask, orig_batch)
         step_output = step_output.detach().to("cpu")
         return step_output
 

@@ -52,7 +52,6 @@ from .torch_utils import (
     find_block_stack,
     get_default_device,
     get_front_padding,
-    get_nn_submodule,
     get_sequences_from_batched_steps,
     normalize_attributions,
     prod_fn,
