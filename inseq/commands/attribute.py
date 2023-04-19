@@ -26,6 +26,17 @@ class AttributeBaseArgs:
             "help": "Performs the attribution procedure including the generated prefix at every step.",
         },
     )
+    generate_from_target_prefix: bool = field(
+        default=False,
+        metadata={
+            "help": (
+                "Whether the ``generated_texts`` should be used as"
+                "target prefixes for the generation process. If False, the ``generated_texts`` will be used as full"
+                "targets. This option is only available for encoder-decoder models, since the same behavior can be"
+                "achieved by modifying the input texts for decoder-only models. Default: False."
+            )
+        },
+    )
     step_scores: List[str] = field(
         default_factory=list, metadata={"help": "Adds step scores to the attribution output."}
     )
@@ -165,6 +176,7 @@ def attribute(input_texts, generated_texts, args: AttributeBaseArgs):
         generation_args={"max_new_tokens": args.max_gen_length},
         attr_pos_start=args.start_pos,
         attr_pos_end=args.end_pos,
+        generate_from_target_prefix=args.generate_from_target_prefix,
     )
     if args.viz_path:
         print(f"Saving visualization to {args.viz_path}")
