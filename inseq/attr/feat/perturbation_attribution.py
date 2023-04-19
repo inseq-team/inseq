@@ -123,4 +123,6 @@ class ValueZeroingAttribution(PerturbationAttributionRegistry):
         self.use_hidden_states = True
         # Does not rely on predicted output (i.e. decoding strategy agnostic)
         self.use_predicted_target = False
+        # Uses model configuration to access attention module and value vector variable
+        self.use_model_config = True
         self.method = ValueZeroing(attribution_model)

@@ -98,6 +98,9 @@ class FeatureAttribution(Registry):
             use_predicted_target (:obj:`bool`, default `True`): Whether the attribution method uses the predicted
                 target for attribution. In case it doesn't, a warning message will be shown if the target is not
                 the default one.
+            use_model_config (:obj:`bool`, default `False`): Whether the attribution method uses the model config. If
+                True, the method will try to load the config matching the model when hooking to the model. Missing
+                configurations can be registered using :meth:`~inseq.models.register_model_config`.
         """
         super().__init__()
         self.attribution_model = attribution_model
@@ -108,6 +111,7 @@ class FeatureAttribution(Registry):
         self.use_attention_weights: bool = False
         self.use_hidden_states: bool = False
         self.use_predicted_target: bool = True
+        self.use_model_config: bool = False
         if hook_to_model:
             self.hook(**kwargs)
 
@@ -560,7 +564,10 @@ class FeatureAttribution(Registry):
         Hooks the attribution method to the model. Useful to implement pre-attribution logic
         (e.g. freezing layers, replacing embeddings, raise warnings, etc.).
         """
-        pass
+        from ...models.model_config import get_model_config
+
+        if self.use_model_config and self.attribution_model is not None:
+            self.attribution_model.config = get_model_config(self.attribution_model.info["model_class"])
 
     @unset_hook
     def unhook(self, **kwargs) -> None:
@@ -568,7 +575,8 @@ class FeatureAttribution(Registry):
         Unhooks the attribution method from the model. If the model was modified in any way, this
         should restore its initial state.
         """
-        pass
+        if self.use_model_config and self.attribution_model is not None:
+            self.attribution_model.config = None
 
 
 def list_feature_attribution_methods():

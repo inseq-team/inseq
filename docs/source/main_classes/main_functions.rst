@@ -28,4 +28,6 @@ functionalities required for its usage.
 
 .. autofunction:: register_step_function
 
+.. autofunction:: register_model_config
+
 .. autofunction:: show_attributions

@@ -46,6 +46,7 @@ class GradientAttributionRegistry(FeatureAttribution, Registry):
         Hooks the attribution method to the model by replacing normal :obj:`nn.Embedding` with Captum's
         `InterpretableEmbeddingBase <https://captum.ai/api/utilities.html#captum.attr.InterpretableEmbeddingBase>`__.
         """
+        super().hook(**kwargs)
         if self.attribute_batch_ids and not self.forward_batch_embeds:
             self.target_layer = kwargs.pop("target_layer", self.attribution_model.get_embedding_layer())
             logger.debug(f"target_layer={self.target_layer}")
@@ -59,6 +60,7 @@ class GradientAttributionRegistry(FeatureAttribution, Registry):
         r"""
         Unhook the attribution method by restoring the model's original embeddings.
         """
+        super().hook(**kwargs)
         if self.attribute_batch_ids and not self.forward_batch_embeds:
             self.target_layer = None
         else:

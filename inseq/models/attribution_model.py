@@ -37,6 +37,7 @@ from ..utils.typing import (
     TokenWithId,
     VocabularyEmbeddingsTensor,
 )
+from .model_config import ModelConfig
 from .model_decorators import unhooked
 
 ModelOutput = TypeVar("ModelOutput")
@@ -169,14 +170,15 @@ class AttributionModel(ABC, torch.nn.Module):
         super().__init__()
         if not hasattr(self, "model"):
             self.model = None
-            self.model_name = None
-            self.is_encoder_decoder = True
-        self.pad_token = None
-        self.embed_scale = None
-        self._device = None
-        self.attribution_method = None
-        self.is_hooked = False
-        self._default_attributed_fn_id = "probability"
+            self.model_name: str = None
+            self.is_encoder_decoder: bool = True
+        self.pad_token: Optional[str] = None
+        self.embed_scale: Optional[float] = None
+        self._device: Optional[str] = None
+        self.attribution_method: Optional[FeatureAttribution] = None
+        self.is_hooked: bool = False
+        self._default_attributed_fn_id: str = "probability"
+        self.config: Optional[ModelConfig] = None
 
     @property
     def device(self) -> Optional[str]:

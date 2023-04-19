@@ -2,7 +2,7 @@
 
 from .attr import list_feature_attribution_methods, list_step_functions, register_step_function
 from .data import FeatureAttributionOutput, show_attributions
-from .models import AttributionModel, list_supported_frameworks, load_model
+from .models import AttributionModel, list_supported_frameworks, load_model, register_model_config
 
 
 def get_version() -> str:
@@ -24,4 +24,5 @@ __all__ = [
     "list_step_functions",
     "list_supported_frameworks",
     "register_step_function",
+    "register_model_config",
 ]

@@ -1,5 +1,5 @@
 from .aggregable_mixin import AggregableMixin
-from .basic_attention import AttentionWeights
+from .attention_weights import AttentionWeights
 from .discretized_integrated_gradients import DiscretetizedIntegratedGradients
 from .lime import Lime
 from .monotonic_path_builder import MonotonicPathBuilder
