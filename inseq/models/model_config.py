@@ -44,7 +44,7 @@ def register_model_config(
             The class of the model for which the configuration is registered, used as key in the stored configuration.
             E.g. GPT2LMHeadModel for the GPT-2 model in HuggingFace Transformers.
         config (`dict`):
-            A dictionary containing the configuration for the model. The fields should match those of the 
+            A dictionary containing the configuration for the model. The fields should match those of the
             :class:`~inseq.models.ModelConfig` class.
         overwrite (`bool`, *optional*, defaults to False):
             If `True`, the configuration will be overwritten if it already exists.

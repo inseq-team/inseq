@@ -13,27 +13,32 @@
 # limitations under the License.
 
 import logging
-from typing import Callable, Dict, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Tuple, Union
 
 import torch
 from captum._utils.typing import TensorOrTupleOfTensorsGeneric
 from captum.attr._utils.attribution import Attribution
 from captum.log import log_usage
+from torch import nn
 
 from ....utils import find_block_stack, get_post_variable_assignment_hook
-from ....utils.typing import AllLayersEmbeddingsTensor, EmbeddingsTensor
+from ....utils.typing import EmbeddingsTensor, MultiLayerEmbeddingsTensor
+from .aggregable_mixin import AggregableMixin, AggregationFunction
+
+if TYPE_CHECKING:
+    from ....models import AttributionModel
 
 logger = logging.getLogger(__name__)
 
 
-class ValueZeroing(Attribution):
+class ValueZeroing(Attribution, AggregableMixin):
     SIMILARITY_METRICS = {
-        "cosine_distance": torch.nn.CosineSimilarity(dim=-1),
+        "cosine_distance": nn.CosineSimilarity(dim=-1),
     }
 
     """Value Zeroing method for feature attribution."""
 
-    def __init__(self, forward_func: Callable) -> None:
+    def __init__(self, forward_func: "AttributionModel") -> None:
         super().__init__(forward_func)
         self.clean_hidden_states: Dict[int, EmbeddingsTensor] = {}
         self.corrupted_hidden_states: Dict[int, EmbeddingsTensor] = {}
@@ -52,7 +57,11 @@ class ValueZeroing(Attribution):
         def states_extract_and_patch_forward_hook(module, args, output) -> None:
             device = output[hidden_state_index].device
             self.corrupted_hidden_states[layer] = output[hidden_state_index].clone().detach().cpu()
-            output[hidden_state_index] = self.clean_hidden_states[layer].to(device)
+            output = (
+                output[:hidden_state_index]
+                + (self.clean_hidden_states[layer].to(device),)
+                + output[hidden_state_index + 1 :]
+            )
             return output
 
         return states_extract_and_patch_forward_hook
@@ -67,9 +76,10 @@ class ValueZeroing(Attribution):
         inputs: TensorOrTupleOfTensorsGeneric,
         additional_forward_args: TensorOrTupleOfTensorsGeneric,
         layers: Union[int, Tuple[int, int], List[int], None] = None,
+        aggregate_layers_fn: Union[str, AggregationFunction, None] = None,
         metric: str = "cosine_distance",
-        encoder_hidden_states: Optional[AllLayersEmbeddingsTensor] = None,
-        decoder_hidden_states: Optional[AllLayersEmbeddingsTensor] = None,
+        encoder_hidden_states: Optional[MultiLayerEmbeddingsTensor] = None,
+        decoder_hidden_states: Optional[MultiLayerEmbeddingsTensor] = None,
     ) -> TensorOrTupleOfTensorsGeneric:
         """Perform attribution using the Value Zeroing method.
 
@@ -88,13 +98,15 @@ class ValueZeroing(Attribution):
         Returns:
             `TensorOrTupleOfTensorsGeneric`: Attribution outputs for source-only or source + target feature attribution
         """
-        target_sequence_length = decoder_hidden_states.size(2)
-        num_decoder_layers = decoder_hidden_states.size(0)
-        value_zeroing_scores = torch.zeros(num_decoder_layers, target_sequence_length, target_sequence_length)
-        decoder_stack = find_block_stack(self.forward_func.get_decoder())
+        batch_size = decoder_hidden_states.size(0)
+        num_layers = self._num_layers(decoder_hidden_states)
+        tgt_seq_len = decoder_hidden_states.size(2)
+        decoder_stack: nn.ModuleList = find_block_stack(self.forward_func.get_decoder())
         self.clean_hidden_states = {
-            layer: decoder_hidden_states[layer].clone().detach().cpu() for layer in range(len(decoder_stack))
+            layer: decoder_hidden_states[:, layer, ...].clone().detach().cpu() for layer in range(len(decoder_stack))
         }
+        scores = torch.zeros(batch_size, num_layers, tgt_seq_len, tgt_seq_len)
+
         # Hooks:
         #   1. forward_hook on transformer block is used to hijack "hidden_states" (config var depending on
         #      model) and force original hidden states ("decoder_hidden_states" variable). It also records the
@@ -103,37 +115,47 @@ class ValueZeroing(Attribution):
         #   2. pre_forward_hook to perform the value zeroing by dynamically replacing the intermediate "value"
         #      tensor in the forward (name is config-dependent) with a zeroed version.
         states_extraction_hook_handles = []
-        for block_idx, block in enumerate(decoder_stack, start=1):
+        for block_idx, block in enumerate(decoder_stack):
             states_extract_and_patch_hook = self.get_states_extract_and_patch_hook(block_idx, hidden_state_index=0)
             states_extraction_hook_handles.append(block.register_forward_hook(states_extract_and_patch_hook))
-        for token_idx in range(target_sequence_length):
+
+        for token_idx in range(tgt_seq_len):
             value_zeroing_hook_handles = []
             for block in decoder_stack:
+                attention_module = block.get_submodule(self.forward_func.config.attention_module)
                 value_zeroing_block_hook = get_post_variable_assignment_hook(
-                    block.get_submodule("attn"),
-                    hook_fn=self.get_value_zeroing_hook("value"),
-                    varname="value",
+                    attention_module,
+                    hook_fn=self.get_value_zeroing_hook(self.forward_func.config.value_vector),
+                    varname=self.forward_func.config.value_vector,
                     value_zeroing_index=token_idx,
                 )
-                value_zeroing_hook_handle = block.attn.register_forward_pre_hook(value_zeroing_block_hook)
+                value_zeroing_hook_handle = attention_module.register_forward_pre_hook(value_zeroing_block_hook)
                 value_zeroing_hook_handles.append(value_zeroing_hook_handle)
             with torch.no_grad():
                 self.forward_func(*inputs, *additional_forward_args)
             for handle in value_zeroing_hook_handles:
                 handle.remove()
+            for block_idx in range(len(decoder_stack)):
+                similarity_scores = self.SIMILARITY_METRICS[metric](
+                    self.clean_hidden_states[block_idx], self.corrupted_hidden_states[block_idx]
+                )
+                scores[:, block_idx, :, token_idx] = torch.ones_like(similarity_scores) - similarity_scores
         for handle in states_extraction_hook_handles:
             handle.remove()
-        for clean_hs, corrupt_hs in zip(self.clean_hidden_states.values(), self.corrupted_hidden_states.values()):
-            value_zeroing_scores = self.SIMILARITY_METRICS[metric](clean_hs, corrupt_hs)
-        tot_per_token_score = value_zeroing_scores.sum(dim=-1, keepdim=True)
-        empty_score_mask = torch.all(tot_per_token_score == 0, dim=-1, keepdim=True)
-        value_zeroing_scores = torch.divide(
-            value_zeroing_scores,
-            tot_per_token_score,
-            out=torch.zeros_like(value_zeroing_scores),
-            where=~empty_score_mask,
-        )
-        return value_zeroing_scores
+
+        # Normalize scores to sum to 1
+        per_token_sum_score = scores.sum(dim=-1, keepdim=True)
+        per_token_sum_score[per_token_sum_score == 0] = 1
+        scores = scores / per_token_sum_score
+        # [batch_size, tgt_seq_len, tgt_seq_len]
+        scores = self._aggregate_layers(scores, aggregate_layers_fn, layers)
+        # Since presently Inseq attribution is constrained by the attribution loop over the full generation, the
+        # extraction of value zeroing scores is done inefficiently by picking only the last token scores at every step.
+        # This makes the complexity of calling this method O(n^2), when it could be O(n) if the scores were extracted
+        # only at the final step. Since other methods (e.g. attention) face the same issue, this will be addressed in
+        # future releases.
+        return scores[:, :, -1]
+        # TODO: Add support for encoder-decoder models
         # if is_encoder_decoder:
         #    encoder_hidden_states = torch.stack(outputs.encoder_hidden_states)
         #    encoder = self.forward_func.get_encoder()

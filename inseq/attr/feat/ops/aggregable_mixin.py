@@ -19,15 +19,16 @@ import torch
 
 from ....utils.typing import (
     MultiLayerMultiUnitScoreTensor,
+    MultiLayerScoreTensor,
     MultiUnitScoreTensor,
-    ScoresTensor,
+    ScoreTensor,
 )
 
 logger = logging.getLogger(__name__)
 
 
 class AggregationFunction(Protocol):
-    def __call__(self, attention: MultiUnitScoreTensor, dim: int, **kwargs) -> ScoresTensor:
+    def __call__(self, attention: MultiUnitScoreTensor, dim: int, **kwargs) -> ScoreTensor:
         ...
 
 
@@ -52,7 +53,7 @@ class AggregableMixin:
         return scores.size(1)
 
     @staticmethod
-    def _num_layers(scores: MultiLayerMultiUnitScoreTensor) -> int:
+    def _num_layers(scores: MultiLayerScoreTensor) -> int:
         """Returns the number of layers contained in the scores tensor."""
         return scores.size(1)
 
@@ -62,7 +63,7 @@ class AggregableMixin:
         scores: MultiUnitScoreTensor,
         aggregate_fn: Union[str, AggregationFunction, None] = None,
         units: Union[int, Tuple[int, int], List[int], None] = None,
-    ) -> ScoresTensor:
+    ) -> ScoreTensor:
         """
         Merges the scores values across the specified units for the full sequence.
 
@@ -144,16 +145,15 @@ class AggregableMixin:
     @classmethod
     def _aggregate_layers(
         cls,
-        scores: MultiLayerMultiUnitScoreTensor,
+        scores: Union[MultiLayerMultiUnitScoreTensor, MultiLayerScoreTensor],
         aggregate_fn: Union[str, AggregationFunction, None] = None,
         layers: Union[int, Tuple[int, int], List[int], None] = None,
-    ) -> MultiUnitScoreTensor:
+    ) -> Union[MultiUnitScoreTensor, ScoreTensor]:
         """
         Merges the scores of every unit across the specified layers for the full sequence.
 
         Args:
-            scores (:obj:`torch.Tensor`) Tensor of shape
-                `(batch_size, num_layers, num_units, sequence_length, sequence_length)`
+            scores (:obj:`torch.Tensor`) Tensor of shape `(batch_size, num_layers, ...)`
             aggregate_fn (:obj:`str` or :obj:`callable`): The method to use for aggregating across layers.
                 Can be one of `average` (default if layers is tuple or list), `max`, `min` or `single` (default if
                 layers is int or None), or a custom function defined by the user.
@@ -164,8 +164,7 @@ class AggregableMixin:
                 used by default. Otherwise, all available layers are passed to aggregate_fn by default.
 
         Returns:
-            :obj:`torch.Tensor`: An aggregated scores tensor of shape
-                `(batch_size, num_units, sequence_length, sequence_length)`
+            :obj:`torch.Tensor`: An aggregated scores tensor of shape `(batch_size, ...)`
         """
         n_layers = cls._num_layers(scores)
         aggregate_kwargs = {}

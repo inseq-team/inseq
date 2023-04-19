@@ -1,6 +1,6 @@
 import re
 from inspect import getsourcelines
-from sys import settrace
+from sys import gettrace, settrace
 from typing import Callable, Optional, TypeVar
 
 from torch import nn
@@ -29,7 +29,7 @@ def get_last_variable_assignment_position(
         assignment. Returns None if no assignment to the variable was found.
     """
     # Matches any assignment of variable varname
-    pattern = rf"^\s*(?:\w+\s*,\s*)*\b{varname}\b\s*(?:,.+\s*)*=\s*[^\W=]+$"
+    pattern = rf"^\s*(?:\w+\s*,\s*)*\b{varname}\b\s*(?:,.+\s*)*=\s*[^\W=]+.*$"
     code, startline = getsourcelines(getattr(module, fname))
     line_numbers = [i for i, line in enumerate(code) if re.match(pattern, line)]
     if len(line_numbers) == 0:
@@ -66,7 +66,8 @@ def get_post_variable_assignment_hook(
         The hook function that can be registered with the module. If hooking the module's ``forward()`` method, the
         hook can be registered with Pytorch native hook methods.
     """
-    hook_line_num = get_last_variable_assignment_position(module, varname)
+    hook_line_num = get_last_variable_assignment_position(module, varname, fname)
+    curr_trace_fn = gettrace()
     if hook_line_num is None:
         raise ValueError(f"Could not find assignment to {varname} in {module}'s {fname}() method")
 
@@ -83,10 +84,10 @@ def get_post_variable_assignment_hook(
         ):
             # Call the custom hook providing the current frame and any additional arguments as context
             hook_fn(frame, **kwargs)
-            settrace(None)
+            settrace(curr_trace_fn)
         return var_tracer
 
-    def hook(**kwargs):
+    def hook(*args, **kwargs):
         settrace(var_tracer)
 
     return hook
