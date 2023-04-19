@@ -166,6 +166,8 @@ class AttributionModel(ABC, torch.nn.Module):
         attributed_fn: Union[str, Callable[..., SingleScorePerStepTensor], None] = None,
         device: Optional[str] = None,
         batch_size: Optional[int] = None,
+        generate_from_target_prefix: bool = False,
+        generation_args: Dict[str, Any] = {},
         **kwargs,
     ) -> FeatureAttributionOutput:
         """Perform sequential attribution of input texts for every token in generated texts using the specified method.
@@ -210,6 +212,10 @@ class AttributionModel(ABC, torch.nn.Module):
                 device will be used.
             batch_size (:obj:`int`, `optional`): The batch size to use to dilute the attribution computation over the
                 set of inputs. If no batch size is provided, the full set of input texts will be attributed at once.
+            generate_from_target_prefix (:obj:`bool`, `optional`): Whether the ``generated_texts`` should be used as
+                target prefixes for the generation process. If False, the ``generated_texts`` will be used as full
+                targets. This option is only available for encoder-decoder models, since the same behavior can be
+                achieved by modifying the input texts for decoder-only models. Default: False.
             **kwargs: Additional keyword arguments. These can include keyword arguments for the attribution method, for
                 the generation process or for the attributed function. Generation arguments can be provided explicitly
                 as a dictionary named ``generation_args``.
@@ -223,6 +229,12 @@ class AttributionModel(ABC, torch.nn.Module):
             raise ValueError("At least one text must be provided to perform attribution.")
         if attribute_target and not self.is_encoder_decoder:
             logger.warning("attribute_target parameter is set to True, but will be ignored (not an encoder-decoder).")
+            attribute_target = False
+        if generate_from_target_prefix and not self.is_encoder_decoder:
+            logger.warning(
+                "generate_from_target_prefix parameter is set to True, but will be ignored (not an encoder-decoder)."
+            )
+            generate_from_target_prefix = False
         original_device = self.device
         if device is not None:
             self.device = device
@@ -230,19 +242,19 @@ class AttributionModel(ABC, torch.nn.Module):
         if batch_size is not None:
             n_batches = len(input_texts) // batch_size + ((len(input_texts) % batch_size) > 0)
             logger.info(f"Splitting input texts into {n_batches} batches of size {batch_size}.")
-        constrained_decoding = generated_texts is not None
-        orig_input_texts = input_texts
-        # If constrained decoding is not enabled, we need to generate the
-        # generated texts from the input texts.
-        generation_args = kwargs.pop("generation_args", {})
-        if constrained_decoding and generation_args:
-            logger.warning(
-                f"Generation arguments {generation_args} are provided, but constrained decoding is enabled. "
-                "Generation arguments will be ignored."
-            )
-        if not constrained_decoding:
+        has_generated_texts = generated_texts is not None
+        # If constrained decoding is not enabled, output texts are generated from input texts.
+        if not has_generated_texts or generate_from_target_prefix:
             encoded_input = self.encode(input_texts, return_baseline=True, include_eos_baseline=include_eos_baseline)
+            if generate_from_target_prefix:
+                decoder_input = self.encode(generated_texts, as_targets=True)
+                generation_args["decoder_input_ids"] = decoder_input.input_ids
             generated_texts = self.generate(encoded_input, return_generation_output=False, **generation_args)
+        else:
+            if generation_args:
+                logger.warning(
+                    f"Generation arguments {generation_args} are provided, but will be ignored (constrained decoding)."
+                )
         logger.debug(f"reference_texts={generated_texts}")
         attribution_method = self.get_attribution_method(method, override_default_attribution)
         attributed_fn = self.get_attributed_fn(attributed_fn)
@@ -256,7 +268,7 @@ class AttributionModel(ABC, torch.nn.Module):
             assert all(
                 generated_texts[idx].startswith(input_texts[idx]) for idx in range(len(input_texts))
             ), "Forced generations with decoder-only models must start with the input texts."
-            if constrained_decoding and len(input_texts) > 1:
+            if has_generated_texts and len(input_texts) > 1:
                 logger.info(
                     "Batched constrained decoding is currently not supported for decoder-only models."
                     " Using batch size of 1."
@@ -289,12 +301,13 @@ class AttributionModel(ABC, torch.nn.Module):
             step_scores_args=step_scores_args,
         )
         attribution_output = FeatureAttributionOutput.merge_attributions(attribution_outputs)
-        attribution_output.info["input_texts"] = orig_input_texts
+        attribution_output.info["input_texts"] = input_texts
         attribution_output.info["generated_texts"] = (
             [generated_texts] if isinstance(generated_texts, str) else generated_texts
         )
         attribution_output.info["generation_args"] = generation_args
-        attribution_output.info["constrained_decoding"] = constrained_decoding
+        attribution_output.info["constrained_decoding"] = has_generated_texts
+        attribution_output.info["generate_from_target_prefix"] = generate_from_target_prefix
         if device and original_device:
             self.device = original_device
         return attribution_output
