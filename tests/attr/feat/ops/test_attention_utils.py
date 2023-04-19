@@ -3,9 +3,9 @@ import random
 import torch
 from pytest import mark, skip
 
-from inseq.attr.feat.ops.basic_attention import BaseAttentionAttribution
+from inseq.attr.feat.ops import AggregableMixin
 
-AGGREGATE_FN_OPTIONS = list(BaseAttentionAttribution.AGGREGATE_FN_OPTIONS.keys()) + [None]
+AGGREGATE_FN_OPTIONS = list(AggregableMixin.AGGREGATE_FN_OPTIONS.keys()) + [None]
 
 AGGREGATE_OPTIONS = ["int", "range", "list", "none"]
 
@@ -23,7 +23,7 @@ def test_layer_aggregation(aggr_method: str, aggr_layers: str) -> None:
     for _ in range(max_layer):
         attention = torch.rand(size=shape, dtype=torch.float)
         layerAttention = layerAttention + (attention,)
-    layerAttention = torch.stack(layerAttention, dim=0)
+    layerAttention = torch.stack(layerAttention, dim=1)
 
     if aggr_method == "single":
         if aggr_layers != "int" and aggr_layers != "none":
@@ -40,7 +40,7 @@ def test_layer_aggregation(aggr_method: str, aggr_layers: str) -> None:
     elif aggr_layers == "none":
         layers = None
 
-    layer_aggr_attention = BaseAttentionAttribution._aggregate_layers(layerAttention, aggr_method, layers)
+    layer_aggr_attention = AggregableMixin._aggregate_layers(layerAttention, aggr_method, layers)
 
     assert layer_aggr_attention.shape == shape
 
@@ -72,6 +72,6 @@ def test_head_aggregation(aggr_method: str, aggr_heads: str) -> None:
     elif aggr_heads == "none":
         heads = None
 
-    head_aggr_attention = BaseAttentionAttribution._aggregate_attention_heads(attention, aggr_method, heads)
+    head_aggr_attention = AggregableMixin._aggregate_units(attention, aggr_method, heads)
 
     assert head_aggr_attention.shape == out_shape

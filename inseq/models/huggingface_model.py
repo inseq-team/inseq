@@ -18,11 +18,11 @@ from transformers.modeling_outputs import CausalLMOutput, ModelOutput, Seq2SeqLM
 from ..data import BatchEncoding
 from ..utils import check_device
 from ..utils.typing import (
-    AllLayersEmbeddingsTensor,
-    AllLayersMultiHeadAttentionTensor,
     EmbeddingsTensor,
     IdsTensor,
     LogitsTensor,
+    MultiLayerEmbeddingsTensor,
+    MultiLayerMultiUnitScoreTensor,
     OneOrMoreIdSequences,
     OneOrMoreTokenSequences,
     TextInput,
@@ -390,17 +390,17 @@ class HuggingfaceEncoderDecoderModel(HuggingfaceModel, EncoderDecoderAttribution
     @staticmethod
     def get_attentions_dict(
         output: Seq2SeqLMOutput,
-    ) -> Dict[str, AllLayersMultiHeadAttentionTensor]:
+    ) -> Dict[str, MultiLayerMultiUnitScoreTensor]:
         return {
-            "decoder_self_attentions": torch.stack(output.decoder_attentions, dim=0),
-            "cross_attentions": torch.stack(output.cross_attentions, dim=0),
+            "decoder_self_attentions": torch.stack(output.decoder_attentions, dim=1),
+            "cross_attentions": torch.stack(output.cross_attentions, dim=1),
         }
 
     @staticmethod
-    def get_hidden_states_dict(output: Seq2SeqLMOutput) -> Dict[str, AllLayersEmbeddingsTensor]:
+    def get_hidden_states_dict(output: Seq2SeqLMOutput) -> Dict[str, MultiLayerEmbeddingsTensor]:
         return {
-            "encoder_hidden_states": torch.stack(output.encoder_hidden_states, dim=0),
-            "decoder_hidden_states": torch.stack(output.decoder_hidden_states, dim=0),
+            "encoder_hidden_states": torch.stack(output.encoder_hidden_states, dim=1),
+            "decoder_hidden_states": torch.stack(output.decoder_hidden_states, dim=1),
         }
 
 
@@ -435,13 +435,13 @@ class HuggingfaceDecoderOnlyModel(HuggingfaceModel, DecoderOnlyAttributionModel)
             self.embed_scale = self.model.embed_scale
 
     @staticmethod
-    def get_attentions_dict(output: CausalLMOutput) -> Dict[str, AllLayersMultiHeadAttentionTensor]:
+    def get_attentions_dict(output: CausalLMOutput) -> Dict[str, MultiLayerMultiUnitScoreTensor]:
         return {
-            "decoder_self_attentions": torch.stack(output.attentions, dim=0),
+            "decoder_self_attentions": torch.stack(output.attentions, dim=1),
         }
 
     @staticmethod
-    def get_hidden_states_dict(output: CausalLMOutput) -> Dict[str, AllLayersEmbeddingsTensor]:
+    def get_hidden_states_dict(output: CausalLMOutput) -> Dict[str, MultiLayerEmbeddingsTensor]:
         return {
-            "decoder_hidden_states": torch.stack(output.hidden_states, dim=0),
+            "decoder_hidden_states": torch.stack(output.hidden_states, dim=1),
         }
