@@ -18,7 +18,7 @@ Todo:
 """
 import logging
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Union
 
 import torch
 from torchtyping import TensorType
@@ -160,7 +160,7 @@ class FeatureAttribution(Registry):
     @batched
     def prepare_and_attribute(
         self,
-        sources: Sequence[str],
+        sources: FeatureAttributionInput,
         targets: FeatureAttributionInput,
         attr_pos_start: Optional[int] = None,
         attr_pos_end: Optional[int] = None,
@@ -182,9 +182,9 @@ class FeatureAttribution(Registry):
         and the :meth:`~inseq.models.InputFormatter.prepare_inputs_for_attribution` method.
 
         Args:
-            sources (:obj:`list(str)`): The sources provided to the
+            sources (:obj:`FeatureAttributionInput`): The sources provided to the
                 :meth:`~inseq.attr.feat.FeatureAttribution.prepare` method.
-            targets (:obj:`FeatureAttributionInput): The targets provided to the
+            targets (:obj:`FeatureAttributionInput`): The targets provided to the
                 :meth:`~inseq.attr.feat.FeatureAttribution.prepare` method.
             attr_pos_start (:obj:`int`, `optional`): The initial position for performing
                 sequence attribution. Defaults to 0.
