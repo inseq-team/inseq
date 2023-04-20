@@ -95,7 +95,7 @@ class ValueZeroing(Attribution, AggregableMixin):
 
         def states_extract_and_patch_forward_hook(module, args, output) -> None:
             self.corrupted_block_output_states[block_idx] = output[hidden_state_idx].clone().detach().cpu()
-            
+
             # Rebuild the output tuple patching the clean states at the place of the corrupted ones
             output = (
                 output[:hidden_state_idx]
@@ -152,10 +152,10 @@ class ValueZeroing(Attribution, AggregableMixin):
         tgt_seq_len = decoder_hidden_states.size(2)
         decoder_stack: nn.ModuleList = find_block_stack(self.forward_func.get_decoder())
 
-        # Store clean hidden states for later use. We use idx + 1 since the first element of the decoder stack is the 
+        # Store clean hidden states for later use. We use idx + 1 since the first element of the decoder stack is the
         # embedding layer, and we are only interested in the transformer blocks outputs.
         self.clean_block_output_states = {
-            idx: decoder_hidden_states[:, idx+1, ...].clone().detach().cpu() for idx, _ in enumerate(decoder_stack)
+            idx: decoder_hidden_states[:, idx + 1, ...].clone().detach().cpu() for idx, _ in enumerate(decoder_stack)
         }
         scores = torch.zeros(batch_size, len(decoder_stack), tgt_seq_len, tgt_seq_len)
 
@@ -209,7 +209,7 @@ class ValueZeroing(Attribution, AggregableMixin):
         # Aggregate scores across layers to obtain final attribution scores
         # Aggregation output has shape: [batch_size, tgt_seq_len, tgt_seq_len]
         scores = self._aggregate_layers(scores, aggregate_layers_fn, layers)
-        
+
         # Since presently Inseq attribution is constrained by the attribution loop over the full generation, the
         # extraction of value zeroing scores is done inefficiently by picking only the last token scores at every step.
         # This makes the complexity of calling this method O(n^2), when it could be O(n) if the scores were extracted
