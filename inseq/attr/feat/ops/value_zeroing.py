@@ -51,9 +51,9 @@ class ValueZeroing(Attribution, AggregableMixin):
             produced with and without the zeroing operation. Converted to distances as 1 - produced values.
         forward_func (:obj:`AttributionModel`):
             The attribution model to be used for value zeroing.
-        clean_hidden_states (:obj:`Dict[int, torch.Tensor]`):
+        clean_block_output_states (:obj:`Dict[int, torch.Tensor]`):
             Dictionary to store the hidden states produced by the model without the zeroing operation.
-        corrupted_hidden_states (:obj:`Dict[int, torch.Tensor]`):
+        corrupted_block_output_states (:obj:`Dict[int, torch.Tensor]`):
             Dictionary to store the hidden states produced by the model with the zeroing operation.
     """
 
@@ -63,8 +63,8 @@ class ValueZeroing(Attribution, AggregableMixin):
 
     def __init__(self, forward_func: "AttributionModel") -> None:
         super().__init__(forward_func)
-        self.clean_hidden_states: Dict[int, EmbeddingsTensor] = {}
-        self.corrupted_hidden_states: Dict[int, EmbeddingsTensor] = {}
+        self.clean_block_output_states: Dict[int, EmbeddingsTensor] = {}
+        self.corrupted_block_output_states: Dict[int, EmbeddingsTensor] = {}
 
     @staticmethod
     def get_value_zeroing_hook(varname: str = "value") -> Callable[..., None]:
@@ -84,22 +84,23 @@ class ValueZeroing(Attribution, AggregableMixin):
 
         return value_zeroing_forward_mid_hook
 
-    def get_states_extract_and_patch_hook(self, layer: int, hidden_state_index: int = 0) -> Callable[..., None]:
+    def get_states_extract_and_patch_hook(self, block_idx: int, hidden_state_idx: int = 0) -> Callable[..., None]:
         """Returns a hook to extract the produced hidden states (corrupted by value zeroing)
           and patch them with pre-computed clean states that will be passed onwards in the model forward.
 
         Args:
-            layer (:obj:`int`): The layer at which the hook is applied. Used to store the extracted states.
-            hidden_state_index (:obj:`int`, optional): The index of the hidden state in the model output tuple.
+            block_idx (:obj:`int`): The idx of the block at which the hook is applied, used to store extracted states.
+            hidden_state_idx (:obj:`int`, optional): The index of the hidden state in the model output tuple.
         """
 
         def states_extract_and_patch_forward_hook(module, args, output) -> None:
-            device = output[hidden_state_index].device
-            self.corrupted_hidden_states[layer] = output[hidden_state_index].clone().detach().cpu()
+            self.corrupted_block_output_states[block_idx] = output[hidden_state_idx].clone().detach().cpu()
+            
+            # Rebuild the output tuple patching the clean states at the place of the corrupted ones
             output = (
-                output[:hidden_state_index]
-                + (self.clean_hidden_states[layer].to(device),)
-                + output[hidden_state_index + 1 :]
+                output[:hidden_state_idx]
+                + (self.clean_block_output_states[block_idx].to(output[hidden_state_idx].device),)
+                + output[hidden_state_idx + 1 :]
             )
             return output
 
@@ -136,7 +137,7 @@ class ValueZeroing(Attribution, AggregableMixin):
             encoder_hidden_states (:obj:`torch.Tensor`, optional): A tensor of shape ``[batch_size, num_layers,
                 source_seq_len, hidden_size]`` containing hidden states of the encoder. Available only for
                 encoder-decoders models. Default: None.
-            decoder_hidden_states (:obj:`torch.Tensor`, optional): A tensor of shape ``[batch_size, num_layers
+            decoder_hidden_states (:obj:`torch.Tensor`, optional): A tensor of shape ``[batch_size, num_layers + 1,
                 target_seq_len, hidden_size]`` containing hidden states of the decoder.
 
         Returns:
@@ -148,14 +149,15 @@ class ValueZeroing(Attribution, AggregableMixin):
                 f"Available metrics: {','.join(self.SIMILARITY_METRICS.keys())}"
             )
         batch_size = decoder_hidden_states.size(0)
-        num_layers = self._num_layers(decoder_hidden_states)
         tgt_seq_len = decoder_hidden_states.size(2)
         decoder_stack: nn.ModuleList = find_block_stack(self.forward_func.get_decoder())
-        # Store clean hidden states for later use
-        self.clean_hidden_states = {
-            layer: decoder_hidden_states[:, layer, ...].clone().detach().cpu() for layer in range(len(decoder_stack))
+
+        # Store clean hidden states for later use. We use idx + 1 since the first element of the decoder stack is the 
+        # embedding layer, and we are only interested in the transformer blocks outputs.
+        self.clean_block_output_states = {
+            idx: decoder_hidden_states[:, idx+1, ...].clone().detach().cpu() for idx, _ in enumerate(decoder_stack)
         }
-        scores = torch.zeros(batch_size, num_layers, tgt_seq_len, tgt_seq_len)
+        scores = torch.zeros(batch_size, len(decoder_stack), tgt_seq_len, tgt_seq_len)
 
         # Hooks:
         #   1. states_extract_and_patch_hook on the transformer block stores corrupted states and force clean states
@@ -167,7 +169,7 @@ class ValueZeroing(Attribution, AggregableMixin):
         # State extraction hooks can be registered only once since they are token-independent
         states_extraction_hook_handles = []
         for block_idx, block in enumerate(decoder_stack):
-            states_extract_and_patch_hook = self.get_states_extract_and_patch_hook(block_idx, hidden_state_index=0)
+            states_extract_and_patch_hook = self.get_states_extract_and_patch_hook(block_idx, hidden_state_idx=0)
             states_extraction_hook_handles.append(block.register_forward_hook(states_extract_and_patch_hook))
 
         # Zeroing is done for every token in the target sequence separately (O(n) complexity)
@@ -184,6 +186,7 @@ class ValueZeroing(Attribution, AggregableMixin):
                 )
                 value_zeroing_hook_handle = attention_module.register_forward_pre_hook(value_zeroing_block_hook)
                 value_zeroing_hook_handles.append(value_zeroing_hook_handle)
+
             # Run forward pass with hooks. Fills self.corrupted_hidden_states with corrupted states across layers
             # when zeroing the specified token index.
             with torch.no_grad():
@@ -192,7 +195,7 @@ class ValueZeroing(Attribution, AggregableMixin):
                 handle.remove()
             for block_idx in range(len(decoder_stack)):
                 similarity_scores = self.SIMILARITY_METRICS[similarity_metric](
-                    self.clean_hidden_states[block_idx], self.corrupted_hidden_states[block_idx]
+                    self.clean_block_output_states[block_idx], self.corrupted_block_output_states[block_idx]
                 )
                 scores[:, block_idx, :, token_idx] = torch.ones_like(similarity_scores) - similarity_scores
         for handle in states_extraction_hook_handles:
@@ -202,9 +205,11 @@ class ValueZeroing(Attribution, AggregableMixin):
         per_token_sum_score = scores.sum(dim=-1, keepdim=True)
         per_token_sum_score[per_token_sum_score == 0] = 1
         scores = scores / per_token_sum_score
+
         # Aggregate scores across layers to obtain final attribution scores
         # Aggregation output has shape: [batch_size, tgt_seq_len, tgt_seq_len]
         scores = self._aggregate_layers(scores, aggregate_layers_fn, layers)
+        
         # Since presently Inseq attribution is constrained by the attribution loop over the full generation, the
         # extraction of value zeroing scores is done inefficiently by picking only the last token scores at every step.
         # This makes the complexity of calling this method O(n^2), when it could be O(n) if the scores were extracted
