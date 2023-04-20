@@ -72,4 +72,4 @@ def register_model_config(
         )
     if allow_partial:
         config = {**{field: None for field in diff}, **config}
-    MODEL_CONFIGS[model_type] = config
+    MODEL_CONFIGS[model_type] = ModelConfig(**config)

@@ -118,7 +118,7 @@ class ValueZeroingAttribution(PerturbationAttributionRegistry):
     method_name = "value_zeroing"
 
     def __init__(self, attribution_model, **kwargs):
-        super().__init__(attribution_model)
+        super().__init__(attribution_model, hook_to_model=False)
         # Hidden states will be passed to the attribute_step method
         self.use_hidden_states = True
         # Does not rely on predicted output (i.e. decoding strategy agnostic)
@@ -126,3 +126,4 @@ class ValueZeroingAttribution(PerturbationAttributionRegistry):
         # Uses model configuration to access attention module and value vector variable
         self.use_model_config = True
         self.method = ValueZeroing(attribution_model)
+        self.hook(**kwargs)

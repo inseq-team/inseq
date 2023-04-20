@@ -5,7 +5,7 @@ from typing import Any, Callable, Dict, List, Optional, Protocol, Tuple, TypeVar
 
 import torch
 
-from ..attr import STEP_SCORES_MAP
+from ..attr import STEP_SCORES_MAP, get_step_function_reserved_args
 from ..attr.feat import FeatureAttribution, extract_args, join_token_ids
 from ..data import (
     BatchEncoding,
@@ -150,20 +150,6 @@ class AttributionModel(ABC, torch.nn.Module):
         is_hooked (:obj:`bool`): Whether the model is currently hooked by the attribution method.
         default_attributed_fn_id (:obj:`str`): The id for the default step function used as attribution target.
     """
-
-    # Default arguments for custom attributed functions
-    # in the AttributionModel.forward method.
-    _DEFAULT_ATTRIBUTED_FN_ARGS = [
-        "attribution_model",
-        "forward_output",
-        "encoder_input_ids",
-        "decoder_input_ids",
-        "encoder_input_embeds",
-        "decoder_input_embeds",
-        "target_ids",
-        "encoder_attention_mask",
-        "decoder_attention_mask",
-    ]
 
     formatter = InputFormatter
 
@@ -362,7 +348,7 @@ class AttributionModel(ABC, torch.nn.Module):
         attribution_method = self.get_attribution_method(method, override_default_attribution)
         attributed_fn = self.get_attributed_fn(attributed_fn)
         attribution_args, attributed_fn_args, step_scores_args = extract_args(
-            attribution_method, attributed_fn, step_scores, default_args=self._DEFAULT_ATTRIBUTED_FN_ARGS, **kwargs
+            attribution_method, attributed_fn, step_scores, default_args=get_step_function_reserved_args(), **kwargs
         )
         if isnotebook():
             logger.debug("Pretty progress currently not supported in notebooks, falling back to tqdm.")

@@ -1,4 +1,5 @@
 import logging
+from inspect import getfullargspec
 from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Protocol, Union
 
 import torch
@@ -29,6 +30,10 @@ class StepScoreFunction(Protocol):
         **kwargs,
     ) -> SingleScorePerStepTensor:
         ...
+
+
+def get_step_function_reserved_args() -> List[str]:
+    return getfullargspec(StepScoreFunction.__call__).args
 
 
 def logit_fn(

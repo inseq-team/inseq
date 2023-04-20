@@ -1,3 +1,46 @@
 GPT2LMHeadModel:
     attention_module: "attn"
     value_vector: "value"
+OpenAIGPTLMHeadModel:
+    attention_module: "attn"
+    value_vector: "value"
+GPTNeoXForCausalLM:
+    attention_module: "attention"
+    value_vector: "value"
+BloomForCausalLM:
+    attention_module: "self_attention"
+    value_vector: "value_layer"
+LlamaForCausalLM:
+    attention_module: "self_attn"
+    value_vector: "value_states"
+GPTBigCodeForCausalLM:
+    attention_module: "attn"
+    value_vector: "value"
+CodeGenForCausalLM:
+    attention_module: "attn"
+    value_vector: "value"
+
+# TODO ForCausalLM
+# GPTNeoForCausalLM
+# GPTJForCausalLM
+# OPTForCausalLM
+# XGLMForCausalLM
+# BioGptForCausalLM
+# XLNetLMHeadModel
+ 
+# TODO ForConditionalGeneration
+# BartForConditionalGeneration
+# BlenderbotForConditionalGeneration
+# T5ForConditionalGeneration
+# MarianMTModel
+# LongT5ForConditionalGeneration
+# FSMTForConditionalGeneration
+# M2M100ForConditionalGeneration
+# MBartForConditionalGeneration
+# PegasusForConditionalGeneration
+# ProphetNetForConditionalGeneration
+# LEDForConditionalGeneration
+# BigBirdPegasusForConditionalGeneration
+# PLBartForConditionalGeneration
+# SwitchTransformerForConditionalGeneration
+# NllbMoeForConditionalGeneration
