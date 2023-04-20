@@ -134,7 +134,7 @@ class ValueZeroing(Attribution, AggregableMixin):
                 layers is int or None), or a custom function defined by the user.
             metric (:obj:`str`, optional): The similarity metric to use for computing the distance between hidden
                 states produced with and without the zeroing operation. Default: cosine.
-            encoder_hidden_states (:obj:`torch.Tensor`, optional): A tensor of shape ``[batch_size, num_layers,
+            encoder_hidden_states (:obj:`torch.Tensor`, optional): A tensor of shape ``[batch_size, num_layers + 1,
                 source_seq_len, hidden_size]`` containing hidden states of the encoder. Available only for
                 encoder-decoders models. Default: None.
             decoder_hidden_states (:obj:`torch.Tensor`, optional): A tensor of shape ``[batch_size, num_layers + 1,
@@ -162,15 +162,18 @@ class ValueZeroing(Attribution, AggregableMixin):
         # Hooks:
         #   1. states_extract_and_patch_hook on the transformer block stores corrupted states and force clean states
         #      as the output of the block forward pass, i.e. the zeroing is done independently across layers.
-        #   2. value_zeroing_block_hook on the attention module performs the value zeroing by dynamically replacing
-        #      the intermediate "value" tensor in the forward (name is config-dependent) with a zeroed version for the
-        #      specified token index.
+        #   2. value_zeroing_hook on the attention module performs the value zeroing by replacing the "value" tensor
+        #      during the forward (name is config-dependent) with a zeroed version for the specified token index.
         #
         # State extraction hooks can be registered only once since they are token-independent
+        # Skip last block since its states are not used raw, but may have further transformations applied to them
+        # (e.g. LayerNorm, Dropout). These are extracted separately from the model outputs.
         states_extraction_hook_handles = []
-        for block_idx, block in enumerate(decoder_stack):
+        for block_idx in range(len(decoder_stack) - 1):
             states_extract_and_patch_hook = self.get_states_extract_and_patch_hook(block_idx, hidden_state_idx=0)
-            states_extraction_hook_handles.append(block.register_forward_hook(states_extract_and_patch_hook))
+            states_extraction_hook_handles.append(
+                decoder_stack[block_idx].register_forward_hook(states_extract_and_patch_hook)
+            )
 
         # Zeroing is done for every token in the target sequence separately (O(n) complexity)
         for token_idx in range(tgt_seq_len):
@@ -178,19 +181,27 @@ class ValueZeroing(Attribution, AggregableMixin):
             # Value zeroing hooks are registered for every token separately since they are token-dependent
             for block in decoder_stack:
                 attention_module = block.get_submodule(self.forward_func.config.attention_module)
-                value_zeroing_block_hook = get_post_variable_assignment_hook(
+                value_zeroing_hook = get_post_variable_assignment_hook(
                     attention_module,
                     hook_fn=self.get_value_zeroing_hook(self.forward_func.config.value_vector),
                     varname=self.forward_func.config.value_vector,
                     value_zeroing_index=token_idx,
                 )
-                value_zeroing_hook_handle = attention_module.register_forward_pre_hook(value_zeroing_block_hook)
+                value_zeroing_hook_handle = attention_module.register_forward_pre_hook(value_zeroing_hook)
                 value_zeroing_hook_handles.append(value_zeroing_hook_handle)
 
             # Run forward pass with hooks. Fills self.corrupted_hidden_states with corrupted states across layers
             # when zeroing the specified token index.
             with torch.no_grad():
-                self.forward_func(*inputs, *additional_forward_args)
+                output = self.forward_func.forward_with_output(
+                    *inputs, *additional_forward_args, output_hidden_states=True
+                )
+                # Extract last layer states directly from the model outputs
+                corrupted_states_dict = self.forward_func.get_hidden_states_dict(output)
+                corrupted_decoder_last_hidden_state = (
+                    corrupted_states_dict["decoder_hidden_states"][:, -1, ...].clone().detach().cpu()
+                )
+                self.corrupted_block_output_states[len(decoder_stack) - 1] = corrupted_decoder_last_hidden_state
             for handle in value_zeroing_hook_handles:
                 handle.remove()
             for block_idx in range(len(decoder_stack)):

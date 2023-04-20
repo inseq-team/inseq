@@ -41,6 +41,7 @@ from .model_config import ModelConfig
 from .model_decorators import unhooked
 
 ModelOutput = TypeVar("ModelOutput")
+CustomForwardOutput = TypeVar("CustomForwardOutput")
 
 
 logger = logging.getLogger(__name__)
@@ -55,7 +56,7 @@ class ForwardMethod(Protocol):
         use_embeddings: bool,
         attributed_fn_argnames: Optional[List[str]],
         *args,
-    ) -> LogitsTensor:
+    ) -> CustomForwardOutput:
         ...
 
 
@@ -109,9 +110,9 @@ class InputFormatter:
         raise NotImplementedError()
 
     @staticmethod
-    def format_forward_args(forward: ForwardMethod) -> Callable[..., LogitsTensor]:
+    def format_forward_args(forward: ForwardMethod) -> Callable[..., CustomForwardOutput]:
         @wraps(forward)
-        def formatted_forward_input_wrapper(self, *args, **kwargs):
+        def formatted_forward_input_wrapper(self, *args, **kwargs) -> CustomForwardOutput:
             raise NotImplementedError()
 
         return formatted_forward_input_wrapper
@@ -568,10 +569,11 @@ class AttributionModel(ABC, torch.nn.Module):
         use_embeddings: bool = True,
         attributed_fn_argnames: Optional[List[str]] = None,
         *args,
+        **kwargs,
     ) -> LogitsTensor:
         assert len(args) == len(attributed_fn_argnames), "Number of arguments and number of argnames must match"
         target_ids = target_ids.squeeze(-1)
-        output = self.get_forward_output(batch, use_embeddings=use_embeddings)
+        output = self.get_forward_output(batch, use_embeddings=use_embeddings, **kwargs)
         logger.debug(f"logits: {pretty_tensor(output.logits)}")
         step_function_args = self.formatter.format_step_function_args(
             attribution_model=self,
@@ -582,6 +584,19 @@ class AttributionModel(ABC, torch.nn.Module):
         )
         return attributed_fn(**step_function_args)
 
+    def _forward_with_output(
+        self,
+        batch: Union[DecoderOnlyBatch, EncoderDecoderBatch],
+        use_embeddings: bool = True,
+        *args,
+        **kwargs,
+    ) -> ModelOutput:
+        return self.get_forward_output(batch, use_embeddings=use_embeddings, **kwargs)
+
     @formatter.format_forward_args
     def forward(self, *args, **kwargs) -> LogitsTensor:
         return self._forward(*args, **kwargs)
+
+    @formatter.format_forward_args
+    def forward_with_output(self, *args, **kwargs) -> ModelOutput:
+        return self._forward_with_output(*args, **kwargs)

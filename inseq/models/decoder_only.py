@@ -1,6 +1,6 @@
 import logging
 from functools import wraps
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, TypeVar, Union
 
 import torch
 
@@ -26,6 +26,8 @@ from ..utils.typing import (
     TokenWithId,
 )
 from .attribution_model import AttributionModel, ForwardMethod, InputFormatter, ModelOutput
+
+CustomForwardOutput = TypeVar("CustomForwardOutput")
 
 logger = logging.getLogger(__name__)
 
@@ -165,8 +167,8 @@ class DecoderOnlyInputFormatter(InputFormatter):
         return DecoderOnlyBatch(encoding, embedding)
 
     @staticmethod
-    def format_forward_args(forward: ForwardMethod) -> Callable[..., LogitsTensor]:
-        @wraps(forward)
+    def format_forward_args(forward_fn: ForwardMethod) -> Callable[..., CustomForwardOutput]:
+        @wraps(forward_fn)
         def formatted_forward_input_wrapper(
             self: "DecoderOnlyAttributionModel",
             forward_tensor: AttributionForwardInputs,
@@ -177,13 +179,16 @@ class DecoderOnlyInputFormatter(InputFormatter):
             use_embeddings: bool = True,
             attributed_fn_argnames: Optional[List[str]] = None,
             *args,
-        ) -> LogitsTensor:
+            **kwargs,
+        ) -> CustomForwardOutput:
             batch = self.formatter.convert_args_to_batch(
                 input_ids=input_ids,
                 attention_mask=attention_mask,
                 input_embeds=forward_tensor if use_embeddings else None,
             )
-            return self._forward(batch, target_ids, attributed_fn, use_embeddings, attributed_fn_argnames, *args)
+            return forward_fn(
+                self, batch, target_ids, attributed_fn, use_embeddings, attributed_fn_argnames, *args, **kwargs
+            )
 
         return formatted_forward_input_wrapper
 
@@ -216,6 +221,10 @@ class DecoderOnlyAttributionModel(AttributionModel):
     @formatter.format_forward_args
     def forward(self, *args, **kwargs) -> LogitsTensor:
         return self._forward(*args, **kwargs)
+
+    @formatter.format_forward_args
+    def forward_with_output(self, *args, **kwargs) -> ModelOutput:
+        return self._forward_with_output(*args, **kwargs)
 
     def get_encoder(self) -> torch.nn.Module:
         raise NotImplementedError("Decoder-only models do not have an encoder.")
