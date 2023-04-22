@@ -23,12 +23,17 @@ from ....utils.typing import (
     MultiUnitScoreTensor,
     ScoreTensor,
 )
+from .rollout import rollout
 
 logger = logging.getLogger(__name__)
 
 
 class AggregationFunction(Protocol):
-    def __call__(self, attention: MultiUnitScoreTensor, dim: int, **kwargs) -> ScoreTensor:
+    def __call__(
+        self,
+        scores: Union[MultiUnitScoreTensor, Tuple[MultiUnitScoreTensor, MultiUnitScoreTensor, MultiUnitScoreTensor]],
+        **kwargs,
+    ) -> ScoreTensor:
         ...
 
 
@@ -41,10 +46,11 @@ class AggregableMixin:
         return "unit"
 
     AGGREGATE_FN_OPTIONS: Dict[str, AggregationFunction] = {
-        "average": lambda x, dim: x.mean(dim),
-        "max": lambda x, dim: x.max(dim)[0],
-        "min": lambda x, dim: x.min(dim)[0],
-        "single": lambda x, dim, idx: x.select(dim, idx),
+        "average": lambda scores, dim: scores.mean(dim),
+        "max": lambda scores, dim: scores.max(dim)[0],
+        "min": lambda scores, dim: scores.min(dim)[0],
+        "single": lambda scores, dim, idx: scores.select(dim, idx),
+        "rollout": lambda scores, _, add_residual=False: rollout(scores, add_residual),
     }
 
     @staticmethod
