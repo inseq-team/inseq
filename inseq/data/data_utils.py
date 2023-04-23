@@ -179,7 +179,7 @@ class TensorWrapper:
         return f"{self.__class__.__name__}({pretty_dict(self.to_dict())})"
 
     def __repr__(self):
-        return self.__dict__
+        return f"{self.__class__.__name__}({pretty_dict(self.__dict__)})"
 
     def __eq__(self, other):
         equals = {field: self._eq(val, getattr(other, field)) for field, val in self.__dict__.items()}

@@ -27,8 +27,8 @@ from ..utils.typing import (
     TextInput,
     TokenWithId,
 )
-from .aggregation_functions import DEFAULT_ATTRIBUTION_AGGREGATE_DICT, get_aggregation_fns_from_ids
-from .aggregator import AggregableMixin, Aggregator, AggregatorPipeline, SequenceAttributionAggregator
+from .aggregation_functions import DEFAULT_ATTRIBUTION_AGGREGATE_DICT
+from .aggregator import AggregableMixin, Aggregator, AggregatorPipeline
 from .batch import Batch, BatchEncoding, DecoderOnlyBatch, EncoderDecoderBatch
 from .data_utils import TensorWrapper
 
@@ -68,16 +68,17 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
     sequence_scores: Optional[Dict[str, MultipleScoresPerSequenceTensor]] = None
     attr_pos_start: int = 0
     attr_pos_end: Optional[int] = None
-    _aggregator: Union[AggregatorPipeline, Type[Aggregator]] = None
-    _dict_aggregate_fn: Dict[str, Any] = None
+    _aggregator: Union[str, List[str], None] = None
+    _dict_aggregate_fn: Optional[Dict[str, str]] = None
 
     def __post_init__(self):
-        aggregate_dict = DEFAULT_ATTRIBUTION_AGGREGATE_DICT
-        if isinstance(self._dict_aggregate_fn, dict):
-            aggregate_dict.update(self._dict_aggregate_fn)
-        self._dict_aggregate_fn = get_aggregation_fns_from_ids(aggregate_dict)
+        if self._dict_aggregate_fn is None:
+            self._dict_aggregate_fn = {}
+        default_aggregate_fn = DEFAULT_ATTRIBUTION_AGGREGATE_DICT
+        default_aggregate_fn.update(self._dict_aggregate_fn)
+        self._dict_aggregate_fn = default_aggregate_fn
         if self._aggregator is None:
-            self._aggregator = SequenceAttributionAggregator
+            self._aggregator = "scores"
         if self.attr_pos_end is None or self.attr_pos_end > len(self.target):
             self.attr_pos_end = len(self.target)
 
@@ -258,7 +259,8 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
         if self.target_attributions is not None:
             target_attr = aggregated_attr.target_attributions.float().T
             self.target_attributions = (step_scores * target_attr).T
-        self._aggregator = AggregatorPipeline([])
+        # Empty aggregator pipeline -> no aggregation
+        self._aggregator = []
         return self
 
     def get_scores_dicts(

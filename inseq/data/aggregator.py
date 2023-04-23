@@ -172,7 +172,7 @@ class AggregableMixin(ABC):
         """
         if aggregator is None:
             aggregator = self._aggregator
-        elif isinstance(aggregator, str):
+        if isinstance(aggregator, str):
             aggregator = Aggregator.available_classes()[aggregator]
         elif isinstance(aggregator, (list, tuple)):
             aggregator = AggregatorPipeline(aggregator, kwargs.pop("aggregate_functions", None))
