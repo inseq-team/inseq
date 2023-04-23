@@ -9,6 +9,19 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class ModelConfig:
+    """Configuration used by the methods for which the attribute ``use_model_config=True``.
+
+    Args:
+        attention_module (:obj:`str`):
+            The name of the module performing the attention computation (e.g.``attn`` for the GPT-2 model in
+            transformers). Can be identified by looking at the name of the attribute instantiating the attention module
+            in the model's transformer block class (e.g. :obj:`transformers.models.gpt2.GPT2Block` for GPT-2).
+        value_vector (:obj:`str`):
+            The name of the variable in the forward pass of the attention module containing the value vector
+            (e.g. ``value`` for the GPT-2 model in transformers). Can be identified by looking at the forward pass of
+            the attention module (e.g. :obj:`transformers.models.gpt2.modeling_gpt2.GPT2Attention.forward` for GPT-2).
+    """
+
     attention_module: str
     value_vector: str
 

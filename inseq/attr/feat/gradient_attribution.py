@@ -27,7 +27,7 @@ from captum.attr import (
     Saliency,
 )
 
-from ...data import GradientFeatureAttributionStepOutput
+from ...data import GranularFeatureAttributionStepOutput
 from ...utils import Registry, extract_signature_args, rgetattr
 from ..attribution_decorators import set_hook, unset_hook
 from .attribution_utils import get_source_target_attributions
@@ -70,7 +70,7 @@ class GradientAttributionRegistry(FeatureAttribution, Registry):
         self,
         attribute_fn_main_args: Dict[str, Any],
         attribution_args: Dict[str, Any] = {},
-    ) -> GradientFeatureAttributionStepOutput:
+    ) -> GranularFeatureAttributionStepOutput:
         r"""
         Performs a single attribution step for the specified attribution arguments.
 
@@ -81,7 +81,7 @@ class GradientAttributionRegistry(FeatureAttribution, Registry):
                 These can be specified by the user while calling the top level `attribute` methods. Defaults to {}.
 
         Returns:
-            :class:`~inseq.data.GradientFeatureAttributionStepOutput`: A dataclass containing a tensor of source
+            :class:`~inseq.data.GranularFeatureAttributionStepOutput`: A dataclass containing a tensor of source
                 attributions of size `(batch_size, source_length)`, possibly a tensor of target attributions of size
                 `(batch_size, prefix length) if attribute_target=True and possibly a tensor of deltas of size
                 `(batch_size)` if the attribution step supports deltas and they are requested. At this point the batch
@@ -98,7 +98,7 @@ class GradientAttributionRegistry(FeatureAttribution, Registry):
         source_attributions, target_attributions = get_source_target_attributions(
             attr, self.attribution_model.is_encoder_decoder
         )
-        return GradientFeatureAttributionStepOutput(
+        return GranularFeatureAttributionStepOutput(
             source_attributions=source_attributions,
             target_attributions=target_attributions,
             step_scores={"deltas": deltas} if deltas is not None else {},

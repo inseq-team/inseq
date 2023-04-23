@@ -1,3 +1,7 @@
+from .aggregation_functions import (
+    list_aggregation_functions,
+    register_aggregation_function,
+)
 from .aggregator import (
     Aggregator,
     AggregatorPipeline,
@@ -7,13 +11,12 @@ from .aggregator import (
     SubwordAggregator,
 )
 from .attribution import (
+    CoarseFeatureAttributionSequenceOutput,
     FeatureAttributionInput,
     FeatureAttributionOutput,
     FeatureAttributionSequenceOutput,
     FeatureAttributionStepOutput,
-    GradientFeatureAttributionStepOutput,
-    OcclusionFeatureAttributionStepOutput,
-    PerturbationFeatureAttributionStepOutput,
+    GranularFeatureAttributionStepOutput,
 )
 from .batch import Batch, BatchEmbedding, BatchEncoding, DecoderOnlyBatch, EncoderDecoderBatch
 from .viz import show_attributions
@@ -32,9 +35,8 @@ __all__ = [
     "EncoderDecoderBatch",
     "FeatureAttributionInput",
     "FeatureAttributionStepOutput",
-    "GradientFeatureAttributionStepOutput",
-    "OcclusionFeatureAttributionStepOutput",
-    "PerturbationFeatureAttributionStepOutput",
+    "GranularFeatureAttributionStepOutput",
+    "CoarseFeatureAttributionSequenceOutput",
     "FeatureAttributionSequenceOutput",
     "FeatureAttributionOutput",
     "ModelIdentifier",
@@ -42,4 +44,6 @@ __all__ = [
     "OneOrMoreTokenSequences",
     "TextInput",
     "show_attributions",
+    "list_aggregation_functions",
+    "register_aggregation_function",
 ]

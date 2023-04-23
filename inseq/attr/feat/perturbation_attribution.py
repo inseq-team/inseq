@@ -3,7 +3,7 @@ from typing import Any, Dict
 
 from captum.attr import Occlusion
 
-from ...data import OcclusionFeatureAttributionStepOutput, PerturbationFeatureAttributionStepOutput
+from ...data import CoarseFeatureAttributionSequenceOutput, GranularFeatureAttributionStepOutput
 from ...utils import Registry
 from .attribution_utils import get_source_target_attributions
 from .gradient_attribution import FeatureAttribution
@@ -43,7 +43,7 @@ class OcclusionAttribution(PerturbationAttributionRegistry):
         self,
         attribute_fn_main_args: Dict[str, Any],
         attribution_args: Dict[str, Any] = {},
-    ) -> OcclusionFeatureAttributionStepOutput:
+    ) -> CoarseFeatureAttributionSequenceOutput:
         r"""Sliding window shapes is defined as a tuple.
         First entry is between 1 and length of input.
         Second entry is given by the embedding dimension of the underlying model.
@@ -73,7 +73,7 @@ class OcclusionAttribution(PerturbationAttributionRegistry):
         if target_attributions is not None:
             target_attributions = target_attributions[:, :, 0].abs()
 
-        return OcclusionFeatureAttributionStepOutput(
+        return CoarseFeatureAttributionSequenceOutput(
             source_attributions=source_attributions,
             target_attributions=target_attributions,
             step_scores={},
@@ -100,7 +100,7 @@ class LimeAttribution(PerturbationAttributionRegistry):
         self,
         attribute_fn_main_args: Dict[str, Any],
         attribution_args: Dict[str, Any] = {},
-    ) -> PerturbationFeatureAttributionStepOutput:
+    ) -> GranularFeatureAttributionStepOutput:
         if len(attribute_fn_main_args["inputs"]) > 1:
             # Captum's `_evaluate_batch` function for LIME does not account for multiple inputs when encoder-decoder
             # models and attribute_target=True are used. The model output is of length two and if the inputs are either

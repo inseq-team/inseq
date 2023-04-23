@@ -23,7 +23,7 @@ from ....utils.typing import (
     MultiUnitScoreTensor,
     ScoreTensor,
 )
-from .rollout import rollout
+from .rollout import rollout_fn
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +50,7 @@ class AggregableMixin:
         "max": lambda scores, dim: scores.max(dim)[0],
         "min": lambda scores, dim: scores.min(dim)[0],
         "single": lambda scores, dim, idx: scores.select(dim, idx),
-        "rollout": lambda scores, _, add_residual=False: rollout(scores, add_residual),
+        "rollout_fn": lambda scores, _, add_residual=False: rollout_fn(scores, add_residual),
     }
 
     @staticmethod

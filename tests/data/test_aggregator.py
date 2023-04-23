@@ -72,6 +72,23 @@ def test_aggregator_pipeline(saliency_mt_model):
     assert out_agg_sumsqueeze.step_scores["probability"].shape == (4,)
     assert not torch.allclose(out_agg_squeezesum.source_attributions, out_agg_sumsqueeze.source_attributions)
     assert not torch.allclose(out_agg_squeezesum.target_attributions, out_agg_sumsqueeze.target_attributions)
+    # Named indexing version
+    named_squeezesum = ["spans", "scores"]
+    named_sumsqueeze = ["scores", "spans"]
+    out_agg_squeezesum_named = seqattr.aggregate(named_squeezesum, source_spans=(3, 5), target_spans=[(0, 3), (4, 6)])
+    out_agg_sumsqueeze_named = seqattr.aggregate(named_sumsqueeze, source_spans=(3, 5), target_spans=[(0, 3), (4, 6)])
+    assert out_agg_squeezesum_named.source_attributions.shape == (5, 4)
+    assert out_agg_squeezesum_named.target_attributions.shape == (4, 4)
+    assert out_agg_squeezesum_named.step_scores["probability"].shape == (4,)
+    assert out_agg_sumsqueeze_named.source_attributions.shape == (5, 4)
+    assert out_agg_sumsqueeze_named.target_attributions.shape == (4, 4)
+    assert out_agg_sumsqueeze_named.step_scores["probability"].shape == (4,)
+    assert not torch.allclose(
+        out_agg_squeezesum_named.source_attributions, out_agg_sumsqueeze_named.source_attributions
+    )
+    assert not torch.allclose(
+        out_agg_squeezesum_named.target_attributions, out_agg_sumsqueeze_named.target_attributions
+    )
 
 
 def test_subword_aggregator(saliency_mt_model):
@@ -111,3 +128,9 @@ def test_pair_aggregator(saliency_mt_model):
     assert torch.allclose(
         alt_seqattr.source_attributions - orig_seqattr.source_attributions, diff_seqattr.source_attributions
     )
+    # Default aggregation with SequenceAttributionAggregator
+    orig_seqattr_other = out.sequence_attributions[0].aggregate()
+    alt_seqattr_other = out.sequence_attributions[1].aggregate()
+    # Aggregate with aggregator name
+    diff_seqattr_other = orig_seqattr_other.aggregate("pair", paired_attr=alt_seqattr_other)
+    assert torch.allclose(diff_seqattr_other.source_attributions, diff_seqattr.source_attributions)

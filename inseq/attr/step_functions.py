@@ -1,12 +1,12 @@
 import logging
 from inspect import getfullargspec
-from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Protocol, Union
+from typing import TYPE_CHECKING, Dict, List, Optional, Protocol, Union
 
 import torch
 from transformers import AutoModelForCausalLM, AutoModelForSeq2SeqLM
 from transformers.modeling_outputs import ModelOutput
 
-from ..data.attribution import DEFAULT_ATTRIBUTION_AGGREGATE_DICT
+from ..data.aggregation_functions import DEFAULT_ATTRIBUTION_AGGREGATE_DICT
 from ..utils.typing import EmbeddingsTensor, IdsTensor, SingleScorePerStepTensor, TargetIdsTensor
 
 if TYPE_CHECKING:
@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class StepScoreFunction(Protocol):
+class StepFunction(Protocol):
     def __call__(
         self,
         attribution_model: "AttributionModel",
@@ -33,7 +33,7 @@ class StepScoreFunction(Protocol):
 
 
 def get_step_function_reserved_args() -> List[str]:
-    return getfullargspec(StepScoreFunction.__call__).args
+    return getfullargspec(StepFunction.__call__).args
 
 
 def logit_fn(
@@ -237,9 +237,10 @@ def list_step_functions() -> List[str]:
 
 
 def register_step_function(
-    fn: StepScoreFunction,
+    fn: StepFunction,
     identifier: str,
-    aggregate_map: Optional[Dict[str, Callable[[torch.Tensor], torch.Tensor]]] = None,
+    aggregate_map: Optional[Dict[str, str]] = None,
+    overwrite: bool = False,
 ) -> None:
     """
     Registers a function to be used to compute step scores and store them in the
@@ -269,15 +270,22 @@ def register_step_function(
 
         identifier (:obj:`str`): The identifier that will be used for the registered step score.
         aggregate_map (:obj:`dict`, `optional`): An optional dictionary mapping from :class:`~inseq.data.Aggregator`
-            name identifiers to functions taking in input a tensor of shape `(batch_size, seq_len)` and producing
-            tensors of shape `(batch_size, aggregated_seq_len)` in output that will be used to aggregate the
-            registered step score when used in conjunction with the corresponding aggregator. E.g. the ``probability``
-            step score uses the aggregate_map ``{"span_aggregate": lambda x: t.prod(dim=1, keepdim=True)}`` to
-            aggregate probabilities with a product when aggregating scores over spans.
+            name identifiers to aggregation function identifiers. A list of available aggregation functions is
+            available using :func:`~inseq.list_aggregation_functions`. Custom aggregation functions can be registered
+            using :func:`~inseq.register_aggregation_function`. If provided, the registered step score will be
+            automatically added to the list of available aggregation functions.
+        overwrite (:obj:`bool`, `optional`, defaults to :obj:`False`): Whether to overwrite an existing function
+            registered with the same identifier.
     """
+    if identifier in STEP_SCORES_MAP:
+        if not overwrite:
+            raise ValueError(
+                f"{identifier} is already registered in step functions map. Override with overwrite=True."
+            )
+        logger.warning(f"Overwriting {identifier} step function.")
     STEP_SCORES_MAP[identifier] = fn
     if isinstance(aggregate_map, dict):
-        for agg_name, agg_fn in aggregate_map.items():
+        for agg_name, aggregation_fn_identifier in aggregate_map.items():
             if agg_name not in DEFAULT_ATTRIBUTION_AGGREGATE_DICT["step_scores"]:
                 DEFAULT_ATTRIBUTION_AGGREGATE_DICT["step_scores"][agg_name] = {}
-            DEFAULT_ATTRIBUTION_AGGREGATE_DICT["step_scores"][agg_name][identifier] = agg_fn
+            DEFAULT_ATTRIBUTION_AGGREGATE_DICT["step_scores"][agg_name][identifier] = aggregation_fn_identifier

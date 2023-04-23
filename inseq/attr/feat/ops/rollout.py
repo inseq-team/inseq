@@ -27,7 +27,7 @@ def _rollout_joint(
     final_source_scores: ScoreTensor,
     cross_scores: MultiUnitScoreTensor,
     target_scores: MultiUnitScoreTensor,
-) -> Tuple[MultiUnitScoreTensor, MultiUnitScoreTensor]:
+) -> Tuple[ScoreTensor, ScoreTensor]:
     """Performs the rollout aggregation adapted for an encoder-decoder architecture with cross-importance scores."""
     target_scores = (target_scores.mT * cross_scores[..., None, :, -1]).mT
     joint_source_cross_scores = torch.einsum("blij, bjk -> blik", cross_scores, final_source_scores)
@@ -44,11 +44,12 @@ def _rollout_joint(
     source_rollout_scores, target_rollout_scores = normalize_attributions(
         (source_rollout_scores, target_rollout_scores), cat_dim=-1, norm_dim=-1
     )
-    return source_rollout_scores, target_rollout_scores
+    return source_rollout_scores[:, -1, ...], target_rollout_scores[:, -1, ...]
 
 
-def rollout(
+def rollout_fn(
     scores: Union[MultiUnitScoreTensor, Tuple[MultiUnitScoreTensor, MultiUnitScoreTensor, MultiUnitScoreTensor]],
+    dim: int = 1,
     add_residual: bool = False,
 ) -> Union[ScoreTensor, Tuple[ScoreTensor, ScoreTensor]]:
     """
@@ -60,12 +61,13 @@ def rollout(
 
     Args:
         scores (:obj:`torch.Tensor` or :obj:`tuple(torch.Tensor, torch.Tensor, torch.Tensor)`):
-            Tensor of shape `(batch_size, num_layers, ...)`, or a tuple of tensors of the same shape containing the
+            Tensor of shape `(num_layers, ...)`, or a tuple of tensors of the same shape containing the
             scores computed for different layers. If a tuple is passed, rollout will be performed assuming tensors are
             (source_scores, cross_scores, target_scores) produced by an Transformer-like encoder-decoder architecture
             (i.e. rolled-out importance of the source in the encoder is modulated by cross_scores at every layer of the
             decoder). For an encoder-decoder architecture, the rollout procedure follows the procedure described by
             `Ferrando et al. (2022) <https://aclanthology.org/2022.emnlp-main.599/>`__.
+        dim (:obj:`int`, `optional`, defaults to 1): The dimension along which to perform the rollout aggregation.
         add_residual (:obj:`bool`):
             Whether to incorporate residual connection between the layers by adding an identity matrix and normalizing
             weights, as proposed by `Abnar and Zuidema (2020) <https://aclanthology.org/2020.acl-main.385/>`__.
@@ -79,12 +81,18 @@ def rollout(
             rollout is performed, a tuple of tensors ``(source_scores, target_scores)``.
     """
     if isinstance(scores, tuple):
-        source_scores, cross_scores, target_scores = scores
+        if dim != 1:
+            source_scores, cross_scores, target_scores = tuple(t.transpose(dim, 1) for t in scores)
+        else:
+            source_scores, cross_scores, target_scores = scores
 
         # Get rolled out scores of encoder last layer with respect to source input
         source_scores = _rollout_single(source_scores)
 
         final_source_scores = source_scores[:, -1, ...]
         source_rollout_scores, target_rollout_scores = _rollout_joint(final_source_scores, cross_scores, target_scores)
-        return source_rollout_scores[:, -1, ...], target_rollout_scores[:, -1, ...]
+        if dim != 1:
+            source_rollout_scores = source_rollout_scores.transpose(1, dim)
+            target_rollout_scores = target_rollout_scores.transpose(1, dim)
+        return source_rollout_scores, target_rollout_scores
     return _rollout_single(scores)[:, -1, ...]

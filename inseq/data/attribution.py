@@ -8,18 +8,12 @@ from typing import Any, Dict, List, Optional, Type, Union
 import torch
 
 from ..utils import (
-    abs_max,
     drop_padding,
     get_sequences_from_batched_steps,
-    identity_fn,
     json_advanced_dump,
     json_advanced_load,
-    normalize_attributions,
     pretty_dict,
-    prod_fn,
     remap_from_filtered,
-    sum_fn,
-    sum_normalize_attributions,
 )
 from ..utils.typing import (
     MultipleScoresPerSequenceTensor,
@@ -33,26 +27,13 @@ from ..utils.typing import (
     TextInput,
     TokenWithId,
 )
+from .aggregation_functions import DEFAULT_ATTRIBUTION_AGGREGATE_DICT, get_aggregation_fns_from_ids
 from .aggregator import AggregableMixin, Aggregator, AggregatorPipeline, SequenceAttributionAggregator
 from .batch import Batch, BatchEncoding, DecoderOnlyBatch, EncoderDecoderBatch
 from .data_utils import TensorWrapper
 
 FeatureAttributionInput = Union[TextInput, BatchEncoding, Batch]
 
-DEFAULT_ATTRIBUTION_AGGREGATE_DICT = {
-    "source_attributions": {"sequence_aggregate": identity_fn, "span_aggregate": abs_max},
-    "target_attributions": {"sequence_aggregate": identity_fn, "span_aggregate": abs_max},
-    "step_scores": {
-        "span_aggregate": {
-            "probability": prod_fn,
-            "entropy": sum_fn,
-            "crossentropy": sum_fn,
-            "perplexity": prod_fn,
-            "contrast_prob_diff": prod_fn,
-            "mc_dropout_prob_avg": prod_fn,
-        }
-    },
-}
 
 logger = logging.getLogger(__name__)
 
@@ -92,11 +73,9 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
 
     def __post_init__(self):
         aggregate_dict = DEFAULT_ATTRIBUTION_AGGREGATE_DICT
-        if self._dict_aggregate_fn is None or self._dict_aggregate_fn == {}:
-            self._dict_aggregate_fn = aggregate_dict
-        elif isinstance(self._dict_aggregate_fn, dict):
+        if isinstance(self._dict_aggregate_fn, dict):
             aggregate_dict.update(self._dict_aggregate_fn)
-            self._dict_aggregate_fn = aggregate_dict
+        self._dict_aggregate_fn = get_aggregation_fns_from_ids(aggregate_dict)
         if self._aggregator is None:
             self._aggregator = SequenceAttributionAggregator
         if self.attr_pos_end is None or self.attr_pos_end > len(self.target):
@@ -528,6 +507,7 @@ class FeatureAttributionOutput:
         display: bool = True,
         return_html: Optional[bool] = False,
         aggregator: Union[AggregatorPipeline, Type[Aggregator]] = None,
+        do_aggregation: bool = True,
         **kwargs,
     ) -> Optional[str]:
         """Visualize the sequence attributions.
@@ -540,6 +520,9 @@ class FeatureAttributionOutput:
             aggregator (:obj:`AggregatorPipeline` or :obj:`Type[Aggregator]`, optional): Aggregator
                 or pipeline to use. If not provided, the default aggregator for every sequence attribution
                 is used.
+            do_aggregation (:obj:`bool`, *optional*, defaults to True):
+                Whether to aggregate the attributions before visualizing them. Allows to skip aggregation if the
+                attributions are already aggregated.
 
         Returns:
             str: Attribution visualization as HTML if `return_html=True`, None otherwise.
@@ -547,9 +530,9 @@ class FeatureAttributionOutput:
         out_str = ""
         for attr in self.sequence_attributions:
             if return_html:
-                out_str += attr.show(min_val, max_val, display, return_html, aggregator, **kwargs)
+                out_str += attr.show(min_val, max_val, display, return_html, aggregator, do_aggregation, **kwargs)
             else:
-                attr.show(min_val, max_val, display, return_html, aggregator, **kwargs)
+                attr.show(min_val, max_val, display, return_html, aggregator, do_aggregation, **kwargs)
         if return_html:
             return out_str
 
@@ -620,64 +603,47 @@ class FeatureAttributionOutput:
         return [attr.get_scores_dicts(aggregator, do_aggregation, **kwargs) for attr in self.sequence_attributions]
 
 
-# Gradient attribution classes
-
-
 @dataclass(eq=False, repr=False)
-class GradientFeatureAttributionSequenceOutput(FeatureAttributionSequenceOutput):
-    """Raw output of a single sequence of gradient feature attribution.
+class GranularFeatureAttributionSequenceOutput(FeatureAttributionSequenceOutput):
+    """Raw output of a single sequence of granular feature attribution.
+
+    An example of granular feature attribution methods are gradient-based attribution methods such as Integrated
+    Gradients, returning one score per hidden dimension of the model for every generated token.
+
     Adds the convergence delta and default L2 + normalization merging of attributions to the base class.
     """
 
     def __post_init__(self):
         super().__post_init__()
-        self._dict_aggregate_fn["source_attributions"]["sequence_aggregate"] = sum_normalize_attributions
-        self._dict_aggregate_fn["target_attributions"]["sequence_aggregate"] = sum_normalize_attributions
-        if "deltas" not in self._dict_aggregate_fn["step_scores"]["span_aggregate"]:
-            self._dict_aggregate_fn["step_scores"]["span_aggregate"]["deltas"] = abs_max
+        self._dict_aggregate_fn["source_attributions"]["scores"] = "sum_normalize"
+        self._dict_aggregate_fn["target_attributions"]["scores"] = "sum_normalize"
+        if "deltas" not in self._dict_aggregate_fn["step_scores"]["spans"]:
+            self._dict_aggregate_fn["step_scores"]["spans"]["deltas"] = "absmax"
 
 
 @dataclass(eq=False, repr=False)
-class GradientFeatureAttributionStepOutput(FeatureAttributionStepOutput):
-    """Raw output of a single step of gradient feature attribution.
-    Adds the convergence delta to the base class.
+class GranularFeatureAttributionStepOutput(FeatureAttributionStepOutput):
+    """Raw output of a single step of gradient feature attribution."""
+
+    _sequence_cls: Type["FeatureAttributionSequenceOutput"] = GranularFeatureAttributionSequenceOutput
+
+
+@dataclass(eq=False, repr=False)
+class CoarseFeatureAttributionSequenceOutput(FeatureAttributionSequenceOutput):
+    """Raw output of a single sequence of coarse-grained feature attribution.
+
+    An example of coarse-grained feature attribution methods are occlusion methods in which a whole token is masked at
+    once, producing a single output score per token.
     """
 
-    _sequence_cls: Type["FeatureAttributionSequenceOutput"] = GradientFeatureAttributionSequenceOutput
-
-
-# Perturbation attribution classes
-
-
-@dataclass(eq=False, repr=False)
-class OcclusionFeatureAttributionSequenceOutput(FeatureAttributionSequenceOutput):
-    """Raw output of a single sequence of occlusion feature attribution."""
-
     def __post_init__(self):
         super().__post_init__()
-        self._dict_aggregate_fn["source_attributions"]["sequence_aggregate"] = normalize_attributions
-        self._dict_aggregate_fn["target_attributions"]["sequence_aggregate"] = normalize_attributions
+        self._dict_aggregate_fn["source_attributions"]["scores"] = "normalize"
+        self._dict_aggregate_fn["target_attributions"]["scores"] = "normalize"
 
 
 @dataclass(eq=False, repr=False)
-class OcclusionFeatureAttributionStepOutput(FeatureAttributionStepOutput):
+class CoarseFeatureAttributionStepOutput(FeatureAttributionStepOutput):
     """Raw output of a single step of occlusion feature attribution."""
 
-    _sequence_cls: Type["FeatureAttributionSequenceOutput"] = OcclusionFeatureAttributionSequenceOutput
-
-
-@dataclass(eq=False, repr=False)
-class PerturbationFeatureAttributionSequenceOutput(FeatureAttributionSequenceOutput):
-    """Raw output of a single sequence of perturbation feature attribution."""
-
-    def __post_init__(self):
-        super().__post_init__()
-        self._dict_aggregate_fn["source_attributions"]["sequence_aggregate"] = sum_normalize_attributions
-        self._dict_aggregate_fn["target_attributions"]["sequence_aggregate"] = sum_normalize_attributions
-
-
-@dataclass(eq=False, repr=False)
-class PerturbationFeatureAttributionStepOutput(FeatureAttributionStepOutput):
-    """Raw output of a single step of perturbation feature attribution."""
-
-    _sequence_cls: Type["FeatureAttributionSequenceOutput"] = PerturbationFeatureAttributionSequenceOutput
+    _sequence_cls: Type["FeatureAttributionSequenceOutput"] = CoarseFeatureAttributionSequenceOutput
