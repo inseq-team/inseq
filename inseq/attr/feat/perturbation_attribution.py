@@ -3,7 +3,11 @@ from typing import Any, Dict
 
 from captum.attr import Occlusion
 
-from ...data import CoarseFeatureAttributionSequenceOutput, GranularFeatureAttributionStepOutput
+from ...data import (
+    CoarseFeatureAttributionSequenceOutput,
+    GranularFeatureAttributionStepOutput,
+    MultiDimensionalFeatureAttributionStepOutput,
+)
 from ...utils import Registry
 from .attribution_utils import get_source_target_attributions
 from .gradient_attribution import FeatureAttribution
@@ -127,3 +131,19 @@ class ValueZeroingAttribution(PerturbationAttributionRegistry):
         self.use_model_config = True
         self.method = ValueZeroing(attribution_model)
         self.hook(**kwargs)
+
+    def attribute_step(
+        self,
+        attribute_fn_main_args: Dict[str, Any],
+        attribution_args: Dict[str, Any] = {},
+    ) -> MultiDimensionalFeatureAttributionStepOutput:
+        attr = self.method.attribute(**attribute_fn_main_args, **attribution_args)
+        source_attributions, target_attributions = get_source_target_attributions(
+            attr, self.attribution_model.is_encoder_decoder
+        )
+        return MultiDimensionalFeatureAttributionStepOutput(
+            source_attributions=source_attributions,
+            target_attributions=target_attributions,
+            step_scores={},
+            _num_dimensions=1,
+        )

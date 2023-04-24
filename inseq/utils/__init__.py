@@ -42,10 +42,9 @@ from .misc import (
     save_to_file,
     scalar_to_numpy,
 )
-from .registry import Registry, get_available_methods
+from .registry import Registry, available_classes
 from .serialization import json_advanced_dump, json_advanced_dumps, json_advanced_load, json_advanced_loads
 from .torch_utils import (
-    abs_max,
     aggregate_contiguous,
     check_device,
     euclidean_distance,
@@ -54,10 +53,8 @@ from .torch_utils import (
     get_front_padding,
     get_sequences_from_batched_steps,
     normalize_attributions,
-    prod_fn,
     remap_from_filtered,
-    sum_fn,
-    sum_normalize_attributions,
+    vnorm_normalize_attributions,
 )
 
 __all__ = [
@@ -75,18 +72,15 @@ __all__ = [
     "aggregate_token_sequence",
     "format_input_texts",
     "rgetattr",
-    "get_available_methods",
+    "available_classes",
     "isnotebook",
     "find_char_indexes",
     "extract_signature_args",
     "remap_from_filtered",
     "drop_padding",
     "normalize_attributions",
-    "sum_normalize_attributions",
+    "vnorm_normalize_attributions",
     "aggregate_contiguous",
-    "abs_max",
-    "prod_fn",
-    "sum_fn",
     "get_front_padding",
     "get_sequences_from_batched_steps",
     "euclidean_distance",

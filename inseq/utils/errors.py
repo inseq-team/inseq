@@ -1,6 +1,6 @@
 from typing import Any, Tuple
 
-from .registry import get_available_methods
+from .registry import available_classes
 
 
 class InseqDeprecationWarning(UserWarning):
@@ -27,7 +27,7 @@ class UnknownAttributionMethodError(Exception):
 
         msg = msg.format(
             attribution_method=method_name,
-            available_methods=", ".join(get_available_methods(FeatureAttribution)),
+            available_methods=", ".join(available_classes(FeatureAttribution)),
         )
         super().__init__(msg, *args)
 
@@ -44,7 +44,7 @@ class MissingAttributionMethodError(Exception):
     def __init__(self, msg: str = MISSING_ATTRIBUTION_METHOD_MSG, *args: Tuple[Any]) -> None:
         from inseq.attr import FeatureAttribution
 
-        msg = msg.format(available_methods=", ".join(get_available_methods(FeatureAttribution)))
+        msg = msg.format(available_methods=", ".join(available_classes(FeatureAttribution)))
         super().__init__(msg, *args)
 
 

@@ -3,7 +3,7 @@ from copy import deepcopy
 from dataclasses import dataclass, field
 from os import PathLike
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Type, Union
+from typing import Any, Callable, Dict, List, Optional, Type, Union
 
 import torch
 
@@ -82,6 +82,22 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
         if self.attr_pos_end is None or self.attr_pos_end > len(self.target):
             self.attr_pos_end = len(self.target)
 
+    @staticmethod
+    def get_remove_pad_fn(attr: "FeatureAttributionStepOutput", name: str) -> Callable:
+        if attr.source_attributions is None or name.startswith("decoder"):
+            remove_pad_fn = lambda scores, _, targets, seq_id: scores[seq_id][
+                : len(targets[seq_id]), : len(targets[seq_id]), ...
+            ]
+        elif name.startswith("encoder"):
+            remove_pad_fn = lambda scores, sources, _, seq_id: scores[seq_id][
+                : len(sources[seq_id]), : len(sources[seq_id]), ...
+            ]
+        else:  # default case: cross-attention
+            remove_pad_fn = lambda scores, sources, targets, seq_id: scores[seq_id][
+                : len(sources[seq_id]), : len(targets[seq_id]), ...
+            ]
+        return remove_pad_fn
+
     @classmethod
     def from_step_attributions(
         cls,
@@ -103,7 +119,6 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
             :class:`~inseq.data.attribution.FeatureAttributionSequenceOutput` objects.
         """
         attr = attributions[0]
-        seq_attr_cls = attr._sequence_cls
         num_sequences = len(attr.prefix)
         if not all([len(attr.prefix) == num_sequences for attr in attributions]):
             raise ValueError("All the attributions must include the same number of sequences.")
@@ -125,7 +140,7 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
         for seq_id in range(num_sequences):
             source = tokenized_target_sentences[seq_id][: pos_start[seq_id]] if sources is None else sources[seq_id]
             seq_attributions.append(
-                seq_attr_cls(
+                attr.get_sequence_cls(
                     source=source,
                     target=tokenized_target_sentences[seq_id],
                     attr_pos_start=pos_start[seq_id],
@@ -141,9 +156,7 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
                 ]
                 seq_attributions[seq_id].source_attributions = filtered_source_attribution
         if attr.target_attributions is not None:
-            target_attributions = get_sequences_from_batched_steps(
-                [att.target_attributions for att in attributions], pad_dims=(1,)
-            )
+            target_attributions = get_sequences_from_batched_steps([att.target_attributions for att in attributions])
             for seq_id in range(num_sequences):
                 if has_bos_token:
                     target_attributions[seq_id] = target_attributions[seq_id][1:, ...]
@@ -169,13 +182,16 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
         if attr.sequence_scores is not None:
             seq_scores = [{} for _ in range(num_sequences)]
             for seq_score_name in attr.sequence_scores.keys():
+                # Since we need to know in advance the length of the sequence to remove padding from
+                # batching sequences with different lengths, we rely on code names for sequence scores
+                # that are not source-to-target (default for encoder-decoder) or target-to-target
+                # (default for decoder only).
+                remove_pad_fn = cls.get_remove_pad_fn(attr, seq_score_name)
                 out_seq_scores = get_sequences_from_batched_steps(
                     [att.sequence_scores[seq_score_name] for att in attributions]
                 )
                 for seq_id in range(num_sequences):
-                    seq_scores[seq_id][seq_score_name] = out_seq_scores[seq_id][
-                        : len(sources[seq_id]), : len(targets[seq_id]), ...
-                    ]
+                    seq_scores[seq_id][seq_score_name] = remove_pad_fn(out_seq_scores, sources, targets, seq_id)
             for seq_id in range(num_sequences):
                 seq_attributions[seq_id].sequence_scores = seq_scores[seq_id]
         return seq_attributions
@@ -313,6 +329,9 @@ class FeatureAttributionStepOutput(TensorWrapper):
 
     def __post_init__(self):
         self.to(torch.float32)
+
+    def get_sequence_cls(self, **kwargs):
+        return self._sequence_cls(**kwargs)
 
     def remap_from_filtered(
         self,
@@ -617,8 +636,8 @@ class GranularFeatureAttributionSequenceOutput(FeatureAttributionSequenceOutput)
 
     def __post_init__(self):
         super().__post_init__()
-        self._dict_aggregate_fn["source_attributions"]["scores"] = "sum_normalize"
-        self._dict_aggregate_fn["target_attributions"]["scores"] = "sum_normalize"
+        self._dict_aggregate_fn["source_attributions"]["scores"] = "vnorm_normalize"
+        self._dict_aggregate_fn["target_attributions"]["scores"] = "vnorm_normalize"
         if "deltas" not in self._dict_aggregate_fn["step_scores"]["spans"]:
             self._dict_aggregate_fn["step_scores"]["spans"]["deltas"] = "absmax"
 
@@ -646,6 +665,33 @@ class CoarseFeatureAttributionSequenceOutput(FeatureAttributionSequenceOutput):
 
 @dataclass(eq=False, repr=False)
 class CoarseFeatureAttributionStepOutput(FeatureAttributionStepOutput):
-    """Raw output of a single step of occlusion feature attribution."""
+    """Raw output of a single step of coarse-grained feature attribution."""
 
     _sequence_cls: Type["FeatureAttributionSequenceOutput"] = CoarseFeatureAttributionSequenceOutput
+
+
+@dataclass(eq=False, repr=False)
+class MultiDimensionalFeatureAttributionSequenceOutput(FeatureAttributionSequenceOutput):
+    """Raw output of a single sequence of multi-dimensional feature attribution.
+
+    Multi-dimensional feature attribution methods are a generalization of granular feature attribution methods
+    allowing for an arbitrary number of extra dimensions. For example, the attention method returns one score per
+    attention head and per layer for every source-target token pair in the source attributions (i.e. 2 dimensions).
+    """
+
+    _num_dimensions: int = 2
+
+    def __post_init__(self):
+        super().__post_init__()
+        self._aggregator = [("scores", "mean")] * self._num_dimensions + [("scores", "normalize")]
+
+
+@dataclass(eq=False, repr=False)
+class MultiDimensionalFeatureAttributionStepOutput(FeatureAttributionStepOutput):
+    """Raw output of a single step of multi-dimensional feature attribution."""
+
+    _num_dimensions: int = 2
+    _sequence_cls: Type["FeatureAttributionSequenceOutput"] = MultiDimensionalFeatureAttributionSequenceOutput
+
+    def get_sequence_cls(self, **kwargs):
+        return MultiDimensionalFeatureAttributionSequenceOutput(_num_dimensions=self._num_dimensions, **kwargs)

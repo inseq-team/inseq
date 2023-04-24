@@ -13,13 +13,14 @@
 # limitations under the License.
 
 import logging
-from typing import Dict, List, Protocol, Sequence, Union
+from abc import abstractmethod
+from typing import List, Tuple, Union
 
 import torch
 from torch.linalg import vector_norm
 
 from ..attr.feat.ops import rollout_fn
-from ..utils import normalize_attributions, sum_normalize_attributions
+from ..utils import Registry, available_classes, normalize_attributions, vnorm_normalize_attributions
 from ..utils.typing import (
     ScoreTensor,
 )
@@ -27,30 +28,116 @@ from ..utils.typing import (
 logger = logging.getLogger(__name__)
 
 
-class AggregationFunction(Protocol):
+class AggregationFunction(Registry):
+    registry_attr = "aggregation_function_name"
+
+    def __init__(self):
+        self.takes_single_tensor: bool = True
+
+    @abstractmethod
     def __call__(
         self,
-        scores: Union[torch.Tensor, Sequence[torch.Tensor]],
+        scores: Union[torch.Tensor, Tuple[torch.Tensor, ...]],
         dim: int,
         **kwargs,
     ) -> ScoreTensor:
-        ...
+        pass
 
 
-AGGREGATION_FN_MAP: Dict[str, AggregationFunction] = {
-    "mean": lambda scores, dim: scores.mean(dim),
-    "max": lambda scores, dim: scores.max(dim).values,
-    "min": lambda scores, dim: scores.min(dim).values,
-    "single": lambda scores, dim, idx: scores.select(dim, idx),
-    "sum": lambda scores, dim: scores.sum(dim),
-    "prod": lambda scores, dim: scores.prod(dim),
-    "absmax": lambda scores, dim: scores.gather(dim, scores.abs().argmax(dim, keepdim=True)).squeeze(dim),
-    "identity": lambda scores, dim: scores,
-    "vnorm": lambda scores, dim, ord=2: vector_norm(scores, ord=ord, dim=dim),
-    "normalize": lambda scores, dim: normalize_attributions(scores),
-    "sum_normalize": lambda scores, dim: sum_normalize_attributions(scores),
-    "rollout": lambda scores, dim, add_residual=False: rollout_fn(scores, dim, add_residual),
-}
+class MeanAggregationFunction(AggregationFunction):
+    aggregation_function_name = "mean"
+
+    def __call__(self, scores: torch.Tensor, dim: int) -> ScoreTensor:
+        return scores.mean(dim)
+
+
+class MaxAggregationFunction(AggregationFunction):
+    aggregation_function_name = "max"
+
+    def __call__(self, scores: torch.Tensor, dim: int) -> ScoreTensor:
+        return scores.max(dim)
+
+
+class MinAggregationFunction(AggregationFunction):
+    aggregation_function_name = "min"
+
+    def __call__(self, scores: torch.Tensor, dim: int) -> ScoreTensor:
+        return scores.min(dim)
+
+
+class SingleAggregationFunction(AggregationFunction):
+    aggregation_function_name = "single"
+
+    def __call__(self, scores: torch.Tensor, dim: int, idx: int) -> ScoreTensor:
+        return scores.select(dim, idx)
+
+
+class SumAggregationFunction(AggregationFunction):
+    aggregation_function_name = "sum"
+
+    def __call__(self, scores: torch.Tensor, dim: int) -> ScoreTensor:
+        return scores.sum(dim)
+
+
+class ProdAggregationFunction(AggregationFunction):
+    aggregation_function_name = "prod"
+
+    def __call__(self, scores: torch.Tensor, dim: int) -> ScoreTensor:
+        return scores.prod(dim)
+
+
+class AbsMaxAggregationFunction(AggregationFunction):
+    aggregation_function_name = "absmax"
+
+    def __call__(self, scores: torch.Tensor, dim: int) -> ScoreTensor:
+        return scores.gather(dim, scores.abs().argmax(dim, keepdim=True)).squeeze(dim)
+
+
+class IdentityAggregationFunction(AggregationFunction):
+    aggregation_function_name = "identity"
+
+    def __call__(self, scores: torch.Tensor, dim: int) -> ScoreTensor:
+        return scores
+
+
+class VectorNormAggregationFunction(AggregationFunction):
+    aggregation_function_name = "vnorm"
+
+    def __call__(self, scores: torch.Tensor, dim: int, ord: int = 2) -> ScoreTensor:
+        return vector_norm(scores, ord=ord, dim=dim)
+
+
+class NormalizeAggregationFunction(AggregationFunction):
+    aggregation_function_name = "normalize"
+
+    def __init__(self):
+        self.takes_single_tensor: bool = False
+
+    def __call__(self, scores: Union[torch.Tensor, Tuple[torch.Tensor, ...]], dim: int) -> ScoreTensor:
+        return normalize_attributions(scores)
+
+
+class VectorNormNormalizeAggregationFunction(AggregationFunction):
+    aggregation_function_name = "vnorm_normalize"
+
+    def __init__(self):
+        self.takes_single_tensor: bool = False
+
+    def __call__(self, scores: Union[torch.Tensor, Tuple[torch.Tensor, ...]], dim: int) -> ScoreTensor:
+        return vnorm_normalize_attributions(scores, norm_dim=dim)
+
+
+class RolloutAggregationFunction(AggregationFunction):
+    aggregation_function_name = "rollout"
+
+    def __init__(self):
+        self.takes_single_tensor: bool = False
+
+    def __call__(
+        self, scores: Union[torch.Tensor, Tuple[torch.Tensor, ...]], dim: int, add_residual: bool = False
+    ) -> ScoreTensor:
+        return rollout_fn(scores, dim=dim, add_residual=add_residual)
+
 
 DEFAULT_ATTRIBUTION_AGGREGATE_DICT = {
     "source_attributions": {"scores": "identity", "spans": "absmax"},
@@ -72,57 +159,4 @@ def list_aggregation_functions() -> List[str]:
     """
     Lists identifiers for all available aggregation functions scores.
     """
-    return list(AGGREGATION_FN_MAP.keys())
-
-
-def register_aggregation_function(fn: AggregationFunction, identifier: str, overwrite: bool = False) -> None:
-    """
-    Registers a function to be used for aggregation purposes.
-
-    Args:
-        fn (:obj:`callable`): The function to be used to compute step scores. Default parameters are:
-
-            - :obj:`scores`: an :obj:`torch.Tensor` or a sequence of :obj:`torch.Tensor` objects to be aggregated.
-
-            - :obj:`dim`: An integer specifying the dimension along which tensors should be aggregated.
-
-            The function can also define an arbitrary number of custom parameters, and it must return a
-            :obj:`torch.Tensor` or a tuple of :obj:`torch.Tensor` objects containing aggregated scores alongside the
-            corresponding aggregation dimensions.
-
-        identifier (:obj:`str`): The identifier that will be used for the registered step score.
-        overwrite (:obj:`bool`, `optional`, defaults to :obj:`False`): Whether to overwrite an existing function
-            registered with the same identifier.
-    """
-    if identifier in AGGREGATION_FN_MAP:
-        if not overwrite:
-            raise ValueError(
-                f"{identifier} is already registered in aggregation functions map. Override with overwrite=True."
-            )
-        logger.warning(f"Overwriting {identifier} aggregation function.")
-    AGGREGATION_FN_MAP[identifier] = fn
-
-
-def get_aggregation_fns_from_ids(aggregation_dict: Dict[str, Union[Dict, str]]) -> Dict[str, AggregationFunction]:
-    """
-    Returns a dictionary mapping aggregation identifiers to aggregation functions.
-
-    Args:
-        aggregation_dict (:obj:`dict`): A dictionary mapping aggregator identifiers to aggregation function
-            identifiers.
-
-    Returns:
-        :obj:`Dict[str, AggregationFunction]`: A dictionary mapping aggregation identifiers to aggregation functions.
-    """
-    fn_dict = {}
-    for k, v in aggregation_dict.items():
-        if isinstance(v, dict):
-            fn_dict[k] = get_aggregation_fns_from_ids(v)
-        elif isinstance(v, str):
-            if v not in AGGREGATION_FN_MAP:
-                raise ValueError(
-                    f"Aggregation function {v} is not registered."
-                    "Register it with :func:`~inseq.register_aggregation_function`."
-                )
-            fn_dict[k] = AGGREGATION_FN_MAP[v]
-    return fn_dict
+    return available_classes(AggregationFunction)

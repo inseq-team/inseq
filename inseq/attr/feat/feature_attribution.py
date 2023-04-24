@@ -36,9 +36,9 @@ from ...data.viz import close_progress_bar, get_progress_bar, update_progress_ba
 from ...utils import (
     Registry,
     UnknownAttributionMethodError,
+    available_classes,
     extract_signature_args,
     find_char_indexes,
-    get_available_methods,
     get_front_padding,
     pretty_tensor,
 )
@@ -585,4 +585,4 @@ def list_feature_attribution_methods():
     `integrated_gradients`) can be passed to :class:`~inseq.models.AttributionModel` or :meth:`~inseq.load_model`
     to define a model for attribution.
     """
-    return get_available_methods(FeatureAttribution)
+    return available_classes(FeatureAttribution)

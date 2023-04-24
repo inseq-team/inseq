@@ -271,9 +271,7 @@ def register_step_function(
         identifier (:obj:`str`): The identifier that will be used for the registered step score.
         aggregate_map (:obj:`dict`, `optional`): An optional dictionary mapping from :class:`~inseq.data.Aggregator`
             name identifiers to aggregation function identifiers. A list of available aggregation functions is
-            available using :func:`~inseq.list_aggregation_functions`. Custom aggregation functions can be registered
-            using :func:`~inseq.register_aggregation_function`. If provided, the registered step score will be
-            automatically added to the list of available aggregation functions.
+            available using :func:`~inseq.list_aggregation_functions`.
         overwrite (:obj:`bool`, `optional`, defaults to :obj:`False`): Whether to overwrite an existing function
             registered with the same identifier.
     """

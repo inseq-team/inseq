@@ -33,5 +33,5 @@ class Registry(ABC):
         return methods
 
 
-def get_available_methods(cls: type[Registry]) -> list[str]:
+def available_classes(cls: type[Registry]) -> list[str]:
     return list(cls.available_classes().keys())

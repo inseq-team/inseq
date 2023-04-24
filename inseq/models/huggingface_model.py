@@ -392,6 +392,7 @@ class HuggingfaceEncoderDecoderModel(HuggingfaceModel, EncoderDecoderAttribution
         output: Seq2SeqLMOutput,
     ) -> Dict[str, MultiLayerMultiUnitScoreTensor]:
         return {
+            "encoder_self_attentions": torch.stack(output.encoder_attentions, dim=1),
             "decoder_self_attentions": torch.stack(output.decoder_attentions, dim=1),
             "cross_attentions": torch.stack(output.cross_attentions, dim=1),
         }

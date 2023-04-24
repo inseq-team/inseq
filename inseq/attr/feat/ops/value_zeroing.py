@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import logging
-from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Callable, Dict, Optional
 
 import torch
 from captum._utils.typing import TensorOrTupleOfTensorsGeneric
@@ -23,7 +23,6 @@ from torch import nn
 
 from ....utils import find_block_stack, get_post_variable_assignment_hook
 from ....utils.typing import EmbeddingsTensor, MultiLayerEmbeddingsTensor
-from .aggregable_mixin import AggregableMixin, AggregationFunction
 
 if TYPE_CHECKING:
     from ....models import AttributionModel
@@ -31,7 +30,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class ValueZeroing(Attribution, AggregableMixin):
+class ValueZeroing(Attribution):
     """Value Zeroing method for feature attribution.
 
     Introduced by `Mohebbi et al. (2023) <https://arxiv.org/abs/2301.12971>`__ to quantify context mixing inside
@@ -115,8 +114,6 @@ class ValueZeroing(Attribution, AggregableMixin):
         self,
         inputs: TensorOrTupleOfTensorsGeneric,
         additional_forward_args: TensorOrTupleOfTensorsGeneric,
-        layers: Union[int, Tuple[int, int], List[int], None] = None,
-        aggregate_layers_fn: Union[str, AggregationFunction, None] = None,
         similarity_metric: str = "cosine",
         encoder_hidden_states: Optional[MultiLayerEmbeddingsTensor] = None,
         decoder_hidden_states: Optional[MultiLayerEmbeddingsTensor] = None,
@@ -124,14 +121,6 @@ class ValueZeroing(Attribution, AggregableMixin):
         """Perform attribution using the Value Zeroing method.
 
         Args:
-            layers (:obj:`int` or :obj:`tuple[int, int]` or :obj:`list(int)`, optional): If a single value is specified
-                , the layer at the corresponding index is used. If a tuple of two indices is specified, all layers
-                among the indices will be aggregated using aggregate_fn. If a list of indices is specified, the
-                respective layers will be used for aggregation. If aggregate_fn is "single", the last layer is
-                used by default. If no value is specified, all available layers are passed to aggregate_fn by default.
-            aggregate_layers_fn (:obj:`str` or :obj:`callable`): The method to use for aggregating across layers.
-                Can be one of `average` (default if layers is tuple or list), `max`, `min` or `single` (default if
-                layers is int or None), or a custom function defined by the user.
             metric (:obj:`str`, optional): The similarity metric to use for computing the distance between hidden
                 states produced with and without the zeroing operation. Default: cosine.
             encoder_hidden_states (:obj:`torch.Tensor`, optional): A tensor of shape ``[batch_size, num_layers + 1,
@@ -217,16 +206,13 @@ class ValueZeroing(Attribution, AggregableMixin):
         per_token_sum_score[per_token_sum_score == 0] = 1
         scores = scores / per_token_sum_score
 
-        # Aggregate scores across layers to obtain final attribution scores
-        # Aggregation output has shape: [batch_size, tgt_seq_len, tgt_seq_len]
-        scores = self._aggregate_layers(scores, aggregate_layers_fn, layers)
-
         # Since presently Inseq attribution is constrained by the attribution loop over the full generation, the
         # extraction of value zeroing scores is done inefficiently by picking only the last token scores at every step.
         # This makes the complexity of calling this method O(n^2), when it could be O(n) if the scores were extracted
         # only at the final step. Since other methods (e.g. attention) face the same issue, this will be addressed in
         # future releases.
-        return scores[:, -1, :]
+        # Final shape: [batch_size, seq_len, num_layers]
+        return scores[..., -1, :].mT.clone()
         # TODO: Add support for encoder-decoder models
         # if is_encoder_decoder:
         #    encoder_hidden_states = torch.stack(outputs.encoder_hidden_states)

@@ -1,19 +1,26 @@
+import logging
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Callable, List, Optional, Sequence, Tuple, Type, Union
+
+import torch
 
 from ..utils import (
     Registry,
     aggregate_contiguous,
     aggregate_token_pair,
     aggregate_token_sequence,
+    available_classes,
     extract_signature_args,
 )
 from ..utils.typing import IndexSpan, TokenWithId
-from .aggregation_functions import AGGREGATION_FN_MAP
+from .aggregation_functions import AggregationFunction
 from .data_utils import TensorWrapper
 
 if TYPE_CHECKING:
     from .attribution import FeatureAttributionSequenceOutput
+
+
+logger = logging.getLogger(__name__)
 
 
 class DictWithDefault(dict):
@@ -26,13 +33,11 @@ class DictWithDefault(dict):
 
     @staticmethod
     def _get_fn(name: str) -> Callable:
-        if name not in AGGREGATION_FN_MAP:
+        if name not in available_classes(AggregationFunction):
             raise ValueError(
-                f"Unknown aggregation function {name}"
-                f"Please choose from {','.join(AGGREGATION_FN_MAP.keys())} or register a new aggregation function"
-                "using inseq.register_aggregation_function"
+                f"Unknown aggregation function {name}. Choose from {','.join(available_classes(AggregationFunction))}."
             )
-        return AGGREGATION_FN_MAP[name]
+        return AggregationFunction.available_classes()[name]()
 
     def __init__(self, default: Union[str, Callable], **kwargs):
         super().__init__(**kwargs)
@@ -131,13 +136,12 @@ class AggregatorPipeline:
             self.aggregate_functions: List[Callable] = []
             for aggregate_function in aggregate_functions:
                 if isinstance(aggregate_function, str):
-                    if aggregate_function not in AGGREGATION_FN_MAP:
+                    if aggregate_function not in available_classes(AggregationFunction):
                         raise ValueError(
-                            f"Unknown aggregation function {aggregate_function}"
-                            f"Please choose from {','.join(AGGREGATION_FN_MAP.keys())} or register a new aggregation "
-                            "function using inseq.register_aggregation_function"
+                            f"Unknown aggregation function {aggregate_function}. "
+                            f"Choose from {','.join(available_classes(AggregationFunction))}"
                         )
-                    self.aggregate_functions.append(AGGREGATION_FN_MAP[aggregate_function])
+                    self.aggregate_functions.append(AggregationFunction.available_classes()[aggregate_function]())
                 else:
                     self.aggregate_functions.append(aggregate_function)
 
@@ -158,7 +162,8 @@ class AggregableMixin(ABC):
 
     def aggregate(
         self,
-        aggregator: Union[AggregatorPipeline, Type[Aggregator], str, Sequence] = None,
+        aggregator: Union[AggregatorPipeline, Type[Aggregator], str, Sequence, None] = None,
+        aggregate_fn: Union[str, Callable, Sequence[Union[str, Callable]], None] = None,
         **kwargs,
     ) -> "AggregableMixin":
         """Aggregate outputs using the default or provided aggregator.
@@ -174,8 +179,18 @@ class AggregableMixin(ABC):
             aggregator = self._aggregator
         if isinstance(aggregator, str):
             aggregator = Aggregator.available_classes()[aggregator]
+            if aggregate_fn is not None:
+                kwargs["aggregate_fn"] = aggregate_fn
         elif isinstance(aggregator, (list, tuple)):
-            aggregator = AggregatorPipeline(aggregator, kwargs.pop("aggregate_functions", None))
+            if all(isinstance(a, (str, type)) for a in aggregator):
+                aggregator = AggregatorPipeline(aggregator, aggregate_fn)
+            elif all(isinstance(a, (list, tuple)) and all(isinstance(s, (str, type)) for s in a) for a in aggregator):
+                aggregator = AggregatorPipeline([a[0] for a in aggregator], [a[1] for a in aggregator])
+            else:
+                raise ValueError(
+                    "If aggregator is a sequence, it should contain either strings/classes identifying aggregators"
+                    "or pairs of strings/classes identifying aggregators and aggregate functions."
+                )
         return aggregator.aggregate(self, **kwargs)
 
     @abstractmethod
@@ -234,9 +249,9 @@ class SequenceAttributionAggregator(Aggregator):
         super().end_aggregation_hook(attr, **kwargs)
         # Needed to ensure the attribution can be visualized
         if attr.source_attributions is not None:
-            assert len(attr.source_attributions.shape) == 2
+            assert len(attr.source_attributions.shape) == 2, attr.source_attributions.shape
         if attr.target_attributions is not None:
-            assert len(attr.target_attributions.shape) == 2
+            assert len(attr.target_attributions.shape) == 2, attr.target_attributions.shape
 
     @staticmethod
     def aggregate_source(attr: "FeatureAttributionSequenceOutput", **kwargs):
@@ -246,25 +261,41 @@ class SequenceAttributionAggregator(Aggregator):
     def aggregate_target(attr: "FeatureAttributionSequenceOutput", **kwargs):
         return attr.target
 
-    @staticmethod
-    def aggregate_source_attributions(attr: "FeatureAttributionSequenceOutput", aggregate_fn: Callable, **kwargs):
+    @classmethod
+    def aggregate_source_attributions(
+        cls,
+        attr: "FeatureAttributionSequenceOutput",
+        aggregate_fn: AggregationFunction,
+        indices: Union[int, Tuple[int, int], List[int], None] = None,
+        **kwargs,
+    ):
         if attr.source_attributions is None:
             return attr.source_attributions
         fn_kwargs = extract_signature_args(kwargs, aggregate_fn)
+        scores = cls._filter_scores(attr.source_attributions, dim=-1, indices=indices)
         if attr.target_attributions is None:
-            return aggregate_fn(attr.source_attributions, dim=0, **fn_kwargs)
+            return cls._aggregate_scores(scores, aggregate_fn, dim=-1, **fn_kwargs)
         else:
-            return aggregate_fn((attr.source_attributions, attr.target_attributions), dim=0, **fn_kwargs)[0]
+            scores = (scores, cls._filter_scores(attr.target_attributions, dim=-1, indices=indices))
+            return cls._aggregate_scores(scores, aggregate_fn, dim=-1, **fn_kwargs)[0]
 
-    @staticmethod
-    def aggregate_target_attributions(attr: "FeatureAttributionSequenceOutput", aggregate_fn: Callable, **kwargs):
+    @classmethod
+    def aggregate_target_attributions(
+        cls,
+        attr: "FeatureAttributionSequenceOutput",
+        aggregate_fn: AggregationFunction,
+        indices: Union[int, Tuple[int, int], List[int], None] = None,
+        **kwargs,
+    ):
         if attr.target_attributions is None:
             return attr.target_attributions
         fn_kwargs = extract_signature_args(kwargs, aggregate_fn)
+        scores = cls._filter_scores(attr.target_attributions, dim=-1, indices=indices)
         if attr.source_attributions is None:
-            return aggregate_fn(attr.target_attributions, dim=0, **fn_kwargs)
+            return cls._aggregate_scores(scores, aggregate_fn, dim=-1, **fn_kwargs)
         else:
-            return aggregate_fn((attr.source_attributions, attr.target_attributions), dim=0, **fn_kwargs)[1]
+            scores = (cls._filter_scores(attr.source_attributions, dim=-1, indices=indices), scores)
+            return cls._aggregate_scores(scores, aggregate_fn, dim=-1, **fn_kwargs)[1]
 
     @staticmethod
     def aggregate_step_scores(attr: "FeatureAttributionSequenceOutput", **kwargs):
@@ -296,9 +327,59 @@ class SequenceAttributionAggregator(Aggregator):
         if attr.step_scores is not None:
             for step_score in attr.step_scores.values():
                 assert len(step_score) == attr.attr_pos_end - attr.attr_pos_start
-        if attr.sequence_scores is not None:
-            for sequence_score in attr.sequence_scores.values():
-                assert sequence_score.shape == attr.source_attributions.shape
+
+    @staticmethod
+    def _filter_scores(
+        scores: torch.Tensor,
+        dim: int = -1,
+        indices: Union[int, Tuple[int, int], List[int], None] = None,
+    ) -> torch.Tensor:
+        n_units = scores.shape[dim]
+
+        if hasattr(indices, "__iter__"):
+            if len(indices) == 0:
+                raise RuntimeError("At least two indices must be specified for aggregation.")
+            if len(indices) == 1:
+                indices = indices[0]
+
+        if isinstance(indices, int) and indices not in range(-n_units, n_units):
+            raise IndexError(f"Index out of range. Scores only have {n_units} units.")
+        else:
+            if indices is None:
+                indices = (0, n_units)
+                logger.info("No indices specified for extraction. Using all units by default.")
+
+            # Convert negative indices to positive indices
+            if hasattr(indices, "__iter__"):
+                indices = type(indices)([h_idx if h_idx >= 0 else n_units + h_idx for h_idx in indices])
+            if not hasattr(indices, "__iter__") or (
+                len(indices) == 2 and isinstance(indices, tuple) and indices[0] >= indices[1]
+            ):
+                raise RuntimeError(
+                    "A (start, end) tuple of indices representing a span or a list of individual indices"
+                    " must be specified for aggregation."
+                )
+            max_idx_val = n_units if isinstance(indices, list) else n_units + 1
+            if not all(h in range(-n_units, max_idx_val) for h in indices):
+                raise IndexError("One or more index out of range. Scores only have {n_units} units.")
+            if len(set(indices)) != len(indices):
+                raise IndexError("Duplicate indices are not allowed.")
+            if isinstance(indices, tuple):
+                scores = scores.index_select(dim, torch.arange(indices[0], indices[1]))
+            else:
+                scores = scores.index_select(dim, torch.tensor(indices, device=scores.device))
+            return scores
+
+    @staticmethod
+    def _aggregate_scores(
+        scores: Union[torch.Tensor, Tuple[torch.Tensor, ...]],
+        aggregate_fn: AggregationFunction,
+        dim: int = -1,
+        **kwargs,
+    ) -> Union[torch.Tensor, Tuple[torch.Tensor, ...]]:
+        if isinstance(scores, tuple) and aggregate_fn.takes_single_tensor:
+            return tuple(aggregate_fn(score, dim=dim, **kwargs) for score in scores)
+        return aggregate_fn(scores, dim=dim, **kwargs)
 
 
 class ContiguousSpanAggregator(SequenceAttributionAggregator):

@@ -4,7 +4,6 @@ from .attr import list_feature_attribution_methods, list_step_functions, registe
 from .data import (
     FeatureAttributionOutput,
     list_aggregation_functions,
-    register_aggregation_function,
     show_attributions,
 )
 from .models import AttributionModel, list_supported_frameworks, load_model, register_model_config
@@ -31,5 +30,4 @@ __all__ = [
     "list_supported_frameworks",
     "register_step_function",
     "register_model_config",
-    "register_aggregation_function",
 ]

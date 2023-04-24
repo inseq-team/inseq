@@ -2,7 +2,7 @@ import functools
 import gzip
 import io
 import logging
-import numbers
+import math
 import warnings
 from base64 import standard_b64decode, standard_b64encode
 from collections import OrderedDict
@@ -11,6 +11,7 @@ from functools import wraps
 from importlib import import_module
 from inspect import signature
 from itertools import dropwhile
+from numbers import Number
 from os import PathLike, fsync
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
@@ -39,27 +40,24 @@ def optional(condition, context_manager, alternative_fn=None, **alternative_fn_k
 
 
 def _pretty_list_contents(l: Sequence[Any]) -> str:
-    quote = f"""{"'" if l and type(l[0]) in [str, TokenWithId] else ""}"""
+    quote = "'" if l and type(l[0]) in [str, TokenWithId] else ""
+    get_space = lambda s: "" if not isinstance(s, Number) or s < 0 else "  " if math.isnan(s) else " "
     return (
         quote
-        + f"{quote}, {quote}".join(
-            [
-                f"{' ' if isinstance(v, numbers.Number) and v >= 0 else ''}"
-                + (f"{v:.2f}" if isinstance(v, float) else f"{v}")
-                for v in l
-            ]
-        )
+        + f"{quote}, {quote}".join([get_space(v) + (f"{v:.2f}" if isinstance(v, float) else f"{v}") for v in l])
         + quote
     )
 
 
 def _pretty_list(l: Optional[Sequence[Any]], lpad: int = 8) -> str:
-    if all([isinstance(x, list) for x in l]):
+    if all(isinstance(x, list) for x in l):
         line_sep = f" ],\n{' ' * lpad}[ "
         contents = " " * lpad + "[ " + line_sep.join([_pretty_list_contents(subl) for subl in l]) + " ]"
     else:
         if all([hasattr(x, "to_dict") for x in l]):
-            contents = ",\n".join([f"{' ' * lpad + x.__class__.__name__}({pretty_dict(x.to_dict(), lpad)}" for x in l])
+            contents = ",\n".join(
+                [f"{' ' * lpad + x.__class__.__name__}({pretty_dict(x.to_dict(), lpad + 4)})" for x in l]
+            )
         else:
             contents = " " * lpad + _pretty_list_contents(l)
     return "[\n" + contents + f"\n{' ' * (lpad - 4)}]"
@@ -75,6 +73,8 @@ def pretty_list(l: Optional[Sequence[Any]], lpad: int = 8) -> str:
         out_txt = f"list with {len(l)} sub-lists"
         if any([len(sl) > 20 for sl in l]) or len(l) > 15:
             return out_txt
+        if all(isinstance(ssl, list) for sl in l for ssl in sl):
+            return out_txt
     if len(l) > 20:
         return out_txt
     return f"{out_txt}:{_pretty_list(l, lpad)}"
@@ -83,7 +83,7 @@ def pretty_list(l: Optional[Sequence[Any]], lpad: int = 8) -> str:
 def pretty_tensor(t: Optional[Tensor] = None, lpad: int = 8) -> str:
     if t is None:
         return "None"
-    if len(t.shape) > 3 or any([x > 20 for x in t.shape]):
+    if len(t.shape) > 2 or any([x > 20 for x in t.shape]):
         return f"{t.dtype} tensor of shape {list(t.shape)} on {t.device}"
     else:
         out_list = t.tolist()
@@ -104,7 +104,7 @@ def pretty_dict(d: Dict[str, Any], lpad: int = 4) -> str:
         elif isinstance(v, dict):
             out_txt += pretty_dict(v, lpad + 4)
         elif hasattr(v, "to_dict"):
-            out_txt += pretty_dict(v.to_dict(), lpad + 4)
+            out_txt += f"{v.__class__.__name__}({pretty_dict(v.to_dict(), lpad + 4)})"
         else:
             out_txt += "None" if v is None else str(v)
         out_txt += ",\n"

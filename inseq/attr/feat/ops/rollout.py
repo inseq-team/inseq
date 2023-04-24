@@ -42,9 +42,9 @@ def _rollout_joint(
         target_rollout_scores[:, i, ...] = target_scores[:, i, ...] @ target_rollout_scores[:, i - 1, ...]
     # Normalize scores across source and target
     source_rollout_scores, target_rollout_scores = normalize_attributions(
-        (source_rollout_scores, target_rollout_scores), cat_dim=-1, norm_dim=-1
+        (source_rollout_scores, target_rollout_scores), cat_dim=-1
     )
-    return source_rollout_scores[:, -1, ...], target_rollout_scores[:, -1, ...]
+    return source_rollout_scores, target_rollout_scores
 
 
 def rollout_fn(
@@ -91,8 +91,16 @@ def rollout_fn(
 
         final_source_scores = source_scores[:, -1, ...]
         source_rollout_scores, target_rollout_scores = _rollout_joint(final_source_scores, cross_scores, target_scores)
+        source_rollout_scores = source_rollout_scores[:, -1, ...].unsqueeze(1)
+        target_rollout_scores = target_rollout_scores[:, -1, ...].unsqueeze(1)
         if dim != 1:
             source_rollout_scores = source_rollout_scores.transpose(1, dim)
             target_rollout_scores = target_rollout_scores.transpose(1, dim)
-        return source_rollout_scores, target_rollout_scores
-    return _rollout_single(scores)[:, -1, ...]
+        return source_rollout_scores.squeeze(dim), target_rollout_scores.squeeze(dim)
+    else:
+        if dim != 1:
+            scores = scores.transpose(dim, 1)
+        target_rollout_scores = _rollout_single(scores)[:, -1, ...].unsqueeze(1)
+        if dim != 1:
+            target_rollout_scores = target_rollout_scores.transpose(1, dim)
+        return target_rollout_scores.squeeze(dim)
