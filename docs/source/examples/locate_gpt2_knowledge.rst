@@ -46,7 +46,7 @@ saving aggregated outputs to disk.
         )
         for i, ex in data:
             # e.g. "The capital of Spain is"
-            prompt = ex["relation"].format{ex["subject"]}
+            prompt = ex["relation"].format(ex["subject"])
             # e.g. "The capital of Spain is Madrid"
             true_answer = prompt + ex["target_true"]
             # e.g. "The capital of Spain is Paris"
@@ -56,15 +56,15 @@ saving aggregated outputs to disk.
             out = attrib_model.attribute(
                 prompt,
                 true_answer,
-                attributed_fn="contrast_logits_diff",
+                attributed_fn="contrast_prob_diff",
                 contrast_ids=contrast.input_ids,
                 contrast_attention_mask=contrast.attention_mask,
-                step_scores=["contrast_logits_diff"],
+                step_scores=["contrast_prob_diff"],
                 show_progress=False,
             )
             # Save aggregated attributions to disk
             out = out.aggregate()
-            out.save(f"layer_{l}_ex_{i}.json", overwrite=True)
+            out.save(f"layer_{layer}_ex_{i}.json", overwrite=True)
 
 The following plots visualize attributions per layers for some examples taken from the dataset, showing how
 intermediate layers play a relevant role in recalling factual knowledge, in relation to the last subject token in the
