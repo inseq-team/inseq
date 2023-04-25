@@ -150,7 +150,7 @@ class AggregatorPipeline:
         self.aggregators: List[Type[Aggregator]] = []
         self.aggregate_fn: List[Callable] = []
         if aggregate_fn is not None:
-            if len(aggregate_fn) != len(self.aggregators):
+            if len(aggregate_fn) != len(aggregators):
                 raise ValueError(
                     "If custom aggregate_fn are provided, their number should match the number of aggregators."
                 )
@@ -166,9 +166,12 @@ class AggregatorPipeline:
         for aggregator in self.aggregators:
             aggregator.start_aggregation_hook(tensors, **kwargs)
         for aggregator, aggregate_fn in zip(self.aggregators, self.aggregate_fn):
+            curr_aggregation_kwargs = kwargs.copy()
             if aggregate_fn is not None:
-                kwargs["aggregate_fn"] = aggregate_fn
-            tensors = aggregator.aggregate(tensors, do_start_aggregation=False, do_end_aggregation=False, **kwargs)
+                curr_aggregation_kwargs["aggregate_fn"] = aggregate_fn
+            tensors = aggregator.aggregate(
+                tensors, do_start_aggregation=False, do_end_aggregation=False, **curr_aggregation_kwargs
+            )
         for aggregator in self.aggregators:
             aggregator.end_aggregation_hook(tensors, **kwargs)
         return tensors
