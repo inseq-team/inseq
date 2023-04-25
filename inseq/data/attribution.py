@@ -683,7 +683,7 @@ class MultiDimensionalFeatureAttributionSequenceOutput(FeatureAttributionSequenc
 
     def __post_init__(self):
         super().__post_init__()
-        self._aggregator = [("scores", "mean")] * self._num_dimensions + [("scores", "normalize")]
+        self._aggregator = ["mean"] * self._num_dimensions + ["normalize"]
 
 
 @dataclass(eq=False, repr=False)

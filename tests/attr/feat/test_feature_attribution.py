@@ -7,38 +7,43 @@ from inseq.models import HuggingfaceDecoderOnlyModel, HuggingfaceEncoderDecoderM
 
 
 @fixture(scope="session")
-def saliency_mt_model() -> HuggingfaceEncoderDecoderModel:
+def saliency_mt_model_larger() -> HuggingfaceEncoderDecoderModel:
     return inseq.load_model("Helsinki-NLP/opus-mt-en-it", "saliency")
 
 
 @fixture(scope="session")
+def saliency_mt_model() -> HuggingfaceEncoderDecoderModel:
+    return inseq.load_model("hf-internal-testing/tiny-random-MarianMTModel", "saliency")
+
+
+@fixture(scope="session")
 def saliency_gpt_model() -> HuggingfaceDecoderOnlyModel:
-    return inseq.load_model("gpt2", "saliency")
+    return inseq.load_model("hf-internal-testing/tiny-random-GPT2LMHeadModel", "saliency")
 
 
 @fixture(scope="session")
 def auxiliary_saliency_mt_model():
-    return AutoModelForSeq2SeqLM.from_pretrained("Helsinki-NLP/opus-mt-en-it")
+    return AutoModelForSeq2SeqLM.from_pretrained("hf-internal-testing/tiny-random-MarianMTModel")
 
 
 @fixture(scope="session")
 def auxiliary_saliency_gpt_model():
-    return AutoModelForCausalLM.from_pretrained("gpt2")
+    return AutoModelForCausalLM.from_pretrained("hf-internal-testing/tiny-random-GPT2LMHeadModel")
 
 
-def test_contrastive_attribution_seq2seq(saliency_mt_model: HuggingfaceEncoderDecoderModel):
+def test_contrastive_attribution_seq2seq(saliency_mt_model_larger: HuggingfaceEncoderDecoderModel):
     """Runs a contrastive feature attribution using the method relying on logits difference
     introduced by [Yin and Neubig '22](https://arxiv.org/pdf/2202.10419.pdf), taking advantage of
     the custom feature attribution target function module.
     """
     # Pre-compute ids and attention map for the contrastive target
-    contrast = saliency_mt_model.encode("Non posso crederlo.", as_targets=True)
+    contrast = saliency_mt_model_larger.encode("Non posso crederlo.", as_targets=True)
 
     # Perform the contrastive attribution:
     # Regular (forced) target -> "Non posso crederci."
     # Contrastive target      -> "Non posso crederlo."
     # contrast_ids & contrast_attention_mask are kwargs defined in the function definition
-    out = saliency_mt_model.attribute(
+    out = saliency_mt_model_larger.attribute(
         "I can't believe it",
         "Non posso crederci.",
         attributed_fn="contrast_prob_diff",
@@ -67,7 +72,7 @@ def test_contrastive_attribution_gpt(saliency_gpt_model: HuggingfaceDecoderOnlyM
         show_progress=False,
     )
     attribution_scores = out.sequence_attributions[0].target_attributions
-    assert attribution_scores.shape == torch.Size([11, 4, 768])
+    assert attribution_scores.shape == torch.Size([23, 5, 32])
 
 
 def test_mcd_weighted_attribution_seq2seq(saliency_mt_model, auxiliary_saliency_mt_model):
@@ -77,7 +82,7 @@ def test_mcd_weighted_attribution_seq2seq(saliency_mt_model, auxiliary_saliency_
     out = saliency_mt_model.attribute(
         "Hello ladies and badgers!",
         attributed_fn="mc_dropout_prob_avg",
-        attributed_fn_args={"n_mcd_steps": 5, "aux_model": auxiliary_saliency_mt_model.to(saliency_mt_model.device)},
+        attributed_fn_args={"n_mcd_steps": 3, "aux_model": auxiliary_saliency_mt_model.to(saliency_mt_model.device)},
         show_progress=False,
     )
     attribution_scores = out.sequence_attributions[0].source_attributions
@@ -91,8 +96,8 @@ def test_mcd_weighted_attribution_gpt(saliency_gpt_model, auxiliary_saliency_gpt
     out = saliency_gpt_model.attribute(
         "Hello ladies and badgers!",
         attributed_fn="mc_dropout_prob_avg",
-        attributed_fn_args={"n_mcd_steps": 5, "aux_model": auxiliary_saliency_gpt_model.to(saliency_gpt_model.device)},
-        generation_args={"max_new_tokens": 5},
+        attributed_fn_args={"n_mcd_steps": 3, "aux_model": auxiliary_saliency_gpt_model.to(saliency_gpt_model.device)},
+        generation_args={"max_new_tokens": 3},
         show_progress=False,
     )
     attribution_scores = out.sequence_attributions[0].target_attributions

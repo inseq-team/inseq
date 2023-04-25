@@ -115,46 +115,66 @@ class Aggregator(Registry):
         pass
 
 
+def _get_aggregators_from_id(
+    aggregator: str,
+    aggregate_fn: Optional[str] = None,
+) -> Tuple[Type[Aggregator], Optional[AggregationFunction]]:
+    if aggregator in available_classes(Aggregator):
+        aggregator = Aggregator.available_classes()[aggregator]
+    elif aggregator in available_classes(AggregationFunction):
+        if aggregate_fn is not None:
+            raise ValueError(
+                "If aggregator is a string identifying an aggregation function, aggregate_fn should not be provided."
+            )
+        aggregate_fn = aggregator
+        aggregator = SequenceAttributionAggregator
+    else:
+        raise ValueError(f"Unknown aggregator {aggregator}. Choose from {','.join(available_classes(Aggregator))}.")
+    if aggregate_fn is None:
+        return aggregator, aggregate_fn
+    if aggregate_fn not in available_classes(AggregationFunction):
+        raise ValueError(
+            f"Unknown aggregation function {aggregate_fn}. "
+            f"Choose from {','.join(available_classes(AggregationFunction))}"
+        )
+    aggregate_fn = AggregationFunction.available_classes()[aggregate_fn]()
+    return aggregator, aggregate_fn
+
+
 class AggregatorPipeline:
     def __init__(
         self,
         aggregators: List[Union[str, Type[Aggregator]]],
-        aggregate_functions: Optional[List[Union[str, Callable]]] = None,
+        aggregate_fn: Optional[List[Union[str, Callable]]] = None,
     ):
         self.aggregators: List[Type[Aggregator]] = []
-        for aggregator in aggregators:
-            if isinstance(aggregator, str):
-                self.aggregators.append(Aggregator.available_classes()[aggregator])
-            else:
-                self.aggregators.append(aggregator)
-        self.aggregate_functions = None
-        if aggregate_functions is not None:
-            if not len(aggregate_functions) == len(self.aggregators):
+        self.aggregate_fn: List[Callable] = []
+        if aggregate_fn is not None:
+            if len(aggregate_fn) != len(self.aggregators):
                 raise ValueError(
-                    "If custom aggregate_functions are provided, their number should match the number of aggregators."
+                    "If custom aggregate_fn are provided, their number should match the number of aggregators."
                 )
-            self.aggregate_functions: List[Callable] = []
-            for aggregate_function in aggregate_functions:
-                if isinstance(aggregate_function, str):
-                    if aggregate_function not in available_classes(AggregationFunction):
-                        raise ValueError(
-                            f"Unknown aggregation function {aggregate_function}. "
-                            f"Choose from {','.join(available_classes(AggregationFunction))}"
-                        )
-                    self.aggregate_functions.append(AggregationFunction.available_classes()[aggregate_function]())
-                else:
-                    self.aggregate_functions.append(aggregate_function)
+        for idx in range(len(aggregators)):
+            curr_aggregator = aggregators[idx]
+            curr_aggregate_fn = aggregate_fn[idx] if aggregate_fn is not None else None
+            if isinstance(curr_aggregator, str):
+                curr_aggregator, curr_aggregate_fn = _get_aggregators_from_id(curr_aggregator, curr_aggregate_fn)
+            self.aggregators.append(curr_aggregator)
+            self.aggregate_fn.append(curr_aggregate_fn)
 
     def aggregate(self, tensors: TensorWrapper, **kwargs):
         for aggregator in self.aggregators:
             aggregator.start_aggregation_hook(tensors, **kwargs)
-        for idx, aggregator in enumerate(self.aggregators):
-            if self.aggregate_functions is not None:
-                kwargs["aggregate_fn"] = self.aggregate_functions[idx]
+        for aggregator, aggregate_fn in zip(self.aggregators, self.aggregate_fn):
+            if aggregate_fn is not None:
+                kwargs["aggregate_fn"] = aggregate_fn
             tensors = aggregator.aggregate(tensors, do_start_aggregation=False, do_end_aggregation=False, **kwargs)
         for aggregator in self.aggregators:
             aggregator.end_aggregation_hook(tensors, **kwargs)
         return tensors
+
+
+AggregatorInput = Union[AggregatorPipeline, Type[Aggregator], str, Sequence[Union[str, Type[Aggregator]]], None]
 
 
 class AggregableMixin(ABC):
@@ -162,14 +182,14 @@ class AggregableMixin(ABC):
 
     def aggregate(
         self,
-        aggregator: Union[AggregatorPipeline, Type[Aggregator], str, Sequence, None] = None,
-        aggregate_fn: Union[str, Callable, Sequence[Union[str, Callable]], None] = None,
+        aggregator: AggregatorInput = None,
+        aggregate_fn: Union[str, Sequence[str], None] = None,
         **kwargs,
     ) -> "AggregableMixin":
         """Aggregate outputs using the default or provided aggregator.
 
         Args:
-            aggregator (:obj:`AggregatorPipeline` or :obj:`Type[Aggregator]`, optional): Aggregator
+            aggregator (:obj:`AggregatorPipeline` or :obj:`Type[Aggregator]` or :obj:`str` or , optional): Aggregator
                 pipeline to use. If not provided, the default aggregator pipeline is used.
 
         Returns:
@@ -178,18 +198,24 @@ class AggregableMixin(ABC):
         if aggregator is None:
             aggregator = self._aggregator
         if isinstance(aggregator, str):
-            aggregator = Aggregator.available_classes()[aggregator]
+            if isinstance(aggregate_fn, (list, tuple)):
+                raise ValueError(
+                    "If a single aggregator is used, aggregate_fn should also be a string identifier for the "
+                    "corresponding aggregation function if defined."
+                )
+            aggregator, aggregate_fn = _get_aggregators_from_id(aggregator, aggregate_fn)
             if aggregate_fn is not None:
                 kwargs["aggregate_fn"] = aggregate_fn
         elif isinstance(aggregator, (list, tuple)):
             if all(isinstance(a, (str, type)) for a in aggregator):
                 aggregator = AggregatorPipeline(aggregator, aggregate_fn)
-            elif all(isinstance(a, (list, tuple)) and all(isinstance(s, (str, type)) for s in a) for a in aggregator):
-                aggregator = AggregatorPipeline([a[0] for a in aggregator], [a[1] for a in aggregator])
+            elif all(isinstance(agg, tuple) for agg in aggregator):
+                if all(isinstance(idx, (str, type)) for agg in aggregator for idx in agg):
+                    aggregator = AggregatorPipeline([a[0] for a in aggregator], [a[1] for a in aggregator])
             else:
                 raise ValueError(
                     "If aggregator is a sequence, it should contain either strings/classes identifying aggregators"
-                    "or pairs of strings/classes identifying aggregators and aggregate functions."
+                    "or tuples of pairs of strings/classes identifying aggregators and aggregate functions."
                 )
         return aggregator.aggregate(self, **kwargs)
 
