@@ -6,6 +6,7 @@ import torch
 from transformers import AutoModelForCausalLM, AutoModelForSeq2SeqLM
 from transformers.modeling_outputs import ModelOutput
 
+from ..data import DecoderOnlyBatch, FeatureAttributionInput, get_batch_from_inputs
 from ..data.aggregation_functions import DEFAULT_ATTRIBUTION_AGGREGATE_DICT
 from ..utils.typing import EmbeddingsTensor, IdsTensor, SingleScorePerStepTensor, TargetIdsTensor
 
@@ -96,6 +97,116 @@ def perplexity_fn(
     return 2 ** crossentropy_fn(attribution_model, forward_output, target_ids)
 
 
+def contrast_prob_fn(
+    attribution_model: "AttributionModel",
+    encoder_input_ids: IdsTensor,
+    decoder_input_ids: IdsTensor,
+    encoder_attention_mask: IdsTensor,
+    decoder_attention_mask: IdsTensor,
+    encoder_input_embeds: EmbeddingsTensor,
+    decoder_input_embeds: EmbeddingsTensor,
+    target_ids: TargetIdsTensor,
+    contrast_target_prefixes: FeatureAttributionInput = None,
+    contrast_sources: FeatureAttributionInput = None,
+    **kwargs,
+) -> SingleScorePerStepTensor:
+    """
+    Compute the probability of target ids given contrastive inputs, equivalent to the pro
+
+    Args:
+        contrast_sources (:obj:`str` or :obj:`list(str)`): Source text(s) used as contrastive inputs to compute
+            target probabilities for encoder-decoder models. If not specified, the source text is assumed to match the
+            original source text. Defaults to :obj:`None`.
+        contrast_target_prefixes (:obj:`str` or :obj:`list(str)`): Target prefix(es) used as contrastive inputs to
+            compute target probabilities. If not specified, no target prefix beyond previously generated tokens is
+            assumed. Defaults to :obj:`None`.
+    """
+    if contrast_target_prefixes is not None:
+        c_dec_in = attribution_model.encode(
+            contrast_target_prefixes, as_targets=attribution_model.is_encoder_decoder, add_special_tokens=False
+        )
+        if attribution_model.is_encoder_decoder:
+            # Remove the first token of the decoder input ids and attention mask if it's BOS
+            if torch.all(torch.eq(decoder_input_ids[:, 0], attribution_model.bos_token_id)):
+                decoder_input_ids = decoder_input_ids[:, 1:]
+                decoder_attention_mask = decoder_attention_mask[:, 1:]
+        c_dec_ids = torch.cat((c_dec_in.input_ids, decoder_input_ids), dim=1)
+        c_dec_mask = torch.cat((c_dec_in.attention_mask, decoder_attention_mask), dim=1)
+        c_dec_embeds = attribution_model.embed(c_dec_ids, as_targets=attribution_model.is_encoder_decoder)
+    else:
+        c_dec_ids = decoder_input_ids
+        c_dec_mask = decoder_attention_mask
+        c_dec_embeds = decoder_input_embeds
+    if contrast_sources is not None:
+        if not attribution_model.is_encoder_decoder:
+            raise ValueError(
+                "Contrastive source inputs can only be used with encoder-decoder models. "
+                "Use `contrast_target_prefixes` to set a contrastive target prefix for decoder-only models."
+            )
+        c_enc_in = attribution_model.encode(contrast_sources)
+        c_enc_ids = c_enc_in.input_ids
+        c_enc_mask = c_enc_in.attention_mask
+        c_enc_embeds = attribution_model.embed(c_enc_ids, as_targets=False)
+    else:
+        c_enc_ids = encoder_input_ids
+        c_enc_mask = encoder_attention_mask
+        c_enc_embeds = encoder_input_embeds
+    c_batch = attribution_model.formatter.convert_args_to_batch(
+        encoder_input_ids=c_enc_ids,
+        decoder_input_ids=c_dec_ids,
+        encoder_input_embeds=c_enc_embeds,
+        decoder_input_embeds=c_dec_embeds,
+        encoder_attention_mask=c_enc_mask,
+        decoder_attention_mask=c_dec_mask,
+    )
+    c_out = attribution_model.get_forward_output(c_batch, use_embeddings=attribution_model.is_encoder_decoder)
+    return probability_fn(attribution_model, c_out, target_ids)
+
+
+def pcxmi_fn(
+    attribution_model: "AttributionModel",
+    forward_output: ModelOutput,
+    encoder_input_ids: IdsTensor,
+    decoder_input_ids: IdsTensor,
+    encoder_attention_mask: IdsTensor,
+    decoder_attention_mask: IdsTensor,
+    encoder_input_embeds: EmbeddingsTensor,
+    decoder_input_embeds: EmbeddingsTensor,
+    target_ids: TargetIdsTensor,
+    contrast_sources: FeatureAttributionInput = None,
+    contrast_target_prefixes: FeatureAttributionInput = None,
+    **kwargs,
+) -> SingleScorePerStepTensor:
+    """
+    Compute the pointwise conditional cross-mutual information (P-CXMI) of target ids given original and contrastive
+    input options. The P-CXMI is defined as the negative log-ratio between the conditional probability of the target
+    given the original input and the conditional probability of the target given the contrastive input, as defined
+    by `Yin et al. (2021) <https://arxiv.org/abs/2109.07446>`__.
+
+    Args:
+        contrast_sources (:obj:`str` or :obj:`list(str)`): Source text(s) used as contrastive inputs to compute
+            the P-CXMI for encoder-decoder models. If not specified, the source text is assumed to match the original
+            source text. Defaults to :obj:`None`.
+        contrast_target_prefixes (:obj:`str` or :obj:`list(str)`): Target prefix(es) used as contrastive inputs to
+            compute the P-CXMI. If not specified, no target prefix beyond previously generated tokens is assumed.
+            Defaults to :obj:`None`.
+    """
+    original_probs = probability_fn(attribution_model, forward_output, target_ids)
+    contrast_probs = contrast_prob_fn(
+        attribution_model=attribution_model,
+        encoder_input_ids=encoder_input_ids,
+        decoder_input_ids=decoder_input_ids,
+        encoder_attention_mask=encoder_attention_mask,
+        decoder_attention_mask=decoder_attention_mask,
+        encoder_input_embeds=encoder_input_embeds,
+        decoder_input_embeds=decoder_input_embeds,
+        target_ids=target_ids,
+        contrast_sources=contrast_sources,
+        contrast_target_prefixes=contrast_target_prefixes,
+    )
+    return -torch.log2(torch.div(original_probs, contrast_probs))
+
+
 def contrast_prob_diff_fn(
     attribution_model: "AttributionModel",
     forward_output: ModelOutput,
@@ -103,57 +214,55 @@ def contrast_prob_diff_fn(
     encoder_input_embeds: EmbeddingsTensor,
     encoder_attention_mask: IdsTensor,
     decoder_input_ids: IdsTensor,
-    decoder_attention_mask: IdsTensor,
     target_ids: TargetIdsTensor,
-    contrast_ids: IdsTensor,
-    contrast_attention_mask: IdsTensor,
+    contrast_targets: FeatureAttributionInput,
     **kwargs,
 ):
-    """Returnsthe difference between next step probability for a candidate generation target vs. a contrastive
-    alternative, answering the question. Can be used as attribution target to answer the question: "Which features
-    were salient in the choice of picking the selected token rather than its contrastive alternative?"
+    """Returns the difference between next step probability for a candidate generation target vs. a contrastive
+    alternative. Can be used as attribution target to answer the question: "Which features were salient in the
+    choice of picking the selected token rather than its contrastive alternative?". Follows the implementation
+    of `Yin and Neubig (2022) <https://aclanthology.org/2022.emnlp-main.14>`__.
 
     Args:
-        contrast_ids (:obj:`torch.Tensor`): Tensor of shape ``[batch_size, seq_len]`` containing the ids of the
-            contrastive input to be compared to the candidate.
-        contrast_attention_mask (:obj:`torch.Tensor`): Tensor of shape ``[batch_size, seq_len]`` containing the
-            attention mask for the contrastive input.
+        contrast_targets (:obj:`str` or :obj:`list(str)`): Contrastive target text(s) to be compared to the original
+            target text.
     """
-    from ..models import DecoderOnlyAttributionModel, EncoderDecoderAttributionModel
-
-    # We truncate contrastive ids and their attention map to the current generation step
-    contrast_decoder_input_ids = contrast_ids[:, : decoder_input_ids.shape[1]].to(attribution_model.device)
-    contrast_decoder_attention_mask = contrast_attention_mask[:, : decoder_attention_mask.shape[1]].to(
-        attribution_model.device
+    c_batch = DecoderOnlyBatch.from_batch(
+        get_batch_from_inputs(
+            attribution_model=attribution_model,
+            inputs=contrast_targets,
+            as_targets=attribution_model.is_encoder_decoder,
+        )
     )
-    # We select the next contrastive token as target
-    contrast_target_ids = contrast_ids[:, decoder_input_ids.shape[1]].to(attribution_model.device)
+    curr_prefix_len = decoder_input_ids.size(1)
+
+    # We select the next contrastive token as target and truncate contrastive ids
+    # and their attention map to the current generation step.
+    c_tgt_ids = c_batch.target_ids[:, curr_prefix_len]
+    c_batch = c_batch[:curr_prefix_len].to(attribution_model.device)
+
+    if decoder_input_ids.size(0) != c_batch.target_ids.size(0):
+        raise ValueError(
+            f"Contrastive batch size ({c_batch.target_ids.size(0)}) must match candidate batch size"
+            f"({decoder_input_ids.size(0)}). Methods expanding inputs to multiple steps (e.g. Integrated Gradients) "
+            "are currently not supported for contrastive feature attribution."
+        )
+
     # Forward pass with the same model used for the main generation, but using contrastive inputs instead
-    if isinstance(attribution_model, EncoderDecoderAttributionModel):
-        contrast_decoder_input_embeds = attribution_model.embed_ids(contrast_decoder_input_ids, as_targets=True)
-        contrast_batch = attribution_model.formatter.convert_args_to_batch(
-            encoder_input_ids=encoder_input_ids,
-            encoder_input_embeds=encoder_input_embeds,
-            decoder_input_ids=contrast_decoder_input_ids,
-            encoder_attention_mask=encoder_attention_mask,
-            decoder_attention_mask=contrast_decoder_attention_mask,
-            decoder_input_embeds=contrast_decoder_input_embeds,
-        )
-        use_embeddings = True
-    elif isinstance(attribution_model, DecoderOnlyAttributionModel):
-        contrast_batch = attribution_model.formatter.convert_args_to_batch(
-            input_ids=contrast_decoder_input_ids,
-            input_embeds=None,
-            attention_mask=contrast_decoder_attention_mask,
-        )
-        use_embeddings = False
-    else:
-        raise ValueError("Unsupported attribution model type")
-    contrast_output = attribution_model.get_forward_output(contrast_batch, use_embeddings=use_embeddings)
+    c_batch = attribution_model.formatter.convert_args_to_batch(
+        encoder_input_ids=encoder_input_ids,
+        decoder_input_ids=c_batch.target_ids,
+        encoder_input_embeds=encoder_input_embeds,
+        decoder_input_embeds=c_batch.target_embeds,
+        encoder_attention_mask=encoder_attention_mask,
+        decoder_attention_mask=c_batch.target_mask,
+    )
+    c_output = attribution_model.get_forward_output(c_batch, use_embeddings=attribution_model.is_encoder_decoder)
+
     # Return the prob difference as target for attribution
     model_probs = probability_fn(attribution_model, forward_output, target_ids)
-    contrast_probs = probability_fn(attribution_model, contrast_output, contrast_target_ids)
-    return model_probs - contrast_probs
+    c_probs = probability_fn(attribution_model, c_output, c_tgt_ids)
+    return model_probs - c_probs
 
 
 def mc_dropout_prob_avg_fn(
@@ -166,7 +275,7 @@ def mc_dropout_prob_avg_fn(
     decoder_attention_mask: IdsTensor,
     target_ids: TargetIdsTensor,
     aux_model: Union[AutoModelForSeq2SeqLM, AutoModelForCausalLM],
-    n_mcd_steps: int = 10,
+    n_mcd_steps: int = 5,
     **kwargs,
 ):
     """Returns the average of probability scores using a pool of noisy prediction computed with MC Dropout. Can be
@@ -180,7 +289,6 @@ def mc_dropout_prob_avg_fn(
             - Must contain dropout layers to enable MC Dropout.
         n_mcd_steps (:obj:`int`): The number of prediction steps that should be used to normalize the original output.
     """
-    from ..models import DecoderOnlyAttributionModel, EncoderDecoderAttributionModel
 
     noisy_probs = []
     # Compute noisy predictions using the auxiliary model
@@ -193,20 +301,17 @@ def mc_dropout_prob_avg_fn(
             "mc_dropout_prob_avg expects models using the same vocabulary."
         )
     for _ in range(n_mcd_steps):
-        if isinstance(attribution_model, EncoderDecoderAttributionModel):
-            aux_output = aux_model(
-                inputs_embeds=encoder_input_embeds,
-                attention_mask=encoder_attention_mask,
-                decoder_inputs_embeds=decoder_input_embeds,
-                decoder_attention_mask=decoder_attention_mask,
-            )
-        elif isinstance(attribution_model, DecoderOnlyAttributionModel):
-            aux_output = aux_model(
-                input_ids=decoder_input_ids,
-                attention_mask=decoder_attention_mask,
-            )
-        else:
-            raise ValueError("Unsupported model type")
+        aux_batch = attribution_model.formatter.convert_args_to_batch(
+            encoder_input_ids=None,
+            decoder_input_ids=decoder_input_ids,
+            encoder_input_embeds=encoder_input_embeds,
+            decoder_input_embeds=decoder_input_embeds,
+            encoder_attention_mask=encoder_attention_mask,
+            decoder_attention_mask=decoder_attention_mask,
+        )
+        aux_output = attribution_model.get_forward_output(
+            aux_batch, use_embeddings=attribution_model.is_encoder_decoder
+        )
         noisy_prob = probability_fn(attribution_model, aux_output, target_ids)
         noisy_probs.append(noisy_prob)
     # Original probability from the model without noise
@@ -221,6 +326,8 @@ STEP_SCORES_MAP = {
     "entropy": entropy_fn,
     "crossentropy": crossentropy_fn,
     "perplexity": perplexity_fn,
+    "contrast_prob": contrast_prob_fn,
+    "pcxmi": pcxmi_fn,
     "contrast_prob_diff": contrast_prob_diff_fn,
     "mc_dropout_prob_avg": mc_dropout_prob_avg_fn,
 }
