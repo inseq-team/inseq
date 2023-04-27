@@ -133,7 +133,7 @@ def ordinal_str(n: int):
 
 
 def rgetattr(obj, attr, *args):
-    """Recursively access attributes from nested classes
+    """Recursively access attributes from nested classes.
 
     E.g. rgetattr(attr_model, 'model.model.decoder.layers[4].self_attn')
     >> MarianAttention(
@@ -179,7 +179,7 @@ def drop_padding(seq: Sequence[Any], pad_id: Any):
 
 
 def isnotebook():
-    """Returns true if code is being executed in a notebook, false otherwise
+    """Returns true if code is being executed in a notebook, false otherwise.
 
     Currently supported: Jupyter Notebooks, Google Colab
     To validate: Kaggle Notebooks, JupyterLab
@@ -250,9 +250,7 @@ def aggregate_token_pair(tokens: List[TokenWithId], other_tokens: List[TokenWith
 
 
 def gzip_compress(data, compresslevel):
-    """
-    Do gzip compression, without the timestamp. Similar to gzip.compress, but without timestamp, and also before py3.2.
-    """
+    """Do gzip compression, without the timestamp."""
     buf = io.BytesIO()
     with gzip.GzipFile(fileobj=buf, mode="wb", compresslevel=compresslevel, mtime=0) as fh:
         fh.write(data)
@@ -260,17 +258,13 @@ def gzip_compress(data, compresslevel):
 
 
 def gzip_decompress(data):
-    """
-    Do gzip decompression, without the timestamp. Just like gzip.decompress, but that's py3.2+.
-    """
+    """Do gzip decompression, without the timestamp."""
     with gzip.GzipFile(fileobj=io.BytesIO(data)) as f:
         return f.read()
 
 
 def ndarray_to_bin_str(array, do_compress):
-    """
-    From ndarray to base64 encoded, gzipped binary data.
-    """
+    """From ndarray to base64 encoded, gzipped binary data."""
     assert array.flags["C_CONTIGUOUS"], "only C memory order is (currently) supported for compact ndarray format"
 
     original_size = array.size * array.itemsize
@@ -286,8 +280,7 @@ def ndarray_to_bin_str(array, do_compress):
 
 
 class hashodict(OrderedDict):
-    """
-    This dictionary is hashable. It should NOT be mutated, or all kinds of weird
+    """This dictionary is hashable. It should NOT be mutated, or all kinds of weird
     bugs may appear. This is not enforced though, it's only used for encoding.
     """
 
@@ -307,9 +300,7 @@ def get_module_name_from_object(obj):
 
 
 def save_to_file(f: Callable[[Any], Any]) -> Callable[[Any], Any]:
-    """
-    Serializes the function output to a file, performing the required checks.
-    """
+    """Serializes the function output to a file, performing the required checks."""
 
     @wraps(f)
     def save_to_file_wrapper(
@@ -365,9 +356,7 @@ def save_to_file(f: Callable[[Any], Any]) -> Callable[[Any], Any]:
 
 
 def bin_str_to_ndarray(data, order, shape, dtype):
-    """
-    From base64 encoded, gzipped binary data to ndarray.
-    """
+    """From base64 encoded, gzipped binary data to ndarray."""
     assert order in [
         None,
         "C",
@@ -386,9 +375,7 @@ def bin_str_to_ndarray(data, order, shape, dtype):
 
 
 def lists_of_numbers_to_ndarray(data, order, shape, dtype):
-    """
-    From nested list of numbers to ndarray.
-    """
+    """From nested list of numbers to ndarray."""
     arr = asarray(data, dtype=dtype, order=order)
     if 0 in shape:
         return arr.reshape(shape)
@@ -398,9 +385,7 @@ def lists_of_numbers_to_ndarray(data, order, shape, dtype):
 
 
 def scalar_to_numpy(data, dtype):
-    """
-    From scalar value to numpy type.
-    """
+    """From scalar value to numpy type."""
     import numpy as nptypes
 
     dtype = getattr(nptypes, dtype)

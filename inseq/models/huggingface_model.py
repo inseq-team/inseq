@@ -1,4 +1,4 @@
-""" HuggingFace Seq2seq model """
+"""HuggingFace Seq2seq model."""
 import logging
 from abc import abstractmethod
 from typing import Dict, List, NoReturn, Optional, Tuple, Union
@@ -70,8 +70,7 @@ class HuggingfaceModel(AttributionModel):
         device: Optional[str] = None,
         **kwargs,
     ) -> None:
-        """
-        AttributionModel subclass for Huggingface-compatible models.
+        """AttributionModel subclass for Huggingface-compatible models.
 
         Args:
             model (:obj:`str` or :obj:`transformers.PreTrainedModel`): the name of the model in the
@@ -231,7 +230,7 @@ class HuggingfaceModel(AttributionModel):
         add_bos_token: bool = True,
         add_special_tokens: bool = True,
     ) -> BatchEncoding:
-        """Encode one or multiple texts, producing a BatchEncoding
+        """Encode one or multiple texts, producing a BatchEncoding.
 
         Args:
             texts (str or list of str): the texts to tokenize.

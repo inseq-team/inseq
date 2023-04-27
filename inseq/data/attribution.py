@@ -74,8 +74,7 @@ def get_batch_from_inputs(
 
 @dataclass(eq=False, repr=False)
 class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
-    """
-    Output produced by a standard attribution method.
+    """Output produced by a standard attribution method.
 
     Attributes:
         source (list of :class:`~inseq.utils.typing.TokenWithId`): Tokenized source sequence.
@@ -403,8 +402,7 @@ class FeatureAttributionStepOutput(TensorWrapper):
 
 @dataclass
 class FeatureAttributionOutput:
-    """
-    Output produced by the `AttributionModel.attribute` method.
+    """Output produced by the `AttributionModel.attribute` method.
 
     Attributes:
         sequence_attributions (list of :class:`~inseq.data.FeatureAttributionSequenceOutput`): List
@@ -461,8 +459,7 @@ class FeatureAttributionOutput:
         use_primitives: bool = False,
         split_sequences: bool = False,
     ) -> None:
-        """
-        Save class contents to a JSON file.
+        """Save class contents to a JSON file.
 
         Args:
             path (:obj:`os.PathLike`): Path to the folder where the attribution output will be stored

@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-""" Gradient-based feature attribution methods. """
+"""Gradient-based feature attribution methods."""
 
 import logging
 from typing import Any, Dict
@@ -42,8 +42,7 @@ class GradientAttributionRegistry(FeatureAttribution, Registry):
 
     @set_hook
     def hook(self, **kwargs):
-        r"""
-        Hooks the attribution method to the model by replacing normal :obj:`nn.Embedding` with Captum's
+        r"""Hooks the attribution method to the model by replacing normal :obj:`nn.Embedding` with Captum's
         `InterpretableEmbeddingBase <https://captum.ai/api/utilities.html#captum.attr.InterpretableEmbeddingBase>`__.
         """
         super().hook(**kwargs)
@@ -57,9 +56,7 @@ class GradientAttributionRegistry(FeatureAttribution, Registry):
 
     @unset_hook
     def unhook(self, **kwargs):
-        r"""
-        Unhook the attribution method by restoring the model's original embeddings.
-        """
+        r"""Unhook the attribution method by restoring the model's original embeddings."""
         super().hook(**kwargs)
         if self.attribute_batch_ids and not self.forward_batch_embeds:
             self.target_layer = None
@@ -71,8 +68,7 @@ class GradientAttributionRegistry(FeatureAttribution, Registry):
         attribute_fn_main_args: Dict[str, Any],
         attribution_args: Dict[str, Any] = {},
     ) -> GranularFeatureAttributionStepOutput:
-        r"""
-        Performs a single attribution step for the specified attribution arguments.
+        r"""Performs a single attribution step for the specified attribution arguments.
 
         Args:
             attribute_fn_main_args (:obj:`dict`): Main arguments used for the attribution method. These are built from
@@ -136,7 +132,7 @@ class GradientShapAttribution(GradientAttributionRegistry):
 
 
 class DiscretizedIntegratedGradientsAttribution(GradientAttributionRegistry):
-    """Discretized Integrated Gradients attribution method
+    """Discretized Integrated Gradients attribution method.
 
     Reference: https://arxiv.org/abs/2108.13654
 

@@ -53,8 +53,7 @@ def check_attribute_positions(
     attr_pos_start: Optional[int] = None,
     attr_pos_end: Optional[int] = None,
 ) -> Tuple[int, int]:
-    r"""
-    Checks whether the combination of start/end positions for attribution is valid.
+    r"""Checks whether the combination of start/end positions for attribution is valid.
 
     Args:
         max_length (:obj:`int`): The maximum length of sequences in the batch.
@@ -84,9 +83,7 @@ def get_step_scores(
     score_identifier: str = "probability",
     step_scores_args: Dict[str, Any] = {},
 ) -> SingleScorePerStepTensor:
-    """
-    Returns step scores for the target tokens in the batch.
-    """
+    """Returns step scores for the target tokens in the batch."""
     if score_identifier not in STEP_SCORES_MAP:
         raise AttributeError(
             f"Step score {score_identifier} not found. Available step scores are: "

@@ -20,7 +20,7 @@ def dig_model():
 
 
 def original_monotonic(vec1, vec2, vec3):
-    """Taken verbatim from https://github.com/INK-USC/DIG/blob/main/monotonic_paths.py"""
+    """Taken verbatim from https://github.com/INK-USC/DIG/blob/main/monotonic_paths.py."""
     increasing_dims = vec1 > vec2  # dims where baseline > input
     decreasing_dims = vec1 < vec2  # dims where baseline < input
     equal_dims = vec1 == vec2  # dims where baseline == input

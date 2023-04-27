@@ -92,8 +92,7 @@ class InputFormatter:
         target_tokens: OneOrMoreTokenSequences,
         target_ids: TargetIdsTensor,
     ) -> FeatureAttributionStepOutput:
-        r"""
-        Enriches the attribution output with token information, producing the finished
+        r"""Enriches the attribution output with token information, producing the finished
         :class:`~inseq.data.FeatureAttributionStepOutput` object.
 
         Args:

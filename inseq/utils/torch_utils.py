@@ -92,13 +92,13 @@ def aggregate_contiguous(
 
 def get_front_padding(t: torch.Tensor, pad: int = 0, dim: int = 1) -> List[int]:
     """Given a tensor of shape (batch, seq_len) of ids, return a list of length batch containing
-    the number of padding tokens at the beginning of each sequence."""
+    the number of padding tokens at the beginning of each sequence.
+    """
     return (t != pad).int().argmax(dim).tolist()
 
 
 def get_sequences_from_batched_steps(bsteps: List[torch.Tensor]) -> List[torch.Tensor]:
-    """
-    Given a sequence of batched step tensors of shape (batch_size, ...) builds a sequence
+    """Given a sequence of batched step tensors of shape (batch_size, ...) builds a sequence
     of tensors of shape (len(sequence), ...) where each resulting tensor is the aggregation
     across batch steps for every batch element.
 
@@ -150,8 +150,7 @@ def get_default_device() -> str:
 
 
 def find_block_stack(module):
-    """
-    Recursively searches for the first instance of a `nn.ModuleList` submodule within a given `torch.nn.Module`.
+    """Recursively searches for the first instance of a `nn.ModuleList` submodule within a given `torch.nn.Module`.
 
     Args:
         module (:obj:`torch.nn.Module`): A Pytorch :obj:`nn.Module` object.
@@ -160,7 +159,6 @@ def find_block_stack(module):
         :obj:`torch.nn.ModuleList`: The first instance of a :obj:`nn.Module` submodule found within the given object.
         None: If no `nn.ModuleList` submodule is found within the given `nn.Module` object.
     """
-
     # Check if the current module is an instance of nn.ModuleList
     if isinstance(module, nn.ModuleList):
         return module

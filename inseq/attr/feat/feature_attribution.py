@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-""" Feature attribution methods registry.
+"""Feature attribution methods registry.
 
 Todo:
     * 🟡: Allow custom arguments for model loading in the :class:`FeatureAttribution` :meth:`load` method.
@@ -55,8 +55,7 @@ logger = logging.getLogger(__name__)
 
 
 class FeatureAttribution(Registry):
-    r"""
-    Abstract registry for feature attribution methods.
+    r"""Abstract registry for feature attribution methods.
 
     Attributes:
         attr (:obj:`str`): Attribute of child classes that will act as lookup name
@@ -71,8 +70,7 @@ class FeatureAttribution(Registry):
     ignore_extra_args = ["inputs", "baselines", "target", "additional_forward_args"]
 
     def __init__(self, attribution_model: "AttributionModel", hook_to_model: bool = True, **kwargs):
-        r"""
-        Common instantiation steps for FeatureAttribution methods. Hooks the attribution method
+        r"""Common instantiation steps for FeatureAttribution methods. Hooks the attribution method
         to the model calling the :meth:`~inseq.attr.feat.FeatureAttribution.hook` method of the child class.
 
         Args:
@@ -123,8 +121,7 @@ class FeatureAttribution(Registry):
         model_name_or_path: Optional[ModelIdentifier] = None,
         **kwargs,
     ) -> "FeatureAttribution":
-        r"""
-        Load the selected method and hook it to an existing or available
+        r"""Load the selected method and hook it to an existing or available
         attribution model.
 
         Args:
@@ -179,8 +176,7 @@ class FeatureAttribution(Registry):
         attributed_fn_args: Dict[str, Any] = {},
         step_scores_args: Dict[str, Any] = {},
     ) -> FeatureAttributionOutput:
-        r"""
-        Prepares inputs and performs attribution.
+        r"""Prepares inputs and performs attribution.
 
         Wraps the attribution method :meth:`~inseq.attr.feat.FeatureAttribution.attribute` method
         and the :meth:`~inseq.models.InputFormatter.prepare_inputs_for_attribution` method.
@@ -214,6 +210,7 @@ class FeatureAttribution(Registry):
             attribution_args (:obj:`dict`, `optional`): Additional arguments to pass to the attribution method.
             attributed_fn_args (:obj:`dict`, `optional`): Additional arguments to pass to the attributed function.
             step_scores_args (:obj:`dict`, `optional`): Additional arguments to pass to the step scores functions.
+
         Returns:
             :class:`~inseq.data.FeatureAttributionOutput`: An object containing a list of sequence attributions, with
                 an optional added list of single :class:`~inseq.data.FeatureAttributionStepOutput` for each step and
@@ -271,8 +268,7 @@ class FeatureAttribution(Registry):
         attributed_fn_args: Dict[str, Any] = {},
         step_scores_args: Dict[str, Any] = {},
     ) -> FeatureAttributionOutput:
-        r"""
-        Performs the feature attribution procedure using the specified attribution method.
+        r"""Performs the feature attribution procedure using the specified attribution method.
 
         Args:
             batch (:class:`~inseq.data.EncoderDecoderBatch` or :class:`~inseq.data.DecoderOnlyBatch`): The batch of
@@ -298,6 +294,7 @@ class FeatureAttribution(Registry):
             attribution_args (:obj:`dict`, `optional`): Additional arguments to pass to the attribution method.
             attributed_fn_args (:obj:`dict`, `optional`): Additional arguments to pass to the attributed function.
             step_scores_args (:obj:`dict`, `optional`): Additional arguments to pass to the step scores function.
+
         Returns:
             :class:`~inseq.data.FeatureAttributionOutput`: An object containing a list of sequence attributions, with
                 an optional added list of single :class:`~inseq.data.FeatureAttributionStepOutput` for each step and
@@ -432,8 +429,7 @@ class FeatureAttribution(Registry):
         attributed_fn_args: Dict[str, Any] = {},
         step_scores_args: Dict[str, Any] = {},
     ) -> FeatureAttributionStepOutput:
-        r"""
-        Performs a single attribution step for all the sequences in the batch that
+        r"""Performs a single attribution step for all the sequences in the batch that
         still have valid target_ids, as identified by the target_attention_mask.
         Finished sentences are temporarily filtered out to make the attribution step
         faster and then reinserted before returning.
@@ -458,6 +454,7 @@ class FeatureAttribution(Registry):
             attribution_args (:obj:`dict`, `optional`): Additional arguments to pass to the attribution method.
             attributed_fn_args (:obj:`dict`, `optional`): Additional arguments to pass to the attributed function.
             step_scores_args (:obj:`dict`, `optional`): Additional arguments to pass to the step scores functions.
+
         Returns:
             :class:`~inseq.data.FeatureAttributionStepOutput`: A dataclass containing attribution tensors for source
                 and target attributions of size `(batch_size, source_length)` and `(batch_size, prefix length)`.
@@ -534,8 +531,7 @@ class FeatureAttribution(Registry):
         attribute_fn_main_args: Dict[str, Any],
         attribution_args: Dict[str, Any] = {},
     ) -> FeatureAttributionStepOutput:
-        r"""
-        Performs a single attribution step for the specified attribution arguments.
+        r"""Performs a single attribution step for the specified attribution arguments.
 
         Args:
             attribute_fn_main_args (:obj:`dict`): Main arguments used for the attribution method. These are built from
@@ -560,8 +556,7 @@ class FeatureAttribution(Registry):
 
     @set_hook
     def hook(self, **kwargs) -> None:
-        r"""
-        Hooks the attribution method to the model. Useful to implement pre-attribution logic
+        r"""Hooks the attribution method to the model. Useful to implement pre-attribution logic
         (e.g. freezing layers, replacing embeddings, raise warnings, etc.).
         """
         from ...models.model_config import get_model_config
@@ -571,8 +566,7 @@ class FeatureAttribution(Registry):
 
     @unset_hook
     def unhook(self, **kwargs) -> None:
-        r"""
-        Unhooks the attribution method from the model. If the model was modified in any way, this
+        r"""Unhooks the attribution method from the model. If the model was modified in any way, this
         should restore its initial state.
         """
         if self.use_model_config and self.attribution_model is not None:
@@ -580,8 +574,7 @@ class FeatureAttribution(Registry):
 
 
 def list_feature_attribution_methods():
-    """
-    Lists identifiers for all available feature attribution methods. A feature attribution method identifier (e.g.
+    """Lists identifiers for all available feature attribution methods. A feature attribution method identifier (e.g.
     `integrated_gradients`) can be passed to :class:`~inseq.models.AttributionModel` or :meth:`~inseq.load_model`
     to define a model for attribution.
     """

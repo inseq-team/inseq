@@ -37,8 +37,7 @@ class EncoderDecoderInputFormatter(InputFormatter):
         inputs: Tuple[FeatureAttributionInput, FeatureAttributionInput],
         include_eos_baseline: bool = False,
     ) -> EncoderDecoderBatch:
-        r"""
-        Prepares sources and target to produce an :class:`~inseq.data.EncoderDecoderBatch`.
+        r"""Prepares sources and target to produce an :class:`~inseq.data.EncoderDecoderBatch`.
         There are two stages of preparation:
 
             1. Raw text sources and target texts are encoded by the model.
@@ -135,8 +134,7 @@ class EncoderDecoderInputFormatter(InputFormatter):
         target_tokens: OneOrMoreTokenSequences,
         target_ids: TargetIdsTensor,
     ) -> FeatureAttributionStepOutput:
-        r"""
-        Enriches the attribution output with token information, producing the finished
+        r"""Enriches the attribution output with token information, producing the finished
         :class:`~inseq.data.FeatureAttributionStepOutput` object.
 
         Args:

@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-""" Decorators for attribution methods. """
+"""Decorators for attribution methods."""
 
 import logging
 from functools import wraps
@@ -23,8 +23,7 @@ logger = logging.getLogger(__name__)
 
 
 def set_hook(f: Callable[[Any], Any]) -> Callable[[Any], Any]:
-    """
-    Sets the status of the attribution model associated to the function
+    """Sets the status of the attribution model associated to the function
     to is_hooked = True.
     Required to decorate the hook functions in subclasses.
     """
@@ -38,8 +37,7 @@ def set_hook(f: Callable[[Any], Any]) -> Callable[[Any], Any]:
 
 
 def unset_hook(f: Callable[[Any], Any]) -> Callable[[Any], Any]:
-    """
-    Sets the status of the attribution model associated to the function
+    """Sets the status of the attribution model associated to the function
     to is_hooked = False.
     Required to decorate the unhook functions in subclasses.
     """
@@ -53,9 +51,7 @@ def unset_hook(f: Callable[[Any], Any]) -> Callable[[Any], Any]:
 
 
 def batched(f: Callable[..., Any]) -> Callable[..., Any]:
-    """
-    Decorator that enables batching of the args
-    """
+    """Decorator that enables batching of the args."""
 
     @wraps(f)
     def batched_wrapper(self, *args, batch_size: Optional[int] = None, **kwargs):

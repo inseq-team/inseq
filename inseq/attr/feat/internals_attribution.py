@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-""" Attention-based feature attribution methods. """
+"""Attention-based feature attribution methods."""
 
 import logging
 from typing import Any, Dict, Optional
@@ -34,8 +34,7 @@ class InternalsAttributionRegistry(FeatureAttribution, Registry):
 
 
 class AttentionWeightsAttribution(InternalsAttributionRegistry):
-    """
-    The basic attention attribution method, which retrieves the attention weights from the model.
+    """The basic attention attribution method, which retrieves the attention weights from the model.
 
     Attribute Args:
             aggregate_heads_fn (:obj:`str` or :obj:`callable`): The method to use for aggregating across heads.
@@ -56,7 +55,6 @@ class AttentionWeightsAttribution(InternalsAttributionRegistry):
                 used by default. If no value is specified, all available layers are passed to aggregate_fn by default.
 
     Example:
-
         - ``model.attribute(src)`` will return the average attention for all heads of the last layer.
         - ``model.attribute(src, heads=0)`` will return the attention weights for the first head of the last layer.
         - ``model.attribute(src, heads=(0, 5), aggregate_heads_fn="max", layers=[0, 2, 7])`` will return the maximum

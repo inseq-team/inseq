@@ -4,14 +4,14 @@ from .registry import available_classes
 
 
 class InseqDeprecationWarning(UserWarning):
-    """Special deprecation warning because the built-in one is ignored by default"""
+    """Special deprecation warning because the built-in one is ignored by default."""
 
     def __init__(self, msg):
         super().__init__(msg)
 
 
 class UnknownAttributionMethodError(Exception):
-    """Raised when an attribution method is not valid"""
+    """Raised when an attribution method is not valid."""
 
     UNKNOWN_ATTRIBUTION_METHOD_MSG = (
         "Unknown attribution method: {attribution_method}.\nAvailable methods: {available_methods}"
@@ -33,7 +33,7 @@ class UnknownAttributionMethodError(Exception):
 
 
 class MissingAttributionMethodError(Exception):
-    """Raised when an attribution method is not found"""
+    """Raised when an attribution method is not found."""
 
     MISSING_ATTRIBUTION_METHOD_MSG = (
         "Attribution methods is not set. "
@@ -49,6 +49,6 @@ class MissingAttributionMethodError(Exception):
 
 
 class LengthMismatchError(Exception):
-    """Raised when lengths do not match"""
+    """Raised when lengths do not match."""
 
     pass

@@ -16,6 +16,7 @@
 # IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
 # WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
 # OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+"""Monotonic path builder for Discretized Integrated Gradients (DIG)."""
 
 import logging
 import os
@@ -25,7 +26,6 @@ from pathlib import Path
 from typing import Any, List, Optional, Tuple, Union
 
 import torch
-from scipy.sparse import csr_matrix
 from torchtyping import TensorType
 
 from ....utils import is_joblib_available, is_scikitlearn_available
@@ -34,6 +34,7 @@ if is_joblib_available():
     from joblib import Parallel, delayed
 
 if is_scikitlearn_available():
+    from scipy.sparse import csr_matrix
     from sklearn.neighbors import kneighbors_graph
 
 from ....utils import INSEQ_ARTIFACTS_CACHE, cache_results, euclidean_distance
@@ -43,18 +44,21 @@ logger = logging.getLogger(__name__)
 
 
 class PathBuildingStrategies(Enum):
+    """Strategies for building monotonic paths."""
+
     GREEDY = "greedy"  # Based on the Euclidean distance between embeddings.
     MAXCOUNT = "maxcount"  # Based on the number of monotonic dimensions
 
 
 class UnknownPathBuildingStrategy(Exception):
-    """Raised when a strategy for pathbuilding is not valid"""
+    """Raised when a strategy for pathbuilding is not valid."""
 
     def __init__(
         self,
         strategy: str,
         *args: Tuple[Any],
     ) -> None:
+        """Initialize the exception."""
         super().__init__(
             (
                 f"Unknown strategy: {strategy}.\nAvailable strategies: "
@@ -65,12 +69,15 @@ class UnknownPathBuildingStrategy(Exception):
 
 
 class MonotonicPathBuilder:
+    """Build monotonic paths between two token embeddings."""
+
     def __init__(
         self,
         vocabulary_embeddings: VocabularyEmbeddingsTensor,
-        knn_graph: csr_matrix,
+        knn_graph: "csr_matrix",
         special_tokens: List[int] = [],
     ) -> None:
+        """Initialize the monotonic path builder."""
         self.vocabulary_embeddings = vocabulary_embeddings
         self.knn_graph = knn_graph
         self.special_tokens = special_tokens
@@ -82,10 +89,8 @@ class MonotonicPathBuilder:
         n_neighbors: int = 50,
         mode: str = "distance",
         n_jobs: int = -1,
-    ) -> csr_matrix:
-        """
-        Etiher loads or computes the knn graph for token embeddings.
-        """
+    ) -> "csr_matrix":
+        """Either loads or computes the knn graph for token embeddings."""
         if not is_scikitlearn_available():
             raise ImportError("scikit-learn is not available. Please install it to use MonotonicPathBuilder.")
         knn_graph = kneighbors_graph(
@@ -110,6 +115,7 @@ class MonotonicPathBuilder:
         special_tokens: List[int] = [],
         embedding_scaling: int = 1,
     ) -> "MonotonicPathBuilder":
+        """Load a cached monotonic path builder from a model name, or compute it if it does not exist."""
         cache_filename = os.path.join(cache_dir, f"{model_name.replace('/', '__')}_{n_neighbors}.pkl")
         if vocabulary_embeddings is None:
             logger.warning(
@@ -183,6 +189,7 @@ class MonotonicPathBuilder:
         n_steps: Optional[int] = 30,
         strategy: Optional[str] = "greedy",
     ) -> List[int]:
+        """Find a monotonic path from a word to a baseline."""
         # if word_idx is a special token copy it and return
         if word_idx in self.special_tokens:
             return [word_idx] * (n_steps - 1)
@@ -202,6 +209,7 @@ class MonotonicPathBuilder:
     def build_monotonic_path_embedding(
         self, word_path: List[int], baseline_idx: int, n_steps: int = 30
     ) -> TensorType["n_steps", "embed_size", float]:
+        """Build a monotonic path embedding from a word path."""
         baseline_vec = self.vocabulary_embeddings[baseline_idx]
         monotonic_embs = [self.vocabulary_embeddings[word_path[0]]]
         for idx in range(len(word_path) - 1):
@@ -227,6 +235,7 @@ class MonotonicPathBuilder:
         strategy: str = "greedy",
         n_steps: int = 30,
     ) -> int:
+        """Get the closest word to the current word in the path."""
         # If (for some reason) we do select the ref_idx as the previous anchor word,
         # then all further anchor words should be ref_idx
         if word_idx == baseline_idx:
@@ -252,6 +261,7 @@ class MonotonicPathBuilder:
         original_idx: int,
         n_steps: int,
     ) -> Union[float, int]:
+        """Get the distance between the anchor word and the baseline word."""
         if strategy == PathBuildingStrategies.GREEDY.value:
             # calculate the distance of the monotonized vec from the interpolated point
             monotonic_vec = self.make_monotonic_vec(
@@ -291,7 +301,7 @@ class MonotonicPathBuilder:
         input: torch.Tensor,
         n_steps: Optional[int] = 30,
     ) -> torch.Tensor:
-        """Create a new monotonic vector w.r.t. input and baseline from an existing anchor"""
+        """Create a new monotonic vector w.r.t. input and baseline from an existing anchor."""
         non_monotonic_dims = ~cls.get_monotonic_dims(anchor, baseline, input)
         if non_monotonic_dims.sum() == 0:
             return anchor
@@ -308,9 +318,7 @@ class MonotonicPathBuilder:
         baseline: torch.Tensor,
         input: torch.Tensor,
     ) -> torch.Tensor:
-        """
-        Check if the anchor vector is monotonic w.r.t. the baseline and the input.
-        """
+        """Check if the anchor vector is monotonic w.r.t. the baseline and the input."""
         # fmt: off
         return torch.where(
             (baseline > input)  * (baseline >= anchor) * (anchor >= input) + # noqa E211 W504

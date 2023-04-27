@@ -146,7 +146,5 @@ DEFAULT_ATTRIBUTION_AGGREGATE_DICT = {
 
 
 def list_aggregation_functions() -> List[str]:
-    """
-    Lists identifiers for all available aggregation functions scores.
-    """
+    """Lists identifiers for all available aggregation functions scores."""
     return available_classes(AggregationFunction)

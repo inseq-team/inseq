@@ -46,7 +46,7 @@ poetry-remove:
 add-torch-gpu:
 	poetry run poe upgrade-pip
 	poetry run pip uninstall torch -y
-	poetry run poe torch-cuda11
+	poetry run poe torch-cuda
 
 .PHONY: install
 install:

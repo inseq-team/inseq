@@ -1,5 +1,4 @@
-"""
-TODO: Skipping layer attribution when attributing target and the DIG method
+"""TODO: Skipping layer attribution when attributing target and the DIG method
 since it is bugged is not very elegant, this will need to be refactored.
 """
 

@@ -52,12 +52,11 @@ def rollout_fn(
     dim: int = 1,
     add_residual: bool = False,
 ) -> Union[ScoreTensor, Tuple[ScoreTensor, ScoreTensor]]:
-    """
-    Reference implementations:
+    """Reference implementations:
     * `samiraabnar/attention-flow
         <https://github.com/samiraabnar/attention_flow/blob/master/attention_graph_util.py#L104>`__
     * `mt-upc/transformer-contributions-nmt
-        <https://github.com/mt-upc/transformer-contributions-nmt/blob/main/wrappers/transformer_wrapper.py#L506>`__
+        <https://github.com/mt-upc/transformer-contributions-nmt/blob/main/wrappers/transformer_wrapper.py#L506>`__.
 
     Args:
         scores (:obj:`torch.Tensor` or :obj:`tuple(torch.Tensor, torch.Tensor, torch.Tensor)`):

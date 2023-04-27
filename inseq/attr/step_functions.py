@@ -40,9 +40,7 @@ def get_step_function_reserved_args() -> List[str]:
 def logit_fn(
     attribution_model: "AttributionModel", forward_output: ModelOutput, target_ids: TargetIdsTensor, **kwargs
 ) -> SingleScorePerStepTensor:
-    """
-    Compute the logit of the target_ids from the model's output logits.
-    """
+    """Compute the logit of the target_ids from the model's output logits."""
     logits = attribution_model.output2logits(forward_output)
     target_ids = target_ids.reshape(logits.shape[0], 1)
     return logits.gather(-1, target_ids).squeeze(-1)
@@ -51,9 +49,7 @@ def logit_fn(
 def probability_fn(
     attribution_model: "AttributionModel", forward_output: ModelOutput, target_ids: TargetIdsTensor, **kwargs
 ) -> SingleScorePerStepTensor:
-    """
-    Compute the probabilty of target_ids from the model's output logits.
-    """
+    """Compute the probabilty of target_ids from the model's output logits."""
     logits = attribution_model.output2logits(forward_output)
     target_ids = target_ids.reshape(logits.shape[0], 1)
     logits = torch.softmax(logits, dim=-1)
@@ -65,9 +61,7 @@ def probability_fn(
 def entropy_fn(
     attribution_model: "AttributionModel", forward_output: ModelOutput, **kwargs
 ) -> SingleScorePerStepTensor:
-    """
-    Compute the entropy of the model's output distribution.
-    """
+    """Compute the entropy of the model's output distribution."""
     logits = attribution_model.output2logits(forward_output)
     out = torch.distributions.Categorical(logits=logits).entropy()
     if len(out.shape) > 1:
@@ -78,9 +72,8 @@ def entropy_fn(
 def crossentropy_fn(
     attribution_model: "AttributionModel", forward_output: ModelOutput, target_ids: TargetIdsTensor, **kwargs
 ) -> SingleScorePerStepTensor:
-    """
-    Compute the cross entropy between the target_ids and the logits.
-    See: https://github.com/ZurichNLP/nmtscore/blob/master/src/nmtscore/models/m2m100.py#L99
+    """Compute the cross entropy between the target_ids and the logits.
+    See: https://github.com/ZurichNLP/nmtscore/blob/master/src/nmtscore/models/m2m100.py#L99.
     """
     return -torch.log2(probability_fn(attribution_model, forward_output, target_ids))
 
@@ -88,11 +81,10 @@ def crossentropy_fn(
 def perplexity_fn(
     attribution_model: "AttributionModel", forward_output: ModelOutput, target_ids: TargetIdsTensor, **kwargs
 ) -> SingleScorePerStepTensor:
-    """
-    Compute perplexity of the target_ids from the logits.
+    """Compute perplexity of the target_ids from the logits.
     Perplexity is the weighted branching factor. If we have a perplexity of 100, it means that whenever the model is
     trying to guess the next word it is as confused as if it had to pick between 100 words.
-    Reference: https://chiaracampagnola.io/2020/05/17/perplexity-in-language-models/
+    Reference: https://chiaracampagnola.io/2020/05/17/perplexity-in-language-models/.
     """
     return 2 ** crossentropy_fn(attribution_model, forward_output, target_ids)
 
@@ -110,8 +102,7 @@ def contrast_prob_fn(
     contrast_sources: FeatureAttributionInput = None,
     **kwargs,
 ) -> SingleScorePerStepTensor:
-    """
-    Compute the probability of target ids given contrastive inputs, equivalent to the pro
+    """Compute the probability of target ids given contrastive inputs, equivalent to the pro.
 
     Args:
         contrast_sources (:obj:`str` or :obj:`list(str)`): Source text(s) used as contrastive inputs to compute
@@ -177,8 +168,7 @@ def pcxmi_fn(
     contrast_target_prefixes: FeatureAttributionInput = None,
     **kwargs,
 ) -> SingleScorePerStepTensor:
-    """
-    Compute the pointwise conditional cross-mutual information (P-CXMI) of target ids given original and contrastive
+    """Compute the pointwise conditional cross-mutual information (P-CXMI) of target ids given original and contrastive
     input options. The P-CXMI is defined as the negative log-ratio between the conditional probability of the target
     given the original input and the conditional probability of the target given the contrastive input, as defined
     by `Yin et al. (2021) <https://arxiv.org/abs/2109.07446>`__.
@@ -289,7 +279,6 @@ def mc_dropout_prob_avg_fn(
             - Must contain dropout layers to enable MC Dropout.
         n_mcd_steps (:obj:`int`): The number of prediction steps that should be used to normalize the original output.
     """
-
     noisy_probs = []
     # Compute noisy predictions using the auxiliary model
     # Important: must be in train mode to ensure noise for MCD
@@ -334,8 +323,7 @@ STEP_SCORES_MAP = {
 
 
 def list_step_functions() -> List[str]:
-    """
-    Lists identifiers for all available step scores. One or more step scores identifiers can be passed to the
+    """Lists identifiers for all available step scores. One or more step scores identifiers can be passed to the
     :meth:`~inseq.models.AttributionModel.attribute` method either to compute scores while attributing (``step_scores``
     parameter), or as target function for the attribution, if supported by the attribution method (``attributed_fn``
     parameter).
@@ -349,8 +337,7 @@ def register_step_function(
     aggregate_map: Optional[Dict[str, str]] = None,
     overwrite: bool = False,
 ) -> None:
-    """
-    Registers a function to be used to compute step scores and store them in the
+    """Registers a function to be used to compute step scores and store them in the
     :class:`~inseq.data.attribution.FeatureAttributionOutput` object. Registered step functions can also be used as
     attribution targets by gradient-based feature attribution methods.
 
