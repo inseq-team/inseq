@@ -110,6 +110,11 @@ class InputFormatter:
         raise NotImplementedError()
 
     @staticmethod
+    @abstractmethod
+    def convert_args_to_batch(*args, **kwargs) -> Union[DecoderOnlyBatch, EncoderDecoderBatch]:
+        raise NotImplementedError()
+
+    @staticmethod
     def format_forward_args(forward: ForwardMethod) -> Callable[..., CustomForwardOutput]:
         @wraps(forward)
         def formatted_forward_input_wrapper(self, *args, **kwargs) -> CustomForwardOutput:

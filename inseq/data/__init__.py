@@ -18,6 +18,7 @@ from .attribution import (
     FeatureAttributionStepOutput,
     GranularFeatureAttributionStepOutput,
     MultiDimensionalFeatureAttributionStepOutput,
+    get_batch_from_inputs,
 )
 from .batch import Batch, BatchEmbedding, BatchEncoding, DecoderOnlyBatch, EncoderDecoderBatch
 from .viz import show_attributions
@@ -48,4 +49,5 @@ __all__ = [
     "show_attributions",
     "list_aggregation_functions",
     "MultiDimensionalFeatureAttributionStepOutput",
+    "get_batch_from_inputs",
 ]

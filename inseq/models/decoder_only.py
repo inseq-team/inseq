@@ -6,12 +6,12 @@ import torch
 
 from ..attr.feat import join_token_ids
 from ..data import (
-    Batch,
     BatchEmbedding,
     BatchEncoding,
     DecoderOnlyBatch,
     FeatureAttributionInput,
     FeatureAttributionStepOutput,
+    get_batch_from_inputs,
 )
 from ..utils.typing import (
     AttributionForwardInputs,
@@ -39,31 +39,13 @@ class DecoderOnlyInputFormatter(InputFormatter):
         inputs: FeatureAttributionInput,
         include_eos_baseline: bool = False,
     ) -> DecoderOnlyBatch:
-        if isinstance(inputs, Batch):
-            batch = inputs
-        else:
-            if isinstance(inputs, (str, list)):
-                # Decoder-only model do not tokenize as targets,
-                # since a single tokenizer is available.
-                encodings: BatchEncoding = attribution_model.encode(
-                    inputs,
-                    return_baseline=True,
-                    include_eos_baseline=include_eos_baseline,
-                )
-            elif isinstance(inputs, BatchEncoding):
-                encodings = inputs
-            else:
-                raise ValueError(
-                    "targets must be either a string, a list of strings, a BatchEncoding or a Batch, "
-                    f"not {type(inputs)}"
-                )
-            baseline_embeds = attribution_model.embed(encodings.baseline_ids)
-            embeddings = BatchEmbedding(
-                input_embeds=attribution_model.embed(encodings.input_ids),
-                baseline_embeds=baseline_embeds,
-            )
-            batch = DecoderOnlyBatch(encodings, embeddings)
-        return batch
+        batch = get_batch_from_inputs(
+            attribution_model,
+            inputs=inputs,
+            include_eos_baseline=include_eos_baseline,
+            as_targets=False,
+        )
+        return DecoderOnlyBatch.from_batch(batch)
 
     @staticmethod
     def format_attribution_args(
@@ -158,12 +140,13 @@ class DecoderOnlyInputFormatter(InputFormatter):
 
     @staticmethod
     def convert_args_to_batch(
-        input_ids: Optional[IdsTensor] = None,
-        attention_mask: Optional[IdsTensor] = None,
-        input_embeds: Optional[EmbeddingsTensor] = None,
+        decoder_input_ids: Optional[IdsTensor] = None,
+        decoder_attention_mask: Optional[IdsTensor] = None,
+        decoder_input_embeds: Optional[EmbeddingsTensor] = None,
+        **kwargs,
     ) -> DecoderOnlyBatch:
-        encoding = BatchEncoding(input_ids, attention_mask)
-        embedding = BatchEmbedding(input_embeds)
+        encoding = BatchEncoding(decoder_input_ids, decoder_attention_mask)
+        embedding = BatchEmbedding(decoder_input_embeds)
         return DecoderOnlyBatch(encoding, embedding)
 
     @staticmethod
@@ -182,9 +165,9 @@ class DecoderOnlyInputFormatter(InputFormatter):
             **kwargs,
         ) -> CustomForwardOutput:
             batch = self.formatter.convert_args_to_batch(
-                input_ids=input_ids,
-                attention_mask=attention_mask,
-                input_embeds=forward_tensor if use_embeddings else None,
+                decoder_input_ids=input_ids,
+                decoder_attention_mask=attention_mask,
+                decoder_input_embeds=forward_tensor if use_embeddings else None,
             )
             return forward_fn(
                 self, batch, target_ids, attributed_fn, use_embeddings, attributed_fn_argnames, *args, **kwargs

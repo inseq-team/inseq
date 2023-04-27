@@ -20,7 +20,7 @@ import torch
 from torch.linalg import vector_norm
 
 from ..attr.feat.ops import rollout_fn
-from ..utils import Registry, available_classes, normalize_attributions, vnorm_normalize_attributions
+from ..utils import Registry, available_classes, normalize_attributions
 from ..utils.typing import (
     ScoreTensor,
 )
@@ -115,16 +115,6 @@ class NormalizeAggregationFunction(AggregationFunction):
 
     def __call__(self, scores: Union[torch.Tensor, Tuple[torch.Tensor, ...]], dim: int) -> ScoreTensor:
         return normalize_attributions(scores)
-
-
-class VectorNormNormalizeAggregationFunction(AggregationFunction):
-    aggregation_function_name = "vnorm_normalize"
-
-    def __init__(self):
-        self.takes_single_tensor: bool = False
-
-    def __call__(self, scores: Union[torch.Tensor, Tuple[torch.Tensor, ...]], dim: int) -> ScoreTensor:
-        return vnorm_normalize_attributions(scores, norm_dim=dim)
 
 
 class RolloutAggregationFunction(AggregationFunction):

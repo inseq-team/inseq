@@ -118,6 +118,7 @@ class HuggingfaceModel(AttributionModel):
         if self.model.config.pad_token_id is not None:
             self.pad_token = self.tokenizer.convert_ids_to_tokens(self.model.config.pad_token_id)
             self.tokenizer.pad_token = self.pad_token
+        self.bos_token_id = getattr(self.model.config, "decoder_start_token_id", None)
         self.eos_token_id = getattr(self.model.config, "eos_token_id", None)
         if self.eos_token_id is None:
             self.eos_token_id = self.tokenizer.pad_token_id
@@ -227,6 +228,8 @@ class HuggingfaceModel(AttributionModel):
         return_baseline: bool = False,
         include_eos_baseline: bool = False,
         max_input_length: int = 512,
+        add_bos_token: bool = True,
+        add_special_tokens: bool = True,
     ) -> BatchEncoding:
         """Encode one or multiple texts, producing a BatchEncoding
 
@@ -250,7 +253,7 @@ class HuggingfaceModel(AttributionModel):
         batch = self.tokenizer(
             text=texts if not as_targets else None,
             text_target=texts if as_targets else None,
-            add_special_tokens=True,
+            add_special_tokens=add_special_tokens,
             padding=True,
             truncation=True,
             max_length=max_length,
@@ -265,10 +268,10 @@ class HuggingfaceModel(AttributionModel):
                 baseline_ids_eos = batch["input_ids"].eq(self.eos_token_id).long() * self.eos_token_id
                 baseline_ids = baseline_ids_non_eos + baseline_ids_eos
         # We prepend a BOS token only when tokenizing target texts.
-        if as_targets and self.is_encoder_decoder:
+        if as_targets and self.is_encoder_decoder and add_bos_token:
             ones_mask = torch.ones((batch["input_ids"].shape[0], 1), device=self.device, dtype=long)
             batch["attention_mask"] = torch.cat((ones_mask, batch["attention_mask"]), dim=1)
-            bos_ids = ones_mask * self.model.config.decoder_start_token_id
+            bos_ids = ones_mask * self.bos_token_id
             batch["input_ids"] = torch.cat((bos_ids, batch["input_ids"]), dim=1)
             if return_baseline:
                 baseline_ids = torch.cat((bos_ids, baseline_ids), dim=1)

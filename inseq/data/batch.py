@@ -222,3 +222,10 @@ class DecoderOnlyBatch(Batch):
         if with_attention:
             return tgt, self.attention_mask[:, step]
         return tgt
+
+    @classmethod
+    def from_batch(self, batch: Batch) -> "DecoderOnlyBatch":
+        return DecoderOnlyBatch(
+            encoding=batch.encoding,
+            embedding=batch.embedding,
+        )

@@ -1,11 +1,14 @@
 from copy import deepcopy
 from dataclasses import dataclass, fields
+from typing import Any, Dict, TypeVar
 
 import numpy as np
 import torch
 from torchtyping import TensorType
 
 from ..utils import pretty_dict
+
+TensorClass = TypeVar("TensorClass", bound="TensorWrapper")
 
 
 @dataclass
@@ -106,7 +109,7 @@ class TensorWrapper:
             return attr
 
     @staticmethod
-    def _eq(self_attr, other_attr):
+    def _eq(self_attr: TensorClass, other_attr: TensorClass) -> bool:
         try:
             if isinstance(self_attr, torch.Tensor):
                 return torch.allclose(self_attr, other_attr, equal_nan=True)
@@ -117,7 +120,7 @@ class TensorWrapper:
         except:  # noqa: E722
             return False
 
-    def __getitem__(self, subscript):
+    def __getitem__(self: TensorClass, subscript) -> TensorClass:
         """By default, idiomatic slicing is used for the sequence dimension across batches.
         For batching use `slice_batch` instead.
         """
@@ -125,17 +128,17 @@ class TensorWrapper:
             **{field.name: self._getitem(getattr(self, field.name), subscript) for field in fields(self.__class__)}
         )
 
-    def slice_batch(self, subscript):
+    def slice_batch(self: TensorClass, subscript) -> TensorClass:
         return self.__class__(
             **{field.name: self._slice_batch(getattr(self, field.name), subscript) for field in fields(self.__class__)}
         )
 
-    def select_active(self, mask: TensorType["batch_size", 1, int]):
+    def select_active(self: TensorClass, mask: TensorType["batch_size", 1, int]) -> TensorClass:
         return self.__class__(
             **{field.name: self._select_active(getattr(self, field.name), mask) for field in fields(self.__class__)}
         )
 
-    def to(self, device: str):
+    def to(self: TensorClass, device: str) -> TensorClass:
         for field in fields(self.__class__):
             attr = getattr(self, field.name)
             setattr(self, field.name, self._to(attr, device))
@@ -143,24 +146,24 @@ class TensorWrapper:
             torch.cuda.empty_cache()
         return self
 
-    def detach(self):
+    def detach(self: TensorClass) -> TensorClass:
         for field in fields(self.__class__):
             attr = getattr(self, field.name)
             setattr(self, field.name, self._detach(attr))
         return self
 
-    def numpy(self):
+    def numpy(self: TensorClass) -> TensorClass:
         for field in fields(self.__class__):
             attr = getattr(self, field.name)
             setattr(self, field.name, self._numpy(attr))
         return self
 
-    def torch(self):
+    def torch(self: TensorClass) -> TensorClass:
         for field, val in self.to_dict().items():
             setattr(self, field, self._torch(val))
         return self
 
-    def clone(self):
+    def clone(self: TensorClass) -> TensorClass:
         out_params = {}
         for field in fields(self.__class__):
             attr = getattr(self, field.name)
@@ -172,7 +175,7 @@ class TensorWrapper:
                 out_params[field.name] = None
         return self.__class__(**out_params)
 
-    def to_dict(self):
+    def to_dict(self: TensorClass) -> Dict[str, Any]:
         return {k: v for k, v in self.__dict__.items() if not k.startswith("_")}
 
     def __str__(self):

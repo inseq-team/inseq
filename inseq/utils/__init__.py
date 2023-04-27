@@ -54,7 +54,6 @@ from .torch_utils import (
     get_sequences_from_batched_steps,
     normalize_attributions,
     remap_from_filtered,
-    vnorm_normalize_attributions,
 )
 
 __all__ = [
@@ -79,7 +78,6 @@ __all__ = [
     "remap_from_filtered",
     "drop_padding",
     "normalize_attributions",
-    "vnorm_normalize_attributions",
     "aggregate_contiguous",
     "get_front_padding",
     "get_sequences_from_batched_steps",

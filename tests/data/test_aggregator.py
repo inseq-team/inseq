@@ -121,8 +121,8 @@ def test_subword_aggregator(saliency_mt_model: HuggingfaceEncoderDecoderModel):
 
 def test_pair_aggregator(saliency_mt_model: HuggingfaceEncoderDecoderModel):
     out = saliency_mt_model.attribute([EXAMPLES["source"], EXAMPLES["alternative_source"]], show_progress=False)
-    orig_seqattr = out.sequence_attributions[0].aggregate(aggregator=SequenceAttributionAggregator)
-    alt_seqattr = out.sequence_attributions[1].aggregate(aggregator=SequenceAttributionAggregator)
+    orig_seqattr = out.sequence_attributions[0].aggregate(["vnorm", "normalize"])
+    alt_seqattr = out.sequence_attributions[1].aggregate(["vnorm", "normalize"])
     diff_seqattr = orig_seqattr.aggregate(PairAggregator, paired_attr=alt_seqattr)
     for idx, token in enumerate(diff_seqattr.source):
         assert token.token == EXAMPLES["diff_subwords"][idx]

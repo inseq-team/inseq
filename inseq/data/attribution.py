@@ -3,7 +3,7 @@ from copy import deepcopy
 from dataclasses import dataclass, field
 from os import PathLike
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Type, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Type, Union
 
 import torch
 
@@ -29,13 +29,47 @@ from ..utils.typing import (
 )
 from .aggregation_functions import DEFAULT_ATTRIBUTION_AGGREGATE_DICT
 from .aggregator import AggregableMixin, Aggregator, AggregatorPipeline
-from .batch import Batch, BatchEncoding, DecoderOnlyBatch, EncoderDecoderBatch
+from .batch import Batch, BatchEmbedding, BatchEncoding, DecoderOnlyBatch, EncoderDecoderBatch
 from .data_utils import TensorWrapper
+
+if TYPE_CHECKING:
+    from ..models import AttributionModel
 
 FeatureAttributionInput = Union[TextInput, BatchEncoding, Batch]
 
 
 logger = logging.getLogger(__name__)
+
+
+def get_batch_from_inputs(
+    attribution_model: "AttributionModel",
+    inputs: FeatureAttributionInput,
+    include_eos_baseline: bool = False,
+    as_targets: bool = False,
+) -> Batch:
+    if isinstance(inputs, Batch):
+        batch = inputs
+    else:
+        if isinstance(inputs, (str, list)):
+            encodings: BatchEncoding = attribution_model.encode(
+                inputs,
+                as_targets=as_targets,
+                return_baseline=True,
+                include_eos_baseline=include_eos_baseline,
+            )
+        elif isinstance(inputs, BatchEncoding):
+            encodings = inputs
+        else:
+            raise ValueError(
+                f"Error: Found inputs of type {type(inputs)}. "
+                "Inputs must be either a string, a list of strings, a BatchEncoding or a Batch."
+            )
+        embeddings = BatchEmbedding(
+            input_embeds=attribution_model.embed(encodings.input_ids, as_targets=as_targets),
+            baseline_embeds=attribution_model.embed(encodings.baseline_ids, as_targets=as_targets),
+        )
+        batch = Batch(encodings, embeddings)
+    return batch
 
 
 @dataclass(eq=False, repr=False)
@@ -636,8 +670,9 @@ class GranularFeatureAttributionSequenceOutput(FeatureAttributionSequenceOutput)
 
     def __post_init__(self):
         super().__post_init__()
-        self._dict_aggregate_fn["source_attributions"]["scores"] = "vnorm_normalize"
-        self._dict_aggregate_fn["target_attributions"]["scores"] = "vnorm_normalize"
+        self._aggregator = ["vnorm", "normalize"]
+        self._dict_aggregate_fn["source_attributions"]["scores"] = "vnorm"
+        self._dict_aggregate_fn["target_attributions"]["scores"] = "vnorm"
         if "deltas" not in self._dict_aggregate_fn["step_scores"]["spans"]:
             self._dict_aggregate_fn["step_scores"]["spans"]["deltas"] = "absmax"
 

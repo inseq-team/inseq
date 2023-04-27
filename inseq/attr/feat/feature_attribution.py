@@ -225,7 +225,7 @@ class FeatureAttribution(Registry):
             encoded_sources = self.attribution_model.encode(sources, return_baseline=True)
             # We do this here to support separate attr_pos_start for different sentences when batching
             if attr_pos_start is None or attr_pos_start < encoded_sources.input_ids.shape[1]:
-                attr_pos_start = encoded_sources.input_ids.shape[1]
+                attr_pos_start = encoded_sources.input_ids.shape[1] - 1
         batch = self.attribution_model.formatter.prepare_inputs_for_attribution(
             self.attribution_model, inputs, include_eos_baseline
         )
@@ -336,22 +336,22 @@ class FeatureAttribution(Registry):
             )
             for idx in range(len(target_tokens_with_ids))
         ]
-        pbar_pos_start = attr_pos_start + 1 if self.attribution_model.is_encoder_decoder else attr_pos_start
+        if self.attribution_model.is_encoder_decoder:
+            iter_pos_start, iter_pos_end = attr_pos_start + 1, min(attr_pos_end + 1, batch.max_generation_length)
+        else:
+            iter_pos_start, iter_pos_end = attr_pos_start, attr_pos_end
         pbar = get_progress_bar(
             sequences=sequences,
             target_lengths=targets_lengths,
             method_name=self.method_name,
             show=show_progress,
             pretty=pretty_progress,
-            attr_pos_start=pbar_pos_start,
+            attr_pos_start=iter_pos_start,
             attr_pos_end=attr_pos_end,
         )
         whitespace_indexes = find_char_indexes(sequences.targets, " ")
         attribution_outputs = []
-        if self.attribution_model.is_encoder_decoder:
-            iter_pos_start, iter_pos_end = attr_pos_start + 1, min(attr_pos_end + 1, batch.max_generation_length)
-        else:
-            iter_pos_start, iter_pos_end = attr_pos_start, attr_pos_end
+
         start = datetime.now()
 
         # Attribution loop for generation
@@ -527,7 +527,7 @@ class FeatureAttribution(Registry):
     def get_attribution_args(self, **kwargs) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         if hasattr(self, "method") and hasattr(self.method, "attribute"):
             return extract_signature_args(kwargs, self.method.attribute, self.ignore_extra_args, return_remaining=True)
-        return {}
+        return {}, {}
 
     def attribute_step(
         self,
@@ -586,3 +586,18 @@ def list_feature_attribution_methods():
     to define a model for attribution.
     """
     return available_classes(FeatureAttribution)
+
+
+class DummyAttribution(FeatureAttribution):
+    """Dummy attribution method that returns empty attributions."""
+
+    method_name = "dummy"
+
+    def attribute_step(
+        self, attribute_fn_main_args: Dict[str, Any], attribution_args: Dict[str, Any] = {}
+    ) -> FeatureAttributionStepOutput:
+        return FeatureAttributionStepOutput(
+            source_attributions=None,
+            target_attributions=None,
+            step_scores={},
+        )

@@ -83,13 +83,17 @@ def show_attributions(
     for ex_id, attribution in enumerate(attributions):
         instance_html = get_instance_html(ex_id)
         curr_html = ""
-        curr_html_color = html_colors[idx]
+        curr_html_color = None
         if attribution.source_attributions is not None:
+            curr_html_color = html_colors[idx]
             curr_html += instance_html
             curr_html += get_heatmap_type(attribution, curr_html_color, "Source", use_html=True)
             if attribution.target_attributions is not None:
                 curr_html_color = html_colors[idx + 1]
-        if attribution.target_attributions is not None:
+        display_scores = attribution.source_attributions is None and attribution.step_scores
+        if attribution.target_attributions is not None or display_scores:
+            if curr_html_color is None and html_colors:
+                curr_html_color = html_colors[idx]
             curr_html += instance_html
             curr_html += get_heatmap_type(attribution, curr_html_color, "Target", use_html=True)
         if display and isnotebook():
@@ -168,10 +172,14 @@ def get_heatmap_type(
             label="Source",
         )
     elif heatmap_type == "Target":
-        mask = np.ones_like(attribution.target_attributions.numpy()) * float("nan")
-        mask = np.tril(mask, k=-attribution.attr_pos_start)
+        if attribution.target_attributions is not None:
+            mask = np.ones_like(attribution.target_attributions.numpy()) * float("nan")
+            mask = np.tril(mask, k=-attribution.attr_pos_start)
+            target_attributions = attribution.target_attributions.numpy() + mask
+        else:
+            target_attributions = None
         return heatmap_func(
-            attribution.target_attributions.numpy() + mask,
+            target_attributions,
             [t.token for t in attribution.target[attribution.attr_pos_start : attribution.attr_pos_end]],  # noqa
             [t.token for t in attribution.target],
             colors,
@@ -183,7 +191,7 @@ def get_heatmap_type(
 
 
 def get_saliency_heatmap_html(
-    scores: np.ndarray,
+    scores: Union[np.ndarray, None],
     column_labels: List[str],
     row_labels: List[str],
     input_colors: List[List[str]],
@@ -195,17 +203,18 @@ def get_saliency_heatmap_html(
     uuid = "".join(random.choices(string.ascii_lowercase, k=20))
     out = saliency_heatmap_table_header
     # add top row containing target tokens
-    for head_id in range(scores.shape[1]):
-        out += f"<th>{sanitize_html(column_labels[head_id])}</th>"
+    for column_label in column_labels:
+        out += f"<th>{sanitize_html(column_label)}</th>"
     out += "</tr>"
-    for row_index in range(scores.shape[0]):
-        out += f"<tr><th>{sanitize_html(row_labels[row_index])}</th>"
-        for col_index in range(scores.shape[1]):
-            score = ""
-            if not np.isnan(scores[row_index, col_index]):
-                score = round(float(scores[row_index][col_index]), 3)
-            out += f'<th style="background:{input_colors[row_index][col_index]}">{score}</th>'
-        out += "</tr>"
+    if scores is not None:
+        for row_index in range(scores.shape[0]):
+            out += f"<tr><th>{sanitize_html(row_labels[row_index])}</th>"
+            for col_index in range(scores.shape[1]):
+                score = ""
+                if not np.isnan(scores[row_index, col_index]):
+                    score = round(float(scores[row_index][col_index]), 3)
+                out += f'<th style="background:{input_colors[row_index][col_index]}">{score}</th>'
+            out += "</tr>"
     if step_scores is not None:
         for step_score_name, step_score_values in step_scores.items():
             out += f'<tr style="outline: thin solid"><th><b>{step_score_name}</b></th>'
@@ -214,7 +223,7 @@ def get_saliency_heatmap_html(
             else:
                 threshold = step_scores_threshold.get(step_score_name, 0.5)
             style = lambda val, limit: abs(val) >= limit
-            for col_index in range(scores.shape[1]):
+            for col_index in range(len(column_labels)):
                 score = round(float(step_score_values[col_index]), 3)
                 is_bold = style(score, threshold)
                 out += f'<th>{"<b>" if is_bold else ""}{score}{"</b>" if is_bold else ""}</th>'
@@ -228,7 +237,7 @@ def get_saliency_heatmap_html(
 
 
 def get_saliency_heatmap_rich(
-    scores: np.ndarray,
+    scores: Union[np.ndarray, None],
     column_labels: List[str],
     row_labels: List[str],
     input_colors: List[List[str]],
@@ -237,8 +246,8 @@ def get_saliency_heatmap_rich(
     step_scores_threshold: Union[float, Dict[str, float]] = 0.5,
 ):
     columns = [Column(header="", justify="right")]
-    for head_id in range(scores.shape[1]):
-        columns.append(Column(header=column_labels[head_id], justify="center"))
+    for column_label in column_labels:
+        columns.append(Column(header=column_label, justify="center"))
     table = Table(
         *columns,
         title=f"{label + ' ' if label else ''}Saliency Heatmap",
@@ -247,15 +256,16 @@ def get_saliency_heatmap_rich(
         show_lines=False,
         box=box.HEAVY_HEAD,
     )
-    for row_index in range(scores.shape[0]):
-        row = [Text(row_labels[row_index], style="bold")]
-        for col_index in range(scores.shape[1]):
-            color = Color.from_rgb(*input_colors[row_index][col_index])
-            score = ""
-            if not np.isnan(scores[row_index][col_index]):
-                score = round(float(scores[row_index][col_index]), 2)
-            row.append(Text(f"{score}", justify="center", style=Style(color=color)))
-        table.add_row(*row, end_section=row_index == scores.shape[0] - 1)
+    if scores is not None:
+        for row_index in range(scores.shape[0]):
+            row = [Text(row_labels[row_index], style="bold")]
+            for col_index in range(scores.shape[1]):
+                color = Color.from_rgb(*input_colors[row_index][col_index])
+                score = ""
+                if not np.isnan(scores[row_index][col_index]):
+                    score = round(float(scores[row_index][col_index]), 2)
+                row.append(Text(f"{score}", justify="center", style=Style(color=color)))
+            table.add_row(*row, end_section=row_index == scores.shape[0] - 1)
     if step_scores is not None:
         for step_score_name, step_score_values in step_scores.items():
             if isinstance(step_scores_threshold, float):

@@ -1,6 +1,6 @@
 import logging
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Callable, List, Optional, Sequence, Tuple, Type, Union
+from typing import TYPE_CHECKING, Callable, List, Optional, Sequence, Tuple, Type, TypeVar, Union
 
 import torch
 
@@ -178,17 +178,18 @@ class AggregatorPipeline:
 
 
 AggregatorInput = Union[AggregatorPipeline, Type[Aggregator], str, Sequence[Union[str, Type[Aggregator]]], None]
+AggregableMixinClass = TypeVar("AggregableMixinClass", bound="AggregableMixin")
 
 
 class AggregableMixin(ABC):
     _aggregator: Union[AggregatorPipeline, Type[Aggregator]]
 
     def aggregate(
-        self,
+        self: AggregableMixinClass,
         aggregator: AggregatorInput = None,
         aggregate_fn: Union[str, Sequence[str], None] = None,
         **kwargs,
-    ) -> "AggregableMixin":
+    ) -> AggregableMixinClass:
         """Aggregate outputs using the default or provided aggregator.
 
         Args:

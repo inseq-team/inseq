@@ -90,9 +90,9 @@ The first step is to install the tuned lens library using ``pip install tuned-le
         where the token is not predicted by the model.
         """
         batch = attribution_model.formatter.convert_args_to_batch(
-            input_ids=decoder_input_ids,
-            input_embeds=None,
-            attention_mask=decoder_attention_mask,
+            decoder_input_ids=decoder_input_ids,
+            decoder_input_embeds=None,
+            decoder_attention_mask=decoder_attention_mask,
         )
         # Record activations at every model layer
         with record_residual_stream(attribution_model.model) as stream:

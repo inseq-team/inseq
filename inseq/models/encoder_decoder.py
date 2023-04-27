@@ -10,6 +10,7 @@ from ..data import (
     EncoderDecoderBatch,
     FeatureAttributionInput,
     FeatureAttributionStepOutput,
+    get_batch_from_inputs,
 )
 from ..utils.typing import (
     AttributionForwardInputs,
@@ -50,9 +51,7 @@ class EncoderDecoderInputFormatter(InputFormatter):
         The final result will be consistent in both cases.
 
         Args:
-            sources (:obj:`FeatureAttributionInput`): The sources provided to the
-                :meth:`~inseq.attr.feat.FeatureAttribution.prepare` method.
-            targets (:obj:`FeatureAttributionInput): The targets provided to the
+            inputs (:obj:`tuple` of `FeatureAttributionInput`): A tuple containing sources and targets provided to the
                 :meth:`~inseq.attr.feat.FeatureAttribution.prepare` method.
             include_eos_baseline (:obj:`bool`, `optional`): Whether to include the EOS token in the baseline for
                 attribution. By default the EOS token is not used for attribution. Defaults to False.
@@ -62,51 +61,18 @@ class EncoderDecoderInputFormatter(InputFormatter):
                 and targets in encoded and embedded formats for all inputs.
         """
         sources, targets = inputs
-        if isinstance(sources, Batch):
-            source_batch = sources
-        else:
-            if isinstance(sources, (str, list)):
-                source_encodings: BatchEncoding = attribution_model.encode(
-                    sources, return_baseline=True, include_eos_baseline=include_eos_baseline
-                )
-            elif isinstance(sources, BatchEncoding):
-                source_encodings = sources
-            else:
-                raise ValueError(
-                    "sources must be either a string, a list of strings, a BatchEncoding or a Batch, "
-                    f"not {type(sources)}"
-                )
-            # Even when we are performing layer attribution, we might need the embeddings
-            # to compute step probabilities.
-            source_embeddings = BatchEmbedding(
-                input_embeds=attribution_model.embed(source_encodings.input_ids),
-                baseline_embeds=attribution_model.embed(source_encodings.baseline_ids),
-            )
-            source_batch = Batch(source_encodings, source_embeddings)
-
-        if isinstance(targets, Batch):
-            target_batch = targets
-        else:
-            if isinstance(targets, (str, list)):
-                target_encodings: BatchEncoding = attribution_model.encode(
-                    targets,
-                    as_targets=True,
-                    return_baseline=True,
-                    include_eos_baseline=include_eos_baseline,
-                )
-            elif isinstance(targets, BatchEncoding):
-                target_encodings = targets
-            else:
-                raise ValueError(
-                    "targets must be either a string, a list of strings, a BatchEncoding or a Batch, "
-                    f"not {type(targets)}"
-                )
-            baseline_embeds = attribution_model.embed(target_encodings.baseline_ids, as_targets=True)
-            target_embeddings = BatchEmbedding(
-                input_embeds=attribution_model.embed(target_encodings.input_ids, as_targets=True),
-                baseline_embeds=baseline_embeds,
-            )
-            target_batch = Batch(target_encodings, target_embeddings)
+        source_batch = get_batch_from_inputs(
+            attribution_model,
+            inputs=sources,
+            include_eos_baseline=include_eos_baseline,
+            as_targets=False,
+        )
+        target_batch = get_batch_from_inputs(
+            attribution_model,
+            inputs=targets,
+            include_eos_baseline=include_eos_baseline,
+            as_targets=True,
+        )
         return EncoderDecoderBatch(source_batch, target_batch)
 
     @staticmethod

@@ -7,13 +7,9 @@ from torch.backends.cuda import is_built as is_cuda_built
 from torch.backends.mps import is_available as is_mps_available
 from torch.backends.mps import is_built as is_mps_built
 from torch.cuda import is_available as is_cuda_available
-from torch.linalg import vector_norm
 from torchtyping import TensorType
 
-from .typing import (
-    GranularSequenceAttributionTensor,
-    TokenSequenceAttributionTensor,
-)
+from .typing import TokenSequenceAttributionTensor
 
 if TYPE_CHECKING:
     pass
@@ -38,36 +34,6 @@ def remap_from_filtered(
     index = index.expand_as(filtered)
     new_source = torch.ones(original_shape, dtype=filtered.dtype, device=filtered.device) * float("nan")
     return new_source.scatter(0, index, filtered)
-
-
-def vnorm_normalize_attributions(
-    attributions: Union[
-        GranularSequenceAttributionTensor, Tuple[GranularSequenceAttributionTensor, GranularSequenceAttributionTensor]
-    ],
-    norm_dim: Optional[int] = -1,
-    cat_dim: int = 0,
-) -> TokenSequenceAttributionTensor:
-    """
-    Takes the norm and normalize tensors across dim_sum.
-    The outcome is a matrix of unit row vectors.
-    """
-    concat = False
-    if isinstance(attributions, tuple):
-        concat = True
-        orig_sizes = [a.shape[cat_dim] for a in attributions]
-        attributions = torch.cat(attributions, dim=cat_dim)
-    else:
-        orig_sizes = [attributions.shape[cat_dim]]
-    attributions = vector_norm(attributions, ord=2, dim=norm_dim)
-    if cat_dim is not None:
-        # nansum is used to handle the target side sequence attribution case
-        attributions = attributions / attributions.nansum(dim=cat_dim, keepdim=True)
-    if len(attributions.shape) == 1:
-        attributions = attributions.unsqueeze(0)
-    if concat:
-        attributions = attributions.split(orig_sizes, dim=cat_dim)
-        return attributions[0], attributions[1]
-    return attributions
 
 
 def normalize_attributions(
