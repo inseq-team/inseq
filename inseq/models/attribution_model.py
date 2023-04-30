@@ -318,7 +318,7 @@ class AttributionModel(ABC, torch.nn.Module):
             step-scores, optionally step-wise attributions and general information concerning attributed texts and the
             attribution process.
         """
-        if not input_texts:
+        if self.is_encoder_decoder and not input_texts:
             raise ValueError("At least one text must be provided to perform attribution.")
         if attribute_target and not self.is_encoder_decoder:
             logger.warning("attribute_target parameter is set to True, but will be ignored (not an encoder-decoder).")
@@ -332,10 +332,16 @@ class AttributionModel(ABC, torch.nn.Module):
         if device is not None:
             self.device = device
         input_texts, generated_texts = format_input_texts(input_texts, generated_texts)
+        has_generated_texts = generated_texts is not None
+        if not self.is_encoder_decoder:
+            for i in range(len(input_texts)):
+                if not input_texts[i]:
+                    input_texts[i] = self.bos_token
+                    if has_generated_texts and not generated_texts[i].startswith(self.bos_token):
+                        generated_texts[i] = " ".join([self.bos_token, generated_texts[i]])
         if batch_size is not None:
             n_batches = len(input_texts) // batch_size + ((len(input_texts) % batch_size) > 0)
             logger.info(f"Splitting input texts into {n_batches} batches of size {batch_size}.")
-        has_generated_texts = generated_texts is not None
         # If constrained decoding is not enabled, output texts are generated from input texts.
         if not has_generated_texts or generate_from_target_prefix:
             encoded_input = self.encode(input_texts, return_baseline=True, include_eos_baseline=include_eos_baseline)

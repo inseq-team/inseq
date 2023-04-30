@@ -207,7 +207,7 @@ def format_input_texts(
 ) -> Tuple[List[str], List[str]]:
     texts = [texts] if isinstance(texts, str) else texts
     reference_texts = [ref_texts] if isinstance(ref_texts, str) else ref_texts
-    if reference_texts and len(texts) != len(reference_texts):
+    if reference_texts and texts and len(texts) != len(reference_texts):
         raise LengthMismatchError(
             "Length mismatch for texts and reference_texts.Input length: {}, reference length: {} ".format(
                 len(texts), len(reference_texts)

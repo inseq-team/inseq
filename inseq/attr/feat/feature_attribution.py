@@ -222,7 +222,7 @@ class FeatureAttribution(Registry):
             encoded_sources = self.attribution_model.encode(sources, return_baseline=True)
             # We do this here to support separate attr_pos_start for different sentences when batching
             if attr_pos_start is None or attr_pos_start < encoded_sources.input_ids.shape[1]:
-                attr_pos_start = encoded_sources.input_ids.shape[1] - 1
+                attr_pos_start = encoded_sources.input_ids.shape[1]
         batch = self.attribution_model.formatter.prepare_inputs_for_attribution(
             self.attribution_model, inputs, include_eos_baseline
         )
@@ -328,22 +328,22 @@ class FeatureAttribution(Registry):
             max(
                 0,
                 min(attr_pos_end, len(target_tokens_with_ids[idx]))
-                - attr_pos_start
+                - (attr_pos_start + 1)
                 + get_front_padding(batch.target_mask)[idx],
             )
             for idx in range(len(target_tokens_with_ids))
         ]
         if self.attribution_model.is_encoder_decoder:
-            iter_pos_start, iter_pos_end = attr_pos_start + 1, min(attr_pos_end + 1, batch.max_generation_length)
+            iter_pos_end = min(attr_pos_end + 1, batch.max_generation_length)
         else:
-            iter_pos_start, iter_pos_end = attr_pos_start, attr_pos_end
+            iter_pos_end = attr_pos_end
         pbar = get_progress_bar(
             sequences=sequences,
             target_lengths=targets_lengths,
             method_name=self.method_name,
             show=show_progress,
             pretty=pretty_progress,
-            attr_pos_start=iter_pos_start,
+            attr_pos_start=attr_pos_start,
             attr_pos_end=attr_pos_end,
         )
         whitespace_indexes = find_char_indexes(sequences.targets, " ")
@@ -352,7 +352,7 @@ class FeatureAttribution(Registry):
         start = datetime.now()
 
         # Attribution loop for generation
-        for step in range(iter_pos_start, iter_pos_end):
+        for step in range(attr_pos_start, iter_pos_end):
             tgt_ids, tgt_mask = batch.get_step_target(step, with_attention=True)
             step_output = self.filtered_attribute_step(
                 batch[:step],
@@ -375,8 +375,8 @@ class FeatureAttribution(Registry):
             attribution_outputs.append(step_output)
             if pretty_progress:
                 tgt_tokens = batch.target_tokens
-                skipped_prefixes = tok2string(self.attribution_model, tgt_tokens, end=iter_pos_start)
-                attributed_sentences = tok2string(self.attribution_model, tgt_tokens, iter_pos_start, step + 1)
+                skipped_prefixes = tok2string(self.attribution_model, tgt_tokens, end=attr_pos_start)
+                attributed_sentences = tok2string(self.attribution_model, tgt_tokens, attr_pos_start, step + 1)
                 unattributed_suffixes = tok2string(self.attribution_model, tgt_tokens, step + 1, iter_pos_end)
                 skipped_suffixes = tok2string(self.attribution_model, tgt_tokens, start=iter_pos_end)
                 update_progress_bar(

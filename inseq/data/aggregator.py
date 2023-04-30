@@ -22,6 +22,8 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+AggregableMixinClass = TypeVar("AggregableMixinClass", bound="AggregableMixin")
+
 
 class DictWithDefault(dict):
     """Used to pass specific values to field-specific calls of the aggregate function in Aggregator.
@@ -86,8 +88,12 @@ class Aggregator(Registry):
 
     @classmethod
     def aggregate(
-        cls, tensors: TensorWrapper, do_start_aggregation: bool = True, do_end_aggregation: bool = True, **kwargs
-    ):
+        cls,
+        tensors: AggregableMixinClass,
+        do_start_aggregation: bool = True,
+        do_end_aggregation: bool = True,
+        **kwargs,
+    ) -> AggregableMixinClass:
         if do_start_aggregation:
             cls.start_aggregation_hook(tensors, **kwargs)
         cls.pre_aggregate_hook(tensors, **kwargs)
@@ -129,13 +135,17 @@ def _get_aggregators_from_id(
         aggregate_fn = aggregator
         aggregator = SequenceAttributionAggregator
     else:
-        raise ValueError(f"Unknown aggregator {aggregator}. Choose from {','.join(available_classes(Aggregator))}.")
+        raise ValueError(
+            f"Unknown aggregator {aggregator}. Choose from {', '.join(available_classes(Aggregator))}.\n"
+            f"Alternatively, choose from the aggregate_fn options {', '.join(available_classes(AggregationFunction))} "
+            "for scores aggregation with the selected function."
+        )
     if aggregate_fn is None:
         return aggregator, aggregate_fn
     if aggregate_fn not in available_classes(AggregationFunction):
         raise ValueError(
             f"Unknown aggregation function {aggregate_fn}. "
-            f"Choose from {','.join(available_classes(AggregationFunction))}"
+            f"Choose from {', '.join(available_classes(AggregationFunction))}"
         )
     aggregate_fn = AggregationFunction.available_classes()[aggregate_fn]()
     return aggregator, aggregate_fn
@@ -162,9 +172,16 @@ class AggregatorPipeline:
             self.aggregators.append(curr_aggregator)
             self.aggregate_fn.append(curr_aggregate_fn)
 
-    def aggregate(self, tensors: TensorWrapper, **kwargs):
-        for aggregator in self.aggregators:
-            aggregator.start_aggregation_hook(tensors, **kwargs)
+    def aggregate(
+        self,
+        tensors: AggregableMixinClass,
+        do_start_aggregation: bool = True,
+        do_end_aggregation: bool = True,
+        **kwargs,
+    ) -> AggregableMixinClass:
+        if do_start_aggregation:
+            for aggregator in self.aggregators:
+                aggregator.start_aggregation_hook(tensors, **kwargs)
         for aggregator, aggregate_fn in zip(self.aggregators, self.aggregate_fn):
             curr_aggregation_kwargs = kwargs.copy()
             if aggregate_fn is not None:
@@ -172,13 +189,13 @@ class AggregatorPipeline:
             tensors = aggregator.aggregate(
                 tensors, do_start_aggregation=False, do_end_aggregation=False, **curr_aggregation_kwargs
             )
-        for aggregator in self.aggregators:
-            aggregator.end_aggregation_hook(tensors, **kwargs)
+        if do_end_aggregation:
+            for aggregator in self.aggregators:
+                aggregator.end_aggregation_hook(tensors, **kwargs)
         return tensors
 
 
 AggregatorInput = Union[AggregatorPipeline, Type[Aggregator], str, Sequence[Union[str, Type[Aggregator]]], None]
-AggregableMixinClass = TypeVar("AggregableMixinClass", bound="AggregableMixin")
 
 
 class AggregableMixin(ABC):
@@ -188,6 +205,8 @@ class AggregableMixin(ABC):
         self: AggregableMixinClass,
         aggregator: AggregatorInput = None,
         aggregate_fn: Union[str, Sequence[str], None] = None,
+        do_start_aggregation: bool = True,
+        do_end_aggregation: bool = True,
         **kwargs,
     ) -> AggregableMixinClass:
         """Aggregate outputs using the default or provided aggregator.
@@ -221,7 +240,9 @@ class AggregableMixin(ABC):
                     "If aggregator is a sequence, it should contain either strings/classes identifying aggregators"
                     "or tuples of pairs of strings/classes identifying aggregators and aggregate functions."
                 )
-        return aggregator.aggregate(self, **kwargs)
+        return aggregator.aggregate(
+            self, do_start_aggregation=do_start_aggregation, do_end_aggregation=do_end_aggregation, **kwargs
+        )
 
     @abstractmethod
     def __post_init__(self):
@@ -278,10 +299,15 @@ class SequenceAttributionAggregator(Aggregator):
     def end_aggregation_hook(cls, attr: "FeatureAttributionSequenceOutput", **kwargs):
         super().end_aggregation_hook(attr, **kwargs)
         # Needed to ensure the attribution can be visualized
-        if attr.source_attributions is not None:
-            assert len(attr.source_attributions.shape) == 2, attr.source_attributions.shape
-        if attr.target_attributions is not None:
-            assert len(attr.target_attributions.shape) == 2, attr.target_attributions.shape
+        try:
+            if attr.source_attributions is not None:
+                assert len(attr.source_attributions.shape) == 2, attr.source_attributions.shape
+            if attr.target_attributions is not None:
+                assert len(attr.target_attributions.shape) == 2, attr.target_attributions.shape
+        except AssertionError as e:
+            raise RuntimeError(
+                f"The aggregated attributions should be 2-dimensional to be visualized. Found dimensions: {e.args[0]}"
+            ) from e
 
     @staticmethod
     def aggregate_source(attr: "FeatureAttributionSequenceOutput", **kwargs):

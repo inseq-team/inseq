@@ -69,11 +69,19 @@ def check_attribute_positions(
         `tuple[int, int]`: The start and end positions for attribution.
     """
     if attr_pos_start is None:
-        attr_pos_start = 0
+        attr_pos_start = 1
     if attr_pos_end is None or attr_pos_end > max_length:
         attr_pos_end = max_length
+    if attr_pos_start < -max_length:
+        raise ValueError(f"Invalid starting position for attribution: {attr_pos_start}")
+    if attr_pos_start < 0:
+        attr_pos_start = max_length + attr_pos_start
+    if attr_pos_end < -max_length:
+        raise ValueError(f"Invalid ending position for attribution: {attr_pos_end}")
+    if attr_pos_end < 0:
+        attr_pos_end = max_length + attr_pos_end
     if attr_pos_start > attr_pos_end:
-        raise ValueError("Invalid starting position for attribution")
+        raise ValueError(f"Invalid starting position for attribution: {attr_pos_start} > {attr_pos_end}")
     if attr_pos_start == attr_pos_end:
         raise ValueError("Start and end attribution positions cannot be the same.")
     return attr_pos_start, attr_pos_end

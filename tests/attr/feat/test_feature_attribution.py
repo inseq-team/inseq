@@ -66,7 +66,7 @@ def test_contrastive_attribution_gpt(saliency_gpt_model: HuggingfaceDecoderOnlyM
         show_progress=False,
     )
     attribution_scores = out.sequence_attributions[0].target_attributions
-    assert attribution_scores.shape == torch.Size([23, 6, 32])
+    assert attribution_scores.shape == torch.Size([23, 5, 32])
 
 
 def test_mcd_weighted_attribution_seq2seq(saliency_mt_model, auxiliary_saliency_mt_model):

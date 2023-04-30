@@ -450,6 +450,21 @@ class FeatureAttributionOutput:
             return False
         return True
 
+    def __getitem__(self, item):
+        return self.sequence_attributions[item]
+
+    def __len__(self):
+        return len(self.sequence_attributions)
+
+    def __iter__(self):
+        return iter(self.sequence_attributions)
+
+    def __add__(self, other):
+        return self.merge_attributions([self, other])
+
+    def __radd__(self, other):
+        return self.__add__(other)
+
     def save(
         self,
         path: PathLike,
