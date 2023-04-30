@@ -123,10 +123,8 @@ class RolloutAggregationFunction(AggregationFunction):
     def __init__(self):
         self.takes_single_tensor: bool = False
 
-    def __call__(
-        self, scores: Union[torch.Tensor, Tuple[torch.Tensor, ...]], dim: int, add_residual: bool = False
-    ) -> ScoreTensor:
-        return rollout_fn(scores, dim=dim, add_residual=add_residual)
+    def __call__(self, scores: Union[torch.Tensor, Tuple[torch.Tensor, ...]], dim: int) -> ScoreTensor:
+        return rollout_fn(scores, dim=dim)
 
 
 DEFAULT_ATTRIBUTION_AGGREGATE_DICT = {

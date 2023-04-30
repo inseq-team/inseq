@@ -3,6 +3,7 @@ from inspect import getfullargspec
 from typing import TYPE_CHECKING, Dict, List, Optional, Protocol, Union
 
 import torch
+from torch.nn.functional import kl_div, log_softmax
 from transformers import AutoModelForCausalLM, AutoModelForSeq2SeqLM
 from transformers.modeling_outputs import ModelOutput
 
@@ -52,7 +53,7 @@ def probability_fn(
     """Compute the probabilty of target_ids from the model's output logits."""
     logits = attribution_model.output2logits(forward_output)
     target_ids = target_ids.reshape(logits.shape[0], 1)
-    logits = torch.softmax(logits, dim=-1)
+    logits = logits.softmax(dim=-1)
     # Extracts the ith score from the softmax output over the vocabulary (dim -1 of the logits)
     # where i is the value of the corresponding index in target_ids.
     return logits.gather(-1, target_ids).squeeze(-1)
@@ -89,7 +90,7 @@ def perplexity_fn(
     return 2 ** crossentropy_fn(attribution_model, forward_output, target_ids)
 
 
-def contrast_prob_fn(
+def _get_contrast_output(
     attribution_model: "AttributionModel",
     encoder_input_ids: IdsTensor,
     decoder_input_ids: IdsTensor,
@@ -97,12 +98,11 @@ def contrast_prob_fn(
     decoder_attention_mask: IdsTensor,
     encoder_input_embeds: EmbeddingsTensor,
     decoder_input_embeds: EmbeddingsTensor,
-    target_ids: TargetIdsTensor,
-    contrast_target_prefixes: FeatureAttributionInput = None,
-    contrast_sources: FeatureAttributionInput = None,
+    contrast_target_prefixes: Optional[FeatureAttributionInput] = None,
+    contrast_sources: Optional[FeatureAttributionInput] = None,
     **kwargs,
-) -> SingleScorePerStepTensor:
-    """Compute the probability of target ids given contrastive inputs, equivalent to the pro.
+) -> ModelOutput:
+    """Utility function to return the output of the model for given contrastive inputs.
 
     Args:
         contrast_sources (:obj:`str` or :obj:`list(str)`): Source text(s) used as contrastive inputs to compute
@@ -150,7 +150,43 @@ def contrast_prob_fn(
         encoder_attention_mask=c_enc_mask,
         decoder_attention_mask=c_dec_mask,
     )
-    c_out = attribution_model.get_forward_output(c_batch, use_embeddings=attribution_model.is_encoder_decoder)
+    return attribution_model.get_forward_output(c_batch, use_embeddings=attribution_model.is_encoder_decoder)
+
+
+def contrast_prob_fn(
+    attribution_model: "AttributionModel",
+    encoder_input_ids: IdsTensor,
+    decoder_input_ids: IdsTensor,
+    encoder_attention_mask: IdsTensor,
+    decoder_attention_mask: IdsTensor,
+    encoder_input_embeds: EmbeddingsTensor,
+    decoder_input_embeds: EmbeddingsTensor,
+    target_ids: TargetIdsTensor,
+    contrast_target_prefixes: Optional[FeatureAttributionInput] = None,
+    contrast_sources: Optional[FeatureAttributionInput] = None,
+    **kwargs,
+) -> SingleScorePerStepTensor:
+    """Compute the probability of target ids given contrastive inputs.
+
+    Args:
+        contrast_sources (:obj:`str` or :obj:`list(str)`): Source text(s) used as contrastive inputs to compute
+            target probabilities for encoder-decoder models. If not specified, the source text is assumed to match the
+            original source text. Defaults to :obj:`None`.
+        contrast_target_prefixes (:obj:`str` or :obj:`list(str)`): Target prefix(es) used as contrastive inputs to
+            compute target probabilities. If not specified, no target prefix beyond previously generated tokens is
+            assumed. Defaults to :obj:`None`.
+    """
+    c_out = _get_contrast_output(
+        attribution_model,
+        encoder_input_ids,
+        decoder_input_ids,
+        encoder_attention_mask,
+        decoder_attention_mask,
+        encoder_input_embeds,
+        decoder_input_embeds,
+        contrast_target_prefixes=contrast_target_prefixes,
+        contrast_sources=contrast_sources,
+    )
     return probability_fn(attribution_model, c_out, target_ids)
 
 
@@ -164,8 +200,8 @@ def pcxmi_fn(
     encoder_input_embeds: EmbeddingsTensor,
     decoder_input_embeds: EmbeddingsTensor,
     target_ids: TargetIdsTensor,
-    contrast_sources: FeatureAttributionInput = None,
-    contrast_target_prefixes: FeatureAttributionInput = None,
+    contrast_sources: Optional[FeatureAttributionInput] = None,
+    contrast_target_prefixes: Optional[FeatureAttributionInput] = None,
     **kwargs,
 ) -> SingleScorePerStepTensor:
     """Compute the pointwise conditional cross-mutual information (P-CXMI) of target ids given original and contrastive
@@ -195,6 +231,67 @@ def pcxmi_fn(
         contrast_target_prefixes=contrast_target_prefixes,
     )
     return -torch.log2(torch.div(original_probs, contrast_probs))
+
+
+def kl_divergence_fn(
+    attribution_model: "AttributionModel",
+    forward_output: ModelOutput,
+    encoder_input_ids: IdsTensor,
+    decoder_input_ids: IdsTensor,
+    encoder_attention_mask: IdsTensor,
+    decoder_attention_mask: IdsTensor,
+    encoder_input_embeds: EmbeddingsTensor,
+    decoder_input_embeds: EmbeddingsTensor,
+    contrast_sources: Optional[FeatureAttributionInput] = None,
+    contrast_target_prefixes: Optional[FeatureAttributionInput] = None,
+    top_k: int = 0,
+    **kwargs,
+) -> SingleScorePerStepTensor:
+    """Compute the pointwise Kullback-Leibler divergence of target ids given original and contrastive input options.
+    The KL divergence is the expectation of the log difference between the probabilities of regular (P) and contrastive
+    (Q) inputs.
+
+    Args:
+        contrast_sources (:obj:`str` or :obj:`list(str)`): Source text(s) used as contrastive inputs to compute
+            the KL divergence for encoder-decoder models. If not specified, the source text is assumed to match the
+            original source text. Defaults to :obj:`None`.
+        contrast_target_prefixes (:obj:`str` or :obj:`list(str)`): Target prefix(es) used as contrastive inputs to
+            compute the KL divergence. If not specified, no target prefix beyond previously generated tokens is
+            assumed. Defaults to :obj:`None`.
+        top_k (:obj:`int`): If set to a value > 0, only the top :obj:`top_k` tokens will be considered for
+            computing the KL divergence. Defaults to :obj:`0`.
+    """
+
+    original_logits = attribution_model.output2logits(forward_output)
+    contrast_output = _get_contrast_output(
+        attribution_model=attribution_model,
+        encoder_input_ids=encoder_input_ids,
+        decoder_input_ids=decoder_input_ids,
+        encoder_attention_mask=encoder_attention_mask,
+        decoder_attention_mask=decoder_attention_mask,
+        encoder_input_embeds=encoder_input_embeds,
+        decoder_input_embeds=decoder_input_embeds,
+        contrast_sources=contrast_sources,
+        contrast_target_prefixes=contrast_target_prefixes,
+    )
+    contrast_logits = attribution_model.output2logits(contrast_output)
+    top_k = min(top_k, contrast_logits.size(-1))
+    if top_k > 0:
+        filtered_contrast_logits = torch.zeros(contrast_logits.size(0), top_k)
+        filtered_original_logits = torch.zeros(original_logits.size(0), top_k)
+        indices_to_remove = contrast_logits < contrast_logits.topk(top_k).values[..., -1, None]
+        for i in range(contrast_logits.size(0)):
+            filtered_contrast_logits[i] = contrast_logits[i].masked_select(~indices_to_remove[i])
+            filtered_original_logits[i] = original_logits[i].masked_select(~indices_to_remove[i])
+    else:
+        filtered_contrast_logits = contrast_logits
+        filtered_original_logits = original_logits
+    original_logprobs = log_softmax(filtered_original_logits, dim=-1)
+    contrast_logprobs = log_softmax(filtered_contrast_logits, dim=-1)
+    kl_divergence = torch.zeros(original_logprobs.size(0))
+    for i in range(original_logprobs.size(0)):
+        kl_divergence[i] = kl_div(contrast_logprobs[i], original_logprobs[i], reduction="sum", log_target=True)
+    return kl_divergence
 
 
 def contrast_prob_diff_fn(
@@ -317,6 +414,7 @@ STEP_SCORES_MAP = {
     "perplexity": perplexity_fn,
     "contrast_prob": contrast_prob_fn,
     "pcxmi": pcxmi_fn,
+    "kl_divergence": kl_divergence_fn,
     "contrast_prob_diff": contrast_prob_diff_fn,
     "mc_dropout_prob_avg": mc_dropout_prob_avg_fn,
 }

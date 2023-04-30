@@ -39,7 +39,9 @@ def _rollout_joint(
         # Target scores x previous cross rollout scores
         source_rollout_scores[:, i, ...] = target_scores[:, i, ...] @ source_rollout_scores[:, i - 1, ...]
         # Target scores x previous target rollout scores
-        target_rollout_scores[:, i, ...] = target_scores[:, i, ...] @ target_rollout_scores[:, i - 1, ...]
+        target_rollout_scores[:, i, ...] = (
+            target_scores[:, i, ...] @ target_rollout_scores[:, i - 1, ...]
+        ) + cross_scores[:, i, ...]
     # Normalize scores across source and target
     source_rollout_scores, target_rollout_scores = normalize_attributions(
         (source_rollout_scores, target_rollout_scores), cat_dim=-1
@@ -50,7 +52,6 @@ def _rollout_joint(
 def rollout_fn(
     scores: Union[MultiUnitScoreTensor, Tuple[MultiUnitScoreTensor, MultiUnitScoreTensor, MultiUnitScoreTensor]],
     dim: int = 1,
-    add_residual: bool = False,
 ) -> Union[ScoreTensor, Tuple[ScoreTensor, ScoreTensor]]:
     """Reference implementations:
     * `samiraabnar/attention-flow
@@ -67,10 +68,6 @@ def rollout_fn(
             decoder). For an encoder-decoder architecture, the rollout procedure follows the procedure described by
             `Ferrando et al. (2022) <https://aclanthology.org/2022.emnlp-main.599/>`__.
         dim (:obj:`int`, `optional`, defaults to 1): The dimension along which to perform the rollout aggregation.
-        add_residual (:obj:`bool`):
-            Whether to incorporate residual connection between the layers by adding an identity matrix and normalizing
-            weights, as proposed by `Abnar and Zuidema (2020) <https://aclanthology.org/2020.acl-main.385/>`__.
-            Defaults to False.
 
     Returns:
         :obj:`torch.Tensor` or :obj:`tuple(torch.Tensor, torch.Tensor)`:
@@ -79,7 +76,11 @@ def rollout_fn(
             rollout is done skipping layer 3, and only rolled out scores at layer 4 are returned). If encoder-decoder
             rollout is performed, a tuple of tensors ``(source_scores, target_scores)``.
     """
+    squeeze_batch_dim = False
     if isinstance(scores, tuple):
+        if len(scores[0].shape) < 4:
+            scores = tuple(t.unsqueeze(0) for t in scores)
+            squeeze_batch_dim = True
         if dim != 1:
             source_scores, cross_scores, target_scores = tuple(t.transpose(dim, 1) for t in scores)
         else:
@@ -95,11 +96,26 @@ def rollout_fn(
         if dim != 1:
             source_rollout_scores = source_rollout_scores.transpose(1, dim)
             target_rollout_scores = target_rollout_scores.transpose(1, dim)
-        return source_rollout_scores.squeeze(dim), target_rollout_scores.squeeze(dim)
+        source_rollout_scores = source_rollout_scores.squeeze(dim)
+        target_rollout_scores = target_rollout_scores.squeeze(dim)
+        if squeeze_batch_dim:
+            source_rollout_scores = source_rollout_scores.squeeze(0)
+            target_rollout_scores = target_rollout_scores.squeeze(0)
+        return source_rollout_scores, target_rollout_scores
     else:
+        # Add batch dimension if not present
+        # Assumed shape (batch_size, ...) with num_layers at position dim and at least two dimensions representing
+        # scores that will be rolled out
+        if len(scores.shape) < 4:
+            scores = scores.unsqueeze(0)
+            squeeze_batch_dim = True
         if dim != 1:
             scores = scores.transpose(dim, 1)
+        scores[scores.isnan()] = 0.0
         target_rollout_scores = _rollout_single(scores)[:, -1, ...].unsqueeze(1)
         if dim != 1:
             target_rollout_scores = target_rollout_scores.transpose(1, dim)
-        return target_rollout_scores.squeeze(dim)
+        target_rollout_scores = target_rollout_scores.squeeze(dim)
+        if squeeze_batch_dim:
+            target_rollout_scores = target_rollout_scores.squeeze(0)
+        return target_rollout_scores
