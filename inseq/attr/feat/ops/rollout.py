@@ -1,6 +1,7 @@
 from typing import Tuple, Union
 
 import torch
+import torch.nn.functional as F
 
 from ....utils import normalize_attributions
 from ....utils.typing import (
@@ -19,7 +20,8 @@ def _rollout_single(
     rollout_scores[:, 0, ...] = scores[:, 0, ...]
     for i in range(1, scores.size(1)):
         # Rollout scores at layer i by matmul them with the scores at layer i-1
-        rollout_scores[:, i, ...] = scores[:, i, ...] @ rollout_scores[:, i - 1, ...]
+        layer_rollout_scores = scores[:, i, ...] @ rollout_scores[:, i - 1, ...]
+        rollout_scores[:, i, ...] = F.normalize(layer_rollout_scores, p=1, dim=-1)
     return rollout_scores
 
 
@@ -30,18 +32,18 @@ def _rollout_joint(
 ) -> Tuple[ScoreTensor, ScoreTensor]:
     """Performs the rollout aggregation adapted for an encoder-decoder architecture with cross-importance scores."""
     target_scores = (target_scores.mT * cross_scores[..., None, :, -1]).mT
-    joint_source_cross_scores = torch.einsum("blij, bjk -> blik", cross_scores, final_source_scores)
+    joint_source_cross_scores = torch.einsum("bl...ij, b...jk -> bl...ik", cross_scores, final_source_scores)
     source_rollout_scores = torch.zeros_like(joint_source_cross_scores)
     source_rollout_scores[:, 0, ...] = joint_source_cross_scores[:, 0, ...]
     target_rollout_scores = torch.zeros_like(target_scores)
     target_rollout_scores[:, 0, ...] = target_scores[:, 0, ...]
     for i in range(1, target_scores.size(1)):
         # Target scores x previous cross rollout scores
-        source_rollout_scores[:, i, ...] = target_scores[:, i, ...] @ source_rollout_scores[:, i - 1, ...]
+        source_rollout_scores[:, i, ...] = (
+            target_scores[:, i, ...] @ source_rollout_scores[:, i - 1, ...]
+        ) + joint_source_cross_scores[:, i, ...]
         # Target scores x previous target rollout scores
-        target_rollout_scores[:, i, ...] = (
-            target_scores[:, i, ...] @ target_rollout_scores[:, i - 1, ...]
-        ) + cross_scores[:, i, ...]
+        target_rollout_scores[:, i, ...] = target_scores[:, i, ...] @ target_rollout_scores[:, i - 1, ...]
     # Normalize scores across source and target
     source_rollout_scores, target_rollout_scores = normalize_attributions(
         (source_rollout_scores, target_rollout_scores), cat_dim=-1
@@ -77,8 +79,11 @@ def rollout_fn(
             rollout is performed, a tuple of tensors ``(source_scores, target_scores)``.
     """
     squeeze_batch_dim = False
+    remove_padding = False
     if isinstance(scores, tuple):
-        if len(scores[0].shape) < 4:
+        if dim < 0:
+            dim = scores[0].ndim + dim
+        if scores[0].ndim < 4:
             scores = tuple(t.unsqueeze(0) for t in scores)
             squeeze_batch_dim = True
         if dim != 1:
@@ -103,19 +108,28 @@ def rollout_fn(
             target_rollout_scores = target_rollout_scores.squeeze(0)
         return source_rollout_scores, target_rollout_scores
     else:
-        # Add batch dimension if not present
-        # Assumed shape (batch_size, ...) with num_layers at position dim and at least two dimensions representing
-        # scores that will be rolled out
-        if len(scores.shape) < 4:
-            scores = scores.unsqueeze(0)
+        # Convert rollout dim to positive index to account for new dim insertions.
+        if dim < 0:
+            dim = scores.ndim + dim
+        # Add batch dimension if not present. Assumed shape (batch_size, ...) with num_layers at position dim and at
+        # least two dimensions representing scores that will be rolled out.
+        if scores.ndim < 4:
+            scores = scores[None, ...]
             squeeze_batch_dim = True
+            dim += 1
         if dim != 1:
-            scores = scores.transpose(dim, 1)
+            scores = scores[:, None, ...]
+            swap_dim = dim if dim < 2 else dim + 1
+            scores = scores.transpose(swap_dim, 1).squeeze(swap_dim)
         scores[scores.isnan()] = 0.0
-        target_rollout_scores = _rollout_single(scores)[:, -1, ...].unsqueeze(1)
-        if dim != 1:
-            target_rollout_scores = target_rollout_scores.transpose(1, dim)
-        target_rollout_scores = target_rollout_scores.squeeze(dim)
+        # If the matrix is not square (e.g. generating from a prefix), prepend zeros to make it square.
+        if scores.size(-1) < scores.size(-2):
+            pad_size = scores.size(-2) - scores.size(-1)
+            scores = torch.cat([torch.zeros(*tuple(scores.shape[:-1]), pad_size), scores], dim=-1)
+            remove_padding = True
+        target_rollout_scores = _rollout_single(scores.mT)[:, -1, ...].mT
         if squeeze_batch_dim:
             target_rollout_scores = target_rollout_scores.squeeze(0)
+        if remove_padding:
+            target_rollout_scores = target_rollout_scores[..., pad_size:]
         return target_rollout_scores

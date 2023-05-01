@@ -68,8 +68,8 @@ class MinAggregationFunction(AggregationFunction):
 class SingleAggregationFunction(AggregationFunction):
     aggregation_function_name = "single"
 
-    def __call__(self, scores: torch.Tensor, dim: int, idx: int) -> ScoreTensor:
-        return scores.select(dim, idx)
+    def __call__(self, scores: torch.Tensor, dim: int, single_idx: int) -> ScoreTensor:
+        return scores.select(dim, single_idx)
 
 
 class SumAggregationFunction(AggregationFunction):
@@ -103,8 +103,8 @@ class IdentityAggregationFunction(AggregationFunction):
 class VectorNormAggregationFunction(AggregationFunction):
     aggregation_function_name = "vnorm"
 
-    def __call__(self, scores: torch.Tensor, dim: int, ord: int = 2) -> ScoreTensor:
-        return vector_norm(scores, ord=ord, dim=dim)
+    def __call__(self, scores: torch.Tensor, dim: int, vnorm_ord: int = 2) -> ScoreTensor:
+        return vector_norm(scores, ord=vnorm_ord, dim=dim)
 
 
 class NormalizeAggregationFunction(AggregationFunction):

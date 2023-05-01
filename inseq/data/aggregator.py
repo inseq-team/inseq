@@ -322,17 +322,17 @@ class SequenceAttributionAggregator(Aggregator):
         cls,
         attr: "FeatureAttributionSequenceOutput",
         aggregate_fn: AggregationFunction,
-        indices: Union[int, Tuple[int, int], List[int], None] = None,
+        filter_indices: Union[int, Tuple[int, int], List[int], None] = None,
         **kwargs,
     ):
         if attr.source_attributions is None:
             return attr.source_attributions
         fn_kwargs = extract_signature_args(kwargs, aggregate_fn)
-        scores = cls._filter_scores(attr.source_attributions, dim=-1, indices=indices)
+        scores = cls._filter_scores(attr.source_attributions, dim=-1, indices=filter_indices)
         if attr.target_attributions is None:
             return cls._aggregate_scores(scores, aggregate_fn, dim=-1, **fn_kwargs)
         else:
-            scores = (scores, cls._filter_scores(attr.target_attributions, dim=-1, indices=indices))
+            scores = (scores, cls._filter_scores(attr.target_attributions, dim=-1, indices=filter_indices))
             return cls._aggregate_scores(scores, aggregate_fn, dim=-1, **fn_kwargs)[0]
 
     @classmethod
@@ -340,17 +340,17 @@ class SequenceAttributionAggregator(Aggregator):
         cls,
         attr: "FeatureAttributionSequenceOutput",
         aggregate_fn: AggregationFunction,
-        indices: Union[int, Tuple[int, int], List[int], None] = None,
+        filter_indices: Union[int, Tuple[int, int], List[int], None] = None,
         **kwargs,
     ):
         if attr.target_attributions is None:
             return attr.target_attributions
         fn_kwargs = extract_signature_args(kwargs, aggregate_fn)
-        scores = cls._filter_scores(attr.target_attributions, dim=-1, indices=indices)
+        scores = cls._filter_scores(attr.target_attributions, dim=-1, indices=filter_indices)
         if attr.source_attributions is None:
             return cls._aggregate_scores(scores, aggregate_fn, dim=-1, **fn_kwargs)
         else:
-            scores = (cls._filter_scores(attr.source_attributions, dim=-1, indices=indices), scores)
+            scores = (cls._filter_scores(attr.source_attributions, dim=-1, indices=filter_indices), scores)
             return cls._aggregate_scores(scores, aggregate_fn, dim=-1, **fn_kwargs)[1]
 
     @staticmethod
