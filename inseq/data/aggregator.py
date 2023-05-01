@@ -301,9 +301,9 @@ class SequenceAttributionAggregator(Aggregator):
         # Needed to ensure the attribution can be visualized
         try:
             if attr.source_attributions is not None:
-                assert len(attr.source_attributions.shape) == 2, attr.source_attributions.shape
+                assert attr.source_attributions.ndim == 2, attr.source_attributions.shape
             if attr.target_attributions is not None:
-                assert len(attr.target_attributions.shape) == 2, attr.target_attributions.shape
+                assert attr.target_attributions.ndim == 2, attr.target_attributions.shape
         except AssertionError as e:
             raise RuntimeError(
                 f"The aggregated attributions should be 2-dimensional to be visualized. Found dimensions: {e.args[0]}"

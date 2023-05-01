@@ -353,7 +353,7 @@ def test_attention_attribution_seq2seq(
     assert out.info["constrained_decoding"] is False
     assert out.info["attribution_method"] == "attention"
     assert out.info["attribute_target"] is True
-    assert len(out.sequence_attributions[0].source_attributions.shape) == 2
+    assert out.sequence_attributions[0].source_attributions.ndim == 2
 
 
 @mark.slow
@@ -390,4 +390,4 @@ def test_attention_attribution_decoder(
     assert out.info["model_name"] == "gpt2"
     assert out.info["constrained_decoding"] is False
     assert out.info["attribution_method"] == "attention"
-    assert len(out.sequence_attributions[0].target_attributions.shape) == 2
+    assert out.sequence_attributions[0].target_attributions.ndim == 2

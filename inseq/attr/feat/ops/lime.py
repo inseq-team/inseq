@@ -203,9 +203,9 @@ class Lime(LimeBase):
             """
             combined_interp_inps = torch.cat([i[0].view(-1).unsqueeze(dim=0) for i in interpretable_inps]).double()
 
-            combined_outputs = (torch.cat(outputs) if len(outputs[0].shape) > 0 else torch.stack(outputs)).double()
+            combined_outputs = (torch.cat(outputs) if outputs[0].ndim > 0 else torch.stack(outputs)).double()
             combined_sim = (
-                torch.cat(similarities) if len(similarities[0].shape) > 0 else torch.stack(similarities)
+                torch.cat(similarities) if similarities[0].ndim > 0 else torch.stack(similarities)
             ).double()
             dataset = TensorDataset(combined_interp_inps, combined_outputs, combined_sim)
             self.interpretable_model.fit(DataLoader(dataset, batch_size=batch_count))

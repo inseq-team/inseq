@@ -65,7 +65,7 @@ def entropy_fn(
     """Compute the entropy of the model's output distribution."""
     logits = attribution_model.output2logits(forward_output)
     out = torch.distributions.Categorical(logits=logits).entropy()
-    if len(out.shape) > 1:
+    if out.ndim > 1:
         out = out.squeeze(-1)
     return out
 

@@ -83,7 +83,7 @@ def pretty_list(l: Optional[Sequence[Any]], lpad: int = 8) -> str:
 def pretty_tensor(t: Optional[Tensor] = None, lpad: int = 8) -> str:
     if t is None:
         return "None"
-    if len(t.shape) > 2 or any([x > 20 for x in t.shape]):
+    if t.ndim > 2 or any([x > 20 for x in t.shape]):
         return f"{t.dtype} tensor of shape {list(t.shape)} on {t.device}"
     else:
         out_list = t.tolist()

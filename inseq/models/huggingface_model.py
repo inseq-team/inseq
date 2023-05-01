@@ -298,7 +298,7 @@ class HuggingfaceModel(AttributionModel):
     def convert_ids_to_tokens(
         self, ids: IdsTensor, skip_special_tokens: Optional[bool] = True
     ) -> OneOrMoreTokenSequences:
-        if len(ids.shape) < 2:
+        if ids.ndim < 2:
             return self.tokenizer.convert_ids_to_tokens(ids, skip_special_tokens=skip_special_tokens)
         return [
             self.tokenizer.convert_ids_to_tokens(id_slice, skip_special_tokens=skip_special_tokens) for id_slice in ids

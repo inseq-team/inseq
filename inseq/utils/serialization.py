@@ -121,7 +121,7 @@ def ndarray_encode(
                     ("shape", obj.shape),
                 )
             )
-            if len(obj.shape) > 1:
+            if obj.ndim > 1:
                 dct["Corder"] = obj.flags["C_CONTIGUOUS"]
             return dct
     elif isinstance(obj, generic):

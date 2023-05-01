@@ -18,9 +18,9 @@ class TensorWrapper:
     @staticmethod
     def _getitem(attr, subscript):
         if isinstance(attr, torch.Tensor):
-            if len(attr.shape) == 1:
+            if attr.ndim == 1:
                 return attr[subscript]
-            if len(attr.shape) >= 2:
+            if attr.ndim >= 2:
                 return attr[:, subscript, ...]
         elif isinstance(attr, TensorWrapper):
             return attr[subscript]
@@ -34,9 +34,9 @@ class TensorWrapper:
     @staticmethod
     def _slice_batch(attr, subscript):
         if isinstance(attr, torch.Tensor):
-            if len(attr.shape) == 1:
+            if attr.ndim == 1:
                 return attr[subscript]
-            if len(attr.shape) >= 2:
+            if attr.ndim >= 2:
                 return attr[subscript, ...]
         elif isinstance(attr, (TensorWrapper, list)):
             return attr[subscript]
@@ -48,13 +48,13 @@ class TensorWrapper:
     @staticmethod
     def _select_active(attr, mask):
         if isinstance(attr, torch.Tensor):
-            if len(attr.shape) <= 1:
+            if attr.ndim <= 1:
                 return attr
             else:
                 curr_mask = mask.clone()
                 if curr_mask.dtype != torch.bool:
                     curr_mask = curr_mask.bool()
-                while len(curr_mask.shape) < len(attr.shape):
+                while curr_mask.ndim < attr.ndim:
                     curr_mask = curr_mask.unsqueeze(-1)
                 orig_shape = attr.shape[1:]
                 return attr.masked_select(curr_mask).reshape(-1, *orig_shape)

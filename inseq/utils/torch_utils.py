@@ -29,7 +29,7 @@ def remap_from_filtered(
     filtered: TensorType["filtered_batch_size", Any],
 ) -> TensorType["batch_size", Any]:
     index = mask.squeeze(-1).nonzero().reshape(-1, 1)
-    while len(index.shape) < len(filtered.shape):
+    while index.ndim < filtered.ndim:
         index = index.unsqueeze(-1)
     index = index.expand_as(filtered)
     new_source = torch.ones(original_shape, dtype=filtered.dtype, device=filtered.device) * float("nan")
@@ -51,7 +51,7 @@ def normalize_attributions(
         orig_sizes = [attributions.shape[cat_dim]]
     # nansum is used to handle the target side sequence attribution case
     attributions = attributions / attributions.nansum(dim=cat_dim, keepdim=True)
-    if len(attributions.shape) == 1:
+    if attributions.ndim == 1:
         attributions = attributions.unsqueeze(0)
     if concat:
         attributions = attributions.split(orig_sizes, dim=cat_dim)
@@ -74,7 +74,7 @@ def aggregate_contiguous(
         return t
     if aggregate_fn is None:
         aggregate_fn = torch.mean
-    while len(t.shape) < 2:
+    while t.ndim < 2:
         t = t.unsqueeze(-1)
     t = t.transpose(aggregate_dim, 1)
     slices = []
@@ -104,7 +104,7 @@ def get_sequences_from_batched_steps(bsteps: List[torch.Tensor]) -> List[torch.T
 
     Input tensors will be padded with nans up to max length in non-uniform dimensions to allow for stacking.
     """
-    dim_ranges = {dim: [bstep.shape[dim] for bstep in bsteps] for dim in range(len(bsteps[0].shape))}
+    dim_ranges = {dim: [bstep.shape[dim] for bstep in bsteps] for dim in range(bsteps[0].ndim)}
     for dim, dim_range in dim_ranges.items():
         # If dimension grows across batch steps, it will be padded
         if max(dim_range) > min(dim_range):
@@ -118,7 +118,7 @@ def get_sequences_from_batched_steps(bsteps: List[torch.Tensor]) -> List[torch.T
                 )
                 padded_bstep = torch.cat([bstep, padded_bstep * float("nan")], dim=dim)
                 bsteps[bstep_idx] = padded_bstep
-    dim = 2 if len(bsteps[0].shape) > 1 else 1
+    dim = 2 if bsteps[0].ndim > 1 else 1
     sequences = torch.stack(bsteps, dim=dim)
     sequences = sequences.split(1, dim=0)
     squeezed_sequences = [seq.squeeze(0) for seq in sequences]

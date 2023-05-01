@@ -147,7 +147,7 @@ class EncoderDecoderInputFormatter(InputFormatter):
         Returns:
             :class:`~inseq.data.FeatureAttributionStepOutput`: The enriched attribution output.
         """
-        if len(target_ids.shape) == 0:
+        if target_ids.ndim == 0:
             target_ids = target_ids.unsqueeze(0)
         step_output.source = join_token_ids(batch.sources.input_tokens, batch.sources.input_ids.tolist())
         step_output.target = [[TokenWithId(token[0], id)] for token, id in zip(target_tokens, target_ids.tolist())]

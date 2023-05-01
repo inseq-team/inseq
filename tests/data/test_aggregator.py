@@ -145,17 +145,17 @@ def test_named_aggregate_fn_aggregation(saliency_mt_model: HuggingfaceEncoderDec
         method="attention",
     )
     out_headmean = out.aggregate(aggregator=["mean", "mean", "normalize"])
-    assert len(out_headmean.sequence_attributions[0].source_attributions.shape) == 2
-    assert len(out_headmean.sequence_attributions[0].target_attributions.shape) == 2
-    assert len(out_headmean.sequence_attributions[1].source_attributions.shape) == 2
-    assert len(out_headmean.sequence_attributions[1].target_attributions.shape) == 2
+    assert out_headmean.sequence_attributions[0].source_attributions.ndim == 2
+    assert out_headmean.sequence_attributions[0].target_attributions.ndim == 2
+    assert out_headmean.sequence_attributions[1].source_attributions.ndim == 2
+    assert out_headmean.sequence_attributions[1].target_attributions.ndim == 2
     out_allmean_subwords = out.aggregate(aggregator=["mean", "mean", "normalize", "subwords"])
 
     # Check whether scores aggregation worked correctly
-    assert len(out_allmean_subwords.sequence_attributions[0].source_attributions.shape) == 2
-    assert len(out_allmean_subwords.sequence_attributions[0].target_attributions.shape) == 2
-    assert len(out_allmean_subwords.sequence_attributions[1].source_attributions.shape) == 2
-    assert len(out_allmean_subwords.sequence_attributions[1].target_attributions.shape) == 2
+    assert out_allmean_subwords.sequence_attributions[0].source_attributions.ndim == 2
+    assert out_allmean_subwords.sequence_attributions[0].target_attributions.ndim == 2
+    assert out_allmean_subwords.sequence_attributions[1].source_attributions.ndim == 2
+    assert out_allmean_subwords.sequence_attributions[1].target_attributions.ndim == 2
 
     # Check whether subword aggregation worked correctly
     assert (
