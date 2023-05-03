@@ -14,13 +14,13 @@
 
 import logging
 from abc import abstractmethod
-from typing import List, Tuple, Union
+from typing import Dict, List, Tuple, Union
 
 import torch
 from torch.linalg import vector_norm
 
 from ..attr.feat.ops import rollout_fn
-from ..utils import Registry, available_classes, normalize_attributions
+from ..utils import Registry, available_classes
 from ..utils.typing import (
     ScoreTensor,
 )
@@ -33,6 +33,7 @@ class AggregationFunction(Registry):
 
     def __init__(self):
         self.takes_single_tensor: bool = True
+        self.takes_sequence_scores: bool = False
 
     @abstractmethod
     def __call__(
@@ -93,13 +94,6 @@ class AbsMaxAggregationFunction(AggregationFunction):
         return scores.gather(dim, scores.abs().argmax(dim, keepdim=True)).squeeze(dim)
 
 
-class IdentityAggregationFunction(AggregationFunction):
-    aggregation_function_name = "identity"
-
-    def __call__(self, scores: torch.Tensor, dim: int) -> ScoreTensor:
-        return scores
-
-
 class VectorNormAggregationFunction(AggregationFunction):
     aggregation_function_name = "vnorm"
 
@@ -107,29 +101,49 @@ class VectorNormAggregationFunction(AggregationFunction):
         return vector_norm(scores, ord=vnorm_ord, dim=dim)
 
 
-class NormalizeAggregationFunction(AggregationFunction):
-    aggregation_function_name = "normalize"
-
-    def __init__(self):
-        self.takes_single_tensor: bool = False
-
-    def __call__(self, scores: Union[torch.Tensor, Tuple[torch.Tensor, ...]], dim: int) -> ScoreTensor:
-        return normalize_attributions(scores)
-
-
 class RolloutAggregationFunction(AggregationFunction):
     aggregation_function_name = "rollout"
 
     def __init__(self):
+        super().__init__()
         self.takes_single_tensor: bool = False
+        self.takes_sequence_scores: bool = True
 
-    def __call__(self, scores: Union[torch.Tensor, Tuple[torch.Tensor, ...]], dim: int) -> ScoreTensor:
-        return rollout_fn(scores, dim=dim)
+    def __call__(
+        self,
+        scores: Union[torch.Tensor, Tuple[torch.Tensor, ...]],
+        dim: int,
+        sequence_scores: Dict[str, torch.Tensor] = {},
+    ) -> ScoreTensor:
+        dec_self_prefix = "decoder_self"
+        enc_self_prefix = "encoder_self"
+        dec_match = [name for name in sequence_scores.keys() if name.startswith(dec_self_prefix)]
+        enc_match = [name for name in sequence_scores.keys() if name.startswith(enc_self_prefix)]
+        if isinstance(scores, torch.Tensor):
+            # If no matching prefix is found, we assume the decoder-only target-only rollout case
+            if not dec_match or not enc_match:
+                return rollout_fn(scores, dim=dim)
+            # If both prefixes are found, we assume the encoder-decoder source-only rollout case
+            else:
+                enc_match = sequence_scores[enc_match[0]]
+                dec_match = sequence_scores[dec_match[0]]
+                return rollout_fn((enc_match, scores, dec_match), dim=dim)[0]
+        else:
+            if not enc_match:
+                raise KeyError(
+                    "Could not find encoder self-importance scores in sequence scores. "
+                    "Encoder self-importance scores are required for encoder-decoder rollout. They should be provided "
+                    f"as an entry in the sequence scores dictionary with key starting with '{enc_self_prefix}', and "
+                    "value being a tensor of shape (src_seq_len, src_seq_len, ..., rollout_dim)."
+                )
+            else:
+                enc_match = sequence_scores[enc_match[0]]
+                return rollout_fn((enc_match,) + scores, dim=dim)
 
 
 DEFAULT_ATTRIBUTION_AGGREGATE_DICT = {
-    "source_attributions": {"scores": "identity", "spans": "absmax"},
-    "target_attributions": {"scores": "identity", "spans": "absmax"},
+    "source_attributions": {"spans": "absmax"},
+    "target_attributions": {"spans": "absmax"},
     "step_scores": {
         "spans": {
             "probability": "prod",
@@ -137,6 +151,9 @@ DEFAULT_ATTRIBUTION_AGGREGATE_DICT = {
             "crossentropy": "sum",
             "perplexity": "prod",
             "contrast_prob_diff": "prod",
+            "contrast_prob": "prod",
+            "pcxmi": "sum",
+            "kl_divergence": "sum",
             "mc_dropout_prob_avg": "prod",
         }
     },

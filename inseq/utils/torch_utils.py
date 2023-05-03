@@ -2,14 +2,13 @@ import logging
 from typing import TYPE_CHECKING, Any, Callable, List, Optional, Sequence, Tuple, Union
 
 import torch
+import torch.nn.functional as F
 from torch import nn
 from torch.backends.cuda import is_built as is_cuda_built
 from torch.backends.mps import is_available as is_mps_available
 from torch.backends.mps import is_built as is_mps_built
 from torch.cuda import is_available as is_cuda_available
 from torchtyping import TensorType
-
-from .typing import TokenSequenceAttributionTensor
 
 if TYPE_CHECKING:
     pass
@@ -36,26 +35,22 @@ def remap_from_filtered(
     return new_source.scatter(0, index, filtered)
 
 
-def normalize_attributions(
-    attributions: Union[
-        TokenSequenceAttributionTensor, Tuple[TokenSequenceAttributionTensor, TokenSequenceAttributionTensor]
-    ],
-    cat_dim: int = 0,
-) -> TokenSequenceAttributionTensor:
-    concat = False
+def normalize(
+    attributions: Union[torch.Tensor, Tuple[torch.Tensor, ...]],
+    norm_dim: int = 0,
+    norm_ord: int = 1,
+) -> Union[torch.Tensor, Tuple[torch.Tensor, ...]]:
+    multi_input = False
     if isinstance(attributions, tuple):
-        concat = True
-        orig_sizes = [a.shape[cat_dim] for a in attributions]
-        attributions = torch.cat(attributions, dim=cat_dim)
-    else:
-        orig_sizes = [attributions.shape[cat_dim]]
-    # nansum is used to handle the target side sequence attribution case
-    attributions = attributions / attributions.nansum(dim=cat_dim, keepdim=True)
-    if attributions.ndim == 1:
-        attributions = attributions.unsqueeze(0)
-    if concat:
-        attributions = attributions.split(orig_sizes, dim=cat_dim)
-        return attributions[0], attributions[1]
+        orig_sizes = [a.shape[norm_dim] for a in attributions]
+        attributions = torch.cat(attributions, dim=norm_dim)
+        multi_input = True
+    nan_mask = attributions.isnan()
+    attributions[nan_mask] = 0.0
+    attributions = F.normalize(attributions, p=norm_ord, dim=norm_dim)
+    attributions[nan_mask] = float("nan")
+    if multi_input:
+        return tuple(attributions.split(orig_sizes, dim=norm_dim))
     return attributions
 
 

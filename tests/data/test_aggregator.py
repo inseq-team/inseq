@@ -121,8 +121,8 @@ def test_subword_aggregator(saliency_mt_model: HuggingfaceEncoderDecoderModel):
 
 def test_pair_aggregator(saliency_mt_model: HuggingfaceEncoderDecoderModel):
     out = saliency_mt_model.attribute([EXAMPLES["source"], EXAMPLES["alternative_source"]], show_progress=False)
-    orig_seqattr = out.sequence_attributions[0].aggregate(["vnorm", "normalize"])
-    alt_seqattr = out.sequence_attributions[1].aggregate(["vnorm", "normalize"])
+    orig_seqattr = out.sequence_attributions[0].aggregate(["vnorm"])
+    alt_seqattr = out.sequence_attributions[1].aggregate(["vnorm"])
     diff_seqattr = orig_seqattr.aggregate(PairAggregator, paired_attr=alt_seqattr)
     for idx, token in enumerate(diff_seqattr.source):
         assert token.token == EXAMPLES["diff_subwords"][idx]
@@ -144,12 +144,12 @@ def test_named_aggregate_fn_aggregation(saliency_mt_model: HuggingfaceEncoderDec
         attribute_target=True,
         method="attention",
     )
-    out_headmean = out.aggregate(aggregator=["mean", "mean", "normalize"])
+    out_headmean = out.aggregate(aggregator=["mean", "mean"])
     assert out_headmean.sequence_attributions[0].source_attributions.ndim == 2
     assert out_headmean.sequence_attributions[0].target_attributions.ndim == 2
     assert out_headmean.sequence_attributions[1].source_attributions.ndim == 2
     assert out_headmean.sequence_attributions[1].target_attributions.ndim == 2
-    out_allmean_subwords = out.aggregate(aggregator=["mean", "mean", "normalize", "subwords"])
+    out_allmean_subwords = out.aggregate(aggregator=["mean", "mean", "subwords"])
 
     # Check whether scores aggregation worked correctly
     assert out_allmean_subwords.sequence_attributions[0].source_attributions.ndim == 2
@@ -176,6 +176,6 @@ def test_named_aggregate_fn_aggregation(saliency_mt_model: HuggingfaceEncoderDec
     )
 
     out_allmean_subwords_expanded = out.aggregate(
-        aggregator=["scores", "scores", "scores", "subwords"], aggregate_fn=["mean", "mean", "normalize", None]
+        aggregator=["scores", "scores", "subwords"], aggregate_fn=["mean", "mean", None]
     )
     assert out_allmean_subwords == out_allmean_subwords_expanded

@@ -3,7 +3,7 @@ from typing import Tuple, Union
 import torch
 import torch.nn.functional as F
 
-from ....utils import normalize_attributions
+from ....utils import normalize as normalize_fn
 from ....utils.typing import (
     MultiUnitScoreTensor,
     ScoreTensor,
@@ -12,6 +12,7 @@ from ....utils.typing import (
 
 def _rollout_single(
     scores: MultiUnitScoreTensor,
+    normalize: bool = False,
 ) -> MultiUnitScoreTensor:
     """Performs rollout aggregation by `Abnar and Zuidema (2020) <https://aclanthology.org/2020.acl-main.385/>`__
     This is a helper function used in :func:`~inseq.attr.feat.ops.rollout` to rollout a single layer stack.
@@ -21,7 +22,10 @@ def _rollout_single(
     for i in range(1, scores.size(1)):
         # Rollout scores at layer i by matmul them with the scores at layer i-1
         layer_rollout_scores = scores[:, i, ...] @ rollout_scores[:, i - 1, ...]
-        rollout_scores[:, i, ...] = F.normalize(layer_rollout_scores, p=1, dim=-1)
+        if normalize:
+            rollout_scores[:, i, ...] = F.normalize(layer_rollout_scores, p=1, dim=-1)
+        else:
+            rollout_scores[:, i, ...] = layer_rollout_scores
     return rollout_scores
 
 
@@ -31,7 +35,7 @@ def _rollout_joint(
     target_scores: MultiUnitScoreTensor,
 ) -> Tuple[ScoreTensor, ScoreTensor]:
     """Performs the rollout aggregation adapted for an encoder-decoder architecture with cross-importance scores."""
-    target_scores = (target_scores.mT * cross_scores[..., None, :, -1]).mT
+    target_scores = (target_scores.mT * cross_scores[..., -1, :]).mT
     joint_source_cross_scores = torch.einsum("bl...ij, b...jk -> bl...ik", cross_scores, final_source_scores)
     source_rollout_scores = torch.zeros_like(joint_source_cross_scores)
     source_rollout_scores[:, 0, ...] = joint_source_cross_scores[:, 0, ...]
@@ -45,7 +49,7 @@ def _rollout_joint(
         # Target scores x previous target rollout scores
         target_rollout_scores[:, i, ...] = target_scores[:, i, ...] @ target_rollout_scores[:, i - 1, ...]
     # Normalize scores across source and target
-    source_rollout_scores, target_rollout_scores = normalize_attributions(
+    source_rollout_scores, target_rollout_scores = normalize_fn(
         (source_rollout_scores, target_rollout_scores), cat_dim=-1
     )
     return source_rollout_scores, target_rollout_scores
@@ -86,15 +90,15 @@ def rollout_fn(
         if scores[0].ndim < 4:
             scores = tuple(t.unsqueeze(0) for t in scores)
             squeeze_batch_dim = True
+            dim += 1
         if dim != 1:
-            source_scores, cross_scores, target_scores = tuple(t.transpose(dim, 1) for t in scores)
-        else:
-            source_scores, cross_scores, target_scores = scores
+            swap_dim = dim if dim < 2 else dim + 1
+            scores = tuple(s[:, None, ...].transpose(swap_dim, 1).squeeze(swap_dim) for s in scores)
+        source_scores, cross_scores, target_scores = scores
 
         # Get rolled out scores of encoder last layer with respect to source input
-        source_scores = _rollout_single(source_scores)
+        final_source_scores = _rollout_single(source_scores.mT)[:, -1, ...].mT
 
-        final_source_scores = source_scores[:, -1, ...]
         source_rollout_scores, target_rollout_scores = _rollout_joint(final_source_scores, cross_scores, target_scores)
         source_rollout_scores = source_rollout_scores[:, -1, ...].unsqueeze(1)
         target_rollout_scores = target_rollout_scores[:, -1, ...].unsqueeze(1)
@@ -127,7 +131,7 @@ def rollout_fn(
             pad_size = scores.size(-2) - scores.size(-1)
             scores = torch.cat([torch.zeros(*tuple(scores.shape[:-1]), pad_size), scores], dim=-1)
             remove_padding = True
-        target_rollout_scores = _rollout_single(scores.mT)[:, -1, ...].mT
+        target_rollout_scores = _rollout_single(scores.mT, normalize=True)[:, -1, ...].mT
         if squeeze_batch_dim:
             target_rollout_scores = target_rollout_scores.squeeze(0)
         if remove_padding:

@@ -362,6 +362,10 @@ class FeatureAttributionStepOutput(TensorWrapper):
 
     def __post_init__(self):
         self.to(torch.float32)
+        if self.step_scores is None:
+            self.step_scores = {}
+        if self.sequence_scores is None:
+            self.sequence_scores = {}
 
     def get_sequence_cls(self, **kwargs):
         return self._sequence_cls(**kwargs)
@@ -682,7 +686,7 @@ class GranularFeatureAttributionSequenceOutput(FeatureAttributionSequenceOutput)
 
     def __post_init__(self):
         super().__post_init__()
-        self._aggregator = ["vnorm", "normalize"]
+        self._aggregator = "vnorm"
         self._dict_aggregate_fn["source_attributions"]["scores"] = "vnorm"
         self._dict_aggregate_fn["target_attributions"]["scores"] = "vnorm"
         if "deltas" not in self._dict_aggregate_fn["step_scores"]["spans"]:
@@ -706,8 +710,6 @@ class CoarseFeatureAttributionSequenceOutput(FeatureAttributionSequenceOutput):
 
     def __post_init__(self):
         super().__post_init__()
-        self._dict_aggregate_fn["source_attributions"]["scores"] = "normalize"
-        self._dict_aggregate_fn["target_attributions"]["scores"] = "normalize"
 
 
 @dataclass(eq=False, repr=False)
@@ -730,7 +732,7 @@ class MultiDimensionalFeatureAttributionSequenceOutput(FeatureAttributionSequenc
 
     def __post_init__(self):
         super().__post_init__()
-        self._aggregator = ["mean"] * self._num_dimensions + ["normalize"]
+        self._aggregator = ["mean"] * self._num_dimensions
 
 
 @dataclass(eq=False, repr=False)

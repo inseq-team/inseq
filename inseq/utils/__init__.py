@@ -29,7 +29,6 @@ from .misc import (
     gzip_compress,
     gzip_decompress,
     hashodict,
-    identity_fn,
     isnotebook,
     lists_of_numbers_to_ndarray,
     ndarray_to_bin_str,
@@ -52,7 +51,7 @@ from .torch_utils import (
     get_default_device,
     get_front_padding,
     get_sequences_from_batched_steps,
-    normalize_attributions,
+    normalize,
     remap_from_filtered,
 )
 
@@ -62,7 +61,6 @@ __all__ = [
     "UnknownAttributionMethodError",
     "cache_results",
     "optional",
-    "identity_fn",
     "pad",
     "pretty_list",
     "pretty_tensor",
@@ -77,7 +75,7 @@ __all__ = [
     "extract_signature_args",
     "remap_from_filtered",
     "drop_padding",
-    "normalize_attributions",
+    "normalize",
     "aggregate_contiguous",
     "get_front_padding",
     "get_sequences_from_batched_steps",

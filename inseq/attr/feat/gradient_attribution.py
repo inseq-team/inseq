@@ -97,7 +97,7 @@ class GradientAttributionRegistry(FeatureAttribution, Registry):
         return GranularFeatureAttributionStepOutput(
             source_attributions=source_attributions,
             target_attributions=target_attributions,
-            step_scores={"deltas": deltas} if deltas is not None else {},
+            step_scores={"deltas": deltas} if deltas is not None else None,
         )
 
 

@@ -80,7 +80,6 @@ class OcclusionAttribution(PerturbationAttributionRegistry):
         return CoarseFeatureAttributionSequenceOutput(
             source_attributions=source_attributions,
             target_attributions=target_attributions,
-            step_scores={},
         )
 
 
@@ -144,6 +143,5 @@ class ValueZeroingAttribution(PerturbationAttributionRegistry):
         return MultiDimensionalFeatureAttributionStepOutput(
             source_attributions=source_attributions,
             target_attributions=target_attributions,
-            step_scores={},
-            _num_dimensions=1,
+            _num_dimensions=1,  # num_layers
         )

@@ -211,10 +211,8 @@ def test_attribute_slice_seq2seq(saliency_mt_model):
     assert ex1.target_attributions.shape[0] == ex1.attr_pos_end
     assert out.info["attr_pos_start"] == 13
     assert out.info["attr_pos_end"] == 17
-    aggregated = [ex1.aggregate(), ex3.aggregate()]
+    aggregated = [ex1.aggregate(), ex2.aggregate(), ex3.aggregate()]
     assert all(isinstance(aggr_attr, FeatureAttributionSequenceOutput) for aggr_attr in aggregated)
-    with pytest.raises(RuntimeError):
-        ex2.aggregate()
 
 
 def test_attribute_decoder(saliency_gpt2_model):

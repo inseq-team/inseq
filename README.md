@@ -148,6 +148,8 @@ Use the `inseq.list_feature_attribution_methods` function to list all available 
 
 - `lime`: [LIME](https://arxiv.org/abs/1602.04938) (Ribeiro et al., 2016)
 
+- `value_zeroing`: [Value Zeroing](https://aclanthology.org/2023.eacl-main.245/) (Mohebbi et al. 2023)
+
 #### Step functions
 
 Step functions are used to extract custom scores from the model at each step of the attribution process with the `step_scores` argument in `model.attribute`. They can also be used as targets for attribution methods relying on model outputs (e.g. gradient-based methods) by passing them as the `attributed_fn` argument. The following step functions are currently supported:
@@ -159,6 +161,7 @@ Step functions are used to extract custom scores from the model at each step of 
 - `perplexity`: Perplexity of the target token.
 - `contrast_prob`: Probability of the target token when different contrastive inputs are provided to the model. Equivalent to `probability` when no contrastive inputs are provided.
 - `pcxmi`: Point-wise Contextual Cross-Mutual Information (P-CXMI) for the target token given original and contrastive contexts [(Yin et al. 2021)](https://arxiv.org/abs/2109.07446).
+- `kl_divergence`: KL divergence of the predictive distribution given original and contrastive contexts. Can be limited to top-K most likely target token options using the `top_k` parameter.
 - `contrast_prob_diff`: Difference in probability between original and foil target tokens pair, can be used for contrastive evaluation as in [Contrastive Attribution](https://aclanthology.org/2022.emnlp-main.14/) (Yin and Neubig, 2022).
 - `mc_dropout_prob_avg`: Average probability of the target token across multiple samples using [MC Dropout](https://arxiv.org/abs/1506.02142) (Gal and Ghahramani, 2016).
 

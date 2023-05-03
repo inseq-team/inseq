@@ -116,15 +116,14 @@ class AttentionWeightsAttribution(InternalsAttributionRegistry):
                 return MultiDimensionalFeatureAttributionStepOutput(
                     source_attributions=cross_attentions[..., -1, :].clone().permute(0, 3, 1, 2),
                     target_attributions=target_attributions,
-                    step_scores={},
                     sequence_scores=sequence_scores,
+                    _num_dimensions=2,  # num_layers, num_heads
                 )
             else:
                 return MultiDimensionalFeatureAttributionStepOutput(
                     source_attributions=None,
                     target_attributions=decoder_self_attentions,
-                    step_scores={},
-                    sequence_scores={},
+                    _num_dimensions=2,  # num_layers, num_heads
                 )
 
     def __init__(self, attribution_model, **kwargs):

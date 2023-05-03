@@ -12,6 +12,7 @@ from ..utils import (
     available_classes,
     extract_signature_args,
 )
+from ..utils import normalize as normalize_fn
 from ..utils.typing import IndexSpan, TokenWithId
 from .aggregation_functions import AggregationFunction
 from .data_utils import TensorWrapper
@@ -250,9 +251,9 @@ class AggregableMixin(ABC):
 
 
 class SequenceAttributionAggregator(Aggregator):
-    """Aggregates sequence attributions using a custom function. By default, the identity function is used.
+    """Aggregates sequence attributions using a custom function. By default, the mean function is used.
 
-    Represent the identity aggregator for the FeatureAttributionSequenceOutput class.
+    Enables aggregation for the FeatureAttributionSequenceOutput class using an aggregation function of choice.
 
     Args:
         attr (:class:`~inseq.data.FeatureAttributionSequenceOutput`): The attribution object to aggregate.
@@ -264,7 +265,7 @@ class SequenceAttributionAggregator(Aggregator):
 
     aggregator_name = "scores"
     aggregator_family = "scores"
-    default_fn = "identity"
+    default_fn = "mean"
 
     @classmethod
     def _aggregate(
@@ -323,17 +324,26 @@ class SequenceAttributionAggregator(Aggregator):
         attr: "FeatureAttributionSequenceOutput",
         aggregate_fn: AggregationFunction,
         filter_indices: Union[int, Tuple[int, int], List[int], None] = None,
+        normalize: bool = True,
         **kwargs,
     ):
         if attr.source_attributions is None:
             return attr.source_attributions
         fn_kwargs = extract_signature_args(kwargs, aggregate_fn)
         scores = cls._filter_scores(attr.source_attributions, dim=-1, indices=filter_indices)
+        if aggregate_fn.takes_sequence_scores:
+            fn_kwargs["sequence_scores"] = attr.sequence_scores
         if attr.target_attributions is None:
-            return cls._aggregate_scores(scores, aggregate_fn, dim=-1, **fn_kwargs)
+            scores = cls._aggregate_scores(scores, aggregate_fn, dim=-1, **fn_kwargs)
+            if normalize:
+                return normalize_fn(scores)
+            return scores
         else:
             scores = (scores, cls._filter_scores(attr.target_attributions, dim=-1, indices=filter_indices))
-            return cls._aggregate_scores(scores, aggregate_fn, dim=-1, **fn_kwargs)[0]
+            scores = cls._aggregate_scores(scores, aggregate_fn, dim=-1, **fn_kwargs)
+            if normalize:
+                return normalize_fn(scores)[0]
+            return scores[0]
 
     @classmethod
     def aggregate_target_attributions(
@@ -341,25 +351,47 @@ class SequenceAttributionAggregator(Aggregator):
         attr: "FeatureAttributionSequenceOutput",
         aggregate_fn: AggregationFunction,
         filter_indices: Union[int, Tuple[int, int], List[int], None] = None,
+        normalize: bool = True,
         **kwargs,
     ):
         if attr.target_attributions is None:
             return attr.target_attributions
         fn_kwargs = extract_signature_args(kwargs, aggregate_fn)
         scores = cls._filter_scores(attr.target_attributions, dim=-1, indices=filter_indices)
+        if aggregate_fn.takes_sequence_scores:
+            fn_kwargs["sequence_scores"] = attr.sequence_scores
         if attr.source_attributions is None:
-            return cls._aggregate_scores(scores, aggregate_fn, dim=-1, **fn_kwargs)
+            scores = cls._aggregate_scores(scores, aggregate_fn, dim=-1, **fn_kwargs)
+            if normalize:
+                return normalize_fn(scores)
+            return scores
         else:
             scores = (cls._filter_scores(attr.source_attributions, dim=-1, indices=filter_indices), scores)
-            return cls._aggregate_scores(scores, aggregate_fn, dim=-1, **fn_kwargs)[1]
+            scores = cls._aggregate_scores(scores, aggregate_fn, dim=-1, **fn_kwargs)
+            if normalize:
+                return normalize_fn(scores)[1]
+            return scores[1]
 
     @staticmethod
     def aggregate_step_scores(attr: "FeatureAttributionSequenceOutput", **kwargs):
         return attr.step_scores
 
-    @staticmethod
-    def aggregate_sequence_scores(attr: "FeatureAttributionSequenceOutput", **kwargs):
-        return attr.sequence_scores
+    @classmethod
+    def aggregate_sequence_scores(
+        cls,
+        attr: "FeatureAttributionSequenceOutput",
+        aggregate_fn: AggregationFunction,
+        filter_indices: Union[int, Tuple[int, int], List[int], None] = None,
+        **kwargs,
+    ):
+        if aggregate_fn.takes_sequence_scores:
+            return attr.sequence_scores
+        fn_kwargs = extract_signature_args(kwargs, aggregate_fn)
+        new_sequence_scores = {}
+        for scores_id, seq_scores in attr.sequence_scores.items():
+            filtered_scores = cls._filter_scores(seq_scores, dim=-1, indices=filter_indices)
+            new_sequence_scores[scores_id] = cls._aggregate_scores(filtered_scores, aggregate_fn, dim=-1, **fn_kwargs)
+        return new_sequence_scores
 
     @staticmethod
     def aggregate_attr_pos_start(attr: "FeatureAttributionSequenceOutput", **kwargs):
