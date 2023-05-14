@@ -337,7 +337,7 @@ def test_attribute_decoder_forced_sliced(saliency_gpt2_model):
         texts,
         forced_generations,
         show_progress=False,
-        device=inseq.utils.get_default_device(),
+        device=get_default_device(),
         attr_pos_start=6,
         attr_pos_end=10,
     )
