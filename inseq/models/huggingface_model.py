@@ -11,7 +11,7 @@ from transformers import (
     AutoModelForSeq2SeqLM,
     AutoTokenizer,
     PreTrainedModel,
-    PreTrainedTokenizer,
+    PreTrainedTokenizerBase,
 )
 from transformers.modeling_outputs import CausalLMOutput, ModelOutput, Seq2SeqLMOutput
 
@@ -64,7 +64,7 @@ class HuggingfaceModel(AttributionModel):
         self,
         model: Union[str, PreTrainedModel],
         attribution_method: Optional[str] = None,
-        tokenizer: Union[str, PreTrainedTokenizer, None] = None,
+        tokenizer: Union[str, PreTrainedTokenizerBase, None] = None,
         device: Optional[str] = None,
         **kwargs,
     ) -> None:
@@ -108,7 +108,7 @@ class HuggingfaceModel(AttributionModel):
         tokenizer_inputs = kwargs.pop("tokenizer_inputs", {})
         tokenizer_kwargs = kwargs.pop("tokenizer_kwargs", {})
 
-        if isinstance(tokenizer, PreTrainedTokenizer):
+        if isinstance(tokenizer, PreTrainedTokenizerBase):
             self.tokenizer = tokenizer
         else:
             self.tokenizer = AutoTokenizer.from_pretrained(tokenizer, *tokenizer_inputs, **tokenizer_kwargs)
@@ -135,7 +135,7 @@ class HuggingfaceModel(AttributionModel):
     def load(
         model: Union[str, PreTrainedModel],
         attribution_method: Optional[str] = None,
-        tokenizer: Union[str, PreTrainedTokenizer, None] = None,
+        tokenizer: Union[str, PreTrainedTokenizerBase, None] = None,
         device: str = None,
         **kwargs,
     ) -> "HuggingfaceModel":
@@ -197,7 +197,7 @@ class HuggingfaceModel(AttributionModel):
             generation outputs.
         """
         if isinstance(inputs, str) or (
-            isinstance(inputs, list) and len(inputs) > 0 and all([isinstance(x, str) for x in inputs])
+            isinstance(inputs, list) and len(inputs) > 0 and all(isinstance(x, str) for x in inputs)
         ):
             inputs = self.encode(inputs)
         inputs = inputs.to(self.device)
@@ -370,7 +370,7 @@ class HuggingfaceEncoderDecoderModel(HuggingfaceModel, EncoderDecoderAttribution
         self,
         model: Union[str, PreTrainedModel],
         attribution_method: Optional[str] = None,
-        tokenizer: Union[str, PreTrainedTokenizer, None] = None,
+        tokenizer: Union[str, PreTrainedTokenizerBase, None] = None,
         device: str = None,
         **kwargs,
     ) -> NoReturn:
@@ -406,7 +406,7 @@ class HuggingfaceDecoderOnlyModel(HuggingfaceModel, DecoderOnlyAttributionModel)
         self,
         model: Union[str, PreTrainedModel],
         attribution_method: Optional[str] = None,
-        tokenizer: Union[str, PreTrainedTokenizer, None] = None,
+        tokenizer: Union[str, PreTrainedTokenizerBase, None] = None,
         device: str = None,
         **kwargs,
     ) -> NoReturn:
