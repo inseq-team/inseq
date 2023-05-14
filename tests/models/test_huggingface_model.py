@@ -9,6 +9,7 @@ import os
 import pytest
 import torch
 from pytest import fixture, mark
+from transformers import AutoTokenizer
 
 import inseq
 from inseq import list_feature_attribution_methods
@@ -38,6 +39,53 @@ def saliency_gpt2_model():
     return inseq.load_model("gpt2", "saliency")
 
 
+def test_tokenizer_consistency():
+    texts = EXAMPLES["texts"][2][0]
+    inf_model = inseq.load_model("distilgpt2", "saliency")
+    tok_model = inseq.load_model(
+        "distilgpt2", "saliency", tokenizer=AutoTokenizer.from_pretrained("distilgpt2", use_fast=False)
+    )
+    fast_tok_model = inseq.load_model("distilgpt2", "saliency", tokenizer=AutoTokenizer.from_pretrained("distilgpt2"))
+
+    out_inferenced = inf_model.attribute(
+        texts,
+        show_progress=False,
+        device=get_default_device(),
+    )
+    out_tok = tok_model.attribute(
+        texts,
+        show_progress=False,
+        device=get_default_device(),
+    )
+
+    out_fast_tok = fast_tok_model.attribute(
+        texts,
+        show_progress=False,
+        device=get_default_device(),
+    )
+
+    assert torch.allclose(
+        out_inferenced.sequence_attributions[0].target_attributions,
+        out_tok.sequence_attributions[0].target_attributions,
+        atol=8e-2,
+        equal_nan=True,
+    )
+
+    assert torch.allclose(
+        out_inferenced.sequence_attributions[0].target_attributions,
+        out_fast_tok.sequence_attributions[0].target_attributions,
+        atol=8e-2,
+        equal_nan=True,
+    )
+
+    assert torch.allclose(
+        out_tok.sequence_attributions[0].target_attributions,
+        out_fast_tok.sequence_attributions[0].target_attributions,
+        atol=8e-2,
+        equal_nan=True,
+    )
+
+
 @mark.slow
 @mark.require_cuda_gpu
 @mark.parametrize(("texts", "reference_texts"), EXAMPLES["short_texts"])
@@ -51,7 +99,7 @@ def test_cuda_attribution_consistency_seq2seq(texts, reference_texts, attribute_
         assert isinstance(out[device], FeatureAttributionOutput)
         assert isinstance(out[device].sequence_attributions[0], FeatureAttributionSequenceOutput)
     for out_cpu, out_gpu in zip(out["cpu"].sequence_attributions, out["cuda"].sequence_attributions):
-        assert all([tok_cpu == tok_gpu for tok_cpu, tok_gpu in zip(out_cpu.target, out_gpu.target)])
+        assert all(tok_cpu == tok_gpu for tok_cpu, tok_gpu in zip(out_cpu.target, out_gpu.target))
         attr_score_matches = [
             torch.allclose(cpu_attr, gpu_attr, atol=1e-3)
             for cpu_attr, gpu_attr in zip(out_cpu.source_attributions, out_gpu.source_attributions)
@@ -289,7 +337,7 @@ def test_attribute_decoder_forced_sliced(saliency_gpt2_model):
         texts,
         forced_generations,
         show_progress=False,
-        device=inseq.utils.get_default_device(),
+        device=get_default_device(),
         attr_pos_start=6,
         attr_pos_end=10,
     )
