@@ -342,8 +342,8 @@ def test_attribute_decoder_forced_sliced(saliency_gpt2_model_tiny):
         forced_generations,
         show_progress=False,
         device=get_default_device(),
-        attr_pos_start=6,
-        attr_pos_end=10,
+        attr_pos_start=16,
+        attr_pos_end=20,
     )
     assert isinstance(out, FeatureAttributionOutput)
     assert len(out.sequence_attributions) == 2
