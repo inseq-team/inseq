@@ -41,7 +41,7 @@ from .misc import (
     save_to_file,
     scalar_to_numpy,
 )
-from .registry import Registry, get_available_methods
+from .registry import Registry, available_classes
 from .serialization import json_advanced_dump, json_advanced_dumps, json_advanced_load, json_advanced_loads
 from .torch_utils import (
     abs_max,
@@ -73,7 +73,7 @@ __all__ = [
     "aggregate_token_sequence",
     "format_input_texts",
     "rgetattr",
-    "get_available_methods",
+    "available_classes",
     "isnotebook",
     "find_char_indexes",
     "extract_signature_args",
@@ -116,4 +116,7 @@ __all__ = [
     "get_cls_from_instance_type",
     "json_advanced_loads",
     "json_advanced_load",
+    "get_nn_submodule",
+    "find_block_stack",
+    "get_post_variable_assignment_hook",
 ]

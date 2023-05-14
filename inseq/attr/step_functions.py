@@ -1,5 +1,6 @@
 import logging
-from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Protocol, Union
+from inspect import getfullargspec
+from typing import TYPE_CHECKING, Dict, List, Optional, Protocol, Union
 
 import torch
 from transformers import AutoModelForCausalLM, AutoModelForSeq2SeqLM
@@ -14,7 +15,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class StepScoreFunction(Protocol):
+class StepFunction(Protocol):
     def __call__(
         self,
         attribution_model: "AttributionModel",
@@ -31,12 +32,14 @@ class StepScoreFunction(Protocol):
         ...
 
 
+def get_step_function_reserved_args() -> List[str]:
+    return getfullargspec(StepFunction.__call__).args
+
+
 def logit_fn(
     attribution_model: "AttributionModel", forward_output: ModelOutput, target_ids: TargetIdsTensor, **kwargs
 ) -> SingleScorePerStepTensor:
-    """
-    Compute the logit of the target_ids from the model's output logits.
-    """
+    """Compute the logit of the target_ids from the model's output logits."""
     logits = attribution_model.output2logits(forward_output)
     target_ids = target_ids.reshape(logits.shape[0], 1)
     return logits.gather(-1, target_ids).squeeze(-1)
@@ -45,12 +48,10 @@ def logit_fn(
 def probability_fn(
     attribution_model: "AttributionModel", forward_output: ModelOutput, target_ids: TargetIdsTensor, **kwargs
 ) -> SingleScorePerStepTensor:
-    """
-    Compute the probabilty of target_ids from the model's output logits.
-    """
+    """Compute the probabilty of target_ids from the model's output logits."""
     logits = attribution_model.output2logits(forward_output)
     target_ids = target_ids.reshape(logits.shape[0], 1)
-    logits = torch.softmax(logits, dim=-1)
+    logits = logits.softmax(dim=-1)
     # Extracts the ith score from the softmax output over the vocabulary (dim -1 of the logits)
     # where i is the value of the corresponding index in target_ids.
     return logits.gather(-1, target_ids).squeeze(-1)
@@ -59,12 +60,10 @@ def probability_fn(
 def entropy_fn(
     attribution_model: "AttributionModel", forward_output: ModelOutput, **kwargs
 ) -> SingleScorePerStepTensor:
-    """
-    Compute the entropy of the model's output distribution.
-    """
+    """Compute the entropy of the model's output distribution."""
     logits = attribution_model.output2logits(forward_output)
     out = torch.distributions.Categorical(logits=logits).entropy()
-    if len(out.shape) > 1:
+    if out.ndim > 1:
         out = out.squeeze(-1)
     return out
 
@@ -72,9 +71,8 @@ def entropy_fn(
 def crossentropy_fn(
     attribution_model: "AttributionModel", forward_output: ModelOutput, target_ids: TargetIdsTensor, **kwargs
 ) -> SingleScorePerStepTensor:
-    """
-    Compute the cross entropy between the target_ids and the logits.
-    See: https://github.com/ZurichNLP/nmtscore/blob/master/src/nmtscore/models/m2m100.py#L99
+    """Compute the cross entropy between the target_ids and the logits.
+    See: https://github.com/ZurichNLP/nmtscore/blob/master/src/nmtscore/models/m2m100.py#L99.
     """
     return -torch.log2(probability_fn(attribution_model, forward_output, target_ids))
 
@@ -82,11 +80,10 @@ def crossentropy_fn(
 def perplexity_fn(
     attribution_model: "AttributionModel", forward_output: ModelOutput, target_ids: TargetIdsTensor, **kwargs
 ) -> SingleScorePerStepTensor:
-    """
-    Compute perplexity of the target_ids from the logits.
+    """Compute perplexity of the target_ids from the logits.
     Perplexity is the weighted branching factor. If we have a perplexity of 100, it means that whenever the model is
     trying to guess the next word it is as confused as if it had to pick between 100 words.
-    Reference: https://chiaracampagnola.io/2020/05/17/perplexity-in-language-models/
+    Reference: https://chiaracampagnola.io/2020/05/17/perplexity-in-language-models/.
     """
     return 2 ** crossentropy_fn(attribution_model, forward_output, target_ids)
 
@@ -98,14 +95,16 @@ def contrast_prob_diff_fn(
     encoder_attention_mask: IdsTensor,
     decoder_input_ids: IdsTensor,
     decoder_attention_mask: IdsTensor,
+    decoder_input_embeds: EmbeddingsTensor,
     target_ids: TargetIdsTensor,
     contrast_ids: IdsTensor,
     contrast_attention_mask: IdsTensor,
     **kwargs,
 ):
-    """Returnsthe difference between next step probability for a candidate generation target vs. a contrastive
-    alternative, answering the question. Can be used as attribution target to answer the question: "Which features
-    were salient in the choice of picking the selected token rather than its contrastive alternative?"
+    """Returns the difference between next step probability for a candidate generation target vs. a contrastive
+    alternative. Can be used as attribution target to answer the question: "Which features were salient in the
+    choice of picking the selected token rather than its contrastive alternative?". Follows the implementation
+    of `Yin and Neubig (2022) <https://aclanthology.org/2022.emnlp-main.14>`__.
 
     Args:
         contrast_ids (:obj:`torch.Tensor`): Tensor of shape ``[batch_size, seq_len]`` containing the ids of the
@@ -113,8 +112,6 @@ def contrast_prob_diff_fn(
         contrast_attention_mask (:obj:`torch.Tensor`): Tensor of shape ``[batch_size, seq_len]`` containing the
             attention mask for the contrastive input.
     """
-    from ..models import DecoderOnlyAttributionModel, EncoderDecoderAttributionModel
-
     # We truncate contrastive ids and their attention map to the current generation step
     contrast_decoder_input_ids = contrast_ids[:, : decoder_input_ids.shape[1]].to(attribution_model.device)
     contrast_decoder_attention_mask = contrast_attention_mask[:, : decoder_attention_mask.shape[1]].to(
@@ -123,22 +120,20 @@ def contrast_prob_diff_fn(
     # We select the next contrastive token as target
     contrast_target_ids = contrast_ids[:, decoder_input_ids.shape[1]].to(attribution_model.device)
     # Forward pass with the same model used for the main generation, but using contrastive inputs instead
-    if isinstance(attribution_model, EncoderDecoderAttributionModel):
+    contrast_decoder_input_embeds = None
+    if attribution_model.is_encoder_decoder:
         contrast_decoder_input_embeds = attribution_model.embed_ids(contrast_decoder_input_ids, as_targets=True)
-        contrast_output = attribution_model.get_forward_output(
-            forward_tensor=encoder_input_embeds,
-            encoder_attention_mask=encoder_attention_mask,
-            decoder_input_embeds=contrast_decoder_input_embeds,
-            decoder_attention_mask=contrast_decoder_attention_mask,
-        )
-    elif isinstance(attribution_model, DecoderOnlyAttributionModel):
-        contrast_output = attribution_model.get_forward_output(
-            forward_tensor=contrast_decoder_input_ids,
-            attention_mask=contrast_decoder_attention_mask,
-            use_embeddings=False,
-        )
-    else:
-        raise ValueError("Unsupported attribution model type")
+    contrast_batch = attribution_model.formatter.convert_args_to_batch(
+        encoder_input_ids=None,
+        decoder_input_ids=contrast_decoder_input_ids,
+        encoder_input_embeds=encoder_input_embeds,
+        decoder_input_embeds=contrast_decoder_input_embeds,
+        encoder_attention_mask=encoder_attention_mask,
+        decoder_attention_mask=contrast_decoder_attention_mask,
+    )
+    contrast_output = attribution_model.get_forward_output(
+        contrast_batch, use_embeddings=attribution_model.is_encoder_decoder
+    )
     # Return the prob difference as target for attribution
     model_probs = probability_fn(attribution_model, forward_output, target_ids)
     contrast_probs = probability_fn(attribution_model, contrast_output, contrast_target_ids)
@@ -155,7 +150,7 @@ def mc_dropout_prob_avg_fn(
     decoder_attention_mask: IdsTensor,
     target_ids: TargetIdsTensor,
     aux_model: Union[AutoModelForSeq2SeqLM, AutoModelForCausalLM],
-    n_mcd_steps: int = 10,
+    n_mcd_steps: int = 5,
     **kwargs,
 ):
     """Returns the average of probability scores using a pool of noisy prediction computed with MC Dropout. Can be
@@ -169,8 +164,6 @@ def mc_dropout_prob_avg_fn(
             - Must contain dropout layers to enable MC Dropout.
         n_mcd_steps (:obj:`int`): The number of prediction steps that should be used to normalize the original output.
     """
-    from ..models import DecoderOnlyAttributionModel, EncoderDecoderAttributionModel
-
     noisy_probs = []
     # Compute noisy predictions using the auxiliary model
     # Important: must be in train mode to ensure noise for MCD
@@ -182,20 +175,17 @@ def mc_dropout_prob_avg_fn(
             "mc_dropout_prob_avg expects models using the same vocabulary."
         )
     for _ in range(n_mcd_steps):
-        if isinstance(attribution_model, EncoderDecoderAttributionModel):
-            aux_output = aux_model(
-                inputs_embeds=encoder_input_embeds,
-                attention_mask=encoder_attention_mask,
-                decoder_inputs_embeds=decoder_input_embeds,
-                decoder_attention_mask=decoder_attention_mask,
-            )
-        elif isinstance(attribution_model, DecoderOnlyAttributionModel):
-            aux_output = aux_model(
-                input_ids=decoder_input_ids,
-                attention_mask=decoder_attention_mask,
-            )
-        else:
-            raise ValueError("Unsupported model type")
+        aux_batch = attribution_model.formatter.convert_args_to_batch(
+            encoder_input_ids=None,
+            decoder_input_ids=decoder_input_ids,
+            encoder_input_embeds=encoder_input_embeds,
+            decoder_input_embeds=decoder_input_embeds,
+            encoder_attention_mask=encoder_attention_mask,
+            decoder_attention_mask=decoder_attention_mask,
+        )
+        aux_output = attribution_model.get_forward_output(
+            aux_batch, use_embeddings=attribution_model.is_encoder_decoder
+        )
         noisy_prob = probability_fn(attribution_model, aux_output, target_ids)
         noisy_probs.append(noisy_prob)
     # Original probability from the model without noise
@@ -216,8 +206,7 @@ STEP_SCORES_MAP = {
 
 
 def list_step_functions() -> List[str]:
-    """
-    Lists identifiers for all available step scores. One or more step scores identifiers can be passed to the
+    """Lists identifiers for all available step scores. One or more step scores identifiers can be passed to the
     :meth:`~inseq.models.AttributionModel.attribute` method either to compute scores while attributing (``step_scores``
     parameter), or as target function for the attribution, if supported by the attribution method (``attributed_fn``
     parameter).
@@ -226,12 +215,12 @@ def list_step_functions() -> List[str]:
 
 
 def register_step_function(
-    fn: StepScoreFunction,
+    fn: StepFunction,
     identifier: str,
-    aggregate_map: Optional[Dict[str, Callable[[torch.Tensor], torch.Tensor]]] = None,
+    aggregate_map: Optional[Dict[str, str]] = None,
+    overwrite: bool = False,
 ) -> None:
-    """
-    Registers a function to be used to compute step scores and store them in the
+    """Registers a function to be used to compute step scores and store them in the
     :class:`~inseq.data.attribution.FeatureAttributionOutput` object. Registered step functions can also be used as
     attribution targets by gradient-based feature attribution methods.
 
@@ -258,12 +247,17 @@ def register_step_function(
 
         identifier (:obj:`str`): The identifier that will be used for the registered step score.
         aggregate_map (:obj:`dict`, `optional`): An optional dictionary mapping from :class:`~inseq.data.Aggregator`
-            name identifiers to functions taking in input a tensor of shape `(batch_size, seq_len)` and producing
-            tensors of shape `(batch_size, aggregated_seq_len)` in output that will be used to aggregate the
-            registered step score when used in conjunction with the corresponding aggregator. E.g. the ``probability``
-            step score uses the aggregate_map ``{"span_aggregate": lambda x: t.prod(dim=1, keepdim=True)}`` to
-            aggregate probabilities with a product when aggregating scores over spans.
+            name identifiers to aggregation function identifiers. A list of available aggregation functions is
+            available using :func:`~inseq.list_aggregation_functions`.
+        overwrite (:obj:`bool`, `optional`, defaults to :obj:`False`): Whether to overwrite an existing function
+            registered with the same identifier.
     """
+    if identifier in STEP_SCORES_MAP:
+        if not overwrite:
+            raise ValueError(
+                f"{identifier} is already registered in step functions map. Override with overwrite=True."
+            )
+        logger.warning(f"Overwriting {identifier} step function.")
     STEP_SCORES_MAP[identifier] = fn
     if isinstance(aggregate_map, dict):
         for agg_name, agg_fn in aggregate_map.items():

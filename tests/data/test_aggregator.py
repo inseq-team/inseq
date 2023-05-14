@@ -12,17 +12,18 @@ from inseq.data.aggregator import (
     SequenceAttributionAggregator,
     SubwordAggregator,
 )
+from inseq.models import HuggingfaceEncoderDecoderModel
 
 EXAMPLES_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../fixtures/aggregator.json")
 EXAMPLES = json.load(open(EXAMPLES_FILE))
 
 
 @fixture(scope="session")
-def saliency_mt_model():
+def saliency_mt_model() -> HuggingfaceEncoderDecoderModel:
     return inseq.load_model("Helsinki-NLP/opus-mt-en-it", "saliency", device="cpu")
 
 
-def test_sequence_attribution_aggregator(saliency_mt_model):
+def test_sequence_attribution_aggregator(saliency_mt_model: HuggingfaceEncoderDecoderModel):
     out = saliency_mt_model.attribute(
         "This is a test.",
         step_scores=["probability"],
@@ -44,7 +45,7 @@ def test_sequence_attribution_aggregator(saliency_mt_model):
     assert out_agg.step_scores["probability"].shape == (7,)
 
 
-def test_continuous_span_aggregator(saliency_mt_model):
+def test_continuous_span_aggregator(saliency_mt_model: HuggingfaceEncoderDecoderModel):
     out = saliency_mt_model.attribute(
         "This is a test.", attribute_target=True, step_scores=["probability"], device="cpu", show_progress=False
     )
@@ -55,7 +56,7 @@ def test_continuous_span_aggregator(saliency_mt_model):
     assert out_agg.step_scores["probability"].shape == (4,)
 
 
-def test_aggregator_pipeline(saliency_mt_model):
+def test_aggregator_pipeline(saliency_mt_model: HuggingfaceEncoderDecoderModel):
     out = saliency_mt_model.attribute(
         "This is a test.", attribute_target=True, step_scores=["probability"], device="cpu", show_progress=False
     )
@@ -74,7 +75,7 @@ def test_aggregator_pipeline(saliency_mt_model):
     assert not torch.allclose(out_agg_squeezesum.target_attributions, out_agg_sumsqueeze.target_attributions)
 
 
-def test_subword_aggregator(saliency_mt_model):
+def test_subword_aggregator(saliency_mt_model: HuggingfaceEncoderDecoderModel):
     out = saliency_mt_model.attribute(EXAMPLES["source"], show_progress=False)
     seqattr = out.sequence_attributions[0]
     for idx, token in enumerate(seqattr.source):
@@ -101,7 +102,7 @@ def test_subword_aggregator(saliency_mt_model):
         assert token.token == EXAMPLES["target_merged"][idx]
 
 
-def test_pair_aggregator(saliency_mt_model):
+def test_pair_aggregator(saliency_mt_model: HuggingfaceEncoderDecoderModel):
     out = saliency_mt_model.attribute([EXAMPLES["source"], EXAMPLES["alternative_source"]], show_progress=False)
     orig_seqattr = out.sequence_attributions[0].aggregate(aggregator=SequenceAttributionAggregator)
     alt_seqattr = out.sequence_attributions[1].aggregate(aggregator=SequenceAttributionAggregator)

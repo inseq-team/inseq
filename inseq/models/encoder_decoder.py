@@ -1,5 +1,6 @@
 import logging
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from functools import wraps
+from typing import Any, Callable, Dict, List, Optional, Tuple, TypeVar, Union
 
 from ..attr.feat import join_token_ids
 from ..data import (
@@ -9,35 +10,34 @@ from ..data import (
     EncoderDecoderBatch,
     FeatureAttributionInput,
     FeatureAttributionStepOutput,
+    get_batch_from_inputs,
 )
-from ..utils import pretty_tensor
 from ..utils.typing import (
     AttributionForwardInputs,
     EmbeddingsTensor,
     ExpandedTargetIdsTensor,
-    FullLogitsTensor,
     IdsTensor,
+    LogitsTensor,
     OneOrMoreTokenSequences,
     SingleScorePerStepTensor,
     TargetIdsTensor,
     TextSequences,
     TokenWithId,
 )
-from .attribution_model import AttributionModel, ModelOutput
+from .attribution_model import AttributionModel, ForwardMethod, InputFormatter, ModelOutput
+
+CustomForwardOutput = TypeVar("CustomForwardOutput")
 
 logger = logging.getLogger(__name__)
 
 
-class EncoderDecoderAttributionModel(AttributionModel):
-    """AttributionModel class for attributing encoder-decoder models."""
-
+class EncoderDecoderInputFormatter(InputFormatter):
     def prepare_inputs_for_attribution(
-        self,
+        attribution_model: "EncoderDecoderAttributionModel",
         inputs: Tuple[FeatureAttributionInput, FeatureAttributionInput],
         include_eos_baseline: bool = False,
     ) -> EncoderDecoderBatch:
-        r"""
-        Prepares sources and target to produce an :class:`~inseq.data.EncoderDecoderBatch`.
+        r"""Prepares sources and target to produce an :class:`~inseq.data.EncoderDecoderBatch`.
         There are two stages of preparation:
 
             1. Raw text sources and target texts are encoded by the model.
@@ -50,9 +50,7 @@ class EncoderDecoderAttributionModel(AttributionModel):
         The final result will be consistent in both cases.
 
         Args:
-            sources (:obj:`FeatureAttributionInput`): The sources provided to the
-                :meth:`~inseq.attr.feat.FeatureAttribution.prepare` method.
-            targets (:obj:`FeatureAttributionInput): The targets provided to the
+            inputs (:obj:`tuple` of `FeatureAttributionInput`): A tuple containing sources and targets provided to the
                 :meth:`~inseq.attr.feat.FeatureAttribution.prepare` method.
             include_eos_baseline (:obj:`bool`, `optional`): Whether to include the EOS token in the baseline for
                 attribution. By default the EOS token is not used for attribution. Defaults to False.
@@ -62,65 +60,19 @@ class EncoderDecoderAttributionModel(AttributionModel):
                 and targets in encoded and embedded formats for all inputs.
         """
         sources, targets = inputs
-        if isinstance(sources, Batch):
-            source_batch = sources
-        else:
-            if isinstance(sources, (str, list)):
-                source_encodings: BatchEncoding = self.encode(
-                    sources, return_baseline=True, include_eos_baseline=include_eos_baseline
-                )
-            elif isinstance(sources, BatchEncoding):
-                source_encodings = sources
-            else:
-                raise ValueError(
-                    "sources must be either a string, a list of strings, a BatchEncoding or a Batch, "
-                    f"not {type(sources)}"
-                )
-            # Even when we are performing layer attribution, we might need the embeddings
-            # to compute step probabilities.
-            source_embeddings = BatchEmbedding(
-                input_embeds=self.embed(source_encodings.input_ids),
-                baseline_embeds=self.embed(source_encodings.baseline_ids),
-            )
-            source_batch = Batch(source_encodings, source_embeddings)
-
-        if isinstance(targets, Batch):
-            target_batch = targets
-        else:
-            if isinstance(targets, (str, list)):
-                target_encodings: BatchEncoding = self.encode(
-                    targets,
-                    as_targets=True,
-                    return_baseline=True,
-                    include_eos_baseline=include_eos_baseline,
-                )
-            elif isinstance(targets, BatchEncoding):
-                target_encodings = targets
-            else:
-                raise ValueError(
-                    "targets must be either a string, a list of strings, a BatchEncoding or a Batch, "
-                    f"not {type(targets)}"
-                )
-            baseline_embeds = self.embed(target_encodings.baseline_ids, as_targets=True)
-            target_embeddings = BatchEmbedding(
-                input_embeds=self.embed(target_encodings.input_ids, as_targets=True),
-                baseline_embeds=baseline_embeds,
-            )
-            target_batch = Batch(target_encodings, target_embeddings)
+        source_batch = get_batch_from_inputs(
+            attribution_model,
+            inputs=sources,
+            include_eos_baseline=include_eos_baseline,
+            as_targets=False,
+        )
+        target_batch = get_batch_from_inputs(
+            attribution_model,
+            inputs=targets,
+            include_eos_baseline=include_eos_baseline,
+            as_targets=True,
+        )
         return EncoderDecoderBatch(source_batch, target_batch)
-
-    @staticmethod
-    def format_forward_args(
-        inputs: EncoderDecoderBatch,
-        use_embeddings: bool = True,
-    ) -> Dict[str, Any]:
-        return {
-            "forward_tensor": inputs.sources.input_embeds if use_embeddings else inputs.sources.input_ids,
-            "decoder_input_embeds": inputs.targets.input_embeds,
-            # "decoder_input_ids": inputs.targets.input_ids,
-            "encoder_attention_mask": inputs.sources.attention_mask,
-            "decoder_attention_mask": inputs.targets.attention_mask,
-        }
 
     @staticmethod
     def format_attribution_args(
@@ -131,7 +83,7 @@ class EncoderDecoderAttributionModel(AttributionModel):
         attributed_fn_args: Dict[str, Any] = {},
         attribute_batch_ids: bool = False,
         forward_batch_embeds: bool = True,
-        **kwargs,
+        use_baselines: bool = False,
     ) -> Tuple[Dict[str, Any], Tuple[Union[IdsTensor, EmbeddingsTensor, None], ...]]:
         if attribute_batch_ids:
             inputs = (batch.sources.input_ids,)
@@ -171,13 +123,9 @@ class EncoderDecoderAttributionModel(AttributionModel):
             attribute_fn_args["additional_forward_args"] = (batch.targets.input_embeds,) + attribute_fn_args[
                 "additional_forward_args"
             ]
-        return attribute_fn_args, baselines
-
-    def get_text_sequences(self, batch: EncoderDecoderBatch) -> TextSequences:
-        return TextSequences(
-            sources=self.convert_tokens_to_string(batch.sources.input_tokens),
-            targets=self.convert_tokens_to_string(batch.targets.input_tokens, as_targets=True),
-        )
+        if use_baselines:
+            attribute_fn_args["baselines"] = baselines
+        return attribute_fn_args
 
     @staticmethod
     def enrich_step_output(
@@ -186,8 +134,7 @@ class EncoderDecoderAttributionModel(AttributionModel):
         target_tokens: OneOrMoreTokenSequences,
         target_ids: TargetIdsTensor,
     ) -> FeatureAttributionStepOutput:
-        r"""
-        Enriches the attribution output with token information, producing the finished
+        r"""Enriches the attribution output with token information, producing the finished
         :class:`~inseq.data.FeatureAttributionStepOutput` object.
 
         Args:
@@ -200,94 +147,117 @@ class EncoderDecoderAttributionModel(AttributionModel):
         Returns:
             :class:`~inseq.data.FeatureAttributionStepOutput`: The enriched attribution output.
         """
-        if len(target_ids.shape) == 0:
+        if target_ids.ndim == 0:
             target_ids = target_ids.unsqueeze(0)
         step_output.source = join_token_ids(batch.sources.input_tokens, batch.sources.input_ids.tolist())
         step_output.target = [[TokenWithId(token[0], id)] for token, id in zip(target_tokens, target_ids.tolist())]
         step_output.prefix = join_token_ids(batch.targets.input_tokens, batch.targets.input_ids.tolist())
         return step_output
 
+    @staticmethod
     def format_step_function_args(
-        self,
+        attribution_model: "EncoderDecoderAttributionModel",
         forward_output: ModelOutput,
         target_ids: ExpandedTargetIdsTensor,
-        encoder_input_ids: Optional[IdsTensor] = None,
-        decoder_input_ids: Optional[IdsTensor] = None,
-        encoder_input_embeds: Optional[EmbeddingsTensor] = None,
-        decoder_input_embeds: Optional[EmbeddingsTensor] = None,
-        encoder_attention_mask: Optional[IdsTensor] = None,
-        decoder_attention_mask: Optional[IdsTensor] = None,
+        batch: EncoderDecoderBatch,
         **kwargs,
     ) -> Dict[str, Any]:
         return {
             **kwargs,
             **{
-                "attribution_model": self,
+                "attribution_model": attribution_model,
                 "forward_output": forward_output,
-                "encoder_input_ids": encoder_input_ids,
-                "decoder_input_ids": decoder_input_ids,
-                "encoder_input_embeds": encoder_input_embeds,
-                "decoder_input_embeds": decoder_input_embeds,
+                "encoder_input_ids": batch.source_ids,
+                "decoder_input_ids": batch.target_ids,
+                "encoder_input_embeds": batch.source_embeds,
+                "decoder_input_embeds": batch.target_embeds,
                 "target_ids": target_ids,
-                "encoder_attention_mask": encoder_attention_mask,
-                "decoder_attention_mask": decoder_attention_mask,
+                "encoder_attention_mask": batch.source_mask,
+                "decoder_attention_mask": batch.target_mask,
             },
         }
 
+    @staticmethod
+    def convert_args_to_batch(
+        encoder_input_ids: Optional[IdsTensor] = None,
+        decoder_input_ids: Optional[IdsTensor] = None,
+        encoder_attention_mask: Optional[IdsTensor] = None,
+        decoder_attention_mask: Optional[IdsTensor] = None,
+        encoder_input_embeds: Optional[EmbeddingsTensor] = None,
+        decoder_input_embeds: Optional[EmbeddingsTensor] = None,
+    ) -> EncoderDecoderBatch:
+        source_encoding = BatchEncoding(encoder_input_ids, encoder_attention_mask)
+        source_embedding = BatchEmbedding(encoder_input_embeds)
+        source_batch = Batch(source_encoding, source_embedding)
+        target_encoding = BatchEncoding(decoder_input_ids, decoder_attention_mask)
+        target_embedding = BatchEmbedding(decoder_input_embeds)
+        target_batch = Batch(target_encoding, target_embedding)
+        return EncoderDecoderBatch(source_batch, target_batch)
+
+    @staticmethod
+    def format_forward_args(forward_fn: ForwardMethod) -> Callable[..., CustomForwardOutput]:
+        @wraps(forward_fn)
+        def formatted_forward_input_wrapper(
+            self: "EncoderDecoderAttributionModel",
+            encoder_tensors: AttributionForwardInputs,
+            decoder_input_embeds: AttributionForwardInputs,
+            encoder_input_ids: IdsTensor,
+            decoder_input_ids: IdsTensor,
+            target_ids: ExpandedTargetIdsTensor,
+            attributed_fn: Callable[..., SingleScorePerStepTensor],
+            encoder_attention_mask: Optional[IdsTensor] = None,
+            decoder_attention_mask: Optional[IdsTensor] = None,
+            use_embeddings: bool = True,
+            attributed_fn_argnames: Optional[List[str]] = None,
+            *args,
+            **kwargs,
+        ) -> CustomForwardOutput:
+            batch = self.formatter.convert_args_to_batch(
+                encoder_input_ids=encoder_input_ids,
+                decoder_input_ids=decoder_input_ids,
+                encoder_attention_mask=encoder_attention_mask,
+                decoder_attention_mask=decoder_attention_mask,
+                encoder_input_embeds=encoder_tensors if use_embeddings else None,
+                decoder_input_embeds=decoder_input_embeds,
+            )
+            return forward_fn(
+                self, batch, target_ids, attributed_fn, use_embeddings, attributed_fn_argnames, *args, **kwargs
+            )
+
+        return formatted_forward_input_wrapper
+
+    @staticmethod
+    def get_text_sequences(self, batch: EncoderDecoderBatch) -> TextSequences:
+        return TextSequences(
+            sources=self.convert_tokens_to_string(batch.sources.input_tokens),
+            targets=self.convert_tokens_to_string(batch.targets.input_tokens, as_targets=True),
+        )
+
+
+class EncoderDecoderAttributionModel(AttributionModel):
+    """AttributionModel class for attributing encoder-decoder models."""
+
+    formatter = EncoderDecoderInputFormatter
+
     def get_forward_output(
         self,
-        forward_tensor: AttributionForwardInputs,
-        encoder_attention_mask: Optional[IdsTensor] = None,
-        decoder_input_embeds: Optional[EmbeddingsTensor] = None,
-        decoder_attention_mask: Optional[IdsTensor] = None,
+        batch: EncoderDecoderBatch,
         use_embeddings: bool = True,
         **kwargs,
     ) -> ModelOutput:
-        encoder_embeds = forward_tensor if use_embeddings else None
-        encoder_ids = None if use_embeddings else forward_tensor
         return self.model(
-            input_ids=encoder_ids,
-            inputs_embeds=encoder_embeds,
-            attention_mask=encoder_attention_mask,
-            decoder_inputs_embeds=decoder_input_embeds,
-            decoder_attention_mask=decoder_attention_mask,
+            input_ids=None if use_embeddings else batch.source_ids,
+            inputs_embeds=batch.source_embeds if use_embeddings else None,
+            attention_mask=batch.source_mask,
+            decoder_inputs_embeds=batch.target_embeds,
+            decoder_attention_mask=batch.target_mask,
             **kwargs,
         )
 
-    def forward(
-        self,
-        encoder_tensors: AttributionForwardInputs,
-        decoder_input_embeds: AttributionForwardInputs,
-        encoder_input_ids: IdsTensor,
-        decoder_input_ids: IdsTensor,
-        target_ids: ExpandedTargetIdsTensor,
-        attributed_fn: Callable[..., SingleScorePerStepTensor],
-        encoder_attention_mask: Optional[IdsTensor] = None,
-        decoder_attention_mask: Optional[IdsTensor] = None,
-        use_embeddings: bool = True,
-        attributed_fn_argnames: Optional[List[str]] = None,
-        *args,
-    ) -> FullLogitsTensor:
-        assert len(args) == len(attributed_fn_argnames), "Number of arguments and number of argnames must match"
-        target_ids = target_ids.squeeze(-1)
-        output = self.get_forward_output(
-            forward_tensor=encoder_tensors,
-            encoder_attention_mask=encoder_attention_mask,
-            decoder_input_embeds=decoder_input_embeds,
-            decoder_attention_mask=decoder_attention_mask,
-            use_embeddings=use_embeddings,
-        )
-        logger.debug(f"logits: {pretty_tensor(output.logits)}")
-        step_function_args = self.format_step_function_args(
-            attribution_model=self,
-            forward_output=output,
-            encoder_input_ids=encoder_input_ids,
-            decoder_input_ids=decoder_input_ids,
-            encoder_input_embeds=encoder_tensors if use_embeddings else None,
-            decoder_input_embeds=decoder_input_embeds,
-            target_ids=target_ids,
-            encoder_attention_mask=encoder_attention_mask,
-            decoder_attention_mask=decoder_attention_mask,
-            **{k: v for k, v in zip(attributed_fn_argnames, args) if v is not None},
-        )
-        return attributed_fn(**step_function_args)
+    @formatter.format_forward_args
+    def forward(self, *args, **kwargs) -> LogitsTensor:
+        return self._forward(*args, **kwargs)
+
+    @formatter.format_forward_args
+    def forward_with_output(self, *args, **kwargs) -> ModelOutput:
+        return self._forward_with_output(*args, **kwargs)

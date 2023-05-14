@@ -1,24 +1,33 @@
 import logging
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Dict, List, Optional, Tuple, TypeVar, Union
+from functools import wraps
+from typing import Any, Callable, Dict, List, Optional, Protocol, Tuple, TypeVar, Union
 
 import torch
 
-from ..attr import STEP_SCORES_MAP
+from ..attr import STEP_SCORES_MAP, get_step_function_reserved_args
 from ..attr.feat import FeatureAttribution, extract_args, join_token_ids
 from ..data import (
     BatchEncoding,
     DecoderOnlyBatch,
     EncoderDecoderBatch,
+    FeatureAttributionInput,
     FeatureAttributionOutput,
     FeatureAttributionStepOutput,
 )
-from ..utils import MissingAttributionMethodError, check_device, format_input_texts, get_default_device, isnotebook
+from ..utils import (
+    MissingAttributionMethodError,
+    check_device,
+    format_input_texts,
+    get_default_device,
+    isnotebook,
+    pretty_tensor,
+)
 from ..utils.typing import (
     EmbeddingsTensor,
     ExpandedTargetIdsTensor,
-    FullLogitsTensor,
     IdsTensor,
+    LogitsTensor,
     OneOrMoreIdSequences,
     OneOrMoreTokenSequences,
     SingleScorePerStepTensor,
@@ -31,9 +40,103 @@ from ..utils.typing import (
 from .model_decorators import unhooked
 
 ModelOutput = TypeVar("ModelOutput")
+CustomForwardOutput = TypeVar("CustomForwardOutput")
 
 
 logger = logging.getLogger(__name__)
+
+
+class ForwardMethod(Protocol):
+    def __call__(
+        self,
+        batch: Union[DecoderOnlyBatch, EncoderDecoderBatch],
+        target_ids: ExpandedTargetIdsTensor,
+        attributed_fn: Callable[..., SingleScorePerStepTensor],
+        use_embeddings: bool,
+        attributed_fn_argnames: Optional[List[str]],
+        *args,
+    ) -> CustomForwardOutput:
+        ...
+
+
+class InputFormatter:
+    @staticmethod
+    @abstractmethod
+    def prepare_inputs_for_attribution(
+        attribution_model: "AttributionModel",
+        inputs: FeatureAttributionInput,
+        include_eos_baseline: bool = False,
+    ) -> Union[DecoderOnlyBatch, EncoderDecoderBatch]:
+        raise NotImplementedError()
+
+    @staticmethod
+    @abstractmethod
+    def format_attribution_args(
+        batch: Union[DecoderOnlyBatch, EncoderDecoderBatch],
+        target_ids: TargetIdsTensor,
+        attributed_fn: Callable[..., SingleScorePerStepTensor],
+        attribute_target: bool = False,
+        attributed_fn_args: Dict[str, Any] = {},
+        attribute_batch_ids: bool = False,
+        forward_batch_embeds: bool = True,
+        use_baselines: bool = False,
+    ) -> Tuple[Dict[str, Any], Tuple[Union[IdsTensor, EmbeddingsTensor, None], ...]]:
+        raise NotImplementedError()
+
+    @staticmethod
+    @abstractmethod
+    def enrich_step_output(
+        step_output: FeatureAttributionStepOutput,
+        batch: Union[DecoderOnlyBatch, EncoderDecoderBatch],
+        target_tokens: OneOrMoreTokenSequences,
+        target_ids: TargetIdsTensor,
+    ) -> FeatureAttributionStepOutput:
+        r"""Enriches the attribution output with token information, producing the finished
+        :class:`~inseq.data.FeatureAttributionStepOutput` object.
+
+        Args:
+            step_output (:class:`~inseq.data.FeatureAttributionStepOutput`): The output produced
+                by the attribution step, with missing batch information.
+            batch (:class:`~inseq.data.DecoderOnlyBatch` or :class:`~inseq.data.EncoderDecoderOnlyBatch`): The batch on
+                which attribution was performed.
+            target_ids (:obj:`torch.Tensor`): Target token ids of size `(batch_size, 1)` corresponding to tokens
+                for which the attribution step was performed.
+
+        Returns:
+            :class:`~inseq.data.FeatureAttributionStepOutput`: The enriched attribution output.
+        """
+        raise NotImplementedError()
+
+    @staticmethod
+    @abstractmethod
+    def convert_args_to_batch(*args, **kwargs) -> Union[DecoderOnlyBatch, EncoderDecoderBatch]:
+        raise NotImplementedError()
+
+    @staticmethod
+    def format_forward_args(forward: ForwardMethod) -> Callable[..., CustomForwardOutput]:
+        @wraps(forward)
+        def formatted_forward_input_wrapper(self, *args, **kwargs) -> CustomForwardOutput:
+            raise NotImplementedError()
+
+        return formatted_forward_input_wrapper
+
+    @staticmethod
+    @abstractmethod
+    def format_step_function_args(
+        attribution_model: "AttributionModel",
+        forward_output: ModelOutput,
+        target_ids: ExpandedTargetIdsTensor,
+        batch: DecoderOnlyBatch,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        raise NotImplementedError()
+
+    @staticmethod
+    @abstractmethod
+    def get_text_sequences(
+        attribution_model: "AttributionModel", batch: Union[DecoderOnlyBatch, EncoderDecoderBatch]
+    ) -> TextSequences:
+        raise NotImplementedError()
 
 
 class AttributionModel(ABC, torch.nn.Module):
@@ -51,32 +154,20 @@ class AttributionModel(ABC, torch.nn.Module):
         default_attributed_fn_id (:obj:`str`): The id for the default step function used as attribution target.
     """
 
-    # Default arguments for custom attributed functions
-    # in the AttributionModel.forward method.
-    _DEFAULT_ATTRIBUTED_FN_ARGS = [
-        "attribution_model",
-        "forward_output",
-        "encoder_input_ids",
-        "decoder_input_ids",
-        "encoder_input_embeds",
-        "decoder_input_embeds",
-        "target_ids",
-        "encoder_attention_mask",
-        "decoder_attention_mask",
-    ]
+    formatter = InputFormatter
 
     def __init__(self, **kwargs) -> None:
         super().__init__()
         if not hasattr(self, "model"):
             self.model = None
-            self.model_name = None
-            self.is_encoder_decoder = True
-        self.pad_token = None
-        self.embed_scale = None
-        self._device = None
-        self.attribution_method = None
-        self.is_hooked = False
-        self._default_attributed_fn_id = "probability"
+            self.model_name: str = None
+            self.is_encoder_decoder: bool = True
+        self.pad_token: Optional[str] = None
+        self.embed_scale: Optional[float] = None
+        self._device: Optional[str] = None
+        self.attribution_method: Optional[FeatureAttribution] = None
+        self.is_hooked: bool = False
+        self._default_attributed_fn_id: str = "probability"
 
     @property
     def device(self) -> Optional[str]:
@@ -225,7 +316,7 @@ class AttributionModel(ABC, torch.nn.Module):
             step-scores, optionally step-wise attributions and general information concerning attributed texts and the
             attribution process.
         """
-        if not input_texts:
+        if self.is_encoder_decoder and not input_texts:
             raise ValueError("At least one text must be provided to perform attribution.")
         if attribute_target and not self.is_encoder_decoder:
             logger.warning("attribute_target parameter is set to True, but will be ignored (not an encoder-decoder).")
@@ -239,10 +330,16 @@ class AttributionModel(ABC, torch.nn.Module):
         if device is not None:
             self.device = device
         input_texts, generated_texts = format_input_texts(input_texts, generated_texts)
+        has_generated_texts = generated_texts is not None
+        if not self.is_encoder_decoder:
+            for i in range(len(input_texts)):
+                if not input_texts[i]:
+                    input_texts[i] = self.bos_token
+                    if has_generated_texts and not generated_texts[i].startswith(self.bos_token):
+                        generated_texts[i] = " ".join([self.bos_token, generated_texts[i]])
         if batch_size is not None:
             n_batches = len(input_texts) // batch_size + ((len(input_texts) % batch_size) > 0)
             logger.info(f"Splitting input texts into {n_batches} batches of size {batch_size}.")
-        has_generated_texts = generated_texts is not None
         # If constrained decoding is not enabled, output texts are generated from input texts.
         if not has_generated_texts or generate_from_target_prefix:
             encoded_input = self.encode(input_texts, return_baseline=True, include_eos_baseline=include_eos_baseline)
@@ -259,7 +356,7 @@ class AttributionModel(ABC, torch.nn.Module):
         attribution_method = self.get_attribution_method(method, override_default_attribution)
         attributed_fn = self.get_attributed_fn(attributed_fn)
         attribution_args, attributed_fn_args, step_scores_args = extract_args(
-            attribution_method, attributed_fn, step_scores, default_args=self._DEFAULT_ATTRIBUTED_FN_ARGS, **kwargs
+            attribution_method, attributed_fn, step_scores, default_args=get_step_function_reserved_args(), **kwargs
         )
         if isnotebook():
             logger.debug("Pretty progress currently not supported in notebooks, falling back to tqdm.")
@@ -343,7 +440,7 @@ class AttributionModel(ABC, torch.nn.Module):
 
     @staticmethod
     @abstractmethod
-    def output2logits(forward_output) -> FullLogitsTensor:
+    def output2logits(forward_output) -> LogitsTensor:
         pass
 
     @abstractmethod
@@ -432,77 +529,58 @@ class AttributionModel(ABC, torch.nn.Module):
     # Architecture-specific methods
 
     @abstractmethod
-    def prepare_inputs_for_attribution(
-        self,
-        inputs: Any,
-        include_eos_baseline: bool = False,
-        use_layer_attribution: bool = False,
-    ) -> Union[DecoderOnlyBatch, EncoderDecoderBatch]:
-        pass
-
-    @staticmethod
-    @abstractmethod
-    def format_forward_args(
-        inputs: Union[DecoderOnlyBatch, EncoderDecoderBatch],
-        use_embeddings: bool = True,
-    ) -> Dict[str, Any]:
-        pass
-
-    @staticmethod
-    @abstractmethod
-    def format_attribution_args(
-        batch: Union[DecoderOnlyBatch, EncoderDecoderBatch],
-        target_ids: TargetIdsTensor,
-        attributed_fn: Callable[..., SingleScorePerStepTensor],
-        attributed_fn_args: Dict[str, Any] = {},
-        attribute_batch_ids: bool = False,
-        forward_batch_embeds: bool = True,
-        **kwargs,
-    ) -> Tuple[Dict[str, Any], Tuple[Union[IdsTensor, EmbeddingsTensor, None], ...]]:
-        pass
-
-    @abstractmethod
-    def get_text_sequences(self, batch: Union[DecoderOnlyBatch, EncoderDecoderBatch]) -> TextSequences:
-        pass
-
-    @abstractmethod
     def get_forward_output(
         self,
         **kwargs,
     ) -> ModelOutput:
         pass
 
-    @staticmethod
     @abstractmethod
-    def enrich_step_output(
-        step_output: FeatureAttributionStepOutput,
+    def get_encoder(self) -> torch.nn.Module:
+        pass
+
+    @abstractmethod
+    def get_decoder(self) -> torch.nn.Module:
+        pass
+
+    # Model forward
+
+    def _forward(
+        self,
         batch: Union[DecoderOnlyBatch, EncoderDecoderBatch],
-        target_tokens: OneOrMoreTokenSequences,
-        target_ids: TargetIdsTensor,
-    ) -> FeatureAttributionStepOutput:
-        pass
-
-    @abstractmethod
-    def format_step_function_args(
-        self,
-        forward_output: ModelOutput,
         target_ids: ExpandedTargetIdsTensor,
-        encoder_input_ids: Optional[IdsTensor] = None,
-        decoder_input_ids: Optional[IdsTensor] = None,
-        encoder_input_embeds: Optional[EmbeddingsTensor] = None,
-        decoder_input_embeds: Optional[EmbeddingsTensor] = None,
-        encoder_attention_mask: Optional[IdsTensor] = None,
-        decoder_attention_mask: Optional[IdsTensor] = None,
-        **kwargs,
-    ) -> Dict[str, Any]:
-        pass
-
-    @abstractmethod
-    def forward(
-        self,
         attributed_fn: Callable[..., SingleScorePerStepTensor],
+        use_embeddings: bool = True,
         attributed_fn_argnames: Optional[List[str]] = None,
         *args,
         **kwargs,
-    ) -> FullLogitsTensor:
-        pass
+    ) -> LogitsTensor:
+        assert len(args) == len(attributed_fn_argnames), "Number of arguments and number of argnames must match"
+        target_ids = target_ids.squeeze(-1)
+        output = self.get_forward_output(batch, use_embeddings=use_embeddings, **kwargs)
+        logger.debug(f"logits: {pretty_tensor(output.logits)}")
+        step_function_args = self.formatter.format_step_function_args(
+            attribution_model=self,
+            forward_output=output,
+            target_ids=target_ids,
+            batch=batch,
+            **{k: v for k, v in zip(attributed_fn_argnames, args) if v is not None},
+        )
+        return attributed_fn(**step_function_args)
+
+    def _forward_with_output(
+        self,
+        batch: Union[DecoderOnlyBatch, EncoderDecoderBatch],
+        use_embeddings: bool = True,
+        *args,
+        **kwargs,
+    ) -> ModelOutput:
+        return self.get_forward_output(batch, use_embeddings=use_embeddings, **kwargs)
+
+    @formatter.format_forward_args
+    def forward(self, *args, **kwargs) -> LogitsTensor:
+        return self._forward(*args, **kwargs)
+
+    @formatter.format_forward_args
+    def forward_with_output(self, *args, **kwargs) -> ModelOutput:
+        return self._forward_with_output(*args, **kwargs)

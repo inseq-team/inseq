@@ -10,7 +10,7 @@ OneOrMoreDataClasses = Union[DataClassType, Iterable[DataClassType]]
 
 
 class BaseCLICommand(ABC):
-    """Adapted from https://github.com/huggingface/transformers/blob/main/src/transformers/commands/__init__.py"""
+    """Adapted from https://github.com/huggingface/transformers/blob/main/src/transformers/commands/__init__.py."""
 
     _name: str = None
     _help: str = None
@@ -18,8 +18,7 @@ class BaseCLICommand(ABC):
 
     @classmethod
     def register_subcommand(cls, parser: InseqArgumentParser):
-        """
-        Register this command to argparse so it's available for the Inseq cli
+        """Register this command to argparse so it's available for the Inseq cli.
 
         Args:
             parser: Root parser to register command-specific arguments

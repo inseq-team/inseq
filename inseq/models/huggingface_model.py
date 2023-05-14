@@ -1,4 +1,4 @@
-""" HuggingFace Seq2seq model """
+"""HuggingFace Seq2seq model."""
 import logging
 from abc import abstractmethod
 from typing import Dict, List, NoReturn, Optional, Tuple, Union
@@ -19,8 +19,8 @@ from ..data import BatchEncoding
 from ..utils import check_device
 from ..utils.typing import (
     EmbeddingsTensor,
-    FullLogitsTensor,
     IdsTensor,
+    LogitsTensor,
     OneOrMoreIdSequences,
     OneOrMoreTokenSequences,
     TextInput,
@@ -68,8 +68,7 @@ class HuggingfaceModel(AttributionModel):
         device: Optional[str] = None,
         **kwargs,
     ) -> None:
-        """
-        AttributionModel subclass for Huggingface-compatible models.
+        """AttributionModel subclass for Huggingface-compatible models.
 
         Args:
             model (:obj:`str` or :obj:`transformers.PreTrainedModel`): the name of the model in the
@@ -116,6 +115,10 @@ class HuggingfaceModel(AttributionModel):
         if self.model.config.pad_token_id is not None:
             self.pad_token = self.tokenizer.convert_ids_to_tokens(self.model.config.pad_token_id)
             self.tokenizer.pad_token = self.pad_token
+        self.bos_token_id = getattr(self.model.config, "decoder_start_token_id", None)
+        if self.bos_token_id is None:
+            self.bos_token_id = self.model.config.bos_token_id
+        self.bos_token = self.tokenizer.convert_ids_to_tokens(self.bos_token_id)
         self.eos_token_id = getattr(self.model.config, "eos_token_id", None)
         if self.eos_token_id is None:
             self.eos_token_id = self.tokenizer.pad_token_id
@@ -213,7 +216,7 @@ class HuggingfaceModel(AttributionModel):
         return texts
 
     @staticmethod
-    def output2logits(forward_output: Union[Seq2SeqLMOutput, CausalLMOutput]) -> FullLogitsTensor:
+    def output2logits(forward_output: Union[Seq2SeqLMOutput, CausalLMOutput]) -> LogitsTensor:
         # Full logits for last position of every sentence:
         # (batch_size, tgt_seq_len, vocab_size) => (batch_size, vocab_size)
         return forward_output.logits[:, -1, :].squeeze(1)
@@ -225,8 +228,10 @@ class HuggingfaceModel(AttributionModel):
         return_baseline: bool = False,
         include_eos_baseline: bool = False,
         max_input_length: int = 512,
+        add_bos_token: bool = True,
+        add_special_tokens: bool = True,
     ) -> BatchEncoding:
-        """Encode one or multiple texts, producing a BatchEncoding
+        """Encode one or multiple texts, producing a BatchEncoding.
 
         Args:
             texts (str or list of str): the texts to tokenize.
@@ -248,7 +253,7 @@ class HuggingfaceModel(AttributionModel):
         batch = self.tokenizer(
             text=texts if not as_targets else None,
             text_target=texts if as_targets else None,
-            add_special_tokens=True,
+            add_special_tokens=add_special_tokens,
             padding=True,
             truncation=True,
             max_length=max_length,
@@ -263,10 +268,10 @@ class HuggingfaceModel(AttributionModel):
                 baseline_ids_eos = batch["input_ids"].eq(self.eos_token_id).long() * self.eos_token_id
                 baseline_ids = baseline_ids_non_eos + baseline_ids_eos
         # We prepend a BOS token only when tokenizing target texts.
-        if as_targets and self.is_encoder_decoder:
+        if as_targets and self.is_encoder_decoder and add_bos_token:
             ones_mask = torch.ones((batch["input_ids"].shape[0], 1), device=self.device, dtype=long)
             batch["attention_mask"] = torch.cat((ones_mask, batch["attention_mask"]), dim=1)
-            bos_ids = ones_mask * self.model.config.decoder_start_token_id
+            bos_ids = ones_mask * self.bos_token_id
             batch["input_ids"] = torch.cat((bos_ids, batch["input_ids"]), dim=1)
             if return_baseline:
                 baseline_ids = torch.cat((bos_ids, baseline_ids), dim=1)
@@ -291,7 +296,7 @@ class HuggingfaceModel(AttributionModel):
     def convert_ids_to_tokens(
         self, ids: IdsTensor, skip_special_tokens: Optional[bool] = True
     ) -> OneOrMoreTokenSequences:
-        if len(ids.shape) < 2:
+        if ids.ndim < 2:
             return self.tokenizer.convert_ids_to_tokens(ids, skip_special_tokens=skip_special_tokens)
         return [
             self.tokenizer.convert_ids_to_tokens(id_slice, skip_special_tokens=skip_special_tokens) for id_slice in ids
@@ -378,6 +383,12 @@ class HuggingfaceEncoderDecoderModel(HuggingfaceModel, EncoderDecoderAttribution
             self.embed_scale = encoder.embed_scale
         if hasattr(decoder, "embed_scale") and decoder.embed_scale != self.embed_scale:
             raise ValueError("Different encoder and decoder embed scales are not supported")
+
+    def get_encoder(self) -> torch.nn.Module:
+        return self.model.get_encoder()
+
+    def get_decoder(self) -> torch.nn.Module:
+        return self.model.get_decoder()
 
 
 class HuggingfaceDecoderOnlyModel(HuggingfaceModel, DecoderOnlyAttributionModel):

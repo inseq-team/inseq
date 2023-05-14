@@ -1,4 +1,4 @@
-"""Interpretability for Sequence Generation Models 🔍"""
+"""Interpretability for Sequence Generation Models 🔍."""
 
 from .attr import list_feature_attribution_methods, list_step_functions, register_step_function
 from .data import FeatureAttributionOutput, show_attributions

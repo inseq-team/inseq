@@ -82,7 +82,6 @@ class Lime(LimeBase):
         LIME's functionality. What follows is an abbreviated docstring.
 
         Args:
-
             inputs (tensor or tuple of tensors):  Input for which LIME
                         is computed.
             target (int, tuple, tensor or list, optional):  Output indices for
@@ -204,9 +203,9 @@ class Lime(LimeBase):
             """
             combined_interp_inps = torch.cat([i[0].view(-1).unsqueeze(dim=0) for i in interpretable_inps]).double()
 
-            combined_outputs = (torch.cat(outputs) if len(outputs[0].shape) > 0 else torch.stack(outputs)).double()
+            combined_outputs = (torch.cat(outputs) if outputs[0].ndim > 0 else torch.stack(outputs)).double()
             combined_sim = (
-                torch.cat(similarities) if len(similarities[0].shape) > 0 else torch.stack(similarities)
+                torch.cat(similarities) if similarities[0].ndim > 0 else torch.stack(similarities)
             ).double()
             dataset = TensorDataset(combined_interp_inps, combined_outputs, combined_sim)
             self.interpretable_model.fit(DataLoader(dataset, batch_size=batch_count))
@@ -224,8 +223,7 @@ class Lime(LimeBase):
         perturbed_interpretable_input: tuple,
         **kwargs,
     ) -> torch.Tensor:
-        r"""Calculates the similarity between original and perturbed input"""
-
+        r"""Calculates the similarity between original and perturbed input."""
         if len(original_input) == 1:
             original_input_tensor = original_input[0][0]
             perturbed_input_tensor = perturbed_input[0][0]
@@ -249,7 +247,6 @@ class Lime(LimeBase):
         r"""Sampling function:
 
         Args:
-
             original_input_tuple (tuple): Tensor tuple where its first element
                 is a 3D tensor (b=1, seq_len, emb_dim)
             mask_prob (float): probability of the MASK token (no information)

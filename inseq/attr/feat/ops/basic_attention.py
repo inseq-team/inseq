@@ -21,13 +21,13 @@ from captum.attr._utils.attribution import Attribution
 from captum.log import log_usage
 
 from ....data import Batch, EncoderDecoderBatch
-from ....utils.typing import AggregatedLayerAttentionTensor, FullAttentionOutput, FullLayerAttentionTensor
+from ....utils.typing import MultiLayerMultiUnitScoreTensor, MultiLayerScoreTensor, ScoreTensor
 
 logger = logging.getLogger(__name__)
 
 
 class AggregateAttentionFunction(Protocol):
-    def __call__(self, attention: FullLayerAttentionTensor, dim: int, **kwargs) -> AggregatedLayerAttentionTensor:
+    def __call__(self, attention: MultiLayerScoreTensor, dim: int, **kwargs) -> ScoreTensor:
         ...
 
 
@@ -50,22 +50,22 @@ class BaseAttentionAttribution(Attribution):
         return False
 
     @staticmethod
-    def _num_attention_heads(attention: FullLayerAttentionTensor) -> int:
+    def _num_attention_heads(attention: MultiLayerScoreTensor) -> int:
         """Returns the number of heads contained in the attention tensor."""
         return attention.size(1)
 
     @staticmethod
-    def _num_layers(attention: FullAttentionOutput) -> int:
+    def _num_layers(attention: MultiLayerMultiUnitScoreTensor) -> int:
         """Returns the number of layers contained in the attention tensor."""
         return len(attention)
 
     @classmethod
     def _aggregate_attention_heads(
         cls,
-        attention: FullLayerAttentionTensor,
+        attention: MultiLayerScoreTensor,
         aggregate_fn: Union[str, AggregateAttentionFunction, None] = None,
         heads: Union[int, Tuple[int, int], List[int], None] = None,
-    ) -> AggregatedLayerAttentionTensor:
+    ) -> ScoreTensor:
         """
         Merges the attention values across the specified attention heads for the full sequence.
 
@@ -143,10 +143,10 @@ class BaseAttentionAttribution(Attribution):
     @classmethod
     def _aggregate_layers(
         cls,
-        attention: FullAttentionOutput,
+        attention: MultiLayerMultiUnitScoreTensor,
         aggregate_fn: Union[str, AggregateAttentionFunction, None] = None,
         layers: Union[int, Tuple[int, int], List[int], None] = None,
-    ) -> FullLayerAttentionTensor:
+    ) -> MultiLayerScoreTensor:
         """
         Merges the attention values of every attention head across the specified layers for the full sequence.
 

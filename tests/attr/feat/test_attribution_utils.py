@@ -22,35 +22,23 @@ def m2m100_model():
 
 
 def test_get_step_prediction_probabilities(m2m100_model, encoder_decoder_batches):
+    # fmt: off
     probas = [
-        0.622,
-        0.008,
-        0.006,
-        0.841,
-        0.002,
-        0.127,
-        0.003,
-        0.087,
-        0.0,
-        0.843,
-        0.744,
-        0.865,
-        0.012,
-        0.27,
-        0.085,
-        0.739,
-        0.749,
-        0.9,
+        0.622, 0.008, 0.006, 0.841, 0.002, 0.127, 0.003, 0.087, 0.0,
+        0.843, 0.744, 0.865, 0.012,  0.27, 0.085, 0.739, 0.749, 0.9,
     ]
+    # fmt: on
     for i, (batch, next_batch) in enumerate(
         zip(encoder_decoder_batches["batches"][1:], encoder_decoder_batches["batches"][2:])
     ):
-        pred_proba = get_step_scores(
-            m2m100_model,
-            batch.to(m2m100_model.device),
-            next_batch.targets.encoding.input_ids[0, -1].to(m2m100_model.device),
-            "probability",
+        output = m2m100_model.get_forward_output(
+            batch.to(m2m100_model.device), use_embeddings=m2m100_model.attribution_method.forward_batch_embeds
         )
+        target_ids = next_batch.targets.encoding.input_ids[0, -1].to(m2m100_model.device)
+        step_scores_args = m2m100_model.formatter.format_step_function_args(
+            attribution_model=m2m100_model, forward_output=output, target_ids=target_ids, batch=batch
+        )
+        pred_proba = get_step_scores("probability", step_scores_args)
         assert float(pred_proba) == pytest.approx(probas[i], abs=1e-3)
 
 

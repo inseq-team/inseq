@@ -168,14 +168,14 @@ import inseq
 attribution_model = inseq.load_model("gpt2", "input_x_gradient")
 
 # Pre-compute ids and attention map for the contrastive target
-contrast = attribution_model.encode("Can you stop the dog from crying")
+contrast = attribution_model.encode("The manager went home because she was sick")
 
 # Perform the contrastive attribution:
 # Regular (forced) target -> "Can you stop the dog from barking"
 # Contrastive target      -> "Can you stop the dog from crying"
 out = attribution_model.attribute(
-    "Can you stop the dog from",
-    "Can you stop the dog from barking",
+    "The manager went home because",
+    "The manager went home because he was sick",
     attributed_fn="contrast_prob_diff",
     contrast_ids=contrast.input_ids,
     contrast_attention_mask=contrast.attention_mask,

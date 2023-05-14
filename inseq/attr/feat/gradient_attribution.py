@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-""" Gradient-based feature attribution methods. """
+"""Gradient-based feature attribution methods."""
 
 import logging
 from typing import Any, Dict
@@ -27,7 +27,7 @@ from captum.attr import (
     Saliency,
 )
 
-from ...data import GradientFeatureAttributionStepOutput
+from ...data import GranularFeatureAttributionStepOutput
 from ...utils import Registry, extract_signature_args, rgetattr
 from ..attribution_decorators import set_hook, unset_hook
 from .attribution_utils import get_source_target_attributions
@@ -42,10 +42,10 @@ class GradientAttributionRegistry(FeatureAttribution, Registry):
 
     @set_hook
     def hook(self, **kwargs):
-        r"""
-        Hooks the attribution method to the model by replacing normal :obj:`nn.Embedding` with Captum's
+        r"""Hooks the attribution method to the model by replacing normal :obj:`nn.Embedding` with Captum's
         `InterpretableEmbeddingBase <https://captum.ai/api/utilities.html#captum.attr.InterpretableEmbeddingBase>`__.
         """
+        super().hook(**kwargs)
         if self.attribute_batch_ids and not self.forward_batch_embeds:
             self.target_layer = kwargs.pop("target_layer", self.attribution_model.get_embedding_layer())
             logger.debug(f"target_layer={self.target_layer}")
@@ -56,9 +56,8 @@ class GradientAttributionRegistry(FeatureAttribution, Registry):
 
     @unset_hook
     def unhook(self, **kwargs):
-        r"""
-        Unhook the attribution method by restoring the model's original embeddings.
-        """
+        r"""Unhook the attribution method by restoring the model's original embeddings."""
+        super().hook(**kwargs)
         if self.attribute_batch_ids and not self.forward_batch_embeds:
             self.target_layer = None
         else:
@@ -68,9 +67,8 @@ class GradientAttributionRegistry(FeatureAttribution, Registry):
         self,
         attribute_fn_main_args: Dict[str, Any],
         attribution_args: Dict[str, Any] = {},
-    ) -> GradientFeatureAttributionStepOutput:
-        r"""
-        Performs a single attribution step for the specified attribution arguments.
+    ) -> GranularFeatureAttributionStepOutput:
+        r"""Performs a single attribution step for the specified attribution arguments.
 
         Args:
             attribute_fn_main_args (:obj:`dict`): Main arguments used for the attribution method. These are built from
@@ -79,7 +77,7 @@ class GradientAttributionRegistry(FeatureAttribution, Registry):
                 These can be specified by the user while calling the top level `attribute` methods. Defaults to {}.
 
         Returns:
-            :class:`~inseq.data.GradientFeatureAttributionStepOutput`: A dataclass containing a tensor of source
+            :class:`~inseq.data.GranularFeatureAttributionStepOutput`: A dataclass containing a tensor of source
                 attributions of size `(batch_size, source_length)`, possibly a tensor of target attributions of size
                 `(batch_size, prefix length) if attribute_target=True and possibly a tensor of deltas of size
                 `(batch_size)` if the attribution step supports deltas and they are requested. At this point the batch
@@ -96,10 +94,10 @@ class GradientAttributionRegistry(FeatureAttribution, Registry):
         source_attributions, target_attributions = get_source_target_attributions(
             attr, self.attribution_model.is_encoder_decoder
         )
-        return GradientFeatureAttributionStepOutput(
+        return GranularFeatureAttributionStepOutput(
             source_attributions=source_attributions,
             target_attributions=target_attributions,
-            step_scores={"deltas": deltas} if deltas is not None else {},
+            step_scores={"deltas": deltas} if deltas is not None else None,
         )
 
 
@@ -115,7 +113,7 @@ class DeepLiftAttribution(GradientAttributionRegistry):
     def __init__(self, attribution_model, multiply_by_inputs: bool = True, **kwargs):
         super().__init__(attribution_model)
         self.method = DeepLift(self.attribution_model, multiply_by_inputs)
-        self.use_baseline = True
+        self.use_baselines = True
 
 
 class GradientShapAttribution(GradientAttributionRegistry):
@@ -130,11 +128,11 @@ class GradientShapAttribution(GradientAttributionRegistry):
     def __init__(self, attribution_model, multiply_by_inputs: bool = True, **kwargs):
         super().__init__(attribution_model)
         self.method = GradientShap(self.attribution_model, multiply_by_inputs)
-        self.use_baseline = True
+        self.use_baselines = True
 
 
 class DiscretizedIntegratedGradientsAttribution(GradientAttributionRegistry):
-    """Discretized Integrated Gradients attribution method
+    """Discretized Integrated Gradients attribution method.
 
     Reference: https://arxiv.org/abs/2108.13654
 
@@ -147,7 +145,7 @@ class DiscretizedIntegratedGradientsAttribution(GradientAttributionRegistry):
         super().__init__(attribution_model, hook_to_model=False)
         self.attribution_model = attribution_model
         self.attribute_batch_ids = True
-        self.use_baseline = True
+        self.use_baselines = True
         self.method = DiscretetizedIntegratedGradients(
             self.attribution_model,
             multiply_by_inputs,
@@ -183,7 +181,7 @@ class IntegratedGradientsAttribution(GradientAttributionRegistry):
     def __init__(self, attribution_model, multiply_by_inputs: bool = True, **kwargs):
         super().__init__(attribution_model)
         self.method = IntegratedGradients(self.attribution_model, multiply_by_inputs)
-        self.use_baseline = True
+        self.use_baselines = True
 
 
 class InputXGradientAttribution(GradientAttributionRegistry):
@@ -230,7 +228,7 @@ class LayerIntegratedGradientsAttribution(GradientAttributionRegistry):
         super().__init__(attribution_model, hook_to_model=False)
         self.attribute_batch_ids = True
         self.forward_batch_embeds = False
-        self.use_baseline = True
+        self.use_baselines = True
         self.hook(**kwargs)
         self.method = LayerIntegratedGradients(
             self.attribution_model,
@@ -252,7 +250,7 @@ class LayerGradientXActivationAttribution(GradientAttributionRegistry):
         super().__init__(attribution_model, hook_to_model=False)
         self.attribute_batch_ids = True
         self.forward_batch_embeds = False
-        self.use_baseline = False
+        self.use_baselines = False
         self.hook(**kwargs)
         self.method = LayerGradientXActivation(
             self.attribution_model,
@@ -274,7 +272,7 @@ class LayerDeepLiftAttribution(GradientAttributionRegistry):
         super().__init__(attribution_model, hook_to_model=False)
         self.attribute_batch_ids = True
         self.forward_batch_embeds = False
-        self.use_baseline = True
+        self.use_baselines = True
         self.hook(**kwargs)
         self.method = LayerDeepLift(
             self.attribution_model,

@@ -3,12 +3,14 @@ from typing import Any, Dict
 
 from captum.attr import Occlusion
 
-from ...data import OcclusionFeatureAttributionStepOutput, PerturbationFeatureAttributionStepOutput
+from ...data import (
+    CoarseFeatureAttributionSequenceOutput,
+    GranularFeatureAttributionStepOutput,
+)
 from ...utils import Registry
-from ..attribution_decorators import set_hook, unset_hook
 from .attribution_utils import get_source_target_attributions
 from .gradient_attribution import FeatureAttribution
-from .ops.lime import Lime
+from .ops import Lime
 
 logger = logging.getLogger(__name__)
 
@@ -16,13 +18,7 @@ logger = logging.getLogger(__name__)
 class PerturbationAttributionRegistry(FeatureAttribution, Registry):
     """Perturbation-based attribution method registry."""
 
-    @set_hook
-    def hook(self, **kwargs):
-        pass
-
-    @unset_hook
-    def unhook(self, **kwargs):
-        pass
+    pass
 
 
 class OcclusionAttribution(PerturbationAttributionRegistry):
@@ -43,14 +39,14 @@ class OcclusionAttribution(PerturbationAttributionRegistry):
 
     def __init__(self, attribution_model):
         super().__init__(attribution_model)
-        self.use_baseline = True
+        self.use_baselines = True
         self.method = Occlusion(self.attribution_model)
 
     def attribute_step(
         self,
         attribute_fn_main_args: Dict[str, Any],
         attribution_args: Dict[str, Any] = {},
-    ) -> OcclusionFeatureAttributionStepOutput:
+    ) -> CoarseFeatureAttributionSequenceOutput:
         r"""Sliding window shapes is defined as a tuple.
         First entry is between 1 and length of input.
         Second entry is given by the embedding dimension of the underlying model.
@@ -80,10 +76,9 @@ class OcclusionAttribution(PerturbationAttributionRegistry):
         if target_attributions is not None:
             target_attributions = target_attributions[:, :, 0].abs()
 
-        return OcclusionFeatureAttributionStepOutput(
+        return CoarseFeatureAttributionSequenceOutput(
             source_attributions=source_attributions,
             target_attributions=target_attributions,
-            step_scores={},
         )
 
 
@@ -107,7 +102,7 @@ class LimeAttribution(PerturbationAttributionRegistry):
         self,
         attribute_fn_main_args: Dict[str, Any],
         attribution_args: Dict[str, Any] = {},
-    ) -> PerturbationFeatureAttributionStepOutput:
+    ) -> GranularFeatureAttributionStepOutput:
         if len(attribute_fn_main_args["inputs"]) > 1:
             # Captum's `_evaluate_batch` function for LIME does not account for multiple inputs when encoder-decoder
             # models and attribute_target=True are used. The model output is of length two and if the inputs are either
@@ -116,15 +111,4 @@ class LimeAttribution(PerturbationAttributionRegistry):
             raise NotImplementedError(
                 "LIME attribution with attribute_target=True currently not supported for encoder-decoder models."
             )
-
-        attr = self.method.attribute(
-            **attribute_fn_main_args,
-            **attribution_args,
-        )
-
-        source_attributions, target_attributions = get_source_target_attributions(
-            attr, self.attribution_model.is_encoder_decoder
-        )
-        return PerturbationFeatureAttributionStepOutput(
-            source_attributions=source_attributions, target_attributions=target_attributions, step_scores={}
-        )
+        super().attribute_step(attribute_fn_main_args, attribution_args)

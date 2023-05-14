@@ -41,19 +41,16 @@ def string_to_bool(v):
 
 
 class InseqArgumentParser(ArgumentParser):
-    """
-    Taken from https://github.com/huggingface/transformers/blob/main/src/transformers/hf_argparser.py
-    """
+    """Taken from https://github.com/huggingface/transformers/blob/main/src/transformers/hf_argparser.py."""
 
     dataclass_types: Iterable[DataClassType]
 
     def __init__(self, dataclass_types: Optional[Union[DataClassType, Iterable[DataClassType]]] = None, **kwargs):
-        """
-        Args:
-            dataclass_types:
-                Dataclass type, or list of dataclass types for which we will "fill" instances with the parsed args.
-            kwargs:
-                (Optional) Passed to `argparse.ArgumentParser()` in the regular way.
+        """Args:
+        dataclass_types:
+        Dataclass type, or list of dataclass types for which we will "fill" instances with the parsed args.
+        kwargs:
+        (Optional) Passed to `argparse.ArgumentParser()` in the regular way.
         """
         # To make the default appear when using --help
         if "formatter_class" not in kwargs:
@@ -168,8 +165,7 @@ class InseqArgumentParser(ArgumentParser):
     def parse_args_into_dataclasses(
         self, args=None, return_remaining_strings=False, look_for_args_file=True, args_filename=None
     ) -> Tuple[DataClass, ...]:
-        """
-        Parse command-line args into instances of the specified dataclass types.
+        """Parse command-line args into instances of the specified dataclass types.
 
         This relies on argparse's `ArgumentParser.parse_known_args`. See the doc at:
         docs.python.org/3.7/library/argparse.html#argparse.ArgumentParser.parse_args
@@ -225,9 +221,8 @@ class InseqArgumentParser(ArgumentParser):
             return (*outputs,)
 
     def parse_json_file(self, json_file: str) -> Tuple[DataClass, ...]:
-        """
-        Alternative helper method that does not use `argparse` at all, instead loading a json file and populating the
-        dataclass types.
+        """Alternative helper method that does not use `argparse` at all, instead loading a json file and populating
+        the dataclass types.
         """
         data = json.loads(Path(json_file).read_text())
         outputs = []
@@ -239,9 +234,8 @@ class InseqArgumentParser(ArgumentParser):
         return (*outputs,)
 
     def parse_dict(self, args: dict) -> Tuple[DataClass, ...]:
-        """
-        Alternative helper method that does not use `argparse` at all, instead uses a dict and populating the dataclass
-        types.
+        """Alternative helper method that does not use `argparse` at all, instead uses a dict and populating the
+        dataclass types.
         """
         outputs = []
         for dtype in self.dataclass_types:

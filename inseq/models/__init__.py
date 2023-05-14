@@ -5,7 +5,7 @@ from rich.status import Status
 
 from ..utils import isnotebook, optional
 from ..utils.typing import ModelClass, ModelIdentifier
-from .attribution_model import AttributionModel
+from .attribution_model import AttributionModel, InputFormatter
 from .decoder_only import DecoderOnlyAttributionModel
 from .encoder_decoder import EncoderDecoderAttributionModel
 from .huggingface_model import HuggingfaceDecoderOnlyModel, HuggingfaceEncoderDecoderModel, HuggingfaceModel
@@ -47,15 +47,15 @@ def load_model(
 
 
 def list_supported_frameworks() -> List[str]:
-    """
-    Lists identifiers for all available frameworks. These can be used to load models with the `framework` argument in
-    the :meth:`~inseq.load_model` function.
+    """Lists identifiers for all available frameworks. These can be used to load models with the `framework` argument
+    in the :meth:`~inseq.load_model` function.
     """
     return list(FRAMEWORKS_MAP.keys())
 
 
 __all__ = [
     "AttributionModel",
+    "InputFormatter",
     "HuggingfaceModel",
     "HuggingfaceEncoderDecoderModel",
     "HuggingfaceDecoderOnlyModel",
