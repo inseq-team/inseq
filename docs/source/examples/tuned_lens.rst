@@ -19,17 +19,17 @@ The Tuned Lens method
 
 .. note::
 
-    This tutorial adopts the "Tuned Lens" name for the affine transformation proposed by 
-    `Belrose et al. (2023) <https://arxiv.org/abs/2303.08112>`__. We note that the Linear Shortcut method proposed by 
+    This tutorial adopts the "Tuned Lens" name for the affine transformation proposed by
+    `Belrose et al. (2023) <https://arxiv.org/abs/2303.08112>`__. We note that the Linear Shortcut method proposed by
     `Yom Din et al. (2023) <https://arxiv.org/abs/2303.09435>`__ can be used for the same purpose, training a linear
     transformation instead.
 
-`Belrose et al. (2023) <https://arxiv.org/abs/2303.08112>`__ and 
-`Yom Din et al. (2023) <https://arxiv.org/abs/2303.09435>`__ introduced a new promising category of approaches to inspect how 
-predictions are progressively formed across the layers of Transformers-based language models. By training projections 
+`Belrose et al. (2023) <https://arxiv.org/abs/2303.08112>`__ and
+`Yom Din et al. (2023) <https://arxiv.org/abs/2303.09435>`__ introduced a new promising category of approaches to inspect how
+predictions are progressively formed across the layers of Transformers-based language models. By training projections
 mapping hidden states of intermediate layers to last layer's space, authors overcome the assumption of
-a common space shared by all Transformer layers adopted by 
-`previous work <https://www.lesswrong.com/posts/AcKRB8wDpdaN6v6ru/interpreting-gpt-the-logit-lens>`__. Tuned lens 
+a common space shared by all Transformer layers adopted by
+`previous work <https://www.lesswrong.com/posts/AcKRB8wDpdaN6v6ru/interpreting-gpt-the-logit-lens>`__. Tuned lens
 predictions are more aligned to model's predictive distribution and more faithful to the internal feature importance
 leveraged by the model.
 
@@ -38,11 +38,11 @@ leveraged by the model.
   :width: 300
   :alt: Visualization of the Tuned Lens approach from Belrose et al. (2023)
 
-An interesting application of the tuned lens leverages the **depth** (i.e. number of model layers) at which a target 
-token starts dominating the tuned lens' predictive distribution as an indication of **model confidence** and 
+An interesting application of the tuned lens leverages the **depth** (i.e. number of model layers) at which a target
+token starts dominating the tuned lens' predictive distribution as an indication of **model confidence** and
 **example difficulty**. This follows the intuition that simple examples would require less computation, and contrary to
-previous work **does not involve further training** of the language model. In this example by Belrose et al (2023), 
-when a 12B GPT-like model is asked to complete the first sentence of Charles Dickens' "A Tale of 
+previous work **does not involve further training** of the language model. In this example by Belrose et al (2023),
+when a 12B GPT-like model is asked to complete the first sentence of Charles Dickens' "A Tale of
 Two Cities", its latent predictions become very confident at early layers, suggesting some degree of memorization.
 
 .. image:: https://d3i71xaburhd42.cloudfront.net/5a1524597b76b67ca8b34fcc6ef8125fd5ce2b3e/16-Figure13-1.png
@@ -55,7 +55,7 @@ Adding Tuned Lens Confidence to Inseq
 -------------------------------------
 
 Thanks to Inseq extensible design, it is straightforward to integrate the tuned lens method into a new step function
-to predict model confidence at every generation step. To do so, we use the 
+to predict model confidence at every generation step. To do so, we use the
 `tuned-lens <https://github.com/AlignmentResearch/tuned-lens>`__ library by Belrose et al.
 to extract the tuned lens' predictions at every layer, and then convert the depth at which the model starts predicting
 the target token to a confidence score (1 = highest confidence, 0 = lowest confidence, not predicted).
@@ -83,19 +83,20 @@ The first step is to install the tuned lens library using ``pip install tuned-le
         become aligned with the target token. This can be used as an indication of confidence in
         model prediction. If the token is not predicted by the model, 0% is returned.
 
-        E.g. Using a 12-layer GPT-2 model, and the prompt "Hello ladies and", 
-        if the target token is "gentlemen" and the tuned lens starts predicting it from layer 8 onwards, 
+        E.g. Using a 12-layer GPT-2 model, and the prompt "Hello ladies and",
+        if the target token is "gentlemen" and the tuned lens starts predicting it from layer 8 onwards,
         the returned score is 1 - 8/14 ~= 0.429, indicating good confidence.
         14 is the number of layers in the model, plus the embedding layer, plus 1 to account for the case
         where the token is not predicted by the model.
         """
+        batch = attribution_model.formatter.convert_args_to_batch(
+            decoder_input_ids=decoder_input_ids,
+            decoder_input_embeds=None,
+            decoder_attention_mask=decoder_attention_mask,
+        )
         # Record activations at every model layer
         with record_residual_stream(attribution_model.model) as stream:
-            outputs = attribution_model.get_forward_output(
-                forward_tensor=decoder_input_ids,
-                attention_mask=decoder_attention_mask,
-                use_embeddings=False,
-            )
+            outputs = attribution_model.get_forward_output(batch, use_embeddings=False)
         # Select last token activations
         stream = stream.map(lambda x: x[..., -1, :])
         # Compute logits for each layer emebedding layer + n_layers
@@ -154,7 +155,7 @@ Now we can simply register the function, load the lens corresponding to the mode
     </div>
 
 We can see that the row ``confidence``, corresponding to the confidence score we defined above, is added at the end of
-the attribution matrix, showing high model confidence for function words and multiword expressions endings 
+the attribution matrix, showing high model confidence for function words and multiword expressions endings
 (e.g. "Board of Directors", "ladies and gentlemen"). Since we are estimating model confidence on the model's naturally
 generated output, all confidence scores will be greater than 0, since this value is reserved for the case where the
 target token is not predicted at all.
@@ -180,14 +181,14 @@ We can now repeat the experiment while constraining a target generation of our c
 
 We see that some of the forced tokens are assigned a confidence score of 0 in this case.
 
-.. warning:: 
+.. warning::
 
     The above example aims to show a possible easy integration of ``tuned-lens`` into Inseq, but has a number of limitations.
 
     - The entire computation using the method above is carried out on CPUs, since device placement is not handled.
-    
-    - The tuned lens library currently supports only decoder-only GPT-like models, so the method cannot be used as-is for encoder-decoders like T5 and BART. 
-    
+
+    - The tuned lens library currently supports only decoder-only GPT-like models, so the method cannot be used as-is for encoder-decoders like T5 and BART.
+
     - Tuned lens authors provide a collection of pre-tuned lenses for popular models `here <https://huggingface.co/spaces/AlignmentResearch/tuned-lens/tree/main/lens>`__. If your model of interest is not available, you will need to train a tuned lens for it yourself, which can be done using the `tuned-lens <https://github.com/AlignmentResearch/tuned-lens>`__ codebase.
-    
+
     - While step functions can generally be also used as attribution targets, the method above does not support this use case in its current form.

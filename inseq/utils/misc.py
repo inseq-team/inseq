@@ -2,7 +2,7 @@ import functools
 import gzip
 import io
 import logging
-import numbers
+import math
 import warnings
 from base64 import standard_b64decode, standard_b64encode
 from collections import OrderedDict
@@ -11,6 +11,7 @@ from functools import wraps
 from importlib import import_module
 from inspect import signature
 from itertools import dropwhile
+from numbers import Number
 from os import PathLike, fsync
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
@@ -39,27 +40,24 @@ def optional(condition, context_manager, alternative_fn=None, **alternative_fn_k
 
 
 def _pretty_list_contents(l: Sequence[Any]) -> str:
-    quote = f"""{"'" if l and type(l[0]) in [str, TokenWithId] else ""}"""
+    quote = "'" if l and type(l[0]) in [str, TokenWithId] else ""
+    get_space = lambda s: "" if not isinstance(s, Number) or s < 0 else "  " if math.isnan(s) else " "
     return (
         quote
-        + f"{quote}, {quote}".join(
-            [
-                f"{' ' if isinstance(v, numbers.Number) and v >= 0 else ''}"
-                + (f"{v:.2f}" if isinstance(v, float) else f"{v}")
-                for v in l
-            ]
-        )
+        + f"{quote}, {quote}".join([get_space(v) + (f"{v:.2f}" if isinstance(v, float) else f"{v}") for v in l])
         + quote
     )
 
 
 def _pretty_list(l: Optional[Sequence[Any]], lpad: int = 8) -> str:
-    if all([isinstance(x, list) for x in l]):
+    if all(isinstance(x, list) for x in l):
         line_sep = f" ],\n{' ' * lpad}[ "
         contents = " " * lpad + "[ " + line_sep.join([_pretty_list_contents(subl) for subl in l]) + " ]"
     else:
         if all([hasattr(x, "to_dict") for x in l]):
-            contents = ",\n".join([f"{' ' * lpad + x.__class__.__name__}({pretty_dict(x.to_dict(), lpad)}" for x in l])
+            contents = ",\n".join(
+                [f"{' ' * lpad + x.__class__.__name__}({pretty_dict(x.to_dict(), lpad + 4)})" for x in l]
+            )
         else:
             contents = " " * lpad + _pretty_list_contents(l)
     return "[\n" + contents + f"\n{' ' * (lpad - 4)}]"
@@ -75,6 +73,8 @@ def pretty_list(l: Optional[Sequence[Any]], lpad: int = 8) -> str:
         out_txt = f"list with {len(l)} sub-lists"
         if any([len(sl) > 20 for sl in l]) or len(l) > 15:
             return out_txt
+        if all(isinstance(ssl, list) for sl in l for ssl in sl):
+            return out_txt
     if len(l) > 20:
         return out_txt
     return f"{out_txt}:{_pretty_list(l, lpad)}"
@@ -83,7 +83,7 @@ def pretty_list(l: Optional[Sequence[Any]], lpad: int = 8) -> str:
 def pretty_tensor(t: Optional[Tensor] = None, lpad: int = 8) -> str:
     if t is None:
         return "None"
-    if len(t.shape) > 3 or any([x > 20 for x in t.shape]):
+    if t.ndim > 2 or any([x > 20 for x in t.shape]):
         return f"{t.dtype} tensor of shape {list(t.shape)} on {t.device}"
     else:
         out_list = t.tolist()
@@ -104,7 +104,7 @@ def pretty_dict(d: Dict[str, Any], lpad: int = 4) -> str:
         elif isinstance(v, dict):
             out_txt += pretty_dict(v, lpad + 4)
         elif hasattr(v, "to_dict"):
-            out_txt += pretty_dict(v.to_dict(), lpad + 4)
+            out_txt += f"{v.__class__.__name__}({pretty_dict(v.to_dict(), lpad + 4)})"
         else:
             out_txt += "None" if v is None else str(v)
         out_txt += ",\n"
@@ -133,7 +133,7 @@ def ordinal_str(n: int):
 
 
 def rgetattr(obj, attr, *args):
-    """Recursively access attributes from nested classes
+    """Recursively access attributes from nested classes.
 
     E.g. rgetattr(attr_model, 'model.model.decoder.layers[4].self_attn')
     >> MarianAttention(
@@ -179,7 +179,7 @@ def drop_padding(seq: Sequence[Any], pad_id: Any):
 
 
 def isnotebook():
-    """Returns true if code is being executed in a notebook, false otherwise
+    """Returns true if code is being executed in a notebook, false otherwise.
 
     Currently supported: Jupyter Notebooks, Google Colab
     To validate: Kaggle Notebooks, JupyterLab
@@ -207,7 +207,7 @@ def format_input_texts(
 ) -> Tuple[List[str], List[str]]:
     texts = [texts] if isinstance(texts, str) else texts
     reference_texts = [ref_texts] if isinstance(ref_texts, str) else ref_texts
-    if reference_texts and len(texts) != len(reference_texts):
+    if reference_texts and texts and len(texts) != len(reference_texts):
         raise LengthMismatchError(
             "Length mismatch for texts and reference_texts.Input length: {}, reference length: {} ".format(
                 len(texts), len(reference_texts)
@@ -250,9 +250,7 @@ def aggregate_token_pair(tokens: List[TokenWithId], other_tokens: List[TokenWith
 
 
 def gzip_compress(data, compresslevel):
-    """
-    Do gzip compression, without the timestamp. Similar to gzip.compress, but without timestamp, and also before py3.2.
-    """
+    """Do gzip compression, without the timestamp."""
     buf = io.BytesIO()
     with gzip.GzipFile(fileobj=buf, mode="wb", compresslevel=compresslevel, mtime=0) as fh:
         fh.write(data)
@@ -260,17 +258,13 @@ def gzip_compress(data, compresslevel):
 
 
 def gzip_decompress(data):
-    """
-    Do gzip decompression, without the timestamp. Just like gzip.decompress, but that's py3.2+.
-    """
+    """Do gzip decompression, without the timestamp."""
     with gzip.GzipFile(fileobj=io.BytesIO(data)) as f:
         return f.read()
 
 
 def ndarray_to_bin_str(array, do_compress):
-    """
-    From ndarray to base64 encoded, gzipped binary data.
-    """
+    """From ndarray to base64 encoded, gzipped binary data."""
     assert array.flags["C_CONTIGUOUS"], "only C memory order is (currently) supported for compact ndarray format"
 
     original_size = array.size * array.itemsize
@@ -286,8 +280,7 @@ def ndarray_to_bin_str(array, do_compress):
 
 
 class hashodict(OrderedDict):
-    """
-    This dictionary is hashable. It should NOT be mutated, or all kinds of weird
+    """This dictionary is hashable. It should NOT be mutated, or all kinds of weird
     bugs may appear. This is not enforced though, it's only used for encoding.
     """
 
@@ -307,9 +300,7 @@ def get_module_name_from_object(obj):
 
 
 def save_to_file(f: Callable[[Any], Any]) -> Callable[[Any], Any]:
-    """
-    Serializes the function output to a file, performing the required checks.
-    """
+    """Serializes the function output to a file, performing the required checks."""
 
     @wraps(f)
     def save_to_file_wrapper(
@@ -365,9 +356,7 @@ def save_to_file(f: Callable[[Any], Any]) -> Callable[[Any], Any]:
 
 
 def bin_str_to_ndarray(data, order, shape, dtype):
-    """
-    From base64 encoded, gzipped binary data to ndarray.
-    """
+    """From base64 encoded, gzipped binary data to ndarray."""
     assert order in [
         None,
         "C",
@@ -386,9 +375,7 @@ def bin_str_to_ndarray(data, order, shape, dtype):
 
 
 def lists_of_numbers_to_ndarray(data, order, shape, dtype):
-    """
-    From nested list of numbers to ndarray.
-    """
+    """From nested list of numbers to ndarray."""
     arr = asarray(data, dtype=dtype, order=order)
     if 0 in shape:
         return arr.reshape(shape)
@@ -398,9 +385,7 @@ def lists_of_numbers_to_ndarray(data, order, shape, dtype):
 
 
 def scalar_to_numpy(data, dtype):
-    """
-    From scalar value to numpy type.
-    """
+    """From scalar value to numpy type."""
     import numpy as nptypes
 
     dtype = getattr(nptypes, dtype)

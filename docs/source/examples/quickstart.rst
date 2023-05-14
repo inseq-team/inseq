@@ -88,8 +88,8 @@ In the code above, the ``out`` object is a :class:`~inseq.FeatureAttributionOutp
 .. code::
 
     FeatureAttributionOutput({
-        sequence_attributions: list with 1 elements of type GradientFeatureAttributionSequenceOutput: [
-            GradientFeatureAttributionSequenceOutput({
+        sequence_attributions: list with 1 elements of type GranularFeatureAttributionSequenceOutput: [
+            GranularFeatureAttributionSequenceOutput({
                 source: list with 13 elements of type TokenWithId:[
                     '▁Hello', '▁world', ',', '▁here', '\'', 's', '▁the', '▁In', 'se', 'q', '▁library', '!', '</s>'
                 ],
@@ -110,4 +110,4 @@ In the code above, the ``out`` object is a :class:`~inseq.FeatureAttributionOutp
         }
     })
 
-The tensor in the ``source_attribution`` field contains one attribution score per model's hidden size (512 here) for every source token (13 in this example, shown in ``source``) at every step of generation (12, shown in ``target``). The :class:`~inseq.data.GradientFeatureAttributionSequenceOutput` is a special class derived by the regular :class:`~inseq.data.FeatureAttributionSequenceOutput` that would automatically handle the last dimension of attribution tensors by summing an L2-normalizing via an :class:`~inseq.data.Aggregator`. This allows using the ``out.show`` function and automatically obtaining a 2-dimensional attribution map despite the original attribution tensor is 3-dimensional.
+The tensor in the ``source_attribution`` field contains one attribution score per model's hidden size (512 here) for every source token (13 in this example, shown in ``source``) at every step of generation (12, shown in ``target``). The :class:`~inseq.data.GranularFeatureAttributionSequenceOutput` is a special class derived by the regular :class:`~inseq.data.FeatureAttributionSequenceOutput` that would automatically handle the last dimension of attribution tensors by summing an L2-normalizing via an :class:`~inseq.data.Aggregator`. This allows using the ``out.show`` function and automatically obtaining a 2-dimensional attribution map despite the original attribution tensor is 3-dimensional.

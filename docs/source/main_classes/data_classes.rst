@@ -55,20 +55,16 @@ Attributions
     :members:
 
 
-.. autoclass:: inseq.data.attribution.GradientFeatureAttributionSequenceOutput
+.. autoclass:: inseq.data.attribution.GranularFeatureAttributionSequenceOutput
     :members:
 
 
-.. autoclass:: inseq.data.attribution.GradientFeatureAttributionStepOutput
+.. autoclass:: inseq.data.attribution.GranularFeatureAttributionStepOutput
     :members:
 
 
 Aggregators
 -----------------------------------------------------------------------------------------------------------------------
-
-
-.. autoclass:: inseq.data.aggregator.DispatchableDict
-    :members:
 
 
 .. autoclass:: inseq.data.aggregator.Aggregator

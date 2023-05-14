@@ -54,8 +54,7 @@ DecodableObject = TypeVar("DecodableObject")
 
 
 def class_instance_encode(obj: EncodableObject, use_primitives: bool = True, **kwargs):
-    """
-    Encodes a class instance to json. Note that it can only be recovered if the environment allows the class to be
+    """Encodes a class instance to json. Note that it can only be recovered if the environment allows the class to be
     imported in the same way.
     """
     if isinstance(obj, (list, dict)):
@@ -98,8 +97,7 @@ def ndarray_encode(
     compression: bool = False,
     **kwargs,
 ) -> Dict[str, Any]:
-    """
-    Encodes numpy ``ndarray`` as lists with meta data.
+    """Encodes numpy ``ndarray`` as lists with meta data.
     Encodes numpy scalar types as Python equivalents. Special encoding is not possible,
     because float64 is a subclass of primitives, which never reach the encoder.
     """
@@ -123,7 +121,7 @@ def ndarray_encode(
                     ("shape", obj.shape),
                 )
             )
-            if len(obj.shape) > 1:
+            if obj.ndim > 1:
                 dct["Corder"] = obj.flags["C_CONTIGUOUS"]
             return dct
     elif isinstance(obj, generic):
@@ -152,8 +150,7 @@ class AttributionSerializer(JSONEncoder):
         super().__init__(**json_kwargs)
 
     def default(self, obj: EncodableObject, *args, **kwargs):
-        """
-        This is the method of JSONEncoders that is called for each object; it calls all the encoders with the previous
+        """This is the method of JSONEncoders that is called for each object; it calls all the encoders with previous
         one's output used as input. Works for Encoder instances, but they are expected not to throw ``TypeError`` for
         unrecognized types (the super method does that by default). It never calls the ``super`` method so if there are
         non-primitive types left at the end, you'll get an encoding error.
@@ -277,8 +274,7 @@ def json_advanced_dump(
 
 
 def ndarray_hook(dct: Any, **kwargs) -> DecodableObject:
-    """
-    Replace any numpy arrays previously encoded by NumpyEncoder to their proper shape, data type and data.
+    """Replace any numpy arrays previously encoded by NumpyEncoder to their proper shape, data type and data.
 
     Args:
         dct: The object to be decoded. Will be processed by the hook if it is a dictionary containing the attribute
@@ -306,8 +302,7 @@ def ndarray_hook(dct: Any, **kwargs) -> DecodableObject:
 
 
 def class_instance_hook(dct: Any, cls_lookup_map: Optional[Dict[str, type]] = None, **kwargs) -> DecodableObject:
-    """
-    This hook tries to convert json encoded by class_instance_encoder back to it's original instance.
+    """This hook tries to convert json encoded by class_instance_encoder back to it's original instance.
     It only works if the environment is the same, e.g. the class is similarly importable and hasn't changed.
 
     Args:
@@ -342,8 +337,7 @@ def class_instance_hook(dct: Any, cls_lookup_map: Optional[Dict[str, type]] = No
 
 
 class AttributionDeserializer:
-    """
-    Hook that converts json maps to the appropriate python type (dict or OrderedDict)
+    """Hook that converts json maps to the appropriate python type (dict or OrderedDict)
     and then runs any number of hooks on the individual maps.
     """
 
@@ -358,7 +352,7 @@ class AttributionDeserializer:
         self.cls_lookup_map = cls_lookup_map
 
     def __call__(self, pairs):
-        """Applies all hooks to the map"""
+        """Applies all hooks to the map."""
         map = self.map_type(pairs)
         for hook in self.hooks:
             map = hook(map, cls_lookup_map=self.cls_lookup_map)

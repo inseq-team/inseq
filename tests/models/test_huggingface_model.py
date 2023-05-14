@@ -1,5 +1,4 @@
-"""
-TODO: Skipping layer attribution when attributing target and the DIG method
+"""TODO: Skipping layer attribution when attributing target and the DIG method
 since it is bugged is not very elegant, this will need to be refactored.
 """
 
@@ -35,7 +34,12 @@ def saliency_mt_model():
 
 @fixture(scope="session")
 def saliency_gpt2_model():
-    return inseq.load_model("gpt2", "saliency")
+    return inseq.load_model("distilgpt2", "saliency")
+
+
+@fixture(scope="session")
+def saliency_gpt2_model_tiny():
+    return inseq.load_model("hf-internal-testing/tiny-random-GPT2LMHeadModel", "saliency")
 
 
 @mark.slow
@@ -191,7 +195,7 @@ def test_attribute_slice_seq2seq(saliency_mt_model):
     assert len(out.sequence_attributions) == 3
     assert isinstance(out.sequence_attributions[0], FeatureAttributionSequenceOutput)
     ex1, ex2, ex3 = out.sequence_attributions[0], out.sequence_attributions[1], out.sequence_attributions[2]
-    assert ex1.attr_pos_start == 13
+    assert ex1.attr_pos_start == 12
     assert ex1.attr_pos_end == 17
     assert ex1.source_attributions.shape[1] == ex1.attr_pos_end - ex1.attr_pos_start
     assert ex1.target_attributions.shape[1] == ex1.attr_pos_end - ex1.attr_pos_start
@@ -200,14 +204,14 @@ def test_attribute_slice_seq2seq(saliency_mt_model):
     assert ex2.attr_pos_start == len(ex2.target)
     assert ex2.attr_pos_end == len(ex2.target)
     assert ex2.source_attributions.shape[1] == 0 and ex2.target_attributions.shape[1] == 0
-    assert ex3.attr_pos_start == 13
+    assert ex3.attr_pos_start == 12
     assert ex3.attr_pos_end == 15
     assert ex1.source_attributions.shape[1] == ex1.attr_pos_end - ex1.attr_pos_start
     assert ex1.target_attributions.shape[1] == ex1.attr_pos_end - ex1.attr_pos_start
     assert ex1.target_attributions.shape[0] == ex1.attr_pos_end
     assert out.info["attr_pos_start"] == 13
     assert out.info["attr_pos_end"] == 17
-    aggregated = [attr.aggregate(attr._aggregator) for attr in out.sequence_attributions]
+    aggregated = [ex1.aggregate(), ex2.aggregate(), ex3.aggregate()]
     assert all(isinstance(aggr_attr, FeatureAttributionSequenceOutput) for aggr_attr in aggregated)
 
 
@@ -224,25 +228,25 @@ def test_attribute_decoder(saliency_gpt2_model):
     assert isinstance(out.sequence_attributions[0], FeatureAttributionSequenceOutput)
     ex1, ex2, ex3 = out.sequence_attributions[0], out.sequence_attributions[1], out.sequence_attributions[2]
     assert ex1.attr_pos_start == 17
-    assert ex1.attr_pos_end == 27
+    assert ex1.attr_pos_end == 22
     assert ex1.target_attributions.shape[1] == ex1.attr_pos_end - ex1.attr_pos_start
     assert ex1.target_attributions.shape[0] == ex1.attr_pos_end
     # Empty attributions outputs have start and end set to seq length
-    assert ex2.attr_pos_start == 6
-    assert ex2.attr_pos_end == 16
+    assert ex2.attr_pos_start == 8
+    assert ex2.attr_pos_end == 13
     assert ex2.target_attributions.shape[1] == ex2.attr_pos_end - ex2.attr_pos_start
     assert ex2.target_attributions.shape[0] == ex2.attr_pos_end
     assert ex3.attr_pos_start == 12
-    assert ex3.attr_pos_end == 22
+    assert ex3.attr_pos_end == 17
     assert ex3.target_attributions.shape[1] == ex3.attr_pos_end - ex3.attr_pos_start
     assert ex3.target_attributions.shape[0] == ex3.attr_pos_end
     assert out.info["attr_pos_start"] == 17
-    assert out.info["attr_pos_end"] == 27
+    assert out.info["attr_pos_end"] == 22
     aggregated = [attr.aggregate(attr._aggregator) for attr in out.sequence_attributions]
     assert all(isinstance(aggr_attr, FeatureAttributionSequenceOutput) for aggr_attr in aggregated)
 
 
-def test_attribute_decoder_forced(saliency_gpt2_model):
+def test_attribute_decoder_forced(saliency_gpt2_model_tiny):
     texts = [
         "Colorless green ideas sleep",
         "The scientist told the director that",
@@ -251,7 +255,7 @@ def test_attribute_decoder_forced(saliency_gpt2_model):
         "Colorless green ideas sleep furiously.",
         "The scientist told the director that the experiment was a success.",
     ]
-    out = saliency_gpt2_model.attribute(
+    out = saliency_gpt2_model_tiny.attribute(
         texts,
         forced_generations,
         show_progress=False,
@@ -261,22 +265,22 @@ def test_attribute_decoder_forced(saliency_gpt2_model):
     assert len(out.sequence_attributions) == 2
     assert isinstance(out.sequence_attributions[0], FeatureAttributionSequenceOutput)
     ex1, ex2 = out.sequence_attributions[0], out.sequence_attributions[1]
-    assert ex1.attr_pos_start == 5
-    assert ex1.attr_pos_end == 7
+    assert ex1.attr_pos_start == 14
+    assert ex1.attr_pos_end == 19
     assert ex1.target_attributions.shape[1] == ex1.attr_pos_end - ex1.attr_pos_start
     assert ex1.target_attributions.shape[0] == ex1.attr_pos_end
     # Empty attributions outputs have start and end set to seq length
-    assert ex2.attr_pos_start == 6
-    assert ex2.attr_pos_end == 12
+    assert ex2.attr_pos_start == 13
+    assert ex2.attr_pos_end == 24
     assert ex2.target_attributions.shape[1] == ex2.attr_pos_end - ex2.attr_pos_start
     assert ex2.target_attributions.shape[0] == ex2.attr_pos_end
-    assert out.info["attr_pos_start"] == 5
-    assert out.info["attr_pos_end"] == 12
+    assert out.info["attr_pos_start"] == 14
+    assert out.info["attr_pos_end"] == 24
     aggregated = [attr.aggregate(attr._aggregator) for attr in out.sequence_attributions]
     assert all(isinstance(aggr_attr, FeatureAttributionSequenceOutput) for aggr_attr in aggregated)
 
 
-def test_attribute_decoder_forced_sliced(saliency_gpt2_model):
+def test_attribute_decoder_forced_sliced(saliency_gpt2_model_tiny):
     texts = [
         "Colorless green ideas sleep",
         "The scientist told the director that",
@@ -285,28 +289,28 @@ def test_attribute_decoder_forced_sliced(saliency_gpt2_model):
         "Colorless green ideas sleep furiously.",
         "The scientist told the director that the experiment was a success.",
     ]
-    out = saliency_gpt2_model.attribute(
+    out = saliency_gpt2_model_tiny.attribute(
         texts,
         forced_generations,
         show_progress=False,
         device=inseq.utils.get_default_device(),
-        attr_pos_start=6,
-        attr_pos_end=10,
+        attr_pos_start=16,
+        attr_pos_end=20,
     )
     assert isinstance(out, FeatureAttributionOutput)
     assert len(out.sequence_attributions) == 2
     assert isinstance(out.sequence_attributions[0], FeatureAttributionSequenceOutput)
     ex1, ex2 = out.sequence_attributions[0], out.sequence_attributions[1]
-    assert ex1.attr_pos_start == 6
-    assert ex1.attr_pos_end == 7
+    assert ex1.attr_pos_start == 16
+    assert ex1.attr_pos_end == 19
     assert ex1.target_attributions.shape[1] == ex1.attr_pos_end - ex1.attr_pos_start
     assert ex1.target_attributions.shape[0] == ex1.attr_pos_end
-    assert ex2.attr_pos_start == 6
-    assert ex2.attr_pos_end == 10
+    assert ex2.attr_pos_start == 16
+    assert ex2.attr_pos_end == 20
     assert ex2.target_attributions.shape[1] == ex2.attr_pos_end - ex2.attr_pos_start
     assert ex2.target_attributions.shape[0] == ex2.attr_pos_end
-    assert out.info["attr_pos_start"] == 6
-    assert out.info["attr_pos_end"] == 10
+    assert out.info["attr_pos_start"] == 16
+    assert out.info["attr_pos_end"] == 20
     aggregated = [attr.aggregate(attr._aggregator) for attr in out.sequence_attributions]
     assert all(isinstance(aggr_attr, FeatureAttributionSequenceOutput) for aggr_attr in aggregated)
 
@@ -347,7 +351,7 @@ def test_attention_attribution_seq2seq(
     assert out.info["constrained_decoding"] is False
     assert out.info["attribution_method"] == "attention"
     assert out.info["attribute_target"] is True
-    assert len(out.sequence_attributions[0].source_attributions.shape) == 2
+    assert out.sequence_attributions[0].source_attributions.ndim == 2
 
 
 @mark.slow
@@ -384,4 +388,4 @@ def test_attention_attribution_decoder(
     assert out.info["model_name"] == "gpt2"
     assert out.info["constrained_decoding"] is False
     assert out.info["attribution_method"] == "attention"
-    assert len(out.sequence_attributions[0].target_attributions.shape) == 2
+    assert out.sequence_attributions[0].target_attributions.ndim == 2

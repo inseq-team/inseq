@@ -20,9 +20,9 @@ class BatchEncoding(TensorWrapper):
     """
 
     input_ids: IdsTensor
-    input_tokens: OneOrMoreTokenSequences
     attention_mask: IdsTensor
-    baseline_ids: Optional[IdsTensor]
+    input_tokens: Optional[OneOrMoreTokenSequences] = None
+    baseline_ids: Optional[IdsTensor] = None
 
     def __len__(self) -> int:
         return len(self.input_tokens)
@@ -222,3 +222,10 @@ class DecoderOnlyBatch(Batch):
         if with_attention:
             return tgt, self.attention_mask[:, step]
         return tgt
+
+    @classmethod
+    def from_batch(self, batch: Batch) -> "DecoderOnlyBatch":
+        return DecoderOnlyBatch(
+            encoding=batch.encoding,
+            embedding=batch.embedding,
+        )
