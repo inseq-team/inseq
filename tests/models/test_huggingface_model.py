@@ -39,12 +39,15 @@ def saliency_gpt2_model():
     return inseq.load_model("gpt2", "saliency")
 
 
-def test_tokenizer_consistency(saliency_gpt2_model):
+def test_tokenizer_consistency():
     texts = EXAMPLES["texts"][2][0]
-    tok_model = inseq.load_model("gpt2", "saliency", tokenizer=AutoTokenizer.from_pretrained("gpt2", use_fast=False))
-    fast_tok_model = inseq.load_model("gpt2", "saliency", tokenizer=AutoTokenizer.from_pretrained("gpt2"))
+    inf_model = inseq.load_model("distilgpt2", "saliency")
+    tok_model = inseq.load_model(
+        "distilgpt2", "saliency", tokenizer=AutoTokenizer.from_pretrained("distilgpt2", use_fast=False)
+    )
+    fast_tok_model = inseq.load_model("distilgpt2", "saliency", tokenizer=AutoTokenizer.from_pretrained("distilgpt2"))
 
-    out_inferenced = saliency_gpt2_model.attribute(
+    out_inferenced = inf_model.attribute(
         texts,
         show_progress=False,
         device=get_default_device(),
