@@ -46,7 +46,7 @@ of inputs using M2M-100:
 .. raw:: html
 
     <div class="html-example">
-        <iframe frameborder="0" scale="0.75" src="/_static/m2m_it_example.htm"></iframe>
+        <iframe frameborder="0" scale="0.75" src="../_static/m2m_it_example.htm"></iframe>
     </div>
 
 Probability scores for the target language id should be disregarded, since the token is manually set before generation.

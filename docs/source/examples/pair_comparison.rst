@@ -63,5 +63,5 @@ Here is an example of using ``PairAggregator`` to produce a heatmap to visualize
 .. raw:: html
 
     <div class="html-example">
-        <iframe frameborder="0" scale="0.75" src="/_static/pair_comparison.htm"></iframe>
+        <iframe frameborder="0" scale="0.75" src="../_static/pair_comparison.htm"></iframe>
     </div>
