@@ -55,14 +55,14 @@ class MaxAggregationFunction(AggregationFunction):
     aggregation_function_name = "max"
 
     def __call__(self, scores: torch.Tensor, dim: int) -> ScoreTensor:
-        return scores.max(dim)
+        return scores.max(dim).values
 
 
 class MinAggregationFunction(AggregationFunction):
     aggregation_function_name = "min"
 
     def __call__(self, scores: torch.Tensor, dim: int) -> ScoreTensor:
-        return scores.min(dim)
+        return scores.min(dim).values
 
 
 class SingleAggregationFunction(AggregationFunction):

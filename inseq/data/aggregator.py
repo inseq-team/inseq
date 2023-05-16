@@ -308,6 +308,8 @@ class SequenceAttributionAggregator(Aggregator):
         except AssertionError as e:
             raise RuntimeError(
                 f"The aggregated attributions should be 2-dimensional to be visualized. Found dimensions: {e.args[0]}"
+                "If you're performing intermediate aggregation and don't aim to visualize the output right away, use"
+                "do_end_aggregation=False in the aggregate method to bypass this check."
             ) from e
 
     @staticmethod
