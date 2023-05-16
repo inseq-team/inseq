@@ -28,7 +28,6 @@ from .misc import (
     gzip_compress,
     gzip_decompress,
     hashodict,
-    identity_fn,
     isnotebook,
     lists_of_numbers_to_ndarray,
     ndarray_to_bin_str,
@@ -44,18 +43,14 @@ from .misc import (
 from .registry import Registry, available_classes
 from .serialization import json_advanced_dump, json_advanced_dumps, json_advanced_load, json_advanced_loads
 from .torch_utils import (
-    abs_max,
     aggregate_contiguous,
     check_device,
     euclidean_distance,
     get_default_device,
     get_front_padding,
     get_sequences_from_batched_steps,
-    normalize_attributions,
-    prod_fn,
+    normalize,
     remap_from_filtered,
-    sum_fn,
-    sum_normalize_attributions,
 )
 
 __all__ = [
@@ -64,7 +59,6 @@ __all__ = [
     "UnknownAttributionMethodError",
     "cache_results",
     "optional",
-    "identity_fn",
     "pad",
     "pretty_list",
     "pretty_tensor",
@@ -79,12 +73,8 @@ __all__ = [
     "extract_signature_args",
     "remap_from_filtered",
     "drop_padding",
-    "normalize_attributions",
-    "sum_normalize_attributions",
+    "normalize",
     "aggregate_contiguous",
-    "abs_max",
-    "prod_fn",
-    "sum_fn",
     "get_front_padding",
     "get_sequences_from_batched_steps",
     "euclidean_distance",

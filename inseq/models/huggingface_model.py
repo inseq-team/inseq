@@ -21,6 +21,7 @@ from ..utils.typing import (
     EmbeddingsTensor,
     IdsTensor,
     LogitsTensor,
+    MultiLayerMultiUnitScoreTensor,
     OneOrMoreIdSequences,
     OneOrMoreTokenSequences,
     TextInput,
@@ -390,6 +391,16 @@ class HuggingfaceEncoderDecoderModel(HuggingfaceModel, EncoderDecoderAttribution
     def get_decoder(self) -> torch.nn.Module:
         return self.model.get_decoder()
 
+    @staticmethod
+    def get_attentions_dict(
+        output: Seq2SeqLMOutput,
+    ) -> Dict[str, MultiLayerMultiUnitScoreTensor]:
+        return {
+            "encoder_self_attentions": torch.stack(output.encoder_attentions, dim=1),
+            "decoder_self_attentions": torch.stack(output.decoder_attentions, dim=1),
+            "cross_attentions": torch.stack(output.cross_attentions, dim=1),
+        }
+
 
 class HuggingfaceDecoderOnlyModel(HuggingfaceModel, DecoderOnlyAttributionModel):
     """Model wrapper for any ForCausalLM or LMHead model on the HuggingFace Hub used to enable
@@ -420,3 +431,9 @@ class HuggingfaceDecoderOnlyModel(HuggingfaceModel, DecoderOnlyAttributionModel)
     def configure_embeddings_scale(self):
         if hasattr(self.model, "embed_scale"):
             self.embed_scale = self.model.embed_scale
+
+    @staticmethod
+    def get_attentions_dict(output: CausalLMOutput) -> Dict[str, MultiLayerMultiUnitScoreTensor]:
+        return {
+            "decoder_self_attentions": torch.stack(output.attentions, dim=1),
+        }

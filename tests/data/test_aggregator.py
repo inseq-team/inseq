@@ -73,6 +73,23 @@ def test_aggregator_pipeline(saliency_mt_model: HuggingfaceEncoderDecoderModel):
     assert out_agg_sumsqueeze.step_scores["probability"].shape == (4,)
     assert not torch.allclose(out_agg_squeezesum.source_attributions, out_agg_sumsqueeze.source_attributions)
     assert not torch.allclose(out_agg_squeezesum.target_attributions, out_agg_sumsqueeze.target_attributions)
+    # Named indexing version
+    named_squeezesum = ["spans", "scores"]
+    named_sumsqueeze = ["scores", "spans"]
+    out_agg_squeezesum_named = seqattr.aggregate(named_squeezesum, source_spans=(3, 5), target_spans=[(0, 3), (4, 6)])
+    out_agg_sumsqueeze_named = seqattr.aggregate(named_sumsqueeze, source_spans=(3, 5), target_spans=[(0, 3), (4, 6)])
+    assert out_agg_squeezesum_named.source_attributions.shape == (5, 4)
+    assert out_agg_squeezesum_named.target_attributions.shape == (4, 4)
+    assert out_agg_squeezesum_named.step_scores["probability"].shape == (4,)
+    assert out_agg_sumsqueeze_named.source_attributions.shape == (5, 4)
+    assert out_agg_sumsqueeze_named.target_attributions.shape == (4, 4)
+    assert out_agg_sumsqueeze_named.step_scores["probability"].shape == (4,)
+    assert not torch.allclose(
+        out_agg_squeezesum_named.source_attributions, out_agg_sumsqueeze_named.source_attributions
+    )
+    assert not torch.allclose(
+        out_agg_squeezesum_named.target_attributions, out_agg_sumsqueeze_named.target_attributions
+    )
 
 
 def test_subword_aggregator(saliency_mt_model: HuggingfaceEncoderDecoderModel):
@@ -104,11 +121,61 @@ def test_subword_aggregator(saliency_mt_model: HuggingfaceEncoderDecoderModel):
 
 def test_pair_aggregator(saliency_mt_model: HuggingfaceEncoderDecoderModel):
     out = saliency_mt_model.attribute([EXAMPLES["source"], EXAMPLES["alternative_source"]], show_progress=False)
-    orig_seqattr = out.sequence_attributions[0].aggregate(aggregator=SequenceAttributionAggregator)
-    alt_seqattr = out.sequence_attributions[1].aggregate(aggregator=SequenceAttributionAggregator)
+    orig_seqattr = out.sequence_attributions[0].aggregate(["vnorm"])
+    alt_seqattr = out.sequence_attributions[1].aggregate(["vnorm"])
     diff_seqattr = orig_seqattr.aggregate(PairAggregator, paired_attr=alt_seqattr)
     for idx, token in enumerate(diff_seqattr.source):
         assert token.token == EXAMPLES["diff_subwords"][idx]
     assert torch.allclose(
         alt_seqattr.source_attributions - orig_seqattr.source_attributions, diff_seqattr.source_attributions
     )
+    # Default aggregation with SequenceAttributionAggregator
+    orig_seqattr_other = out.sequence_attributions[0].aggregate()
+    alt_seqattr_other = out.sequence_attributions[1].aggregate()
+    # Aggregate with aggregator name
+    diff_seqattr_other = orig_seqattr_other.aggregate("pair", paired_attr=alt_seqattr_other)
+    assert torch.allclose(diff_seqattr_other.source_attributions, diff_seqattr.source_attributions)
+
+
+def test_named_aggregate_fn_aggregation(saliency_mt_model: HuggingfaceEncoderDecoderModel):
+    out = saliency_mt_model.attribute(
+        [EXAMPLES["source"], EXAMPLES["alternative_source"]],
+        show_progress=False,
+        attribute_target=True,
+        method="attention",
+    )
+    out_headmean = out.aggregate(aggregator=["mean", "mean"])
+    assert out_headmean.sequence_attributions[0].source_attributions.ndim == 2
+    assert out_headmean.sequence_attributions[0].target_attributions.ndim == 2
+    assert out_headmean.sequence_attributions[1].source_attributions.ndim == 2
+    assert out_headmean.sequence_attributions[1].target_attributions.ndim == 2
+    out_allmean_subwords = out.aggregate(aggregator=["mean", "mean", "subwords"])
+
+    # Check whether scores aggregation worked correctly
+    assert out_allmean_subwords.sequence_attributions[0].source_attributions.ndim == 2
+    assert out_allmean_subwords.sequence_attributions[0].target_attributions.ndim == 2
+    assert out_allmean_subwords.sequence_attributions[1].source_attributions.ndim == 2
+    assert out_allmean_subwords.sequence_attributions[1].target_attributions.ndim == 2
+
+    # Check whether subword aggregation worked correctly
+    assert (
+        out_allmean_subwords.sequence_attributions[0].source_attributions.shape[0]
+        < out.sequence_attributions[0].source_attributions.shape[0]
+    )
+    assert (
+        out_allmean_subwords.sequence_attributions[0].target_attributions.shape[0]
+        < out.sequence_attributions[0].target_attributions.shape[0]
+    )
+    assert (
+        out_allmean_subwords.sequence_attributions[1].source_attributions.shape[0]
+        < out.sequence_attributions[1].source_attributions.shape[0]
+    )
+    assert (
+        out_allmean_subwords.sequence_attributions[1].target_attributions.shape[0]
+        < out.sequence_attributions[1].target_attributions.shape[0]
+    )
+
+    out_allmean_subwords_expanded = out.aggregate(
+        aggregator=["scores", "scores", "subwords"], aggregate_fn=["mean", "mean", None]
+    )
+    assert out_allmean_subwords == out_allmean_subwords_expanded

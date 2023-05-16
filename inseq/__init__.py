@@ -1,7 +1,11 @@
 """Interpretability for Sequence Generation Models 🔍."""
 
 from .attr import list_feature_attribution_methods, list_step_functions, register_step_function
-from .data import FeatureAttributionOutput, show_attributions
+from .data import (
+    FeatureAttributionOutput,
+    list_aggregation_functions,
+    show_attributions,
+)
 from .models import AttributionModel, list_supported_frameworks, load_model
 
 
@@ -21,6 +25,7 @@ __all__ = [
     "load_model",
     "show_attributions",
     "list_feature_attribution_methods",
+    "list_aggregation_functions",
     "list_step_functions",
     "list_supported_frameworks",
     "register_step_function",

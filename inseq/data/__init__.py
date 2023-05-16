@@ -1,3 +1,6 @@
+from .aggregation_functions import (
+    list_aggregation_functions,
+)
 from .aggregator import (
     Aggregator,
     AggregatorPipeline,
@@ -44,6 +47,7 @@ __all__ = [
     "OneOrMoreTokenSequences",
     "TextInput",
     "show_attributions",
+    "list_aggregation_functions",
     "MultiDimensionalFeatureAttributionStepOutput",
     "get_batch_from_inputs",
 ]

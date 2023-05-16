@@ -7,13 +7,7 @@ from torch.backends.cuda import is_built as is_cuda_built
 from torch.backends.mps import is_available as is_mps_available
 from torch.backends.mps import is_built as is_mps_built
 from torch.cuda import is_available as is_cuda_available
-from torch.linalg import vector_norm
 from torchtyping import TensorType
-
-from .typing import (
-    GranularSequenceAttributionTensor,
-    TokenSequenceAttributionTensor,
-)
 
 if TYPE_CHECKING:
     pass
@@ -40,41 +34,8 @@ def remap_from_filtered(
     return new_source.scatter(0, index, filtered)
 
 
-def sum_normalize_attributions(
-    attributions: Union[
-        GranularSequenceAttributionTensor, Tuple[GranularSequenceAttributionTensor, GranularSequenceAttributionTensor]
-    ],
-    cat_dim: int = 0,
-    norm_dim: Optional[int] = 0,
-) -> TokenSequenceAttributionTensor:
-    """
-    Sum and normalize tensors across dim_sum.
-    The outcome is a matrix of unit row vectors.
-    """
-    concat = False
-    if isinstance(attributions, tuple):
-        concat = True
-        orig_sizes = [a.shape[cat_dim] for a in attributions]
-        attributions = torch.cat(attributions, dim=cat_dim)
-    else:
-        orig_sizes = [attributions.shape[cat_dim]]
-    attributions = vector_norm(attributions, ord=2, dim=-1)
-    if norm_dim is not None:
-        # nansum is used to handle the target side sequence attribution case
-        attributions = attributions / attributions.nansum(dim=norm_dim, keepdim=True)
-    if len(attributions.shape) == 1:
-        attributions = attributions.unsqueeze(0)
-    if concat:
-        attributions = attributions.split(orig_sizes, dim=cat_dim)
-        return attributions[0], attributions[1]
-    return attributions
-
-
-def normalize_attributions(
-    attributions: Union[
-        TokenSequenceAttributionTensor, Tuple[TokenSequenceAttributionTensor, TokenSequenceAttributionTensor]
-    ],
-    cat_dim: int = 0,
+def normalize(
+    attributions: Union[torch.Tensor, Tuple[torch.Tensor, ...]],
     norm_dim: int = 0,
     norm_ord: int = 1,
 ) -> Union[torch.Tensor, Tuple[torch.Tensor, ...]]:
@@ -115,25 +76,13 @@ def aggregate_contiguous(
     for start, end in spans:
         if start > base_val:
             slices.append(t[:, base_val:start, ...])
-        slices.append(aggregate_fn(t[:, start:end, ...], dim=1))
+        slices.append(aggregate_fn(t[:, start:end, ...], dim=1).unsqueeze(1))
         base_val = end
     slices.append(t[:, base_val:])
     out_cat = torch.cat(slices, dim=1).transpose(1, aggregate_dim)
     if 1 in out_cat.shape:
         out_cat = out_cat.transpose(1, 0).squeeze(0)
     return out_cat
-
-
-def abs_max(t: torch.Tensor, dim: int = 1) -> torch.Tensor:
-    return t.gather(dim, t.abs().argmax(dim=dim).unsqueeze(1))
-
-
-def prod_fn(t: torch.Tensor, dim: int = 1) -> torch.Tensor:
-    return t.prod(dim=dim, keepdim=True)
-
-
-def sum_fn(t: torch.Tensor, dim: int = 1) -> torch.Tensor:
-    return t.sum(dim=dim, keepdim=True)
 
 
 def get_front_padding(t: torch.Tensor, pad: int = 0, dim: int = 1) -> List[int]:
