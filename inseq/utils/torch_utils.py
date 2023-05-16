@@ -75,8 +75,9 @@ def aggregate_contiguous(
     slices = []
     base_val = 0
     for start, end in spans:
-        slices.append(t[:, base_val:start])
-        slices.append(aggregate_fn(t[:, start:end], dim=1).unsqueeze(1))
+        if start > base_val:
+            slices.append(t[:, base_val:start, ...])
+        slices.append(aggregate_fn(t[:, start:end, ...], dim=1).unsqueeze(1))
         base_val = end
     slices.append(t[:, base_val:])
     out_cat = torch.cat(slices, dim=1).transpose(1, aggregate_dim)

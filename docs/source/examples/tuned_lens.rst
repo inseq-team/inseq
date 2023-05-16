@@ -151,7 +151,7 @@ Now we can simply register the function, load the lens corresponding to the mode
 .. raw:: html
 
     <div class="html-example">
-        <iframe frameborder="0" scale="0.75" src="/_static/tuned_lens.htm"></iframe>
+        <iframe frameborder="0" scale="0.75" src="../_static/tuned_lens.htm"></iframe>
     </div>
 
 We can see that the row ``confidence``, corresponding to the confidence score we defined above, is added at the end of
@@ -176,7 +176,7 @@ We can now repeat the experiment while constraining a target generation of our c
 .. raw:: html
 
     <div class="html-example">
-        <iframe frameborder="0" scale="0.75" src="/_static/tuned_lens_force.htm"></iframe>
+        <iframe frameborder="0" scale="0.75" src="../_static/tuned_lens_force.htm"></iframe>
     </div>
 
 We see that some of the forced tokens are assigned a confidence score of 0 in this case.

@@ -7,7 +7,6 @@ from .value_zeroing import ValueZeroing
 __all__ = [
     "DiscretetizedIntegratedGradients",
     "MonotonicPathBuilder",
-    "AttentionWeights",
     "ValueZeroing",
     "Lime",
     "rollout_fn",

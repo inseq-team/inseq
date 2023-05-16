@@ -53,17 +53,29 @@ protobuf = "^3.20.1"
 captum = "^0.6.0"
 numpy = "^1.21.6"
 torchtyping = "^0.1.4"
+typeguard = "<=2.13.3"
 torch = ">=1.13.1"
 matplotlib = "~3.5.3"
 tqdm = "^4.64.0"
 poethepoet = "^0.13.1"
 
-ipykernel = { version = "^6.19.2", optional = true }
-ipywidgets = { version = "^8.0.0rc2", optional = true }
-joblib = { version = "^1.2.0", optional = true }
-scikit-learn = { version = "^1.1.1", optional = true }
+ipykernel = { extras = ["notebook"], version = "^6.19.2", optional = true }
+ipywidgets = { extras = ["notebook"], version = "^8.0.0rc2", optional = true }
+joblib = { extras = ["sklearn"], version = "^1.2.0", optional = true }
+scikit-learn = { extras = ["sklearn"], version = "^1.1.1", optional = true }
 scipy = { version = "^1.8.1", optional = true}
-datasets = { version = ">=2.3.2", optional = true }
+datasets = { extras = ["datasets"], version = "^2.3.2", optional = true }
+nvidia-cublas-cu11 = { version = "11.10.3.66", platform = 'linux' }
+nvidia-cuda-cupti-cu11 = { version = "11.7.101", platform = 'linux' }
+nvidia-cuda-nvrtc-cu11 = { version = "11.7.99", platform = 'linux' }
+nvidia-cuda-runtime-cu11 = { version = "11.7.99", platform = 'linux' }
+nvidia-cudnn-cu11 = { version = "8.5.0.96", platform = 'linux' }
+nvidia-cufft-cu11 = { version = "10.9.0.58", platform = 'linux' }
+nvidia-curand-cu11 = { version = "10.2.10.91", platform = 'linux' }
+nvidia-cusolver-cu11 = { version = "11.4.0.1", platform = 'linux' }
+nvidia-cusparse-cu11 = { version = "11.7.4.91", platform = 'linux' }
+nvidia-nccl-cu11 = { version = "2.14.3", platform = 'linux' }
+nvidia-nvtx-cu11 = { version = "11.7.91", platform = 'linux' }
 
 [tool.poetry.group.docs]
 optional = true

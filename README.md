@@ -173,8 +173,8 @@ import inseq
 attribution_model = inseq.load_model("gpt2", "input_x_gradient")
 
 # Perform the contrastive attribution:
-# Regular (forced) target -> "Can you stop the dog from barking"
-# Contrastive target      -> "Can you stop the dog from crying"
+# Regular (forced) target -> "The manager went home because he was sick"
+# Contrastive target      -> "The manager went home because she was sick"
 out = attribution_model.attribute(
     "The manager went home because",
     "The manager went home because he was sick",

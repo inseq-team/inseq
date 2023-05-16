@@ -140,7 +140,7 @@ Now that we have our custom attribution function, integrating it in Inseq is ver
 .. raw:: html
 
     <div class="html-example">
-        <iframe frameborder="0" scale="0.75" src="/_static/contrastive_example.htm"></iframe>
+        <iframe frameborder="0" scale="0.75" src="../_static/contrastive_example.htm"></iframe>
     </div>
 
 From this example, we see that the masculine Italian determiner "il" is 70% more likely than its feminine counterpart "la" before "manager",
