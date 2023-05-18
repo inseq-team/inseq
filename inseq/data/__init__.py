@@ -1,4 +1,5 @@
 from .aggregation_functions import (
+    AggregationFunction,
     list_aggregation_functions,
 )
 from .aggregator import (
@@ -8,6 +9,7 @@ from .aggregator import (
     PairAggregator,
     SequenceAttributionAggregator,
     SubwordAggregator,
+    list_aggregators,
 )
 from .attribution import (
     CoarseFeatureAttributionSequenceOutput,
@@ -26,6 +28,7 @@ from .viz import show_attributions
 __all__ = [
     "Aggregator",
     "AggregatorPipeline",
+    "AggregationFunction",
     "SequenceAttributionAggregator",
     "ContiguousSpanAggregator",
     "SubwordAggregator",
@@ -50,4 +53,5 @@ __all__ = [
     "list_aggregation_functions",
     "MultiDimensionalFeatureAttributionStepOutput",
     "get_batch_from_inputs",
+    "list_aggregators",
 ]

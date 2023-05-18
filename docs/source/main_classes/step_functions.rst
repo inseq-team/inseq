@@ -27,6 +27,12 @@ The following functions can be used as attribution targets or step functions in 
 
 .. autofunction:: perplexity_fn
 
+.. autofunction:: contrast_prob_fn
+
+.. autofunction:: pcxmi_fn
+
+.. autofunction:: kl_divergence_fn
+
 .. autofunction:: contrast_prob_diff_fn
 
 .. autofunction:: mc_dropout_prob_avg_fn

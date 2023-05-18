@@ -24,7 +24,7 @@ Inseq is a Pytorch-based hackable toolkit to democratize the study of **in**\ter
 
 Using Inseq, feature attribution maps that can be saved, reloaded, aggregated and visualized either as HTMLs (with Jupyter notebook support) or directly in the console using `rich <https://rich.readthedocs.io/en/latest/>`__. Besides simple attribution, Inseq also supports features like step score extraction, attribution aggregation and attributed functions customization for more advanced use cases. Refer to the guides in the |:bug:| Using Inseq section for more details and examples on specific features.
 
-To give a taste of what Inseq can do in a couple lines of code, here's a snippet doing source-side attribution of an English-to-Italian translation produced by the model ``Helsinki-NLP/opus-mt-en-it`` from |:hugging_face:| Transformers  using the ``IntegratedGradients`` method with 300 integral approximation steps, and returning the attribution convergence delta and token-level prediction probabilties.
+To give a taste of what Inseq can do in a couple lines of code, here's a snippet doing source-side attribution of an English-to-French translation produced by the model ``Helsinki-NLP/opus-mt-en-fr`` from |:hugging_face:| Transformers  using the ``IntegratedGradients`` method with 300 integral approximation steps, and returning the attribution convergence delta and token-level prediction probabilties.
 
 
 .. code-block:: python
@@ -68,6 +68,8 @@ Inseq is still in early development and is currently maintained by a small team 
 
     main_classes/main_functions
     main_classes/models
-    main_classes/data_classes
     main_classes/feature_attribution
+    main_classes/aggregators
     main_classes/step_functions
+    main_classes/aggregation_functions
+    main_classes/data_classes

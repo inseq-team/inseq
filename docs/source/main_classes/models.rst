@@ -24,15 +24,6 @@ Framework Classes
     :members:
 
 
-.. autoclass:: inseq.models.HuggingfaceEncoderDecoderModel
-    :members:
-
-
-.. autoclass:: inseq.models.HuggingfaceDecoderOnlyModel
-    :members:
-
-
-
 Architectural Classes
 -----------------------------------------------------------------------------------------------------------------------
 
@@ -41,4 +32,15 @@ Architectural Classes
 
 
 .. autoclass:: inseq.models.DecoderOnlyAttributionModel
+    :members:
+
+
+Final Classes
+-----------------------------------------------------------------------------------------------------------------------
+
+.. autoclass:: inseq.models.HuggingfaceEncoderDecoderModel
+    :members:
+
+
+.. autoclass:: inseq.models.HuggingfaceDecoderOnlyModel
     :members:

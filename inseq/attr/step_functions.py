@@ -100,7 +100,8 @@ def _get_contrast_output(
     decoder_input_embeds: EmbeddingsTensor,
     contrast_target_prefixes: Optional[FeatureAttributionInput] = None,
     contrast_sources: Optional[FeatureAttributionInput] = None,
-    **kwargs,
+    contrast_targets: Optional[FeatureAttributionInput] = None,
+    return_contrastive_target_ids: bool = False,
 ) -> ModelOutput:
     """Utility function to return the output of the model for given contrastive inputs.
 
@@ -111,8 +112,39 @@ def _get_contrast_output(
         contrast_target_prefixes (:obj:`str` or :obj:`list(str)`): Target prefix(es) used as contrastive inputs to
             compute target probabilities. If not specified, no target prefix beyond previously generated tokens is
             assumed. Defaults to :obj:`None`.
+        contrast_targets (:obj:`str` or :obj:`list(str)`): Contrastive target text(s) to be compared to the original
+            target text. If not specified, the original target text is used as contrastive target (will result in same
+            output unless ``contrast_sources`` or ``contrast_target_prefixes`` are specified). Defaults to :obj:`None`.
+        return_contrastive_target_ids (:obj:`bool`, `optional`, defaults to :obj:`False`): Whether to return the
+            contrastive target ids as well as the model output. Defaults to :obj:`False`.
     """
-    if contrast_target_prefixes is not None:
+    c_tgt_ids = None
+    if contrast_targets:
+        c_batch = DecoderOnlyBatch.from_batch(
+            get_batch_from_inputs(
+                attribution_model=attribution_model,
+                inputs=contrast_targets,
+                as_targets=attribution_model.is_encoder_decoder,
+            )
+        )
+        curr_prefix_len = decoder_input_ids.size(1)
+
+        # We select the next contrastive token as target and truncate contrastive ids
+        # and their attention map to the current generation step.
+        c_tgt_ids = c_batch.target_ids[:, curr_prefix_len]
+        c_batch = c_batch[:curr_prefix_len].to(attribution_model.device)
+
+        if decoder_input_ids.size(0) != c_batch.target_ids.size(0):
+            raise ValueError(
+                f"Contrastive batch size ({c_batch.target_ids.size(0)}) must match candidate batch size "
+                f"({decoder_input_ids.size(0)}). Multi-sentence attribution and methods expanding inputs to multiple "
+                "steps (e.g. Integrated Gradients) are currently not supported for contrastive feature attribution."
+            )
+
+        decoder_input_ids = c_batch.target_ids
+        decoder_input_embeds = c_batch.target_embeds
+        decoder_attention_mask = c_batch.target_mask
+    if contrast_target_prefixes:
         c_dec_in = attribution_model.encode(
             contrast_target_prefixes, as_targets=attribution_model.is_encoder_decoder, add_special_tokens=False
         )
@@ -128,7 +160,7 @@ def _get_contrast_output(
         c_dec_ids = decoder_input_ids
         c_dec_mask = decoder_attention_mask
         c_dec_embeds = decoder_input_embeds
-    if contrast_sources is not None:
+    if contrast_sources:
         if not attribution_model.is_encoder_decoder:
             raise ValueError(
                 "Contrastive source inputs can only be used with encoder-decoder models. "
@@ -150,23 +182,24 @@ def _get_contrast_output(
         encoder_attention_mask=c_enc_mask,
         decoder_attention_mask=c_dec_mask,
     )
-    return attribution_model.get_forward_output(c_batch, use_embeddings=attribution_model.is_encoder_decoder)
+    c_out = attribution_model.get_forward_output(c_batch, use_embeddings=attribution_model.is_encoder_decoder)
+    if return_contrastive_target_ids:
+        return c_out, c_tgt_ids
+    return c_out
 
 
 def contrast_prob_fn(
     attribution_model: "AttributionModel",
-    encoder_input_ids: IdsTensor,
-    decoder_input_ids: IdsTensor,
-    encoder_attention_mask: IdsTensor,
-    decoder_attention_mask: IdsTensor,
-    encoder_input_embeds: EmbeddingsTensor,
-    decoder_input_embeds: EmbeddingsTensor,
     target_ids: TargetIdsTensor,
     contrast_target_prefixes: Optional[FeatureAttributionInput] = None,
     contrast_sources: Optional[FeatureAttributionInput] = None,
+    contrast_targets: Optional[FeatureAttributionInput] = None,
     **kwargs,
-) -> SingleScorePerStepTensor:
-    """Compute the probability of target ids given contrastive inputs.
+):
+    """Returns the probability of a generation target given contrastive context or target prediction alternative.
+    If only ``contrast_targets`` are specified, the probability of the contrastive prediction is computed given same
+    context. The probability for the same token given contrastive source/target preceding context can also be computed
+    using ``contrast_sources`` and ``contrast_target_prefixes`` without specifying ``contrast_targets``.
 
     Args:
         contrast_sources (:obj:`str` or :obj:`list(str)`): Source text(s) used as contrastive inputs to compute
@@ -175,30 +208,27 @@ def contrast_prob_fn(
         contrast_target_prefixes (:obj:`str` or :obj:`list(str)`): Target prefix(es) used as contrastive inputs to
             compute target probabilities. If not specified, no target prefix beyond previously generated tokens is
             assumed. Defaults to :obj:`None`.
+        contrast_targets (:obj:`str` or :obj:`list(str)`): Contrastive target text(s) to be compared to the original
+            target text. If not specified, the original target text is used as contrastive target (will result in same
+            output unless ``contrast_sources`` or ``contrast_target_prefixes`` are specified). Defaults to :obj:`None`.
     """
-    c_out = _get_contrast_output(
-        attribution_model,
-        encoder_input_ids,
-        decoder_input_ids,
-        encoder_attention_mask,
-        decoder_attention_mask,
-        encoder_input_embeds,
-        decoder_input_embeds,
-        contrast_target_prefixes=contrast_target_prefixes,
+    kwargs.pop("forward_output", None)
+    c_output, c_tgt_ids = _get_contrast_output(
+        attribution_model=attribution_model,
         contrast_sources=contrast_sources,
+        contrast_target_prefixes=contrast_target_prefixes,
+        contrast_targets=contrast_targets,
+        return_contrastive_target_ids=True,
+        **kwargs,
     )
-    return probability_fn(attribution_model, c_out, target_ids)
+    if c_tgt_ids is None:
+        c_tgt_ids = target_ids
+    return probability_fn(attribution_model, c_output, c_tgt_ids)
 
 
 def pcxmi_fn(
     attribution_model: "AttributionModel",
     forward_output: ModelOutput,
-    encoder_input_ids: IdsTensor,
-    decoder_input_ids: IdsTensor,
-    encoder_attention_mask: IdsTensor,
-    decoder_attention_mask: IdsTensor,
-    encoder_input_embeds: EmbeddingsTensor,
-    decoder_input_embeds: EmbeddingsTensor,
     target_ids: TargetIdsTensor,
     contrast_sources: Optional[FeatureAttributionInput] = None,
     contrast_target_prefixes: Optional[FeatureAttributionInput] = None,
@@ -220,15 +250,9 @@ def pcxmi_fn(
     original_probs = probability_fn(attribution_model, forward_output, target_ids)
     contrast_probs = contrast_prob_fn(
         attribution_model=attribution_model,
-        encoder_input_ids=encoder_input_ids,
-        decoder_input_ids=decoder_input_ids,
-        encoder_attention_mask=encoder_attention_mask,
-        decoder_attention_mask=decoder_attention_mask,
-        encoder_input_embeds=encoder_input_embeds,
-        decoder_input_embeds=decoder_input_embeds,
-        target_ids=target_ids,
         contrast_sources=contrast_sources,
         contrast_target_prefixes=contrast_target_prefixes,
+        **kwargs,
     )
     return -torch.log2(torch.div(original_probs, contrast_probs))
 
@@ -236,12 +260,6 @@ def pcxmi_fn(
 def kl_divergence_fn(
     attribution_model: "AttributionModel",
     forward_output: ModelOutput,
-    encoder_input_ids: IdsTensor,
-    decoder_input_ids: IdsTensor,
-    encoder_attention_mask: IdsTensor,
-    decoder_attention_mask: IdsTensor,
-    encoder_input_embeds: EmbeddingsTensor,
-    decoder_input_embeds: EmbeddingsTensor,
     contrast_sources: Optional[FeatureAttributionInput] = None,
     contrast_target_prefixes: Optional[FeatureAttributionInput] = None,
     top_k: int = 0,
@@ -265,14 +283,10 @@ def kl_divergence_fn(
     original_logits = attribution_model.output2logits(forward_output)
     contrast_output = _get_contrast_output(
         attribution_model=attribution_model,
-        encoder_input_ids=encoder_input_ids,
-        decoder_input_ids=decoder_input_ids,
-        encoder_attention_mask=encoder_attention_mask,
-        decoder_attention_mask=decoder_attention_mask,
-        encoder_input_embeds=encoder_input_embeds,
-        decoder_input_embeds=decoder_input_embeds,
         contrast_sources=contrast_sources,
         contrast_target_prefixes=contrast_target_prefixes,
+        return_contrastive_target_ids=False,
+        **kwargs,
     )
     contrast_logits = attribution_model.output2logits(contrast_output)
     top_k = min(top_k, contrast_logits.size(-1))
@@ -297,59 +311,40 @@ def kl_divergence_fn(
 def contrast_prob_diff_fn(
     attribution_model: "AttributionModel",
     forward_output: ModelOutput,
-    encoder_input_ids: IdsTensor,
-    encoder_input_embeds: EmbeddingsTensor,
-    encoder_attention_mask: IdsTensor,
-    decoder_input_ids: IdsTensor,
     target_ids: TargetIdsTensor,
-    contrast_targets: FeatureAttributionInput,
+    contrast_target_prefixes: Optional[FeatureAttributionInput] = None,
+    contrast_sources: Optional[FeatureAttributionInput] = None,
+    contrast_targets: Optional[FeatureAttributionInput] = None,
     **kwargs,
 ):
     """Returns the difference between next step probability for a candidate generation target vs. a contrastive
     alternative. Can be used as attribution target to answer the question: "Which features were salient in the
     choice of picking the selected token rather than its contrastive alternative?". Follows the implementation
-    of `Yin and Neubig (2022) <https://aclanthology.org/2022.emnlp-main.14>`__.
+    of `Yin and Neubig (2022) <https://aclanthology.org/2022.emnlp-main.14>`__. Can also be used to compute the
+    difference in probability for the same token given contrastive source/target preceding context using
+    ``contrast_sources`` and ``contrast_target_prefixes`` without specifying ``contrast_targets``.
 
     Args:
+        contrast_sources (:obj:`str` or :obj:`list(str)`): Source text(s) used as contrastive inputs to compute
+            target probabilities for encoder-decoder models. If not specified, the source text is assumed to match the
+            original source text. Defaults to :obj:`None`.
+        contrast_target_prefixes (:obj:`str` or :obj:`list(str)`): Target prefix(es) used as contrastive inputs to
+            compute target probabilities. If not specified, no target prefix beyond previously generated tokens is
+            assumed. Defaults to :obj:`None`.
         contrast_targets (:obj:`str` or :obj:`list(str)`): Contrastive target text(s) to be compared to the original
-            target text.
+            target text. If not specified, the original target text is used as contrastive target (will result in same
+            output unless ``contrast_sources`` or ``contrast_target_prefixes`` are specified). Defaults to :obj:`None`.
     """
-    c_batch = DecoderOnlyBatch.from_batch(
-        get_batch_from_inputs(
-            attribution_model=attribution_model,
-            inputs=contrast_targets,
-            as_targets=attribution_model.is_encoder_decoder,
-        )
-    )
-    curr_prefix_len = decoder_input_ids.size(1)
-
-    # We select the next contrastive token as target and truncate contrastive ids
-    # and their attention map to the current generation step.
-    c_tgt_ids = c_batch.target_ids[:, curr_prefix_len]
-    c_batch = c_batch[:curr_prefix_len].to(attribution_model.device)
-
-    if decoder_input_ids.size(0) != c_batch.target_ids.size(0):
-        raise ValueError(
-            f"Contrastive batch size ({c_batch.target_ids.size(0)}) must match candidate batch size"
-            f"({decoder_input_ids.size(0)}). Methods expanding inputs to multiple steps (e.g. Integrated Gradients) "
-            "are currently not supported for contrastive feature attribution."
-        )
-
-    # Forward pass with the same model used for the main generation, but using contrastive inputs instead
-    c_batch = attribution_model.formatter.convert_args_to_batch(
-        encoder_input_ids=encoder_input_ids,
-        decoder_input_ids=c_batch.target_ids,
-        encoder_input_embeds=encoder_input_embeds,
-        decoder_input_embeds=c_batch.target_embeds,
-        encoder_attention_mask=encoder_attention_mask,
-        decoder_attention_mask=c_batch.target_mask,
-    )
-    c_output = attribution_model.get_forward_output(c_batch, use_embeddings=attribution_model.is_encoder_decoder)
-
-    # Return the prob difference as target for attribution
     model_probs = probability_fn(attribution_model, forward_output, target_ids)
-    c_probs = probability_fn(attribution_model, c_output, c_tgt_ids)
-    return model_probs - c_probs
+    contrast_probs = contrast_prob_fn(
+        attribution_model=attribution_model,
+        target_ids=target_ids,
+        contrast_sources=contrast_sources,
+        contrast_target_prefixes=contrast_target_prefixes,
+        contrast_targets=contrast_targets,
+        **kwargs,
+    )
+    return model_probs - contrast_probs
 
 
 def mc_dropout_prob_avg_fn(

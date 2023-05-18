@@ -11,7 +11,7 @@
     specific language governing permissions and limitations under the License.
 
 #######################################################################################################################
-Using Custom Attribution Targets for Contrastive Feature Attribution
+Custom Attribution Targets for Contrastive Attribution
 #######################################################################################################################
 
 In this tutorial we will see how to customize the target function used by Inseq to compute attributions, to enable some interesting use

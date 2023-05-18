@@ -56,21 +56,14 @@ class MaxAggregationFunction(AggregationFunction):
     aggregation_function_name = "max"
 
     def __call__(self, scores: torch.Tensor, dim: int) -> ScoreTensor:
-        return scores.max(dim)
+        return scores.max(dim).values
 
 
 class MinAggregationFunction(AggregationFunction):
     aggregation_function_name = "min"
 
     def __call__(self, scores: torch.Tensor, dim: int) -> ScoreTensor:
-        return scores.min(dim)
-
-
-class SingleAggregationFunction(AggregationFunction):
-    aggregation_function_name = "single"
-
-    def __call__(self, scores: torch.Tensor, dim: int, single_idx: int) -> ScoreTensor:
-        return scores.select(dim, single_idx)
+        return scores.min(dim).values
 
 
 class SumAggregationFunction(AggregationFunction):
@@ -161,5 +154,5 @@ DEFAULT_ATTRIBUTION_AGGREGATE_DICT = {
 
 
 def list_aggregation_functions() -> List[str]:
-    """Lists identifiers for all available aggregation functions scores."""
+    """Lists identifiers for all available aggregation functions."""
     return available_classes(AggregationFunction)

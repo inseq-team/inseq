@@ -34,32 +34,7 @@ class InternalsAttributionRegistry(FeatureAttribution, Registry):
 
 
 class AttentionWeightsAttribution(InternalsAttributionRegistry):
-    """The basic attention attribution method, which retrieves the attention weights from the model.
-
-    Attribute Args:
-            aggregate_heads_fn (:obj:`str` or :obj:`callable`): The method to use for aggregating across heads.
-                Can be one of `average` (default if heads is list, tuple or None), `max`, `min` or `single` (default
-                if heads is int), or a custom function defined by the user.
-            aggregate_layers_fn (:obj:`str` or :obj:`callable`): The method to use for aggregating across layers.
-                Can be one of `average` (default if layers is tuple or list), `max`, `min` or `single` (default if
-                layers is int or None), or a custom function defined by the user.
-            heads (:obj:`int` or :obj:`tuple[int, int]` or :obj:`list(int)`, optional): If a single value is specified,
-                the head at the corresponding index is used. If a tuple of two indices is specified, all heads between
-                the indices will be aggregated using aggregate_fn. If a list of indices is specified, the respective
-                heads will be used for aggregation. If aggregate_fn is "single", a head must be specified.
-                If no value is specified, all heads are passed to aggregate_fn by default.
-            layers (:obj:`int` or :obj:`tuple[int, int]` or :obj:`list(int)`, optional): If a single value is specified
-                , the layer at the corresponding index is used. If a tuple of two indices is specified, all layers
-                among the indices will be aggregated using aggregate_fn. If a list of indices is specified, the
-                respective layers will be used for aggregation. If aggregate_fn is "single", the last layer is
-                used by default. If no value is specified, all available layers are passed to aggregate_fn by default.
-
-    Example:
-        - ``model.attribute(src)`` will return the average attention for all heads of the last layer.
-        - ``model.attribute(src, heads=0)`` will return the attention weights for the first head of the last layer.
-        - ``model.attribute(src, heads=(0, 5), aggregate_heads_fn="max", layers=[0, 2, 7])`` will return the maximum
-            attention weights for the first 5 heads averaged across the first, third, and eighth layers.
-    """
+    """The basic attention attribution method, which retrieves the attention weights from the model."""
 
     method_name = "attention"
 
