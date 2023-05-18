@@ -8,18 +8,12 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Type, Uni
 import torch
 
 from ..utils import (
-    abs_max,
     drop_padding,
     get_sequences_from_batched_steps,
-    identity_fn,
     json_advanced_dump,
     json_advanced_load,
-    normalize_attributions,
     pretty_dict,
-    prod_fn,
     remap_from_filtered,
-    sum_fn,
-    sum_normalize_attributions,
 )
 from ..utils.typing import (
     MultipleScoresPerSequenceTensor,
@@ -33,7 +27,8 @@ from ..utils.typing import (
     TextInput,
     TokenWithId,
 )
-from .aggregator import AggregableMixin, Aggregator, AggregatorPipeline, SequenceAttributionAggregator
+from .aggregation_functions import DEFAULT_ATTRIBUTION_AGGREGATE_DICT
+from .aggregator import AggregableMixin, Aggregator, AggregatorPipeline
 from .batch import Batch, BatchEmbedding, BatchEncoding, DecoderOnlyBatch, EncoderDecoderBatch
 from .data_utils import TensorWrapper
 
@@ -42,20 +37,6 @@ if TYPE_CHECKING:
 
 FeatureAttributionInput = Union[TextInput, BatchEncoding, Batch]
 
-DEFAULT_ATTRIBUTION_AGGREGATE_DICT = {
-    "source_attributions": {"sequence_aggregate": identity_fn, "span_aggregate": abs_max},
-    "target_attributions": {"sequence_aggregate": identity_fn, "span_aggregate": abs_max},
-    "step_scores": {
-        "span_aggregate": {
-            "probability": prod_fn,
-            "entropy": sum_fn,
-            "crossentropy": sum_fn,
-            "perplexity": prod_fn,
-            "contrast_prob_diff": prod_fn,
-            "mc_dropout_prob_avg": prod_fn,
-        }
-    },
-}
 
 logger = logging.getLogger(__name__)
 
@@ -120,8 +101,8 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
     sequence_scores: Optional[Dict[str, MultipleScoresPerSequenceTensor]] = None
     attr_pos_start: int = 0
     attr_pos_end: Optional[int] = None
-    _aggregator: Union[AggregatorPipeline, Type[Aggregator]] = None
-    _dict_aggregate_fn: Dict[str, Any] = None
+    _aggregator: Union[str, List[str], None] = None
+    _dict_aggregate_fn: Optional[Dict[str, str]] = None
 
     def __post_init__(self):
         if self._dict_aggregate_fn is None:
@@ -130,7 +111,7 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
         default_aggregate_fn.update(self._dict_aggregate_fn)
         self._dict_aggregate_fn = default_aggregate_fn
         if self._aggregator is None:
-            self._aggregator = SequenceAttributionAggregator
+            self._aggregator = "scores"
         if self.attr_pos_end is None or self.attr_pos_end > len(self.target):
             self.attr_pos_end = len(self.target)
 
@@ -328,7 +309,7 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
             target_attr = aggregated_attr.target_attributions.float().T
             self.target_attributions = (step_scores * target_attr).T
         # Empty aggregator pipeline -> no aggregation
-        self._aggregator = AggregatorPipeline([])
+        self._aggregator = []
         return self
 
     def get_scores_dicts(
@@ -705,10 +686,11 @@ class GranularFeatureAttributionSequenceOutput(FeatureAttributionSequenceOutput)
 
     def __post_init__(self):
         super().__post_init__()
-        self._dict_aggregate_fn["source_attributions"]["sequence_aggregate"] = sum_normalize_attributions
-        self._dict_aggregate_fn["target_attributions"]["sequence_aggregate"] = sum_normalize_attributions
-        if "deltas" not in self._dict_aggregate_fn["step_scores"]["span_aggregate"]:
-            self._dict_aggregate_fn["step_scores"]["span_aggregate"]["deltas"] = abs_max
+        self._aggregator = "vnorm"
+        self._dict_aggregate_fn["source_attributions"]["scores"] = "vnorm"
+        self._dict_aggregate_fn["target_attributions"]["scores"] = "vnorm"
+        if "deltas" not in self._dict_aggregate_fn["step_scores"]["spans"]:
+            self._dict_aggregate_fn["step_scores"]["spans"]["deltas"] = "absmax"
 
 
 @dataclass(eq=False, repr=False)
@@ -728,8 +710,6 @@ class CoarseFeatureAttributionSequenceOutput(FeatureAttributionSequenceOutput):
 
     def __post_init__(self):
         super().__post_init__()
-        self._dict_aggregate_fn["source_attributions"]["sequence_aggregate"] = normalize_attributions
-        self._dict_aggregate_fn["target_attributions"]["sequence_aggregate"] = normalize_attributions
 
 
 @dataclass(eq=False, repr=False)
@@ -752,7 +732,7 @@ class MultiDimensionalFeatureAttributionSequenceOutput(FeatureAttributionSequenc
 
     def __post_init__(self):
         super().__post_init__()
-        self._aggregator = AggregatorPipeline([SequenceAttributionAggregator] * self._num_dimensions)
+        self._aggregator = ["mean"] * self._num_dimensions
 
 
 @dataclass(eq=False, repr=False)

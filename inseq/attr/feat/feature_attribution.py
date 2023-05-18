@@ -89,6 +89,8 @@ class FeatureAttribution(Registry):
             target_layer (:obj:`torch.nn.Module`, default `None`): The layer on which attribution should be
                 performed for layer attribution methods.
             use_baselines (:obj:`bool`, default `False`): Whether a baseline should be used for the attribution method.
+            use_attention_weights (:obj:`bool`, default `False`): Whether attention weights are used in the attribution
+                method.
         """
         super().__init__()
         self.attribution_model = attribution_model
@@ -96,6 +98,7 @@ class FeatureAttribution(Registry):
         self.forward_batch_embeds: bool = True
         self.target_layer = None
         self.use_baselines: bool = False
+        self.use_attention_weights: bool = False
         if hook_to_model:
             self.hook(**kwargs)
 
@@ -463,12 +466,16 @@ class FeatureAttribution(Registry):
             forward_batch_embeds=self.forward_batch_embeds,
             use_baselines=self.use_baselines,
         )
-        if len(step_scores) > 0:
+        if len(step_scores) > 0 or self.use_attention_weights:
             with torch.no_grad():
                 output = self.attribution_model.get_forward_output(
                     batch,
                     use_embeddings=self.forward_batch_embeds,
+                    output_attentions=self.use_attention_weights,
                 )
+            if self.use_attention_weights:
+                attentions_dict = self.attribution_model.get_attentions_dict(output)
+                attribution_args = {**attribution_args, **attentions_dict}
         set_seed(42)
         # Perform attribution step
         step_output = self.attribute_step(

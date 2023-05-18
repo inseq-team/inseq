@@ -20,12 +20,18 @@ functionalities required for its usage.
 
 .. autofunction:: get_version
 
-.. autofunction:: list_feature_attribution_methods
-
-.. autofunction:: list_step_functions
+.. autofunction:: explain
 
 .. autofunction:: load_model
 
 .. autofunction:: register_step_function
+
+.. autofunction:: list_feature_attribution_methods
+
+.. autofunction:: list_aggregators
+
+.. autofunction:: list_step_functions
+
+.. autofunction:: list_aggregation_functions
 
 .. autofunction:: show_attributions

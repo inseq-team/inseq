@@ -157,7 +157,10 @@ Step functions are used to extract custom scores from the model at each step of 
 - `entropy`: Entropy of the predictive distribution.
 - `crossentropy`: Cross-entropy loss between target token and predicted distribution.
 - `perplexity`: Perplexity of the target token.
-- `contrast_prob_diff`: Difference in probability between the target token and a foil token used for contrastive evaluation as in [Contrastive Attribution](https://aclanthology.org/2022.emnlp-main.14/) (Yin and Neubig, 2022).
+- `contrast_prob`: Probability of the target token when different contrastive inputs are provided to the model. Equivalent to `probability` when no contrastive inputs are provided.
+- `pcxmi`: Point-wise Contextual Cross-Mutual Information (P-CXMI) for the target token given original and contrastive contexts [(Yin et al. 2021)](https://arxiv.org/abs/2109.07446).
+- `kl_divergence`: KL divergence of the predictive distribution given original and contrastive contexts. Can be limited to top-K most likely target token options using the `top_k` parameter.
+- `contrast_prob_diff`: Difference in probability between original and foil target tokens pair, can be used for contrastive evaluation as in [Contrastive Attribution](https://aclanthology.org/2022.emnlp-main.14/) (Yin and Neubig, 2022).
 - `mc_dropout_prob_avg`: Average probability of the target token across multiple samples using [MC Dropout](https://arxiv.org/abs/1506.02142) (Gal and Ghahramani, 2016).
 
 The following example computes contrastive attributions using the `contrast_prob_diff` step function:
@@ -167,18 +170,14 @@ import inseq
 
 attribution_model = inseq.load_model("gpt2", "input_x_gradient")
 
-# Pre-compute ids and attention map for the contrastive target
-contrast = attribution_model.encode("The manager went home because she was sick")
-
 # Perform the contrastive attribution:
-# Regular (forced) target -> "Can you stop the dog from barking"
-# Contrastive target      -> "Can you stop the dog from crying"
+# Regular (forced) target -> "The manager went home because he was sick"
+# Contrastive target      -> "The manager went home because she was sick"
 out = attribution_model.attribute(
     "The manager went home because",
     "The manager went home because he was sick",
     attributed_fn="contrast_prob_diff",
-    contrast_ids=contrast.input_ids,
-    contrast_attention_mask=contrast.attention_mask,
+    contrast_targets="The manager went home because she was sick",
     # We also visualize the corresponding step score
     step_scores=["contrast_prob_diff"]
 )

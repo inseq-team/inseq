@@ -136,7 +136,7 @@ sphinxcontrib-serializinghtml==1.1.5 ; python_full_version >= "3.8.1" and python
 sphinxemoji==0.2.0 ; python_full_version >= "3.8.1" and python_version < "3.12"
 sphinxext-opengraph==0.4.2 ; python_full_version >= "3.8.1" and python_version < "3.12"
 stack-data==0.6.2 ; python_full_version >= "3.8.1" and python_version < "3.12"
-stevedore==5.0.0 ; python_full_version >= "3.8.1" and python_version < "3.12"
+stevedore==5.1.0 ; python_full_version >= "3.8.1" and python_version < "3.12"
 sympy==1.12 ; python_full_version >= "3.8.1" and python_version < "3.12"
 threadpoolctl==3.1.0 ; python_full_version >= "3.8.1" and python_version < "3.12"
 tokenizers==0.13.3 ; python_full_version >= "3.8.1" and python_version < "3.12"

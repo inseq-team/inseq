@@ -24,10 +24,6 @@ from .typing import TextInput, TokenWithId
 logger = logging.getLogger(__name__)
 
 
-def identity_fn(x, **kwargs):
-    return x
-
-
 @contextmanager
 def optional(condition, context_manager, alternative_fn=None, **alternative_fn_kwargs):
     if condition:

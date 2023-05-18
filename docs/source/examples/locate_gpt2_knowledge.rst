@@ -51,14 +51,12 @@ saving aggregated outputs to disk.
             true_answer = prompt + ex["target_true"]
             # e.g. "The capital of Spain is Paris"
             false_answer = prompt + ex["target_false"]
-            contrast = attrib_model.encode(false_answer)
             # Contrastive attribution of true vs false answer
             out = attrib_model.attribute(
                 prompt,
                 true_answer,
                 attributed_fn="contrast_prob_diff",
-                contrast_ids=contrast.input_ids,
-                contrast_attention_mask=contrast.attention_mask,
+                contrast_targets=false_answer,
                 step_scores=["contrast_prob_diff"],
                 show_progress=False,
             )

@@ -10,29 +10,31 @@
     an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
     specific language governing permissions and limitations under the License.
 
-Step Functions
+Aggregation Functions
 =======================================================================================================================
 
-The following functions can be used as attribution targets or step functions in the :meth:`inseq.models.AttributionModel.attribute` function call.
+The following functions can be used in :meth:`~inseq.FeatureAttributionOutput.aggregate` to specify the aggregation
+strategy to use for aggregation.
 
-.. currentmodule:: inseq.attr.step_functions
+.. currentmodule:: inseq.data.aggregation_functions
 
-.. autofunction:: logit_fn
+.. autoclass:: MeanAggregationFunction
+    :members:
 
-.. autofunction:: probability_fn
+.. autoclass:: MaxAggregationFunction
+    :members:
 
-.. autofunction:: entropy_fn
+.. autoclass:: MinAggregationFunction
+    :members:
 
-.. autofunction:: crossentropy_fn
+.. autoclass:: SumAggregationFunction
+    :members:
 
-.. autofunction:: perplexity_fn
+.. autoclass:: ProdAggregationFunction
+    :members:
 
-.. autofunction:: contrast_prob_fn
+.. autoclass:: AbsMaxAggregationFunction
+    :members:
 
-.. autofunction:: pcxmi_fn
-
-.. autofunction:: kl_divergence_fn
-
-.. autofunction:: contrast_prob_diff_fn
-
-.. autofunction:: mc_dropout_prob_avg_fn
+.. autoclass:: VectorNormAggregationFunction
+    :members:

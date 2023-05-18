@@ -1,8 +1,14 @@
 """Interpretability for Sequence Generation Models 🔍."""
 
 from .attr import list_feature_attribution_methods, list_step_functions, register_step_function
-from .data import FeatureAttributionOutput, show_attributions
+from .data import (
+    FeatureAttributionOutput,
+    list_aggregation_functions,
+    list_aggregators,
+    show_attributions,
+)
 from .models import AttributionModel, list_supported_frameworks, load_model
+from .utils.id_utils import explain
 
 
 def get_version() -> str:
@@ -19,8 +25,11 @@ __all__ = [
     "AttributionModel",
     "FeatureAttributionOutput",
     "load_model",
+    "explain",
     "show_attributions",
     "list_feature_attribution_methods",
+    "list_aggregators",
+    "list_aggregation_functions",
     "list_step_functions",
     "list_supported_frameworks",
     "register_step_function",

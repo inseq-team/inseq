@@ -36,9 +36,6 @@ def test_contrastive_attribution_seq2seq(saliency_mt_model_larger: HuggingfaceEn
     introduced by [Yin and Neubig '22](https://arxiv.org/pdf/2202.10419.pdf), taking advantage of
     the custom feature attribution target function module.
     """
-    # Pre-compute ids and attention map for the contrastive target
-    contrast = saliency_mt_model_larger.encode("Non posso crederlo.", as_targets=True)
-
     # Perform the contrastive attribution:
     # Regular (forced) target -> "Non posso crederci."
     # Contrastive target      -> "Non posso crederlo."
@@ -47,8 +44,7 @@ def test_contrastive_attribution_seq2seq(saliency_mt_model_larger: HuggingfaceEn
         "I can't believe it",
         "Non posso crederci.",
         attributed_fn="contrast_prob_diff",
-        contrast_ids=contrast.input_ids,
-        contrast_attention_mask=contrast.attention_mask,
+        contrast_targets="Non posso crederlo.",
         show_progress=False,
     )
     attribution_scores = out.sequence_attributions[0].source_attributions
@@ -62,13 +58,11 @@ def test_contrastive_attribution_seq2seq(saliency_mt_model_larger: HuggingfaceEn
 
 
 def test_contrastive_attribution_gpt(saliency_gpt_model: HuggingfaceDecoderOnlyModel):
-    contrast = saliency_gpt_model.encode("The female student didn't participate because he was sick.")
     out = saliency_gpt_model.attribute(
         "The female student didn't participate because",
         "The female student didn't participate because she was sick.",
         attributed_fn="contrast_prob_diff",
-        contrast_ids=contrast.input_ids,
-        contrast_attention_mask=contrast.attention_mask,
+        contrast_targets="The female student didn't participate because he was sick.",
         show_progress=False,
     )
     attribution_scores = out.sequence_attributions[0].target_attributions

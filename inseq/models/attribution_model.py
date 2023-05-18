@@ -543,6 +543,11 @@ class AttributionModel(ABC, torch.nn.Module):
     def get_decoder(self) -> torch.nn.Module:
         pass
 
+    @staticmethod
+    @abstractmethod
+    def get_attentions_dict(output: ModelOutput) -> Dict[str, torch.Tensor]:
+        pass
+
     # Model forward
 
     def _forward(
