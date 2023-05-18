@@ -4069,4 +4069,4 @@ sklearn = ["scikit-learn", "joblib"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.8.1,<3.12"
-content-hash = "c57bed5e16b42eafcfbc7fa079633349971c2bfb841e72b7199da24271e22aa9"
+content-hash = "8db9bef0c3d0f20e252eac4c373d1b385a3a4f1c3b5b880da9eb02fb05399779"
