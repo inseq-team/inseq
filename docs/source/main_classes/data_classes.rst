@@ -61,35 +61,3 @@ Attributions
 
 .. autoclass:: inseq.data.attribution.GranularFeatureAttributionStepOutput
     :members:
-
-
-Aggregators
------------------------------------------------------------------------------------------------------------------------
-
-
-.. autoclass:: inseq.data.aggregator.Aggregator
-    :members:
-
-
-.. autoclass:: inseq.data.aggregator.AggregatorPipeline
-    :members:
-
-
-.. autoclass:: inseq.data.aggregator.AggregableMixin
-    :members:
-
-
-.. autoclass:: inseq.data.aggregator.SequenceAttributionAggregator
-    :members:
-
-
-.. autoclass:: inseq.data.aggregator.ContiguousSpanAggregator
-    :members:
-
-
-.. autoclass:: inseq.data.aggregator.SubwordAggregator
-    :members:
-
-
-.. autoclass:: inseq.data.aggregator.PairAggregator
-    :members:
