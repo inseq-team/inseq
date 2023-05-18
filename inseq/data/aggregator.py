@@ -91,16 +91,16 @@ class Aggregator(Registry):
     def aggregate(
         cls,
         tensors: AggregableMixinClass,
-        do_start_aggregation: bool = True,
-        do_end_aggregation: bool = True,
+        do_pre_aggregation_checks: bool = True,
+        do_post_aggregation_checks: bool = True,
         **kwargs,
     ) -> AggregableMixinClass:
-        if do_start_aggregation:
+        if do_pre_aggregation_checks:
             cls.start_aggregation_hook(tensors, **kwargs)
         cls.pre_aggregate_hook(tensors, **kwargs)
         aggregated = cls._aggregate(tensors, **kwargs)
         cls.post_aggregate_hook(aggregated, **kwargs)
-        if do_end_aggregation:
+        if do_post_aggregation_checks:
             cls.end_aggregation_hook(aggregated, **kwargs)
         return aggregated
 
@@ -176,11 +176,11 @@ class AggregatorPipeline:
     def aggregate(
         self,
         tensors: AggregableMixinClass,
-        do_start_aggregation: bool = True,
-        do_end_aggregation: bool = True,
+        do_pre_aggregation_checks: bool = True,
+        do_post_aggregation_checks: bool = True,
         **kwargs,
     ) -> AggregableMixinClass:
-        if do_start_aggregation:
+        if do_pre_aggregation_checks:
             for aggregator in self.aggregators:
                 aggregator.start_aggregation_hook(tensors, **kwargs)
         for aggregator, aggregate_fn in zip(self.aggregators, self.aggregate_fn):
@@ -188,15 +188,20 @@ class AggregatorPipeline:
             if aggregate_fn is not None:
                 curr_aggregation_kwargs["aggregate_fn"] = aggregate_fn
             tensors = aggregator.aggregate(
-                tensors, do_start_aggregation=False, do_end_aggregation=False, **curr_aggregation_kwargs
+                tensors, do_pre_aggregation_checks=False, do_post_aggregation_checks=False, **curr_aggregation_kwargs
             )
-        if do_end_aggregation:
+        if do_post_aggregation_checks:
             for aggregator in self.aggregators:
                 aggregator.end_aggregation_hook(tensors, **kwargs)
         return tensors
 
 
 AggregatorInput = Union[AggregatorPipeline, Type[Aggregator], str, Sequence[Union[str, Type[Aggregator]]], None]
+
+
+def list_aggregators() -> List[str]:
+    """Lists identifiers for all available aggregators."""
+    return available_classes(Aggregator)
 
 
 class AggregableMixin(ABC):
@@ -206,8 +211,8 @@ class AggregableMixin(ABC):
         self: AggregableMixinClass,
         aggregator: AggregatorInput = None,
         aggregate_fn: Union[str, Sequence[str], None] = None,
-        do_start_aggregation: bool = True,
-        do_end_aggregation: bool = True,
+        do_pre_aggregation_checks: bool = True,
+        do_post_aggregation_checks: bool = True,
         **kwargs,
     ) -> AggregableMixinClass:
         """Aggregate outputs using the default or provided aggregator.
@@ -242,7 +247,10 @@ class AggregableMixin(ABC):
                     "or tuples of pairs of strings/classes identifying aggregators and aggregate functions."
                 )
         return aggregator.aggregate(
-            self, do_start_aggregation=do_start_aggregation, do_end_aggregation=do_end_aggregation, **kwargs
+            self,
+            do_pre_aggregation_checks=do_pre_aggregation_checks,
+            do_post_aggregation_checks=do_post_aggregation_checks,
+            **kwargs,
         )
 
     @abstractmethod
@@ -341,7 +349,7 @@ class SequenceAttributionAggregator(Aggregator):
             raise RuntimeError(
                 f"The aggregated attributions should be 2-dimensional to be visualized. Found dimensions: {e.args[0]}"
                 "If you're performing intermediate aggregation and don't aim to visualize the output right away, use"
-                "do_end_aggregation=False in the aggregate method to bypass this check."
+                "do_post_aggregation_checks=False in the aggregate method to bypass this check."
             ) from e
 
     @staticmethod
