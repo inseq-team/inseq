@@ -65,13 +65,6 @@ class MinAggregationFunction(AggregationFunction):
         return scores.min(dim).values
 
 
-class SingleAggregationFunction(AggregationFunction):
-    aggregation_function_name = "single"
-
-    def __call__(self, scores: torch.Tensor, dim: int, single_idx: int) -> ScoreTensor:
-        return scores.select(dim, single_idx)
-
-
 class SumAggregationFunction(AggregationFunction):
     aggregation_function_name = "sum"
 

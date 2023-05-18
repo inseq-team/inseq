@@ -139,7 +139,7 @@ def _get_aggregators_from_id(
         raise ValueError(
             f"Unknown aggregator {aggregator}. Choose from {', '.join(available_classes(Aggregator))}.\n"
             f"Alternatively, choose from the aggregate_fn options {', '.join(available_classes(AggregationFunction))} "
-            "for scores aggregation with the selected function."
+            "for scores aggregation with the chosen function."
         )
     if aggregate_fn is None:
         return aggregator, aggregate_fn
@@ -292,6 +292,38 @@ class SequenceAttributionAggregator(Aggregator):
         return attr.__class__(**aggregated_sequence_attribution_fields)
 
     @classmethod
+    def _process_attribution_scores(
+        cls,
+        attr: "FeatureAttributionSequenceOutput",
+        aggregate_fn: AggregationFunction,
+        select_idx: Union[int, Tuple[int, int], List[int], None] = None,
+        normalize: bool = True,
+        **kwargs,
+    ):
+        fn_kwargs = extract_signature_args(kwargs, aggregate_fn)
+        # If select_idx is a single int, no aggregation is performed
+        do_aggregate = not isinstance(select_idx, int)
+        has_source = attr.source_attributions is not None
+        has_target = attr.target_attributions is not None
+        src_scores = None
+        if has_source:
+            src_scores = cls._filter_scores(attr.source_attributions, dim=-1, indices=select_idx)
+        tgt_scores = None
+        if has_target:
+            tgt_scores = cls._filter_scores(attr.target_attributions, dim=-1, indices=select_idx)
+        if has_source and has_target:
+            scores = (src_scores, tgt_scores)
+        else:
+            scores = src_scores if src_scores is not None else tgt_scores
+        if aggregate_fn.takes_sequence_scores:
+            fn_kwargs["sequence_scores"] = attr.sequence_scores
+        if do_aggregate:
+            scores = cls._aggregate_scores(scores, aggregate_fn, dim=-1, **fn_kwargs)
+        if normalize:
+            scores = normalize_fn(scores)
+        return scores
+
+    @classmethod
     def post_aggregate_hook(cls, attr: "FeatureAttributionSequenceOutput", **kwargs):
         super().post_aggregate_hook(attr, **kwargs)
         cls.is_compatible(attr)
@@ -325,54 +357,28 @@ class SequenceAttributionAggregator(Aggregator):
         cls,
         attr: "FeatureAttributionSequenceOutput",
         aggregate_fn: AggregationFunction,
-        filter_indices: Union[int, Tuple[int, int], List[int], None] = None,
+        select_idx: Union[int, Tuple[int, int], List[int], None] = None,
         normalize: bool = True,
         **kwargs,
     ):
         if attr.source_attributions is None:
             return attr.source_attributions
-        fn_kwargs = extract_signature_args(kwargs, aggregate_fn)
-        scores = cls._filter_scores(attr.source_attributions, dim=-1, indices=filter_indices)
-        if aggregate_fn.takes_sequence_scores:
-            fn_kwargs["sequence_scores"] = attr.sequence_scores
-        if attr.target_attributions is None:
-            scores = cls._aggregate_scores(scores, aggregate_fn, dim=-1, **fn_kwargs)
-            if normalize:
-                return normalize_fn(scores)
-            return scores
-        else:
-            scores = (scores, cls._filter_scores(attr.target_attributions, dim=-1, indices=filter_indices))
-            scores = cls._aggregate_scores(scores, aggregate_fn, dim=-1, **fn_kwargs)
-            if normalize:
-                return normalize_fn(scores)[0]
-            return scores[0]
+        scores = cls._process_attribution_scores(attr, aggregate_fn, select_idx, normalize, **kwargs)
+        return scores[0] if attr.target_attributions is not None else scores
 
     @classmethod
     def aggregate_target_attributions(
         cls,
         attr: "FeatureAttributionSequenceOutput",
         aggregate_fn: AggregationFunction,
-        filter_indices: Union[int, Tuple[int, int], List[int], None] = None,
+        select_idx: Union[int, Tuple[int, int], List[int], None] = None,
         normalize: bool = True,
         **kwargs,
     ):
         if attr.target_attributions is None:
             return attr.target_attributions
-        fn_kwargs = extract_signature_args(kwargs, aggregate_fn)
-        scores = cls._filter_scores(attr.target_attributions, dim=-1, indices=filter_indices)
-        if aggregate_fn.takes_sequence_scores:
-            fn_kwargs["sequence_scores"] = attr.sequence_scores
-        if attr.source_attributions is None:
-            scores = cls._aggregate_scores(scores, aggregate_fn, dim=-1, **fn_kwargs)
-            if normalize:
-                return normalize_fn(scores)
-            return scores
-        else:
-            scores = (cls._filter_scores(attr.source_attributions, dim=-1, indices=filter_indices), scores)
-            scores = cls._aggregate_scores(scores, aggregate_fn, dim=-1, **fn_kwargs)
-            if normalize:
-                return normalize_fn(scores)[1]
-            return scores[1]
+        scores = cls._process_attribution_scores(attr, aggregate_fn, select_idx, normalize, **kwargs)
+        return scores[1] if attr.source_attributions is not None else scores
 
     @staticmethod
     def aggregate_step_scores(attr: "FeatureAttributionSequenceOutput", **kwargs):
@@ -383,7 +389,7 @@ class SequenceAttributionAggregator(Aggregator):
         cls,
         attr: "FeatureAttributionSequenceOutput",
         aggregate_fn: AggregationFunction,
-        filter_indices: Union[int, Tuple[int, int], List[int], None] = None,
+        select_idx: Union[int, Tuple[int, int], List[int], None] = None,
         **kwargs,
     ):
         if aggregate_fn.takes_sequence_scores:
@@ -391,8 +397,10 @@ class SequenceAttributionAggregator(Aggregator):
         fn_kwargs = extract_signature_args(kwargs, aggregate_fn)
         new_sequence_scores = {}
         for scores_id, seq_scores in attr.sequence_scores.items():
-            filtered_scores = cls._filter_scores(seq_scores, dim=-1, indices=filter_indices)
-            new_sequence_scores[scores_id] = cls._aggregate_scores(filtered_scores, aggregate_fn, dim=-1, **fn_kwargs)
+            filtered_scores = cls._filter_scores(seq_scores, dim=-1, indices=select_idx)
+            if not isinstance(select_idx, int):
+                filtered_scores = cls._aggregate_scores(filtered_scores, aggregate_fn, dim=-1, **fn_kwargs)
+            new_sequence_scores[scores_id] = filtered_scores
         return new_sequence_scores
 
     @staticmethod
@@ -432,8 +440,11 @@ class SequenceAttributionAggregator(Aggregator):
             if len(indices) == 1:
                 indices = indices[0]
 
-        if isinstance(indices, int) and indices not in range(-n_units, n_units):
-            raise IndexError(f"Index out of range. Scores only have {n_units} units.")
+        if isinstance(indices, int):
+            if indices not in range(-n_units, n_units):
+                raise IndexError(f"Index out of range. Scores only have {n_units} units.")
+            indices = indices if indices >= 0 else n_units + indices
+            return scores.select(dim, torch.tensor(indices, device=scores.device))
         else:
             if indices is None:
                 indices = (0, n_units)
@@ -446,8 +457,8 @@ class SequenceAttributionAggregator(Aggregator):
                 len(indices) == 2 and isinstance(indices, tuple) and indices[0] >= indices[1]
             ):
                 raise RuntimeError(
-                    "A (start, end) tuple of indices representing a span or a list of individual indices"
-                    " must be specified for aggregation."
+                    "A (start, end) tuple of indices representing a span, a list of individual indices"
+                    " or a single index must be specified for select_idx."
                 )
             max_idx_val = n_units if isinstance(indices, list) else n_units + 1
             if not all(h in range(-n_units, max_idx_val) for h in indices):
