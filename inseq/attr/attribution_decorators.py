@@ -76,7 +76,8 @@ def batched(f: Callable[..., Any]) -> Callable[..., Any]:
         zipped_batched_args = zip(*batched_args) if len(batched_args) > 1 else [(x,) for x in batched_args[0]]
         for i, batch in enumerate(zipped_batched_args):
             logger.debug(f"Batching enabled: processing batch {i + 1} of {len_batches}...")
-            output.append(f(self, *batch, **kwargs))
+            out = f(self, *batch, **kwargs)
+            output += out if isinstance(out, list) else [out]
         return output
 
     return batched_wrapper

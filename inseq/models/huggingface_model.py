@@ -15,6 +15,7 @@ from transformers import (
 )
 from transformers.modeling_outputs import CausalLMOutput, ModelOutput, Seq2SeqLMOutput
 
+from ..attr.attribution_decorators import batched
 from ..data import BatchEncoding
 from ..utils import check_device
 from ..utils.typing import (
@@ -179,6 +180,7 @@ class HuggingfaceModel(AttributionModel):
         return dic_info
 
     @unhooked
+    @batched
     def generate(
         self,
         inputs: Union[TextInput, BatchEncoding],
