@@ -68,7 +68,8 @@ def batched(f: Callable[..., Any]) -> Callable[..., Any]:
                 raise TypeError(f"Unsupported type {type(seq)} for batched attribution computation.")
 
         if batch_size is None:
-            return [f(self, *args, **kwargs)]
+            out = f(self, *args, **kwargs)
+            return out if isinstance(out, list) else [out]
         batched_args = [get_batched(batch_size, arg) for arg in args]
         len_batches = len(batched_args[0])
         assert all(len(batch) == len_batches for batch in batched_args)
