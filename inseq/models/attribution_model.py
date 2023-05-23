@@ -346,7 +346,9 @@ class AttributionModel(ABC, torch.nn.Module):
             if generate_from_target_prefix:
                 decoder_input = self.encode(generated_texts, as_targets=True)
                 generation_args["decoder_input_ids"] = decoder_input.input_ids
-            generated_texts = self.generate(encoded_input, return_generation_output=False, **generation_args)
+            generated_texts = self.generate(
+                encoded_input, return_generation_output=False, batch_size=batch_size, **generation_args
+            )
         else:
             if generation_args:
                 logger.warning(
