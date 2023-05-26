@@ -321,29 +321,27 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
         # If no aggregator is specified, the default aggregator for the class is used
         aggr = self.aggregate(aggregator, **kwargs) if do_aggregation else self
         return_dict = {"source_attributions": {}, "target_attributions": {}, "step_scores": {}}
-        if aggr.source_attributions is not None:
-            score_map_source = {}
-            for tgt_idx, tgt_tok in enumerate(aggr.target):
-                score_map_source[tgt_tok.token] = {}
+        for tgt_idx in range(aggr.attr_pos_start, aggr.attr_pos_end):
+            tgt_tok = aggr.target[tgt_idx]
+            if aggr.source_attributions is not None:
+                return_dict["source_attributions"][tgt_tok.token] = {}
                 for src_idx, src_tok in enumerate(aggr.source):
-                    score_map_source[tgt_tok.token][src_tok.token] = aggr.source_attributions[src_idx, tgt_idx].item()
-            return_dict["source_attributions"] = score_map_source
-        if aggr.target_attributions is not None:
-            score_map_target = {}
-            for tgt_idx_b, tgt_tok_b in enumerate(aggr.target):
-                score_map_target[tgt_tok_b.token] = {}
-                for tgt_idx_a, tgt_tok_a in enumerate(aggr.target):
-                    score_map_target[tgt_tok_b.token][tgt_tok_a.token] = aggr.target_attributions[
-                        tgt_idx_a, tgt_idx_b
+                    return_dict["source_attributions"][tgt_tok.token][src_tok.token] = aggr.source_attributions[
+                        src_idx, tgt_idx - aggr.attr_pos_start
                     ].item()
-            return_dict["target_attributions"] = score_map_target
-        if aggr.step_scores is not None:
-            step_scores_map = {}
-            for tgt_idx, tgt_tok in enumerate(aggr.target):
-                step_scores_map[tgt_tok.token] = {}
+            if aggr.target_attributions is not None:
+                return_dict["target_attributions"][tgt_tok.token] = {}
+                for tgt_idx_attr in range(aggr.attr_pos_end):
+                    tgt_tok_attr = aggr.target[tgt_idx_attr]
+                    return_dict["target_attributions"][tgt_tok.token][tgt_tok_attr.token] = aggr.target_attributions[
+                        tgt_idx_attr, tgt_idx - aggr.attr_pos_start
+                    ].item()
+            if aggr.step_scores is not None:
+                return_dict["step_scores"][tgt_tok.token] = {}
                 for step_score_id, step_score in aggr.step_scores.items():
-                    step_scores_map[tgt_tok.token][step_score_id] = step_score[tgt_idx].item()
-            return_dict["step_scores"] = step_scores_map
+                    return_dict["step_scores"][tgt_tok.token][step_score_id] = step_score[
+                        tgt_idx - aggr.attr_pos_start
+                    ].item()
         return return_dict
 
 
@@ -625,9 +623,11 @@ class FeatureAttributionOutput:
         first = attributions[0]
         for match_field in cls._merge_match_info_fields:
             assert all(
-                attr.info[match_field] == first.info[match_field]
-                if match_field in first.info
-                else match_field not in attr.info
+                (
+                    attr.info[match_field] == first.info[match_field]
+                    if match_field in first.info
+                    else match_field not in attr.info
+                )
                 for attr in attributions
             ), f"Cannot merge: incompatible values for field {match_field}"
         out_info = first.info.copy()
@@ -641,9 +641,11 @@ class FeatureAttributionOutput:
             out_info.update({"input_texts": [text for attr in attributions for text in attr.info["input_texts"]]})
         return cls(
             sequence_attributions=[seqattr for attr in attributions for seqattr in attr.sequence_attributions],
-            step_attributions=[stepattr for attr in attributions for stepattr in attr.step_attributions]
-            if first.step_attributions is not None
-            else None,
+            step_attributions=(
+                [stepattr for attr in attributions for stepattr in attr.step_attributions]
+                if first.step_attributions is not None
+                else None
+            ),
             info=out_info,
         )
 
