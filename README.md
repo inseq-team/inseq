@@ -240,3 +240,17 @@ If you use Inseq in your research we suggest to include a mention to the specifi
     url = {https://arxiv.org/abs/2302.13942}
 }
 ```
+
+## Research using Inseq
+
+Inseq has been used in various research projects. A list of known publications that use Inseq to conduct interpretability analyses of generative models is shown below. If you know more, please let us know or submit a pull request (*last updated: May 2023*).
+
+<details>
+  <summary><b>2023</b></summary>
+  <ol>
+    <li> <a href="https://arxiv.org/abs/2302.13942">Inseq: An Interpretability Toolkit for Sequence Generation Models</a> (Sarti et al., 2023) </li>
+    <li> <a href="https://arxiv.org/abs/2302.14220">Are Character-level Translations Worth the Wait? Comparing Character- and Subword-level Models for Machine Translation</a> (Edman et al., 2023) </li>
+    <li> <a href="https://arxiv.org/abs/2305.15908">Response Generation in Longitudinal Dialogues: Which Knowledge Representation Helps?</a> (Mousavi et al., 2023)  </li> 
+  </ol>
+
+</details>
