@@ -622,9 +622,18 @@ class ContiguousSpanAggregator(SequenceAttributionAggregator):
         out_dict = {}
         for name, step_scores in attr.sequence_scores.items():
             aggregate_fn = aggregate_fn[name] if isinstance(aggregate_fn, dict) else aggregate_fn
-            out_dict[name] = ContiguousSpanAggregator._aggregate_sequential_scores(
-                step_scores, source_spans, target_spans, aggregate_fn
-            )
+            if name.startswith("decoder"):
+                out_dict[name] = ContiguousSpanAggregator._aggregate_sequential_scores(
+                    step_scores, target_spans, target_spans, aggregate_fn
+                )
+            elif name.startswith("encoder"):
+                out_dict[name] = ContiguousSpanAggregator._aggregate_sequential_scores(
+                    step_scores, source_spans, source_spans, aggregate_fn
+                )
+            else:
+                out_dict[name] = ContiguousSpanAggregator._aggregate_sequential_scores(
+                    step_scores, source_spans, target_spans, aggregate_fn
+                )
         return out_dict
 
 
