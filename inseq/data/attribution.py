@@ -324,22 +324,22 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
         for tgt_idx in range(aggr.attr_pos_start, aggr.attr_pos_end):
             tgt_tok = aggr.target[tgt_idx]
             if aggr.source_attributions is not None:
-                return_dict["source_attributions"][tgt_tok.token] = {}
+                return_dict["source_attributions"][(tgt_idx, tgt_tok.token)] = {}
                 for src_idx, src_tok in enumerate(aggr.source):
-                    return_dict["source_attributions"][tgt_tok.token][src_tok.token] = aggr.source_attributions[
-                        src_idx, tgt_idx - aggr.attr_pos_start
-                    ].item()
+                    return_dict["source_attributions"][(tgt_idx, tgt_tok.token)][(src_idx, src_tok.token)] = (
+                        aggr.source_attributions[src_idx, tgt_idx - aggr.attr_pos_start].item()
+                    )
             if aggr.target_attributions is not None:
-                return_dict["target_attributions"][tgt_tok.token] = {}
+                return_dict["target_attributions"][(tgt_idx, tgt_tok.token)] = {}
                 for tgt_idx_attr in range(aggr.attr_pos_end):
                     tgt_tok_attr = aggr.target[tgt_idx_attr]
-                    return_dict["target_attributions"][tgt_tok.token][tgt_tok_attr.token] = aggr.target_attributions[
-                        tgt_idx_attr, tgt_idx - aggr.attr_pos_start
-                    ].item()
+                    return_dict["target_attributions"][(tgt_idx, tgt_tok.token)][
+                        (tgt_idx_attr, tgt_tok_attr.token)
+                    ] = aggr.target_attributions[tgt_idx_attr, tgt_idx - aggr.attr_pos_start].item()
             if aggr.step_scores is not None:
-                return_dict["step_scores"][tgt_tok.token] = {}
+                return_dict["step_scores"][(tgt_idx, tgt_tok.token)] = {}
                 for step_score_id, step_score in aggr.step_scores.items():
-                    return_dict["step_scores"][tgt_tok.token][step_score_id] = step_score[
+                    return_dict["step_scores"][(tgt_idx, tgt_tok.token)][step_score_id] = step_score[
                         tgt_idx - aggr.attr_pos_start
                     ].item()
         return return_dict
