@@ -101,9 +101,24 @@ def get_step_scores(
     return STEP_SCORES_MAP[score_identifier](**step_scores_args)
 
 
-def join_token_ids(tokens: OneOrMoreTokenSequences, ids: OneOrMoreIdSequences) -> List[TokenWithId]:
-    """Builds a list of TokenWithId objects from a list of token sequences and a list of id sequences."""
-    return [[TokenWithId(token, id) for token, id in zip(tok_seq, idx_seq)] for tok_seq, idx_seq in zip(tokens, ids)]
+def join_token_ids(
+    tokens: OneOrMoreTokenSequences,
+    ids: OneOrMoreIdSequences,
+    contrast_tokens: Optional[OneOrMoreTokenSequences] = None,
+) -> List[TokenWithId]:
+    """Joins tokens and ids into a list of TokenWithId objects."""
+    if contrast_tokens is None:
+        contrast_tokens = tokens
+    sequences = []
+    for target_tokens_seq, contrast_target_tokens_seq, input_ids_seq in zip(tokens, contrast_tokens, ids):
+        curr_seq = []
+        for token, contrast_token, idx in zip(target_tokens_seq, contrast_target_tokens_seq, input_ids_seq):
+            if token != contrast_token:
+                curr_seq.append(TokenWithId(f"{contrast_token} → {token}", -1))
+            else:
+                curr_seq.append(TokenWithId(token, idx))
+        sequences.append(curr_seq)
+    return sequences
 
 
 def extract_args(

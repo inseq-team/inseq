@@ -86,10 +86,12 @@ class InputFormatter:
     @staticmethod
     @abstractmethod
     def enrich_step_output(
+        attribution_model: "AttributionModel",
         step_output: FeatureAttributionStepOutput,
         batch: Union[DecoderOnlyBatch, EncoderDecoderBatch],
         target_tokens: OneOrMoreTokenSequences,
         target_ids: TargetIdsTensor,
+        attributed_fn_args: Dict[str, Any] = {},
     ) -> FeatureAttributionStepOutput:
         r"""Enriches the attribution output with token information, producing the finished
         :class:`~inseq.data.FeatureAttributionStepOutput` object.
@@ -420,12 +422,21 @@ class AttributionModel(ABC, torch.nn.Module):
         return self.embed_ids(inputs, as_targets=as_targets)
 
     def tokenize_with_ids(
-        self, inputs: TextInput, as_targets: bool = False, skip_special_tokens: bool = True
+        self,
+        inputs: TextInput,
+        as_targets: bool = False,
+        skip_special_tokens: bool = True,
+        contrast_inputs: Optional[TextInput] = None,
     ) -> List[List[TokenWithId]]:
         tokenized_sentences = self.convert_string_to_tokens(
             inputs, as_targets=as_targets, skip_special_tokens=skip_special_tokens
         )
         ids_sentences = self.convert_tokens_to_ids(tokenized_sentences)
+        if contrast_inputs is not None:
+            contrast_tokenized_sentences = self.convert_string_to_tokens(
+                contrast_inputs, as_targets=as_targets, skip_special_tokens=skip_special_tokens
+            )
+            return join_token_ids(tokenized_sentences, ids_sentences, contrast_tokenized_sentences)
         return join_token_ids(tokenized_sentences, ids_sentences)
 
     # Framework-specific methods
