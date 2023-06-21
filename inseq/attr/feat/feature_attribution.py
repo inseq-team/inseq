@@ -301,8 +301,13 @@ class FeatureAttribution(Registry):
         logger.debug("=" * 30 + f"\nfull batch: {batch}\n" + "=" * 30)
         # Sources are empty for decoder-only models
         sequences = self.attribution_model.formatter.get_text_sequences(self.attribution_model, batch)
+        contrast_targets = attributed_fn_args.get("contrast_targets", None)
+        contrast_targets = [contrast_targets] if isinstance(contrast_targets, str) else contrast_targets
         target_tokens_with_ids = self.attribution_model.tokenize_with_ids(
-            sequences.targets, as_targets=True, skip_special_tokens=False
+            sequences.targets,
+            as_targets=True,
+            skip_special_tokens=False,
+            contrast_inputs=contrast_targets,
         )
         # Manages front padding for decoder-only models, using 0 as lower bound
         # when attr_pos_start exceeds target length.
@@ -349,10 +354,12 @@ class FeatureAttribution(Registry):
             )
             # Add batch information to output
             step_output = self.attribution_model.formatter.enrich_step_output(
+                self.attribution_model,
                 step_output,
                 batch[:step],
                 self.attribution_model.convert_ids_to_tokens(tgt_ids.unsqueeze(1), skip_special_tokens=False),
                 tgt_ids.detach().to("cpu"),
+                attributed_fn_args,
             )
             attribution_outputs.append(step_output)
             if pretty_progress:

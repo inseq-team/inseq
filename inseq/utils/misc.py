@@ -99,7 +99,7 @@ def pretty_dict(d: Dict[str, Any], lpad: int = 4) -> str:
             out_txt += pretty_tensor(v, lpad + 4)
         elif isinstance(v, dict):
             out_txt += pretty_dict(v, lpad + 4)
-        elif hasattr(v, "to_dict"):
+        elif hasattr(v, "to_dict") and not isinstance(v, type):
             out_txt += f"{v.__class__.__name__}({pretty_dict(v.to_dict(), lpad + 4)})"
         else:
             out_txt += "None" if v is None else str(v)

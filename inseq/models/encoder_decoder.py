@@ -22,7 +22,6 @@ from ..utils.typing import (
     SingleScorePerStepTensor,
     TargetIdsTensor,
     TextSequences,
-    TokenWithId,
 )
 from .attribution_model import AttributionModel, ForwardMethod, InputFormatter, ModelOutput
 
@@ -129,10 +128,12 @@ class EncoderDecoderInputFormatter(InputFormatter):
 
     @staticmethod
     def enrich_step_output(
+        attribution_model: "EncoderDecoderAttributionModel",
         step_output: FeatureAttributionStepOutput,
         batch: EncoderDecoderBatch,
         target_tokens: OneOrMoreTokenSequences,
         target_ids: TargetIdsTensor,
+        attributed_fn_args: Dict[str, Any] = {},
     ) -> FeatureAttributionStepOutput:
         r"""Enriches the attribution output with token information, producing the finished
         :class:`~inseq.data.FeatureAttributionStepOutput` object.
@@ -150,8 +151,24 @@ class EncoderDecoderInputFormatter(InputFormatter):
         if target_ids.ndim == 0:
             target_ids = target_ids.unsqueeze(0)
         step_output.source = join_token_ids(batch.sources.input_tokens, batch.sources.input_ids.tolist())
-        step_output.target = [[TokenWithId(token[0], id)] for token, id in zip(target_tokens, target_ids.tolist())]
-        step_output.prefix = join_token_ids(batch.targets.input_tokens, batch.targets.input_ids.tolist())
+        if "contrast_targets" in attributed_fn_args:
+            contrast_batch = get_batch_from_inputs(
+                attribution_model=attribution_model,
+                inputs=attributed_fn_args["contrast_targets"],
+                as_targets=attribution_model.is_encoder_decoder,
+            )
+            offset = len(batch.targets.input_tokens[0])
+            contrast_prefix_tokens = [seq[:offset] for seq in contrast_batch.encoding.input_tokens]
+            contrast_target_tokens = [[seq[offset]] for seq in contrast_batch.encoding.input_tokens]
+            step_output.target = join_token_ids(
+                target_tokens, contrast_target_tokens, [[idx] for idx in target_ids.tolist()]
+            )
+            step_output.prefix = join_token_ids(
+                batch.targets.input_tokens, contrast_prefix_tokens, batch.targets.input_ids.tolist()
+            )
+        else:
+            step_output.target = join_token_ids(target_tokens, [[idx] for idx in target_ids.tolist()])
+            step_output.prefix = join_token_ids(batch.targets.input_tokens, batch.targets.input_ids.tolist())
         return step_output
 
     @staticmethod
