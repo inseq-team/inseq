@@ -290,6 +290,13 @@ class HuggingfaceModel(AttributionModel):
             baseline_ids=baseline_ids,
         )
 
+    def decode(
+        self,
+        ids: Union[List[int], List[List[int]], IdsTensor],
+        skip_special_tokens: bool = True,
+    ) -> List[str]:
+        return self.tokenizer.batch_decode(ids, skip_special_tokens=skip_special_tokens)
+
     def embed_ids(self, ids: IdsTensor, as_targets: bool = False) -> EmbeddingsTensor:
         if as_targets and not self.is_encoder_decoder:
             raise ValueError("Decoder-only models should use tokenization as source only.")
@@ -343,6 +350,7 @@ class HuggingfaceModel(AttributionModel):
             ids = self.tokenizer(
                 text=text if not as_targets else None,
                 text_target=text if as_targets else None,
+                add_special_tokens=not skip_special_tokens,
             )["input_ids"]
             return self.tokenizer.convert_ids_to_tokens(ids, skip_special_tokens)
         return [self.convert_string_to_tokens(t, skip_special_tokens, as_targets) for t in text]

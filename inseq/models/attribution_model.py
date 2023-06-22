@@ -14,6 +14,7 @@ from ..data import (
     FeatureAttributionInput,
     FeatureAttributionOutput,
     FeatureAttributionStepOutput,
+    get_batch_from_inputs,
 )
 from ..utils import (
     MissingAttributionMethodError,
@@ -91,7 +92,8 @@ class InputFormatter:
         batch: Union[DecoderOnlyBatch, EncoderDecoderBatch],
         target_tokens: OneOrMoreTokenSequences,
         target_ids: TargetIdsTensor,
-        attributed_fn_args: Dict[str, Any] = {},
+        contrast_batch: Optional[DecoderOnlyBatch] = None,
+        contrast_targets_alignments: Optional[List[List[Tuple[int, int]]]] = None,
     ) -> FeatureAttributionStepOutput:
         r"""Enriches the attribution output with token information, producing the finished
         :class:`~inseq.data.FeatureAttributionStepOutput` object.
@@ -139,6 +141,54 @@ class InputFormatter:
         attribution_model: "AttributionModel", batch: Union[DecoderOnlyBatch, EncoderDecoderBatch]
     ) -> TextSequences:
         raise NotImplementedError()
+
+    @staticmethod
+    def get_contrast_options_from_args(
+        attribution_model: "AttributionModel", args: Dict[str, Any], target_tokens: List[List[str]]
+    ) -> Tuple[DecoderOnlyBatch, Optional[List[List[Tuple[int, int]]]]]:
+        contrast_targets = args.get("contrast_targets", None)
+        contrast_targets_alignments = args.get("contrast_targets_alignments", None)
+        contrast_targets = [contrast_targets] if isinstance(contrast_targets, str) else contrast_targets
+        contrast_batch = None
+        adjusted_alignments = None
+        if contrast_targets is not None:
+            contrast_batch = DecoderOnlyBatch.from_batch(
+                get_batch_from_inputs(
+                    attribution_model=attribution_model,
+                    inputs=contrast_targets,
+                    as_targets=attribution_model.is_encoder_decoder,
+                )
+            )
+            if isinstance(contrast_targets_alignments, list) and len(contrast_targets_alignments) > 0:
+                if isinstance(contrast_targets_alignments[0], tuple):
+                    contrast_targets_alignments = [contrast_targets_alignments]
+                if not isinstance(contrast_targets_alignments[0], list):
+                    raise ValueError("Invalid contrast_targets_alignments were provided.")
+            else:
+                contrast_targets_alignments = None
+
+            if contrast_targets_alignments is None:
+                adjusted_alignments = [[(idx, idx) for idx, _ in enumerate(seq)] for seq in target_tokens]
+            else:
+                # Sort alignments
+                contrast_targets_alignments = [
+                    sorted(seq, key=lambda x: (x[0], x[1])) for seq in contrast_targets_alignments
+                ]
+
+                # Filling alignments with missing tokens
+                # Assuming 1:1 mapping to cover all tokens from the original sequence
+                adjusted_alignments = []
+                for seq_idx, seq in enumerate(target_tokens):
+                    adjusted_seq_alignments = []
+                    for pair_idx, _ in enumerate(seq):
+                        match_pairs = [x for x in contrast_targets_alignments[seq_idx] if x[0] == pair_idx]
+                        if not match_pairs:
+                            adjusted_seq_alignments.append((pair_idx, pair_idx))
+                        else:
+                            adjusted_seq_alignments.append(match_pairs[0])
+                    adjusted_alignments.append(adjusted_seq_alignments)
+
+        return contrast_batch, adjusted_alignments
 
 
 class AttributionModel(ABC, torch.nn.Module):
@@ -421,23 +471,20 @@ class AttributionModel(ABC, torch.nn.Module):
             inputs = batch.input_ids
         return self.embed_ids(inputs, as_targets=as_targets)
 
-    def tokenize_with_ids(
+    def get_token_with_ids(
         self,
-        inputs: TextInput,
-        as_targets: bool = False,
-        skip_special_tokens: bool = True,
-        contrast_inputs: Optional[TextInput] = None,
+        batch: Union[EncoderDecoderBatch, DecoderOnlyBatch],
+        contrast_batch: Optional[DecoderOnlyBatch] = None,
+        contrast_targets_alignments: Optional[List[List[Tuple[int, int]]]] = None,
     ) -> List[List[TokenWithId]]:
-        tokenized_sentences = self.convert_string_to_tokens(
-            inputs, as_targets=as_targets, skip_special_tokens=skip_special_tokens
-        )
-        ids_sentences = self.convert_tokens_to_ids(tokenized_sentences)
-        if contrast_inputs is not None:
-            contrast_tokenized_sentences = self.convert_string_to_tokens(
-                contrast_inputs, as_targets=as_targets, skip_special_tokens=skip_special_tokens
+        if contrast_batch is not None:
+            return join_token_ids(
+                batch.target_tokens,
+                batch.target_ids.tolist(),
+                contrast_batch.target_tokens,
+                contrast_targets_alignments,
             )
-            return join_token_ids(tokenized_sentences, ids_sentences, contrast_tokenized_sentences)
-        return join_token_ids(tokenized_sentences, ids_sentences)
+        return join_token_ids(batch.target_tokens, batch.target_ids.tolist())
 
     # Framework-specific methods
 
@@ -464,6 +511,10 @@ class AttributionModel(ABC, torch.nn.Module):
         return_baseline: bool = False,
         include_eos_baseline: bool = False,
     ) -> BatchEncoding:
+        pass
+
+    @abstractmethod
+    def decode(self, ids: IdsTensor, **kwargs) -> List[str]:
         pass
 
     @abstractmethod

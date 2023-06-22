@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import List, Optional, Tuple, Union
 
+from ..utils import MissingAlignmentsError
 from ..utils.typing import EmbeddingsTensor, ExpandedTargetIdsTensor, IdsTensor, OneOrMoreTokenSequences
 from .data_utils import TensorWrapper
 
@@ -229,3 +230,26 @@ class DecoderOnlyBatch(Batch):
             encoding=batch.encoding,
             embedding=batch.embedding,
         )
+
+
+def slice_batch_from_position(
+    batch: DecoderOnlyBatch, curr_position: int, alignments: Optional[List[Tuple[int, int]]] = None
+) -> Tuple[DecoderOnlyBatch, IdsTensor]:
+    truncate_idx = curr_position
+    if alignments:
+        if len(alignments) > 0 and isinstance(alignments[0], list):
+            alignments = alignments[0]
+        # Find all alignment pairs for the current original target
+        aligned_idxs = [c_idx for idx, c_idx in alignments if idx == curr_position]
+
+        if not aligned_idxs:
+            raise MissingAlignmentsError(
+                f"No alignment found for original target token at index {curr_position}. "
+                "Please provide alignment pairs that cover all original target tokens."
+            )
+        # Select the minimum index to identify the next target token
+        truncate_idx = min(aligned_idxs)
+    # We select the target token and truncate the batch up to the selected index
+    tgt_ids = batch.target_ids[:, truncate_idx]
+    batch = batch[:truncate_idx]
+    return batch, tgt_ids

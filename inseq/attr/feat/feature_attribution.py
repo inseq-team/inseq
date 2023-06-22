@@ -44,7 +44,12 @@ from ...utils import (
 )
 from ...utils.typing import ModelIdentifier, SingleScorePerStepTensor
 from ..attribution_decorators import batched, set_hook, unset_hook
-from .attribution_utils import check_attribute_positions, get_source_target_attributions, get_step_scores, tok2string
+from ..step_functions import get_step_scores
+from .attribution_utils import (
+    check_attribute_positions,
+    get_source_target_attributions,
+    tok2string,
+)
 
 if TYPE_CHECKING:
     from ...models import AttributionModel
@@ -301,13 +306,15 @@ class FeatureAttribution(Registry):
         logger.debug("=" * 30 + f"\nfull batch: {batch}\n" + "=" * 30)
         # Sources are empty for decoder-only models
         sequences = self.attribution_model.formatter.get_text_sequences(self.attribution_model, batch)
-        contrast_targets = attributed_fn_args.get("contrast_targets", None)
-        contrast_targets = [contrast_targets] if isinstance(contrast_targets, str) else contrast_targets
-        target_tokens_with_ids = self.attribution_model.tokenize_with_ids(
-            sequences.targets,
-            as_targets=True,
-            skip_special_tokens=False,
-            contrast_inputs=contrast_targets,
+        contrast_batch, contrast_targets_alignments = self.attribution_model.formatter.get_contrast_options_from_args(
+            attribution_model=self.attribution_model,
+            args=attributed_fn_args,
+            target_tokens=batch.target_tokens,
+        )
+        target_tokens_with_ids = self.attribution_model.get_token_with_ids(
+            batch,
+            contrast_batch=contrast_batch,
+            contrast_targets_alignments=contrast_targets_alignments,
         )
         # Manages front padding for decoder-only models, using 0 as lower bound
         # when attr_pos_start exceeds target length.
@@ -320,10 +327,6 @@ class FeatureAttribution(Registry):
             )
             for idx in range(len(target_tokens_with_ids))
         ]
-        if self.attribution_model.is_encoder_decoder:
-            iter_pos_end = min(attr_pos_end + 1, batch.max_generation_length)
-        else:
-            iter_pos_end = attr_pos_end
         pbar = get_progress_bar(
             sequences=sequences,
             target_lengths=targets_lengths,
@@ -339,7 +342,7 @@ class FeatureAttribution(Registry):
         start = datetime.now()
 
         # Attribution loop for generation
-        for step in range(attr_pos_start, iter_pos_end):
+        for step in range(attr_pos_start, attr_pos_end):
             tgt_ids, tgt_mask = batch.get_step_target(step, with_attention=True)
             step_output = self.filtered_attribute_step(
                 batch[:step],
@@ -359,15 +362,16 @@ class FeatureAttribution(Registry):
                 batch[:step],
                 self.attribution_model.convert_ids_to_tokens(tgt_ids.unsqueeze(1), skip_special_tokens=False),
                 tgt_ids.detach().to("cpu"),
-                attributed_fn_args,
+                contrast_batch=contrast_batch,
+                contrast_targets_alignments=contrast_targets_alignments,
             )
             attribution_outputs.append(step_output)
             if pretty_progress:
                 tgt_tokens = batch.target_tokens
                 skipped_prefixes = tok2string(self.attribution_model, tgt_tokens, end=attr_pos_start)
                 attributed_sentences = tok2string(self.attribution_model, tgt_tokens, attr_pos_start, step + 1)
-                unattributed_suffixes = tok2string(self.attribution_model, tgt_tokens, step + 1, iter_pos_end)
-                skipped_suffixes = tok2string(self.attribution_model, tgt_tokens, start=iter_pos_end)
+                unattributed_suffixes = tok2string(self.attribution_model, tgt_tokens, step + 1, attr_pos_end)
+                skipped_suffixes = tok2string(self.attribution_model, tgt_tokens, start=attr_pos_end)
                 update_progress_bar(
                     pbar,
                     skipped_prefixes,

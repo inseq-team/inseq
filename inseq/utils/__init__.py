@@ -3,6 +3,7 @@ from .cache import INSEQ_ARTIFACTS_CACHE, INSEQ_HOME_CACHE, cache_results
 from .errors import (
     InseqDeprecationWarning,
     LengthMismatchError,
+    MissingAlignmentsError,
     MissingAttributionMethodError,
     UnknownAttributionMethodError,
 )
@@ -57,6 +58,7 @@ __all__ = [
     "LengthMismatchError",
     "MissingAttributionMethodError",
     "UnknownAttributionMethodError",
+    "MissingAlignmentsError",
     "cache_results",
     "optional",
     "pad",
