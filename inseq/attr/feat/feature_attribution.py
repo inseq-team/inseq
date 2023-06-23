@@ -327,6 +327,10 @@ class FeatureAttribution(Registry):
             )
             for idx in range(len(target_tokens_with_ids))
         ]
+        if self.attribution_model.is_encoder_decoder:
+            iter_pos_end = min(attr_pos_end + 1, batch.max_generation_length)
+        else:
+            iter_pos_end = attr_pos_end
         pbar = get_progress_bar(
             sequences=sequences,
             target_lengths=targets_lengths,
@@ -342,7 +346,7 @@ class FeatureAttribution(Registry):
         start = datetime.now()
 
         # Attribution loop for generation
-        for step in range(attr_pos_start, attr_pos_end):
+        for step in range(attr_pos_start, iter_pos_end):
             tgt_ids, tgt_mask = batch.get_step_target(step, with_attention=True)
             step_output = self.filtered_attribute_step(
                 batch[:step],
