@@ -144,22 +144,39 @@ class InputFormatter:
 
     @staticmethod
     def format_contrast_targets_alignments(
-        contrast_targets_alignments: Union[List[Tuple[int, int]], List[List[Tuple[int, int]]]],
+        contrast_targets_alignments: Union[List[Tuple[int, int]], List[List[Tuple[int, int]]], str],
+        target_sequences: List[str],
         target_tokens: List[List[str]],
+        contrast_sequences: List[str],
+        contrast_tokens: List[List[str]],
     ) -> Tuple[DecoderOnlyBatch, Optional[List[List[Tuple[int, int]]]]]:
-        adjusted_alignments = []
+        # Ensure that the contrast_targets_alignments are in the correct format (list of lists of idxs pairs)
         if contrast_targets_alignments:
             if isinstance(contrast_targets_alignments, list) and len(contrast_targets_alignments) > 0:
                 if isinstance(contrast_targets_alignments[0], tuple):
                     contrast_targets_alignments = [contrast_targets_alignments]
                 if not isinstance(contrast_targets_alignments[0], list):
                     raise ValueError("Invalid contrast_targets_alignments were provided.")
-        for seq_idx, tokens in enumerate(target_tokens):
+            elif not isinstance(str):
+                raise ValueError("Invalid contrast_targets_alignments were provided.")
+
+        adjusted_alignments = []
+        aligns = contrast_targets_alignments
+        for seq_idx, (tgt_seq, tgt_tok, c_seq, c_tok) in enumerate(
+            zip(target_sequences, target_tokens, contrast_sequences, contrast_tokens)
+        ):
             if isinstance(contrast_targets_alignments, list):
                 aligns = contrast_targets_alignments[seq_idx]
-            else:
-                aligns = contrast_targets_alignments
-            adjusted_alignments.append(get_adjusted_alignments(aligns, fill_missing_len=len(tokens)))
+            adjusted_alignments.append(
+                get_adjusted_alignments(
+                    aligns,
+                    target_sequence=tgt_seq,
+                    target_tokens=tgt_tok,
+                    contrast_sequence=c_seq,
+                    contrast_tokens=c_tok,
+                    fill_missing=True,
+                )
+            )
         return adjusted_alignments
 
 

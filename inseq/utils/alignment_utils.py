@@ -1,3 +1,4 @@
+import logging
 import re
 from dataclasses import dataclass
 from enum import Enum
@@ -9,6 +10,8 @@ import torch
 from transformers import AutoModel, AutoTokenizer, PreTrainedModel, PreTrainedTokenizerBase
 
 from .errors import MissingAlignmentsError
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -98,31 +101,54 @@ def get_word_aligns(
 
 def get_adjusted_alignments(
     alignments: Union[List[Tuple[int, int]], str],
+    target_sequence: Optional[str] = None,
+    target_tokens: Optional[List[str]] = None,
+    contrast_sequence: Optional[str] = None,
+    contrast_tokens: Optional[List[str]] = None,
     do_sort: bool = True,
-    fill_missing_len: Optional[int] = None,
+    fill_missing: bool = False,
 ) -> List[Tuple[int, int]]:
-    if alignments is None and isinstance(fill_missing_len, int):
-        alignments = [(idx, idx) for idx in range(fill_missing_len)]
+    if fill_missing and not target_tokens:
+        raise ValueError("Missing target tokens. Please provide target tokens to fill missing alignments.")
+    if alignments is None and fill_missing:
+        alignments = [(idx, idx) for idx in range(len(target_tokens))]
     elif isinstance(alignments, str):
         if alignments == AlignmentMethod.AUTO:
-            raise NotImplementedError
-            # TODO: Implement alignment method. Wrap it in a try-except block that raises a Runtime error in case any
-            # of the steps fail.
-            # 1. Use LaBSE to get alignments at word level
-            # 2. Align word-level alignments to token-level alignments from the generative model tokenizer.
-            # 2.1 Requires cleaning up the model tokens from special tokens and characters, check if something native
-            # exists in the tokenizer.
-            # 3. Propagate word-level alignments to token-level alignments.
+            if not target_sequence or not contrast_sequence or not target_tokens or not contrast_tokens:
+                raise ValueError(
+                    "Missing required arguments to compute alignments. "
+                    "Please provide target and contrast sequence and tokens."
+                )
+            try:
+                # 1. Use aligner to get alignments at word level
+                align_seq = get_word_aligns(target_sequence, contrast_sequence)
+                raise NotImplementedError(f"{align_seq.alignments}")
+                # TODO:
+                # 2. Align word-level alignments to token-level alignments from the generative model tokenizer.
+                # 2.1 Requires cleaning up the model tokens from special tokens and characters, check if smth native
+                # exists in the tokenizer.
+                # 2.2 Default behavior to handle missing aligns: let the step below fill them with 1:1 mapping.
+                # 3. Propagate word-level alignments to token-level alignments.
+                # 4. Log info about the produced alignments
+            except Exception as e:
+                logger.warning(
+                    "Failed to compute alignments using the aligner. "
+                    f"Please check the following error and provide custom alignments if needed.\n{e}"
+                )
+                raise e
         else:
-            raise ValueError(f"Unknown alignment method: {alignments}")
+            raise ValueError(
+                f"Unknown alignment method: {alignments}. "
+                f"Available methods: {','.join([m.value for m in AlignmentMethod])}"
+            )
     if do_sort:
         # Sort alignments
         alignments = sorted(set(alignments), key=lambda x: (x[0], x[1]))
 
     # Filling alignments with missing tokens
-    if isinstance(fill_missing_len, int):
+    if fill_missing:
         filled_alignments = []
-        for pair_idx in range(fill_missing_len):
+        for pair_idx in range(len(target_tokens)):
             match_pairs = [x for x in alignments if x[0] == pair_idx]
             if not match_pairs:
                 # Assuming 1:1 mapping to cover all tokens from the original sequence
@@ -130,6 +156,12 @@ def get_adjusted_alignments(
             else:
                 # Use only first match for the source sequence
                 filled_alignments.append(match_pairs[0])
+        if alignments != filled_alignments:
+            logger.warning(
+                f"Provided alignments do not cover all {len(target_tokens)} tokens from the original sequence.\n"
+                f"Filling missing position with 1:1 position alignments.\\Filled alignments: {filled_alignments}.\n"
+                'Alternatively, use contrast_targets_alignments="auto" to produce custom alignments.'
+            )
         alignments = filled_alignments
     return alignments
 
