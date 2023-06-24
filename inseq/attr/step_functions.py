@@ -7,7 +7,7 @@ from torch.nn.functional import kl_div, log_softmax
 from transformers import AutoModelForCausalLM, AutoModelForSeq2SeqLM
 from transformers.modeling_outputs import ModelOutput
 
-from ..data import FeatureAttributionInput, slice_batch_from_position
+from ..data import DecoderOnlyBatch, FeatureAttributionInput, get_batch_from_inputs, slice_batch_from_position
 from ..data.aggregation_functions import DEFAULT_ATTRIBUTION_AGGREGATE_DICT
 from ..utils import extract_signature_args
 from ..utils.typing import EmbeddingsTensor, IdsTensor, SingleScorePerStepTensor, TargetIdsTensor
@@ -127,10 +127,12 @@ def _get_contrast_output(
     """
     c_tgt_ids = None
     if contrast_targets:
-        c_batch, contrast_targets_alignments = attribution_model.formatter.get_contrast_options_from_args(
-            attribution_model=attribution_model,
-            args={"contrast_targets": contrast_targets, "contrast_targets_alignments": contrast_targets_alignments},
-            target_tokens=torch.zeros(decoder_input_ids.size(0), decoder_input_ids.size(1) + 1).long().tolist(),
+        c_batch = DecoderOnlyBatch.from_batch(
+            get_batch_from_inputs(
+                attribution_model=attribution_model,
+                inputs=contrast_targets,
+                as_targets=attribution_model.is_encoder_decoder,
+            )
         )
         curr_prefix_len = decoder_input_ids.size(1)
         if len(contrast_targets_alignments) > 0 and isinstance(contrast_targets_alignments[0], list):

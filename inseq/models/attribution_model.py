@@ -14,12 +14,12 @@ from ..data import (
     FeatureAttributionInput,
     FeatureAttributionOutput,
     FeatureAttributionStepOutput,
-    get_batch_from_inputs,
 )
 from ..utils import (
     MissingAttributionMethodError,
     check_device,
     format_input_texts,
+    get_adjusted_alignments,
     get_default_device,
     isnotebook,
     pretty_tensor,
@@ -143,52 +143,24 @@ class InputFormatter:
         raise NotImplementedError()
 
     @staticmethod
-    def get_contrast_options_from_args(
-        attribution_model: "AttributionModel", args: Dict[str, Any], target_tokens: List[List[str]]
+    def format_contrast_targets_alignments(
+        contrast_targets_alignments: Union[List[Tuple[int, int]], List[List[Tuple[int, int]]]],
+        target_tokens: List[List[str]],
     ) -> Tuple[DecoderOnlyBatch, Optional[List[List[Tuple[int, int]]]]]:
-        contrast_targets = args.get("contrast_targets", None)
-        contrast_targets_alignments = args.get("contrast_targets_alignments", None)
-        contrast_targets = [contrast_targets] if isinstance(contrast_targets, str) else contrast_targets
-        contrast_batch = None
-        adjusted_alignments = None
-        if contrast_targets is not None:
-            contrast_batch = DecoderOnlyBatch.from_batch(
-                get_batch_from_inputs(
-                    attribution_model=attribution_model,
-                    inputs=contrast_targets,
-                    as_targets=attribution_model.is_encoder_decoder,
-                )
-            )
+        adjusted_alignments = []
+        if contrast_targets_alignments:
             if isinstance(contrast_targets_alignments, list) and len(contrast_targets_alignments) > 0:
                 if isinstance(contrast_targets_alignments[0], tuple):
                     contrast_targets_alignments = [contrast_targets_alignments]
                 if not isinstance(contrast_targets_alignments[0], list):
                     raise ValueError("Invalid contrast_targets_alignments were provided.")
+        for seq_idx, tokens in enumerate(target_tokens):
+            if isinstance(contrast_targets_alignments, list):
+                aligns = contrast_targets_alignments[seq_idx]
             else:
-                contrast_targets_alignments = None
-
-            if contrast_targets_alignments is None:
-                adjusted_alignments = [[(idx, idx) for idx, _ in enumerate(seq)] for seq in target_tokens]
-            else:
-                # Sort alignments
-                contrast_targets_alignments = [
-                    sorted(seq, key=lambda x: (x[0], x[1])) for seq in contrast_targets_alignments
-                ]
-
-                # Filling alignments with missing tokens
-                # Assuming 1:1 mapping to cover all tokens from the original sequence
-                adjusted_alignments = []
-                for seq_idx, seq in enumerate(target_tokens):
-                    adjusted_seq_alignments = []
-                    for pair_idx, _ in enumerate(seq):
-                        match_pairs = [x for x in contrast_targets_alignments[seq_idx] if x[0] == pair_idx]
-                        if not match_pairs:
-                            adjusted_seq_alignments.append((pair_idx, pair_idx))
-                        else:
-                            adjusted_seq_alignments.append(match_pairs[0])
-                    adjusted_alignments.append(adjusted_seq_alignments)
-
-        return contrast_batch, adjusted_alignments
+                aligns = contrast_targets_alignments
+            adjusted_alignments.append(get_adjusted_alignments(aligns, fill_missing_len=len(tokens)))
+        return adjusted_alignments
 
 
 class AttributionModel(ABC, torch.nn.Module):
@@ -474,14 +446,14 @@ class AttributionModel(ABC, torch.nn.Module):
     def get_token_with_ids(
         self,
         batch: Union[EncoderDecoderBatch, DecoderOnlyBatch],
-        contrast_batch: Optional[DecoderOnlyBatch] = None,
+        contrast_target_tokens: Optional[OneOrMoreTokenSequences] = None,
         contrast_targets_alignments: Optional[List[List[Tuple[int, int]]]] = None,
     ) -> List[List[TokenWithId]]:
-        if contrast_batch is not None:
+        if contrast_target_tokens is not None:
             return join_token_ids(
                 batch.target_tokens,
                 batch.target_ids.tolist(),
-                contrast_batch.target_tokens,
+                contrast_target_tokens,
                 contrast_targets_alignments,
             )
         return join_token_ids(batch.target_tokens, batch.target_ids.tolist())

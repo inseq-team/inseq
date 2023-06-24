@@ -1,3 +1,4 @@
+from .alignment_utils import get_adjusted_alignments, get_aligned_idx
 from .argparse import InseqArgumentParser
 from .cache import INSEQ_ARTIFACTS_CACHE, INSEQ_HOME_CACHE, cache_results
 from .errors import (
@@ -110,5 +111,6 @@ __all__ = [
     "json_advanced_load",
     "get_nn_submodule",
     "find_block_stack",
-    "get_post_variable_assignment_hook",
+    "get_adjusted_alignments",
+    "get_aligned_idx",
 ]

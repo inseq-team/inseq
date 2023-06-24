@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Un
 
 import torch
 
-from ...utils import MissingAlignmentsError, extract_signature_args
+from ...utils import extract_signature_args, get_aligned_idx
 from ...utils.typing import (
     OneOrMoreAttributionSequences,
     OneOrMoreIdSequences,
@@ -105,16 +105,9 @@ def join_token_ids(
     ):
         curr_seq = []
         for pos_idx, (token, token_idx) in enumerate(zip(target_tokens_seq, input_ids_seq)):
-            # Find all alignment pairs for the current original target
-            aligned_idxs = [c_idx for idx, c_idx in alignments_seq if idx == pos_idx]
-            if not aligned_idxs:
-                raise MissingAlignmentsError(
-                    f"No alignment found for token at index {pos_idx}: {token} ({token_idx}). "
-                    "Please provide alignment pairs that cover all original target tokens."
-                )
-            contrast_position = min(aligned_idxs)
-            if token != contrast_target_tokens_seq[contrast_position]:
-                curr_seq.append(TokenWithId(f"{contrast_target_tokens_seq[contrast_position]} → {token}", -1))
+            contrast_pos_idx = get_aligned_idx(pos_idx, alignments_seq)
+            if token != contrast_target_tokens_seq[contrast_pos_idx]:
+                curr_seq.append(TokenWithId(f"{contrast_target_tokens_seq[contrast_pos_idx]} → {token}", -1))
             else:
                 curr_seq.append(TokenWithId(token, token_idx))
         sequences.append(curr_seq)

@@ -12,8 +12,8 @@ from ..data import (
     FeatureAttributionInput,
     FeatureAttributionStepOutput,
     get_batch_from_inputs,
-    slice_batch_from_position,
 )
+from ..utils import get_aligned_idx
 from ..utils.typing import (
     AttributionForwardInputs,
     EmbeddingsTensor,
@@ -155,10 +155,8 @@ class EncoderDecoderInputFormatter(InputFormatter):
             target_ids = target_ids.unsqueeze(0)
         step_output.source = join_token_ids(batch.sources.input_tokens, batch.sources.input_ids.tolist())
         if contrast_batch is not None:
-            offset = len(batch.targets.input_tokens[0])
-            contrast_batch, contrast_target_ids = slice_batch_from_position(
-                contrast_batch, offset, contrast_targets_alignments
-            )
+            contrast_aligned_idx = get_aligned_idx(len(batch.target_tokens[0]), contrast_targets_alignments[0])
+            contrast_target_ids = contrast_batch.target_ids[:, contrast_aligned_idx]
             step_output.target = join_token_ids(
                 tokens=target_tokens,
                 ids=[[idx] for idx in target_ids.tolist()],
