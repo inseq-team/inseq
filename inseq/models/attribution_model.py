@@ -149,6 +149,7 @@ class InputFormatter:
         target_tokens: List[List[str]],
         contrast_sequences: List[str],
         contrast_tokens: List[List[str]],
+        special_tokens: List[str] = [],
     ) -> Tuple[DecoderOnlyBatch, Optional[List[List[Tuple[int, int]]]]]:
         # Ensure that the contrast_targets_alignments are in the correct format (list of lists of idxs pairs)
         if contrast_targets_alignments:
@@ -157,7 +158,7 @@ class InputFormatter:
                     contrast_targets_alignments = [contrast_targets_alignments]
                 if not isinstance(contrast_targets_alignments[0], list):
                     raise ValueError("Invalid contrast_targets_alignments were provided.")
-            elif not isinstance(str):
+            elif not isinstance(contrast_targets_alignments, str):
                 raise ValueError("Invalid contrast_targets_alignments were provided.")
 
         adjusted_alignments = []
@@ -175,6 +176,7 @@ class InputFormatter:
                     contrast_sequence=c_seq,
                     contrast_tokens=c_tok,
                     fill_missing=True,
+                    special_tokens=special_tokens,
                 )
             )
         return adjusted_alignments
@@ -503,7 +505,7 @@ class AttributionModel(ABC, torch.nn.Module):
         pass
 
     @abstractmethod
-    def decode(self, ids: IdsTensor, **kwargs) -> List[str]:
+    def decode(self, ids: IdsTensor, skip_special_tokens: bool = True) -> List[str]:
         pass
 
     @abstractmethod
@@ -539,6 +541,15 @@ class AttributionModel(ABC, torch.nn.Module):
         skip_special_tokens: bool = True,
         as_targets: bool = False,
     ) -> OneOrMoreTokenSequences:
+        pass
+
+    @abstractmethod
+    def clean_tokens(
+        self,
+        tokens: OneOrMoreTokenSequences,
+        skip_special_tokens: bool = False,
+        as_targets: bool = False,
+    ):
         pass
 
     @property

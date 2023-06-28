@@ -312,22 +312,25 @@ class FeatureAttribution(Registry):
         contrast_targets = [contrast_targets] if isinstance(contrast_targets, str) else contrast_targets
         contrast_batch = None
         if contrast_targets is not None:
-            contrast_batch = DecoderOnlyBatch.from_batch(
-                get_batch_from_inputs(
-                    attribution_model=self.attribution_model,
-                    inputs=contrast_targets,
-                    as_targets=self.attribution_model.is_encoder_decoder,
-                )
+            as_targets = self.attribution_model.is_encoder_decoder
+            contrast_batch = get_batch_from_inputs(
+                attribution_model=self.attribution_model,
+                inputs=contrast_targets,
+                as_targets=as_targets,
             )
+            contrast_batch = DecoderOnlyBatch.from_batch(contrast_batch)
             contrast_targets_alignments = self.attribution_model.formatter.format_contrast_targets_alignments(
                 contrast_targets_alignments=contrast_targets_alignments,
                 target_sequences=sequences.targets,
-                target_tokens=batch.target_tokens,
+                target_tokens=self.attribution_model.clean_tokens(batch.target_tokens, as_targets=as_targets),
                 contrast_sequences=contrast_targets,
-                contrast_tokens=contrast_batch.target_tokens,
+                contrast_tokens=self.attribution_model.clean_tokens(
+                    contrast_batch.target_tokens, as_targets=as_targets
+                ),
+                special_tokens=self.attribution_model.special_tokens,
             )
             attributed_fn_args["contrast_targets_alignments"] = contrast_targets_alignments
-            if "contrast_targets_alignments" in step_scores_args:
+            if "contrast_targets" in step_scores_args:
                 step_scores_args["contrast_targets_alignments"] = contrast_targets_alignments
         target_tokens_with_ids = self.attribution_model.get_token_with_ids(
             batch,

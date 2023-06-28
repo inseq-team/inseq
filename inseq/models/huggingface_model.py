@@ -355,6 +355,38 @@ class HuggingfaceModel(AttributionModel):
             return self.tokenizer.convert_ids_to_tokens(ids, skip_special_tokens)
         return [self.convert_string_to_tokens(t, skip_special_tokens, as_targets) for t in text]
 
+    def clean_tokens(
+        self,
+        tokens: OneOrMoreTokenSequences,
+        skip_special_tokens: bool = False,
+        as_targets: bool = False,
+    ) -> OneOrMoreTokenSequences:
+        """Cleans special characters from tokens.
+
+        Args:
+            tokens (`OneOrMoreTokenSequences`):
+                A list containing one or more lists of tokens.
+            skip_special_tokens (`bool`, *optional*, defaults to True):
+                If true, special tokens are skipped.
+            as_targets (`bool`, *optional*, defaults to False):
+                If true, a target tokenizer is used to clean the tokens.
+
+        Returns:
+            `OneOrMoreTokenSequences`: A list containing one or more lists of cleaned tokens.
+        """
+        if isinstance(tokens, list) and len(tokens) == 0:
+            return []
+        elif isinstance(tokens[0], str):
+            clean_tokens = []
+            for tok in tokens:
+                clean_tok = self.convert_tokens_to_string(
+                    [tok], skip_special_tokens=skip_special_tokens, as_targets=as_targets
+                )
+                if clean_tok:
+                    clean_tokens.append(clean_tok)
+            return clean_tokens
+        return [self.clean_tokens(token_seq, skip_special_tokens, as_targets) for token_seq in tokens]
+
     @property
     def special_tokens(self) -> List[str]:
         return self.tokenizer.all_special_tokens
