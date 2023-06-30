@@ -10,6 +10,7 @@ import torch
 from transformers import AutoModel, AutoTokenizer, PreTrainedModel, PreTrainedTokenizerBase
 
 from .errors import MissingAlignmentsError
+from .misc import clean_tokens
 
 logger = logging.getLogger(__name__)
 
@@ -192,6 +193,20 @@ def propagate_alignments(aligns_a_b: AlignedSequences, aligns_b_c: AlignedSequen
     )
 
 
+def add_alignment_extra_positions(
+    alignments: List[Tuple[int, int]], extra_positions: List[Tuple[int, int]]
+) -> List[Tuple[int, int]]:
+    for x_idx_a, x_idx_b in extra_positions:
+        for pos, (idx_a, idx_b) in enumerate(alignments):
+            a_val, b_val = idx_a, idx_b
+            if idx_a >= x_idx_a:
+                a_val += 1
+            if idx_b >= x_idx_b:
+                b_val += 1
+            alignments[pos] = (a_val, b_val)
+    return alignments + extra_positions
+
+
 def auto_align_sequences(
     a_sequence: Optional[str] = None,
     a_tokens: Optional[List[str]] = None,
@@ -214,20 +229,8 @@ def auto_align_sequences(
         a_to_b_word_align = compute_word_aligns(a_words, b_words)
         # 2. Align word-level alignments to token-level alignments from the generative model tokenizer.
         # Requires cleaning up the model tokens from special tokens (special characters already removed)
-        clean_a_tokens = []
-        removed_a_token_idxs = []
-        for idx_a, tok_a in enumerate(a_tokens):
-            if tok_a not in filter_special_tokens:
-                clean_a_tokens += [tok_a.strip()]
-            else:
-                removed_a_token_idxs += [idx_a]
-        clean_b_tokens = []
-        removed_b_token_idxs = []
-        for idx_b, tok_b in enumerate(b_tokens):
-            if tok_b not in filter_special_tokens:
-                clean_b_tokens += [tok_b.strip()]
-            else:
-                removed_b_token_idxs += [idx_b]
+        clean_a_tokens, removed_a_token_idxs = clean_tokens(a_tokens, filter_special_tokens)
+        clean_b_tokens, removed_b_token_idxs = clean_tokens(b_tokens, filter_special_tokens)
         if len(removed_a_token_idxs) != len(removed_b_token_idxs):
             raise ValueError(
                 "The number of special tokens in the target and contrast sequences do not match. "
@@ -244,18 +247,13 @@ def auto_align_sequences(
         # Second step: get target token-level -> contrast token-level using previous step outputs
         a_to_b_token_align = propagate_alignments(a_token_to_b_word_align, b_word_to_token_align)
         # 4. Add special tokens alignments
-        for s_idx_a, s_idx_b in aligned_special_tokens:
-            for pos, (idx_a, idx_b) in enumerate(a_to_b_token_align.alignments):
-                a_val, b_val = idx_a, idx_b
-                if idx_a >= s_idx_a:
-                    a_val += 1
-                if idx_b >= s_idx_b:
-                    b_val += 1
-                a_to_b_token_align.alignments[pos] = (a_val, b_val)
+        a_to_b_aligns_with_special_tokens = add_alignment_extra_positions(
+            a_to_b_token_align.alignments.copy(), aligned_special_tokens
+        )
         return AlignedSequences(
             source_tokens=a_tokens,
             target_tokens=b_tokens,
-            alignments=a_to_b_token_align.alignments + aligned_special_tokens,
+            alignments=a_to_b_aligns_with_special_tokens,
         )
     except Exception as e:
         logger.warning(
