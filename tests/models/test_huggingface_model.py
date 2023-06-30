@@ -280,12 +280,12 @@ def test_attribute_decoder(saliency_gpt2_model):
     assert ex1.target_attributions.shape[1] == ex1.attr_pos_end - ex1.attr_pos_start
     assert ex1.target_attributions.shape[0] == ex1.attr_pos_end
     # Empty attributions outputs have start and end set to seq length
-    assert ex2.attr_pos_start == 8
-    assert ex2.attr_pos_end == 13
+    assert ex2.attr_pos_start == 17
+    assert ex2.attr_pos_end == 22
     assert ex2.target_attributions.shape[1] == ex2.attr_pos_end - ex2.attr_pos_start
     assert ex2.target_attributions.shape[0] == ex2.attr_pos_end
-    assert ex3.attr_pos_start == 12
-    assert ex3.attr_pos_end == 17
+    assert ex3.attr_pos_start == 17
+    assert ex3.attr_pos_end == 22
     assert ex3.target_attributions.shape[1] == ex3.attr_pos_end - ex3.attr_pos_start
     assert ex3.target_attributions.shape[0] == ex3.attr_pos_end
     assert out.info["attr_pos_start"] == 17

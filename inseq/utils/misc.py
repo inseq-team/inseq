@@ -423,3 +423,15 @@ def get_cls_from_instance_type(mod, name, cls_lookup_map):
             if curr_class is None:
                 raise ImportError(f"{imp_err}; add the class to `cls_lookup_map={{'{name}': Class}}` argument")
     return curr_class
+
+
+def clean_tokens(tokens: List[str], remove_tokens: List[str]) -> Tuple[List[str], List[int]]:
+    """Removes tokens from a list of tokens and returns the cleaned list and the removed token indexes."""
+    clean_tokens = []
+    removed_token_idxs = []
+    for idx, tok in enumerate(tokens):
+        if tok not in remove_tokens:
+            clean_tokens += [tok.strip()]
+        else:
+            removed_token_idxs += [idx]
+    return clean_tokens, removed_token_idxs

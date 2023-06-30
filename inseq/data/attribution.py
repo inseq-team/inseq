@@ -164,6 +164,11 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
         ]
         if tokenized_target_sentences is None:
             tokenized_target_sentences = targets
+        if has_bos_token:
+            tokenized_target_sentences = [tok_seq[1:] for tok_seq in tokenized_target_sentences]
+        tokenized_target_sentences = [
+            drop_padding(tokenized_target_sentences[seq_id], pad_id) for seq_id in range(num_sequences)
+        ]
         if attr_pos_end is None:
             attr_pos_end = max([len(t) for t in tokenized_target_sentences])
         pos_start = [

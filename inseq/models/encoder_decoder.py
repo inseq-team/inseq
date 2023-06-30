@@ -7,11 +7,13 @@ from ..data import (
     Batch,
     BatchEmbedding,
     BatchEncoding,
+    DecoderOnlyBatch,
     EncoderDecoderBatch,
     FeatureAttributionInput,
     FeatureAttributionStepOutput,
     get_batch_from_inputs,
 )
+from ..utils import get_aligned_idx
 from ..utils.typing import (
     AttributionForwardInputs,
     EmbeddingsTensor,
@@ -133,7 +135,8 @@ class EncoderDecoderInputFormatter(InputFormatter):
         batch: EncoderDecoderBatch,
         target_tokens: OneOrMoreTokenSequences,
         target_ids: TargetIdsTensor,
-        attributed_fn_args: Dict[str, Any] = {},
+        contrast_batch: Optional[DecoderOnlyBatch] = None,
+        contrast_targets_alignments: Optional[List[List[Tuple[int, int]]]] = None,
     ) -> FeatureAttributionStepOutput:
         r"""Enriches the attribution output with token information, producing the finished
         :class:`~inseq.data.FeatureAttributionStepOutput` object.
@@ -151,21 +154,17 @@ class EncoderDecoderInputFormatter(InputFormatter):
         if target_ids.ndim == 0:
             target_ids = target_ids.unsqueeze(0)
         step_output.source = join_token_ids(batch.sources.input_tokens, batch.sources.input_ids.tolist())
-        if "contrast_targets" in attributed_fn_args:
-            contrast_batch = get_batch_from_inputs(
-                attribution_model=attribution_model,
-                inputs=attributed_fn_args["contrast_targets"],
-                as_targets=attribution_model.is_encoder_decoder,
-            )
-            offset = len(batch.targets.input_tokens[0])
-            contrast_prefix_tokens = [seq[:offset] for seq in contrast_batch.encoding.input_tokens]
-            contrast_target_tokens = [[seq[offset]] for seq in contrast_batch.encoding.input_tokens]
+        if contrast_batch is not None:
+            contrast_aligned_idx = get_aligned_idx(len(batch.target_tokens[0]), contrast_targets_alignments[0])
+            contrast_target_ids = contrast_batch.target_ids[:, contrast_aligned_idx]
             step_output.target = join_token_ids(
-                target_tokens, contrast_target_tokens, [[idx] for idx in target_ids.tolist()]
+                tokens=target_tokens,
+                ids=[[idx] for idx in target_ids.tolist()],
+                contrast_tokens=attribution_model.convert_ids_to_tokens(
+                    contrast_target_ids[None, ...], skip_special_tokens=False
+                ),
             )
-            step_output.prefix = join_token_ids(
-                batch.targets.input_tokens, contrast_prefix_tokens, batch.targets.input_ids.tolist()
-            )
+            step_output.prefix = join_token_ids(tokens=batch.target_tokens, ids=batch.target_ids.tolist())
         else:
             step_output.target = join_token_ids(target_tokens, [[idx] for idx in target_ids.tolist()])
             step_output.prefix = join_token_ids(batch.targets.input_tokens, batch.targets.input_ids.tolist())
@@ -244,10 +243,12 @@ class EncoderDecoderInputFormatter(InputFormatter):
         return formatted_forward_input_wrapper
 
     @staticmethod
-    def get_text_sequences(self, batch: EncoderDecoderBatch) -> TextSequences:
+    def get_text_sequences(
+        attribution_model: "EncoderDecoderAttributionModel", batch: EncoderDecoderBatch
+    ) -> TextSequences:
         return TextSequences(
-            sources=self.convert_tokens_to_string(batch.sources.input_tokens),
-            targets=self.convert_tokens_to_string(batch.targets.input_tokens, as_targets=True),
+            sources=attribution_model.convert_tokens_to_string(batch.sources.input_tokens),
+            targets=attribution_model.decode(batch.targets.input_ids),
         )
 
 

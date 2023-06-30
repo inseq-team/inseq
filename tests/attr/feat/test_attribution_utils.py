@@ -2,7 +2,7 @@ import pytest
 import torch
 
 import inseq
-from inseq.attr.feat.attribution_utils import get_step_scores
+from inseq.attr.step_functions import get_step_scores
 
 from ...inference_commons import get_example_batches
 

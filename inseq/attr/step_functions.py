@@ -1,14 +1,15 @@
 import logging
 from inspect import getfullargspec
-from typing import TYPE_CHECKING, Dict, List, Optional, Protocol, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Protocol, Tuple, Union
 
 import torch
 from torch.nn.functional import kl_div, log_softmax
 from transformers import AutoModelForCausalLM, AutoModelForSeq2SeqLM
 from transformers.modeling_outputs import ModelOutput
 
-from ..data import DecoderOnlyBatch, FeatureAttributionInput, get_batch_from_inputs
+from ..data import DecoderOnlyBatch, FeatureAttributionInput, get_batch_from_inputs, slice_batch_from_position
 from ..data.aggregation_functions import DEFAULT_ATTRIBUTION_AGGREGATE_DICT
+from ..utils import extract_signature_args
 from ..utils.typing import EmbeddingsTensor, IdsTensor, SingleScorePerStepTensor, TargetIdsTensor
 
 if TYPE_CHECKING:
@@ -101,6 +102,7 @@ def _get_contrast_output(
     contrast_target_prefixes: Optional[FeatureAttributionInput] = None,
     contrast_sources: Optional[FeatureAttributionInput] = None,
     contrast_targets: Optional[FeatureAttributionInput] = None,
+    contrast_targets_alignments: Optional[List[List[Tuple[int, int]]]] = None,
     return_contrastive_target_ids: bool = False,
 ) -> ModelOutput:
     """Utility function to return the output of the model for given contrastive inputs.
@@ -115,6 +117,11 @@ def _get_contrast_output(
         contrast_targets (:obj:`str` or :obj:`list(str)`): Contrastive target text(s) to be compared to the original
             target text. If not specified, the original target text is used as contrastive target (will result in same
             output unless ``contrast_sources`` or ``contrast_target_prefixes`` are specified). Defaults to :obj:`None`.
+        contrast_targets_alignments (:obj:`list(tuple(int, int))`, `optional`): A list of tuples of indices, where the
+            first element is the index of the original target token and the second element is the index of the
+            contrastive target token, used only if :obj:`contrast_targets` is specified. If an explicit alignment is
+            not specified, the alignment of the original and contrastive target texts is assumed to be 1:1 for all
+            available tokens. Defaults to :obj:`None`.
         return_contrastive_target_ids (:obj:`bool`, `optional`, defaults to :obj:`False`): Whether to return the
             contrastive target ids as well as the model output. Defaults to :obj:`False`.
     """
@@ -128,11 +135,9 @@ def _get_contrast_output(
             )
         )
         curr_prefix_len = decoder_input_ids.size(1)
-
-        # We select the next contrastive token as target and truncate contrastive ids
-        # and their attention map to the current generation step.
-        c_tgt_ids = c_batch.target_ids[:, curr_prefix_len]
-        c_batch = c_batch[:curr_prefix_len].to(attribution_model.device)
+        if len(contrast_targets_alignments) > 0 and isinstance(contrast_targets_alignments[0], list):
+            contrast_targets_alignments = contrast_targets_alignments[0]
+        c_batch, c_tgt_ids = slice_batch_from_position(c_batch, curr_prefix_len, contrast_targets_alignments)
 
         if decoder_input_ids.size(0) != c_batch.target_ids.size(0):
             raise ValueError(
@@ -194,6 +199,7 @@ def contrast_prob_fn(
     contrast_target_prefixes: Optional[FeatureAttributionInput] = None,
     contrast_sources: Optional[FeatureAttributionInput] = None,
     contrast_targets: Optional[FeatureAttributionInput] = None,
+    contrast_targets_alignments: Optional[List[List[Tuple[int, int]]]] = None,
     **kwargs,
 ):
     """Returns the probability of a generation target given contrastive context or target prediction alternative.
@@ -211,6 +217,11 @@ def contrast_prob_fn(
         contrast_targets (:obj:`str` or :obj:`list(str)`): Contrastive target text(s) to be compared to the original
             target text. If not specified, the original target text is used as contrastive target (will result in same
             output unless ``contrast_sources`` or ``contrast_target_prefixes`` are specified). Defaults to :obj:`None`.
+        contrast_targets_alignments (:obj:`list(tuple(int, int))`, `optional`): A list of tuples of indices, where the
+            first element is the index of the original target token and the second element is the index of the
+            contrastive target token, used only if :obj:`contrast_targets` is specified. If an explicit alignment is
+            not specified, the alignment of the original and contrastive target texts is assumed to be 1:1 for all
+            available tokens. Defaults to :obj:`None`.
     """
     kwargs.pop("forward_output", None)
     c_output, c_tgt_ids = _get_contrast_output(
@@ -218,6 +229,7 @@ def contrast_prob_fn(
         contrast_sources=contrast_sources,
         contrast_target_prefixes=contrast_target_prefixes,
         contrast_targets=contrast_targets,
+        contrast_targets_alignments=contrast_targets_alignments,
         return_contrastive_target_ids=True,
         **kwargs,
     )
@@ -317,6 +329,7 @@ def contrast_prob_diff_fn(
     contrast_target_prefixes: Optional[FeatureAttributionInput] = None,
     contrast_sources: Optional[FeatureAttributionInput] = None,
     contrast_targets: Optional[FeatureAttributionInput] = None,
+    contrast_targets_alignments: Optional[List[List[Tuple[int, int]]]] = None,
     **kwargs,
 ):
     """Returns the difference between next step probability for a candidate generation target vs. a contrastive
@@ -336,6 +349,11 @@ def contrast_prob_diff_fn(
         contrast_targets (:obj:`str` or :obj:`list(str)`): Contrastive target text(s) to be compared to the original
             target text. If not specified, the original target text is used as contrastive target (will result in same
             output unless ``contrast_sources`` or ``contrast_target_prefixes`` are specified). Defaults to :obj:`None`.
+        contrast_targets_alignments (:obj:`list(tuple(int, int))`, `optional`): A list of tuples of indices, where the
+            first element is the index of the original target token and the second element is the index of the
+            contrastive target token, used only if :obj:`contrast_targets` is specified. If an explicit alignment is
+            not specified, the alignment of the original and contrastive target texts is assumed to be 1:1 for all
+            available tokens. Defaults to :obj:`None`.
     """
     model_probs = probability_fn(attribution_model, forward_output, target_ids)
     contrast_probs = contrast_prob_fn(
@@ -344,6 +362,7 @@ def contrast_prob_diff_fn(
         contrast_sources=contrast_sources,
         contrast_target_prefixes=contrast_target_prefixes,
         contrast_targets=contrast_targets,
+        contrast_targets_alignments=contrast_targets_alignments,
         **kwargs,
     )
     # Return the prob difference as target for attribution
@@ -416,6 +435,41 @@ STEP_SCORES_MAP = {
     "contrast_prob_diff": contrast_prob_diff_fn,
     "mc_dropout_prob_avg": mc_dropout_prob_avg_fn,
 }
+
+
+def check_is_step_function(identifier: str) -> None:
+    if identifier not in STEP_SCORES_MAP:
+        raise AttributeError(
+            f"Step score {identifier} not found. Available step scores are: "
+            f"{', '.join(list(STEP_SCORES_MAP.keys()))}. Use the inseq.register_step_function"
+            "function to register a custom step score."
+        )
+
+
+def get_step_scores(
+    score_identifier: str = "probability",
+    step_scores_args: Dict[str, Any] = {},
+) -> SingleScorePerStepTensor:
+    """Returns step scores for the target tokens in the batch."""
+    check_is_step_function(score_identifier)
+    return STEP_SCORES_MAP[score_identifier](**step_scores_args)
+
+
+def get_step_scores_args(
+    score_identifiers: List[str], kwargs: Dict[str, Any], default_args: Dict[str, Any]
+) -> Dict[str, Any]:
+    step_scores_args = {}
+    for step_score in score_identifiers:
+        check_is_step_function(step_score)
+        step_scores_args.update(
+            **extract_signature_args(
+                kwargs,
+                STEP_SCORES_MAP[step_score],
+                exclude_args=default_args,
+                return_remaining=False,
+            )
+        )
+    return step_scores_args
 
 
 def list_step_functions() -> List[str]:

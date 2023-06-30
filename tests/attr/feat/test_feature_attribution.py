@@ -12,6 +12,11 @@ def saliency_mt_model_larger() -> HuggingfaceEncoderDecoderModel:
 
 
 @fixture(scope="session")
+def saliency_gpt_model_larger() -> HuggingfaceDecoderOnlyModel:
+    return inseq.load_model("gpt2", "saliency")
+
+
+@fixture(scope="session")
 def saliency_mt_model() -> HuggingfaceEncoderDecoderModel:
     return inseq.load_model("hf-internal-testing/tiny-random-MarianMTModel", "saliency")
 
@@ -67,6 +72,76 @@ def test_contrastive_attribution_gpt(saliency_gpt_model: HuggingfaceDecoderOnlyM
     )
     attribution_scores = out.sequence_attributions[0].target_attributions
     assert attribution_scores.shape == torch.Size([23, 5, 32])
+
+
+def test_contrastive_attribution_seq2seq_alignments(saliency_mt_model_larger: HuggingfaceEncoderDecoderModel):
+    aligned = {
+        "src": "UN peacekeepers",
+        "orig_tgt": "I soldati della pace ONU",
+        "contrast_tgt": "Le forze militari di pace delle Nazioni Unite",
+        "alignments": [[(0, 0), (1, 1), (2, 2), (3, 4), (4, 5), (5, 7), (6, 9)]],
+        "aligned_tgts": ["▁Le → ▁I", "▁forze → ▁soldati", "▁di → ▁della", "▁pace", "▁Nazioni → ▁ONU", "</s>"],
+    }
+    out = saliency_mt_model_larger.attribute(
+        aligned["src"],
+        aligned["orig_tgt"],
+        attributed_fn="contrast_prob_diff",
+        step_scores=["contrast_prob_diff"],
+        contrast_targets=aligned["contrast_tgt"],
+        contrast_targets_alignments=aligned["alignments"],
+        show_progress=False,
+    )
+    # Check tokens are aligned as expected
+    assert [t.token for t in out[0].target] == aligned["aligned_tgts"]
+
+    # Check that a single list of alignments is correctly processed
+    out_single_list = saliency_mt_model_larger.attribute(
+        aligned["src"],
+        aligned["orig_tgt"],
+        attributed_fn="contrast_prob_diff",
+        step_scores=["contrast_prob_diff"],
+        contrast_targets=aligned["contrast_tgt"],
+        contrast_targets_alignments=aligned["alignments"][0],
+        attribute_target=True,
+        show_progress=False,
+    )
+    assert out[0].target == out_single_list[0].target
+    assert torch.allclose(
+        out[0].source_attributions,
+        out_single_list[0].source_attributions,
+        atol=8e-2,
+    )
+
+    # Check that providing only non-matching ids also works
+    out_non_matching_ids = saliency_mt_model_larger.attribute(
+        aligned["src"],
+        aligned["orig_tgt"],
+        attributed_fn="contrast_prob_diff",
+        step_scores=["contrast_prob_diff"],
+        contrast_targets=aligned["contrast_tgt"],
+        contrast_targets_alignments=[(3, 4), (4, 5), (5, 7), (6, 9)],
+        show_progress=False,
+    )
+    assert out[0].target == out_non_matching_ids[0].target
+    assert torch.allclose(
+        out[0].source_attributions,
+        out_non_matching_ids[0].source_attributions,
+        atol=8e-2,
+    )
+
+
+def test_contrastive_attribution_gpt_alignments(saliency_gpt_model_larger: HuggingfaceDecoderOnlyModel):
+    out = saliency_gpt_model_larger.attribute(
+        "UN peacekeepers",
+        "UN peacekeepers were deployed in the region.",
+        attributed_fn="contrast_prob_diff",
+        contrast_targets="UN peacekeepers were sent to the war-torn region.",
+        contrast_targets_alignments=[(7, 10), (8, 11)],
+        step_scores=["contrast_prob_diff"],
+        show_progress=False,
+    )
+    contrast_targets = ["UN", "Ġpeace", "keepers", "Ġwere", "Ġsent → Ġdeployed", "Ġto → Ġin", "Ġthe", "Ġregion", "."]
+    assert [t.token for t in out[0].target] == contrast_targets
 
 
 def test_mcd_weighted_attribution_seq2seq(saliency_mt_model, auxiliary_saliency_mt_model):

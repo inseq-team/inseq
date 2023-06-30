@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Un
 
 import torch
 
-from ...utils import extract_signature_args
+from ...utils import extract_signature_args, get_aligned_idx
 from ...utils.typing import (
     OneOrMoreAttributionSequences,
     OneOrMoreIdSequences,
@@ -13,7 +13,7 @@ from ...utils.typing import (
     TextInput,
     TokenWithId,
 )
-from ..step_functions import STEP_SCORES_MAP
+from ..step_functions import get_step_scores_args
 
 if TYPE_CHECKING:
     from ...models import AttributionModel
@@ -87,36 +87,29 @@ def check_attribute_positions(
     return attr_pos_start, attr_pos_end
 
 
-def get_step_scores(
-    score_identifier: str = "probability",
-    step_scores_args: Dict[str, Any] = {},
-) -> SingleScorePerStepTensor:
-    """Returns step scores for the target tokens in the batch."""
-    if score_identifier not in STEP_SCORES_MAP:
-        raise AttributeError(
-            f"Step score {score_identifier} not found. Available step scores are: "
-            f"{', '.join(list(STEP_SCORES_MAP.keys()))}. Use the inseq.register_step_function"
-            "function to register a custom step score."
-        )
-    return STEP_SCORES_MAP[score_identifier](**step_scores_args)
-
-
 def join_token_ids(
     tokens: OneOrMoreTokenSequences,
     ids: OneOrMoreIdSequences,
     contrast_tokens: Optional[OneOrMoreTokenSequences] = None,
+    contrast_targets_alignments: Optional[List[List[Tuple[int, int]]]] = None,
 ) -> List[TokenWithId]:
     """Joins tokens and ids into a list of TokenWithId objects."""
     if contrast_tokens is None:
         contrast_tokens = tokens
+    # 1:1 alignment between target and contrast tokens
+    if contrast_targets_alignments is None:
+        contrast_targets_alignments = [[(idx, idx) for idx, _ in enumerate(seq)] for seq in tokens]
     sequences = []
-    for target_tokens_seq, contrast_target_tokens_seq, input_ids_seq in zip(tokens, contrast_tokens, ids):
+    for target_tokens_seq, contrast_target_tokens_seq, input_ids_seq, alignments_seq in zip(
+        tokens, contrast_tokens, ids, contrast_targets_alignments
+    ):
         curr_seq = []
-        for token, contrast_token, idx in zip(target_tokens_seq, contrast_target_tokens_seq, input_ids_seq):
-            if token != contrast_token:
-                curr_seq.append(TokenWithId(f"{contrast_token} → {token}", -1))
+        for pos_idx, (token, token_idx) in enumerate(zip(target_tokens_seq, input_ids_seq)):
+            contrast_pos_idx = get_aligned_idx(pos_idx, alignments_seq)
+            if token != contrast_target_tokens_seq[contrast_pos_idx]:
+                curr_seq.append(TokenWithId(f"{contrast_target_tokens_seq[contrast_pos_idx]} → {token}", -1))
             else:
-                curr_seq.append(TokenWithId(token, idx))
+                curr_seq.append(TokenWithId(token, token_idx))
         sequences.append(curr_seq)
     return sequences
 
@@ -135,22 +128,7 @@ def extract_args(
     extra_attributed_fn_args, attributed_fn_unused_args = extract_signature_args(
         kwargs, attributed_fn, exclude_args=default_args, return_remaining=True
     )
-    extra_step_scores_args = {}
-    for step_score in step_scores:
-        if step_score not in STEP_SCORES_MAP:
-            raise AttributeError(
-                f"Step score {step_score} not found. Available step scores are: "
-                f"{', '.join(list(STEP_SCORES_MAP.keys()))}. Use the inseq.register_step_function"
-                "function to register a custom step score."
-            )
-        extra_step_scores_args.update(
-            **extract_signature_args(
-                kwargs,
-                STEP_SCORES_MAP[step_score],
-                exclude_args=default_args,
-                return_remaining=False,
-            )
-        )
+    extra_step_scores_args = get_step_scores_args(step_scores, kwargs, default_args)
     step_scores_unused_args = {k: v for k, v in kwargs.items() if k not in extra_step_scores_args}
     unused_args = {
         k: v

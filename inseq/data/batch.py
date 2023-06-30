@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import List, Optional, Tuple, Union
 
+from ..utils import get_aligned_idx
 from ..utils.typing import EmbeddingsTensor, ExpandedTargetIdsTensor, IdsTensor, OneOrMoreTokenSequences
 from .data_utils import TensorWrapper
 
@@ -229,3 +230,11 @@ class DecoderOnlyBatch(Batch):
             encoding=batch.encoding,
             embedding=batch.embedding,
         )
+
+
+def slice_batch_from_position(
+    batch: DecoderOnlyBatch, curr_idx: int, alignments: Optional[List[Tuple[int, int]]] = None
+) -> Tuple[DecoderOnlyBatch, IdsTensor]:
+    truncate_idx = get_aligned_idx(curr_idx, alignments)
+    tgt_ids = batch.target_ids[:, truncate_idx]
+    return batch[:truncate_idx], tgt_ids

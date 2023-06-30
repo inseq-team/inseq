@@ -19,6 +19,7 @@ from ..utils import (
     MissingAttributionMethodError,
     check_device,
     format_input_texts,
+    get_adjusted_alignments,
     get_default_device,
     isnotebook,
     pretty_tensor,
@@ -91,7 +92,8 @@ class InputFormatter:
         batch: Union[DecoderOnlyBatch, EncoderDecoderBatch],
         target_tokens: OneOrMoreTokenSequences,
         target_ids: TargetIdsTensor,
-        attributed_fn_args: Dict[str, Any] = {},
+        contrast_batch: Optional[DecoderOnlyBatch] = None,
+        contrast_targets_alignments: Optional[List[List[Tuple[int, int]]]] = None,
     ) -> FeatureAttributionStepOutput:
         r"""Enriches the attribution output with token information, producing the finished
         :class:`~inseq.data.FeatureAttributionStepOutput` object.
@@ -139,6 +141,45 @@ class InputFormatter:
         attribution_model: "AttributionModel", batch: Union[DecoderOnlyBatch, EncoderDecoderBatch]
     ) -> TextSequences:
         raise NotImplementedError()
+
+    @staticmethod
+    def format_contrast_targets_alignments(
+        contrast_targets_alignments: Union[List[Tuple[int, int]], List[List[Tuple[int, int]]], str],
+        target_sequences: List[str],
+        target_tokens: List[List[str]],
+        contrast_sequences: List[str],
+        contrast_tokens: List[List[str]],
+        special_tokens: List[str] = [],
+    ) -> Tuple[DecoderOnlyBatch, Optional[List[List[Tuple[int, int]]]]]:
+        # Ensure that the contrast_targets_alignments are in the correct format (list of lists of idxs pairs)
+        if contrast_targets_alignments:
+            if isinstance(contrast_targets_alignments, list) and len(contrast_targets_alignments) > 0:
+                if isinstance(contrast_targets_alignments[0], tuple):
+                    contrast_targets_alignments = [contrast_targets_alignments]
+                if not isinstance(contrast_targets_alignments[0], list):
+                    raise ValueError("Invalid contrast_targets_alignments were provided.")
+            elif not isinstance(contrast_targets_alignments, str):
+                raise ValueError("Invalid contrast_targets_alignments were provided.")
+
+        adjusted_alignments = []
+        aligns = contrast_targets_alignments
+        for seq_idx, (tgt_seq, tgt_tok, c_seq, c_tok) in enumerate(
+            zip(target_sequences, target_tokens, contrast_sequences, contrast_tokens)
+        ):
+            if isinstance(contrast_targets_alignments, list):
+                aligns = contrast_targets_alignments[seq_idx]
+            adjusted_alignments.append(
+                get_adjusted_alignments(
+                    aligns,
+                    target_sequence=tgt_seq,
+                    target_tokens=tgt_tok,
+                    contrast_sequence=c_seq,
+                    contrast_tokens=c_tok,
+                    fill_missing=True,
+                    special_tokens=special_tokens,
+                )
+            )
+        return adjusted_alignments
 
 
 class AttributionModel(ABC, torch.nn.Module):
@@ -421,23 +462,20 @@ class AttributionModel(ABC, torch.nn.Module):
             inputs = batch.input_ids
         return self.embed_ids(inputs, as_targets=as_targets)
 
-    def tokenize_with_ids(
+    def get_token_with_ids(
         self,
-        inputs: TextInput,
-        as_targets: bool = False,
-        skip_special_tokens: bool = True,
-        contrast_inputs: Optional[TextInput] = None,
+        batch: Union[EncoderDecoderBatch, DecoderOnlyBatch],
+        contrast_target_tokens: Optional[OneOrMoreTokenSequences] = None,
+        contrast_targets_alignments: Optional[List[List[Tuple[int, int]]]] = None,
     ) -> List[List[TokenWithId]]:
-        tokenized_sentences = self.convert_string_to_tokens(
-            inputs, as_targets=as_targets, skip_special_tokens=skip_special_tokens
-        )
-        ids_sentences = self.convert_tokens_to_ids(tokenized_sentences)
-        if contrast_inputs is not None:
-            contrast_tokenized_sentences = self.convert_string_to_tokens(
-                contrast_inputs, as_targets=as_targets, skip_special_tokens=skip_special_tokens
+        if contrast_target_tokens is not None:
+            return join_token_ids(
+                batch.target_tokens,
+                batch.target_ids.tolist(),
+                contrast_target_tokens,
+                contrast_targets_alignments,
             )
-            return join_token_ids(tokenized_sentences, ids_sentences, contrast_tokenized_sentences)
-        return join_token_ids(tokenized_sentences, ids_sentences)
+        return join_token_ids(batch.target_tokens, batch.target_ids.tolist())
 
     # Framework-specific methods
 
@@ -464,6 +502,10 @@ class AttributionModel(ABC, torch.nn.Module):
         return_baseline: bool = False,
         include_eos_baseline: bool = False,
     ) -> BatchEncoding:
+        pass
+
+    @abstractmethod
+    def decode(self, ids: IdsTensor, skip_special_tokens: bool = True) -> List[str]:
         pass
 
     @abstractmethod
@@ -499,6 +541,15 @@ class AttributionModel(ABC, torch.nn.Module):
         skip_special_tokens: bool = True,
         as_targets: bool = False,
     ) -> OneOrMoreTokenSequences:
+        pass
+
+    @abstractmethod
+    def clean_tokens(
+        self,
+        tokens: OneOrMoreTokenSequences,
+        skip_special_tokens: bool = False,
+        as_targets: bool = False,
+    ):
         pass
 
     @property
