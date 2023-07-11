@@ -17,17 +17,21 @@
 </div>
 <div align="center">
 
+  [![Follow Inseq on Twitter]( 	https://img.shields.io/badge/Twitter-1DA1F2?style=for-the-badge&logo=twitter&logoColor=white)](https://twitter.com/InseqLib)
+  [![Join the Inseq Discord server](https://img.shields.io/badge/Discord-7289DA?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/V5VgwwFPbu)
+  <!--[![Follow Inseq on Mastodon](https://img.shields.io/mastodon/follow/109308976376923913?domain=https%3A%2F%2Fsigmoid.social&label=Inseq&style=social)](https://sigmoid.social/@inseq)-->
 
-  [![Follow Inseq on Twitter](https://img.shields.io/twitter/follow/inseqlib?label=InseqLib&style=social)](https://twitter.com/InseqLib)
-  [![Follow Inseq on Mastodon](https://img.shields.io/mastodon/follow/109308976376923913?domain=https%3A%2F%2Fsigmoid.social&label=Inseq&style=social)](https://sigmoid.social/@inseq)
+</div>
+<div align="center">
+
+  <a href="http://arxiv.org/abs/2302.13942"><b>Paper</b></a> |
+  <a href="https://inseq.readthedocs.io"><b>Documentation</b></a> |
+  <a href="https://github.com/inseq-team/inseq/blob/main/examples/inseq_tutorial.ipynb"><b>Tutorial</b></a> |
+  <a href="https://pypi.org/project/inseq"><b>PyPI Package</b></a>
+
 </div>
 
 Inseq is a Pytorch-based hackable toolkit to democratize the access to common post-hoc **in**terpretability analyses of **seq**uence generation models.
-
-- **Paper:** [http://arxiv.org/abs/2302.13942](http://arxiv.org/abs/2302.13942)
-- **Documentation:** [https://inseq.readthedocs.io](https://inseq.readthedocs.io)
-- **PyPI Package:** [https://pypi.org/project/inseq](https://pypi.org/project/inseq)
-- **MT Gender Bias Demo:** [oskarvanderwal/MT-bias-demo](https://huggingface.co/spaces/oskarvanderwal/MT-bias-demo)
 
 ## Installation
 
@@ -250,7 +254,7 @@ Inseq has been used in various research projects. A list of known publications t
   <ol>
     <li> <a href="https://arxiv.org/abs/2302.13942">Inseq: An Interpretability Toolkit for Sequence Generation Models</a> (Sarti et al., 2023) </li>
     <li> <a href="https://arxiv.org/abs/2302.14220">Are Character-level Translations Worth the Wait? Comparing Character- and Subword-level Models for Machine Translation</a> (Edman et al., 2023) </li>
-    <li> <a href="https://arxiv.org/abs/2305.15908">Response Generation in Longitudinal Dialogues: Which Knowledge Representation Helps?</a> (Mousavi et al., 2023)  </li> 
+    <li> <a href="https://arxiv.org/abs/2305.15908">Response Generation in Longitudinal Dialogues: Which Knowledge Representation Helps?</a> (Mousavi et al., 2023)  </li>
   </ol>
 
 </details>
