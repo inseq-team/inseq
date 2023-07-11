@@ -22,7 +22,6 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Un
 
 import torch
 from torchtyping import TensorType
-from transformers import set_seed
 
 from ...data import (
     DecoderOnlyBatch,
@@ -513,7 +512,6 @@ class FeatureAttribution(Registry):
             if self.use_attention_weights:
                 attentions_dict = self.attribution_model.get_attentions_dict(output)
                 attribution_args = {**attribution_args, **attentions_dict}
-        set_seed(42)
         # Perform attribution step
         step_output = self.attribute_step(
             attribute_main_args,
