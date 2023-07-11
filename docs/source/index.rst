@@ -15,16 +15,53 @@
 Welcome to Inseq! |:bug:|
 ##############################
 
+.. note::
+    
+    The Inseq community now has a dedicated Discord server! Join us at https://discord.gg/V5VgwwFPbu to chat with the team and other users, ask questions, and share your work!
+
 Inseq is a Pytorch-based hackable toolkit to democratize the study of **in**\terpretability for **seq**\uence generation models. At the moment, Inseq supports a wide set of models from the |:hugging_face:| `Transformers <https://github.com/huggingface/transformers/>`__ library and an ever-growing set of feature attribution methods, leveraging in part the widely-used `Captum library <https://captum.ai>`__. For a quick introduction to common use cases, see the :doc:`examples/quickstart` page.
 
-- **Paper:** `https://arxiv.org/abs/2302.13942 <http://arxiv.org/abs/2302.13942>`__
-- **Github:** `https://github.com/inseq-team/inseq <https://github.com/inseq-team/inseq>`__
-- **PyPI Package:** `https://pypi.org/project/inseq <https://pypi.org/project/inseq>`__
-- **MT Gender Bias Demo:** `oskarvanderwal/MT-bias-demo <https://huggingface.co/spaces/oskarvanderwal/MT-bias-demo>`__
+.. grid:: 2 2 4 4
+
+    .. grid-item::
+
+        .. card:: Paper
+            :link: https://arxiv.org/abs/2302.13942
+            :img-background: images/particle_background.jpg
+            :class-title: sd-text-light 
+            :class-card: sd-text-light sd-d-inline-flex sd-mt-3
+            :class-body: sd-pt-0 sd-pb-0 sd-pr-0 sd-pl-0
+
+    .. grid-item::
+        
+        .. card:: Github
+            :link: https://github.com/inseq-team/inseq
+            :img-background: images/particle_background.jpg
+            :class-title: sd-text-light
+            :class-card: sd-text-light sd-d-inline-flex sd-mt-3
+            :class-body: sd-pt-0 sd-pb-0 sd-pr-0 sd-pl-0
+
+    .. grid-item::
+
+        .. card:: PyPI
+            :link: https://pypi.org/project/inseq
+            :img-background: images/particle_background.jpg
+            :class-title: sd-text-light
+            :class-card: sd-text-light sd-d-inline-flex sd-mt-3 
+            :class-body: sd-pt-0 sd-pb-0 sd-pr-0 sd-pl-0
+
+    .. grid-item::
+
+        .. card:: Tutorial
+            :link: https://github.com/inseq-team/inseq/blob/main/examples/inseq_tutorial.ipynb
+            :img-background: images/particle_background.jpg
+            :class-title: sd-text-light
+            :class-card: sd-text-light sd-d-inline-flex sd-mt-3
+            :class-body: sd-pt-0 sd-pb-0 sd-pr-0 sd-pl-0
 
 Using Inseq, feature attribution maps that can be saved, reloaded, aggregated and visualized either as HTMLs (with Jupyter notebook support) or directly in the console using `rich <https://rich.readthedocs.io/en/latest/>`__. Besides simple attribution, Inseq also supports features like step score extraction, attribution aggregation and attributed functions customization for more advanced use cases. Refer to the guides in the |:bug:| Using Inseq section for more details and examples on specific features.
 
-To give a taste of what Inseq can do in a couple lines of code, here's a snippet doing source-side attribution of an English-to-French translation produced by the model ``Helsinki-NLP/opus-mt-en-fr`` from |:hugging_face:| Transformers  using the ``IntegratedGradients`` method with 300 integral approximation steps, and returning the attribution convergence delta and token-level prediction probabilties.
+In just a couple lines of code, Inseq can be used to perform the source-side attribution of an English-to-French translation produced by the model ``Helsinki-NLP/opus-mt-en-fr`` from |:hugging_face:| Transformers  using the ``IntegratedGradients`` method with 300 integral approximation steps, and returning the attribution convergence delta and token-level prediction probabilties.
 
 
 .. code-block:: python
