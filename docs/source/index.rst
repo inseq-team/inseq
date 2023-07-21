@@ -96,6 +96,7 @@ Inseq is still in early development and is currently maintained by a small team 
     examples/custom_attribute_target
     examples/attribute_mmt
     examples/locate_gpt2_knowledge
+    examples/petals
     examples/tuned_lens
     examples/faq
 
