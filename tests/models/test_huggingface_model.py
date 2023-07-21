@@ -156,6 +156,29 @@ def test_batched_attribution_consistency_seq2seq(
         )
 
 
+def test_batched_attribution_consistency_decoder_only(saliency_gpt2_model):
+    texts_single, reference_single = EXAMPLES["short_texts_decoder"][0]
+    texts_batch, reference_batch = EXAMPLES["short_texts_decoder"][1]
+    out_single = saliency_gpt2_model.attribute(
+        texts_single,
+        reference_single,
+        show_progress=False,
+        device=get_default_device(),
+    )
+    out_batch = saliency_gpt2_model.attribute(
+        texts_batch,
+        reference_batch,
+        show_progress=False,
+        device=get_default_device(),
+    )
+    assert torch.allclose(
+        out_single.sequence_attributions[0].target_attributions,
+        out_batch.sequence_attributions[0].target_attributions,
+        atol=8e-2,
+        equal_nan=True,
+    )
+
+
 @mark.slow
 @mark.parametrize(("texts", "reference_texts"), EXAMPLES["texts"])
 @mark.parametrize("attribution_method", ATTRIBUTION_METHODS)
