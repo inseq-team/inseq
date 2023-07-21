@@ -387,21 +387,21 @@ class FeatureAttributionStepOutput(TensorWrapper):
             )
         if self.target_attributions is not None:
             self.target_attributions = remap_from_filtered(
-                original_shape=(len(batch.targets.input_tokens), *self.target_attributions.shape[1:]),
+                original_shape=(len(batch.target_tokens), *self.target_attributions.shape[1:]),
                 mask=target_attention_mask,
                 filtered=self.target_attributions,
             )
         if self.step_scores is not None:
             for score_name, score_tensor in self.step_scores.items():
                 self.step_scores[score_name] = remap_from_filtered(
-                    original_shape=(len(batch.targets.input_tokens), 1),
+                    original_shape=(len(batch.target_tokens), 1),
                     mask=target_attention_mask,
                     filtered=score_tensor.unsqueeze(-1),
                 ).squeeze(-1)
         if self.sequence_scores is not None:
             for score_name, score_tensor in self.sequence_scores.items():
                 self.sequence_scores[score_name] = remap_from_filtered(
-                    original_shape=(len(batch.targets.input_tokens), *self.source_attributions.shape[1:]),
+                    original_shape=(len(batch.target_tokens), *self.source_attributions.shape[1:]),
                     mask=target_attention_mask,
                     filtered=score_tensor,
                 )
