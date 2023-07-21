@@ -1,6 +1,7 @@
 """HuggingFace Seq2seq model."""
 import logging
 from abc import abstractmethod
+from inspect import getfullargspec
 from typing import Dict, List, NoReturn, Optional, Tuple, Union
 
 import torch
@@ -209,14 +210,23 @@ class HuggingfaceModel(AttributionModel):
         ):
             inputs = self.encode(inputs)
         inputs = inputs.to(self.device)
-        generation_out = self.model.generate(
-            input_ids=inputs.input_ids,
-            attention_mask=inputs.attention_mask,
-            return_dict_in_generate=True,
-            **kwargs,
-        )
+        if "input_ids" not in getfullargspec(self.model.generate).args:
+            logger.warning(
+                "Model does not support input_ids in generation. "
+                "Assuming a petals AutoDistributedModelForCausalLM is being used."
+            )
+            return_generation_output = False
+            sequences = self.model.generate(inputs=inputs.input_ids, **kwargs)
+        else:
+            generation_out = self.model.generate(
+                input_ids=inputs.input_ids,
+                attention_mask=inputs.attention_mask,
+                return_dict_in_generate=True,
+                **kwargs,
+            )
+            sequences = generation_out.sequences
         texts = self.tokenizer.batch_decode(
-            generation_out.sequences,
+            sequences,
             skip_special_tokens=True,
         )
         if return_generation_output:
@@ -384,6 +394,8 @@ class HuggingfaceModel(AttributionModel):
                 )
                 if clean_tok:
                     clean_tokens.append(clean_tok)
+                elif tok:
+                    clean_tokens.append(" ")
             return clean_tokens
         return [self.clean_tokens(token_seq, skip_special_tokens, as_targets) for token_seq in tokens]
 
@@ -442,6 +454,8 @@ class HuggingfaceEncoderDecoderModel(HuggingfaceModel, EncoderDecoderAttribution
     def get_attentions_dict(
         output: Seq2SeqLMOutput,
     ) -> Dict[str, MultiLayerMultiUnitScoreTensor]:
+        if output.encoder_attentions is None or output.decoder_attentions is None:
+            raise ValueError("Model does not support attribution relying on attention outputs.")
         return {
             "encoder_self_attentions": torch.stack(output.encoder_attentions, dim=1),
             "decoder_self_attentions": torch.stack(output.decoder_attentions, dim=1),
@@ -481,6 +495,8 @@ class HuggingfaceDecoderOnlyModel(HuggingfaceModel, DecoderOnlyAttributionModel)
 
     @staticmethod
     def get_attentions_dict(output: CausalLMOutput) -> Dict[str, MultiLayerMultiUnitScoreTensor]:
+        if output.attentions is None:
+            raise ValueError("Model does not support attribution relying on attention outputs.")
         return {
             "decoder_self_attentions": torch.stack(output.attentions, dim=1),
         }

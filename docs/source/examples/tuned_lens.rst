@@ -17,6 +17,12 @@ Estimating Prediction Confidence with Tuned Lens
 The Tuned Lens method
 ---------------------
 
+.. warning::
+
+    The tutorial is deprecated and won't work with the most recent release of ``tuned-lens``. It will be updated as
+    soon as possible.
+
+
 .. note::
 
     This tutorial adopts the "Tuned Lens" name for the affine transformation proposed by
