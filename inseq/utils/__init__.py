@@ -53,6 +53,7 @@ from .torch_utils import (
     get_sequences_from_batched_steps,
     normalize,
     remap_from_filtered,
+    top_p_logits_mask,
 )
 
 __all__ = [
@@ -113,4 +114,5 @@ __all__ = [
     "find_block_stack",
     "get_adjusted_alignments",
     "get_aligned_idx",
+    "top_p_logits_mask",
 ]

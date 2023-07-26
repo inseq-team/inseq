@@ -1,15 +1,14 @@
 import logging
-from inspect import getfullargspec
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Protocol, Tuple, Union
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Protocol, Tuple
 
 import torch
 from torch.nn.functional import kl_div, log_softmax
-from transformers import AutoModelForCausalLM, AutoModelForSeq2SeqLM
 from transformers.modeling_outputs import ModelOutput
 
 from ..data import DecoderOnlyBatch, FeatureAttributionInput, get_batch_from_inputs, slice_batch_from_position
 from ..data.aggregation_functions import DEFAULT_ATTRIBUTION_AGGREGATE_DICT
-from ..utils import extract_signature_args
+from ..utils import extract_signature_args, top_p_logits_mask
 from ..utils.typing import EmbeddingsTensor, IdsTensor, SingleScorePerStepTensor, TargetIdsTensor
 
 if TYPE_CHECKING:
@@ -18,87 +17,106 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+@dataclass
+class StepFunctionArgs:
+    """Base class for step function base arguments. These arguments are passed to all step functions and are
+    complemented by the ones defined in the step function signature.
+
+    Attributes:
+        attribution_model (:class:`~inseq.models.AttributionModel`): The attribution model used in the current step.
+        forward_output (:class:`~inseq.models.ModelOutput`): The output of the model's forward pass.
+        target_ids (:obj:`torch.Tensor`): Tensor of target token ids of size :obj:`(batch_size,)` corresponding to
+            the target predicted tokens for the next generation step.
+        encoder_input_ids (:obj:`torch.Tensor`): Tensor of ids of encoder input tokens of size
+            :obj:`(batch_size, source_seq_len)`, representing encoder inputs at the present step. Available only for
+            encoder-decoder models.
+        decoder_input_ids (:obj:`torch.Tensor`): Tensor of ids of decoder input tokens of size
+            :obj:`(batch_size, target_seq_len)`, representing decoder inputs at the present step.
+        encoder_input_embeds (:obj:`torch.Tensor`): Tensor of embeddings of encoder input tokens of size
+            :obj:`(batch_size, source_seq_len, hidden_size)`, representing encoder inputs at the present step.
+            Available only for encoder-decoder models.
+        decoder_input_embeds (:obj:`torch.Tensor`): Tensor of embeddings of decoder input tokens of size
+            :obj:`(batch_size, target_seq_len, hidden_size)`, representing decoder inputs at the present step.
+        encoder_attention_mask (:obj:`torch.Tensor`): Tensor of attention mask of encoder input tokens of size
+            :obj:`(batch_size, source_seq_len)`, used for masking padding tokens in the encoder input. Available only
+            for encoder-decoder models.
+        decoder_attention_mask (:obj:`torch.Tensor`): Tensor of attention mask of decoder input tokens of size
+            :obj:`(batch_size, target_seq_len)`, used for masking padding tokens in the decoder input.
+    """
+
+    attribution_model: "AttributionModel"
+    forward_output: ModelOutput
+    target_ids: TargetIdsTensor
+    decoder_input_ids: IdsTensor
+    decoder_input_embeds: EmbeddingsTensor
+    decoder_attention_mask: IdsTensor
+
+
+@dataclass
+class StepFunctionEncoderDecoderArgs(StepFunctionArgs):
+    encoder_input_ids: IdsTensor
+    encoder_input_embeds: EmbeddingsTensor
+    encoder_attention_mask: IdsTensor
+
+
+@dataclass
+class StepFunctionDecoderOnlyArgs(StepFunctionArgs):
+    pass
+
+
 class StepFunction(Protocol):
     def __call__(
         self,
-        attribution_model: "AttributionModel",
-        forward_output: ModelOutput,
-        encoder_input_ids: IdsTensor,
-        decoder_input_ids: IdsTensor,
-        encoder_input_embeds: EmbeddingsTensor,
-        decoder_input_embeds: EmbeddingsTensor,
-        encoder_attention_mask: IdsTensor,
-        decoder_attention_mask: IdsTensor,
-        target_ids: TargetIdsTensor,
+        args: StepFunctionArgs,
         **kwargs,
     ) -> SingleScorePerStepTensor:
         ...
 
 
-def get_step_function_reserved_args() -> List[str]:
-    return getfullargspec(StepFunction.__call__).args
-
-
-def logit_fn(
-    attribution_model: "AttributionModel", forward_output: ModelOutput, target_ids: TargetIdsTensor, **kwargs
-) -> SingleScorePerStepTensor:
+def logit_fn(args: StepFunctionArgs) -> SingleScorePerStepTensor:
     """Compute the logit of the target_ids from the model's output logits."""
-    logits = attribution_model.output2logits(forward_output)
-    target_ids = target_ids.reshape(logits.shape[0], 1)
+    logits = args.attribution_model.output2logits(args.forward_output)
+    target_ids = args.target_ids.reshape(logits.shape[0], 1)
     return logits.gather(-1, target_ids).squeeze(-1)
 
 
-def probability_fn(
-    attribution_model: "AttributionModel", forward_output: ModelOutput, target_ids: TargetIdsTensor, **kwargs
-) -> SingleScorePerStepTensor:
+def probability_fn(args: StepFunctionArgs) -> SingleScorePerStepTensor:
     """Compute the probabilty of target_ids from the model's output logits."""
-    logits = attribution_model.output2logits(forward_output)
-    target_ids = target_ids.reshape(logits.shape[0], 1)
+    logits = args.attribution_model.output2logits(args.forward_output)
+    target_ids = args.target_ids.reshape(logits.shape[0], 1)
     logits = logits.softmax(dim=-1)
     # Extracts the ith score from the softmax output over the vocabulary (dim -1 of the logits)
     # where i is the value of the corresponding index in target_ids.
     return logits.gather(-1, target_ids).squeeze(-1)
 
 
-def entropy_fn(
-    attribution_model: "AttributionModel", forward_output: ModelOutput, **kwargs
-) -> SingleScorePerStepTensor:
+def entropy_fn(args: StepFunctionArgs) -> SingleScorePerStepTensor:
     """Compute the entropy of the model's output distribution."""
-    logits = attribution_model.output2logits(forward_output)
+    logits = args.attribution_model.output2logits(args.forward_output)
     out = torch.distributions.Categorical(logits=logits).entropy()
     if out.ndim > 1:
         out = out.squeeze(-1)
     return out
 
 
-def crossentropy_fn(
-    attribution_model: "AttributionModel", forward_output: ModelOutput, target_ids: TargetIdsTensor, **kwargs
-) -> SingleScorePerStepTensor:
+def crossentropy_fn(args: StepFunctionArgs) -> SingleScorePerStepTensor:
     """Compute the cross entropy between the target_ids and the logits.
     See: https://github.com/ZurichNLP/nmtscore/blob/master/src/nmtscore/models/m2m100.py#L99.
     """
-    return -torch.log2(probability_fn(attribution_model, forward_output, target_ids))
+    return -torch.log2(probability_fn(args))
 
 
-def perplexity_fn(
-    attribution_model: "AttributionModel", forward_output: ModelOutput, target_ids: TargetIdsTensor, **kwargs
-) -> SingleScorePerStepTensor:
+def perplexity_fn(args: StepFunctionArgs) -> SingleScorePerStepTensor:
     """Compute perplexity of the target_ids from the logits.
     Perplexity is the weighted branching factor. If we have a perplexity of 100, it means that whenever the model is
     trying to guess the next word it is as confused as if it had to pick between 100 words.
     Reference: https://chiaracampagnola.io/2020/05/17/perplexity-in-language-models/.
     """
-    return 2 ** crossentropy_fn(attribution_model, forward_output, target_ids)
+    return 2 ** crossentropy_fn(args)
 
 
 def _get_contrast_output(
-    attribution_model: "AttributionModel",
-    encoder_input_ids: IdsTensor,
-    decoder_input_ids: IdsTensor,
-    encoder_attention_mask: IdsTensor,
-    decoder_attention_mask: IdsTensor,
-    encoder_input_embeds: EmbeddingsTensor,
-    decoder_input_embeds: EmbeddingsTensor,
+    args: StepFunctionArgs,
     contrast_target_prefixes: Optional[FeatureAttributionInput] = None,
     contrast_sources: Optional[FeatureAttributionInput] = None,
     contrast_targets: Optional[FeatureAttributionInput] = None,
@@ -126,81 +144,66 @@ def _get_contrast_output(
             contrastive target ids as well as the model output. Defaults to :obj:`False`.
     """
     c_tgt_ids = None
+    is_enc_dec = args.attribution_model.is_encoder_decoder
     if contrast_targets:
         c_batch = DecoderOnlyBatch.from_batch(
             get_batch_from_inputs(
-                attribution_model=attribution_model,
+                attribution_model=args.attribution_model,
                 inputs=contrast_targets,
-                as_targets=attribution_model.is_encoder_decoder,
+                as_targets=is_enc_dec,
             )
         )
-        curr_prefix_len = decoder_input_ids.size(1)
+        curr_prefix_len = args.decoder_input_ids.size(1)
         if len(contrast_targets_alignments) > 0 and isinstance(contrast_targets_alignments[0], list):
             contrast_targets_alignments = contrast_targets_alignments[0]
         c_batch, c_tgt_ids = slice_batch_from_position(c_batch, curr_prefix_len, contrast_targets_alignments)
 
-        if decoder_input_ids.size(0) != c_batch.target_ids.size(0):
+        if args.decoder_input_ids.size(0) != c_batch.target_ids.size(0):
             raise ValueError(
-                f"Contrastive batch size ({c_batch.target_ids.size(0)}) must match candidate batch size "
-                f"({decoder_input_ids.size(0)}). Multi-sentence attribution and methods expanding inputs to multiple "
-                "steps (e.g. Integrated Gradients) are currently not supported for contrastive feature attribution."
+                f"Contrastive batch size ({c_batch.target_ids.size(0)}) must match candidate batch size"
+                f" ({args.decoder_input_ids.size(0)}). Multi-sentence attribution and methods expanding inputs to"
+                " multiple steps (e.g. Integrated Gradients) are not supported for contrastive feature attribution."
             )
 
-        decoder_input_ids = c_batch.target_ids
-        decoder_input_embeds = c_batch.target_embeds
-        decoder_attention_mask = c_batch.target_mask
+        args.decoder_input_ids = c_batch.target_ids
+        args.decoder_input_embeds = c_batch.target_embeds
+        args.decoder_attention_mask = c_batch.target_mask
     if contrast_target_prefixes:
-        c_dec_in = attribution_model.encode(
-            contrast_target_prefixes, as_targets=attribution_model.is_encoder_decoder, add_special_tokens=False
+        c_dec_in = args.attribution_model.encode(
+            contrast_target_prefixes, as_targets=is_enc_dec, add_special_tokens=False
         )
-        if attribution_model.is_encoder_decoder:
+        if is_enc_dec:
             # Remove the first token of the decoder input ids and attention mask if it's BOS
-            if torch.all(torch.eq(decoder_input_ids[:, 0], attribution_model.bos_token_id)):
-                decoder_input_ids = decoder_input_ids[:, 1:]
-                decoder_attention_mask = decoder_attention_mask[:, 1:]
-        c_dec_ids = torch.cat((c_dec_in.input_ids, decoder_input_ids), dim=1)
-        c_dec_mask = torch.cat((c_dec_in.attention_mask, decoder_attention_mask), dim=1)
-        c_dec_embeds = attribution_model.embed(c_dec_ids, as_targets=attribution_model.is_encoder_decoder)
-    else:
-        c_dec_ids = decoder_input_ids
-        c_dec_mask = decoder_attention_mask
-        c_dec_embeds = decoder_input_embeds
+            if torch.all(torch.eq(args.decoder_input_ids[:, 0], args.attribution_model.bos_token_id)):
+                args.decoder_input_ids = args.decoder_input_ids[:, 1:]
+                args.decoder_attention_mask = args.decoder_attention_mask[:, 1:]
+        args.decoder_input_ids = torch.cat((c_dec_in.input_ids, args.decoder_input_ids), dim=1)
+        args.decoder_attention_mask = torch.cat((c_dec_in.attention_mask, args.decoder_attention_mask), dim=1)
+        args.decoder_input_embeds = args.attribution_model.embed(args.decoder_input_ids, as_targets=is_enc_dec)
     if contrast_sources:
-        if not attribution_model.is_encoder_decoder:
+        if not is_enc_dec:
             raise ValueError(
                 "Contrastive source inputs can only be used with encoder-decoder models. "
                 "Use `contrast_target_prefixes` to set a contrastive target prefix for decoder-only models."
             )
-        c_enc_in = attribution_model.encode(contrast_sources)
-        c_enc_ids = c_enc_in.input_ids
-        c_enc_mask = c_enc_in.attention_mask
-        c_enc_embeds = attribution_model.embed(c_enc_ids, as_targets=False)
-    else:
-        c_enc_ids = encoder_input_ids
-        c_enc_mask = encoder_attention_mask
-        c_enc_embeds = encoder_input_embeds
-    c_batch = attribution_model.formatter.convert_args_to_batch(
-        encoder_input_ids=c_enc_ids,
-        decoder_input_ids=c_dec_ids,
-        encoder_input_embeds=c_enc_embeds,
-        decoder_input_embeds=c_dec_embeds,
-        encoder_attention_mask=c_enc_mask,
-        decoder_attention_mask=c_dec_mask,
-    )
-    c_out = attribution_model.get_forward_output(c_batch, use_embeddings=attribution_model.is_encoder_decoder)
+        c_enc_in = args.attribution_model.encode(contrast_sources)
+        if is_enc_dec and isinstance(args, StepFunctionEncoderDecoderArgs):
+            args.encoder_input_ids = c_enc_in.input_ids
+            args.encoder_attention_mask = c_enc_in.attention_mask
+            args.encoder_input_embeds = args.attribution_model.embed(args.encoder_input_ids, as_targets=False)
+    c_batch = args.attribution_model.formatter.convert_args_to_batch(args)
+    c_out = args.attribution_model.get_forward_output(c_batch, use_embeddings=is_enc_dec)
     if return_contrastive_target_ids:
         return c_out, c_tgt_ids
     return c_out
 
 
 def contrast_prob_fn(
-    attribution_model: "AttributionModel",
-    target_ids: TargetIdsTensor,
-    contrast_target_prefixes: Optional[FeatureAttributionInput] = None,
+    args: StepFunctionArgs,
     contrast_sources: Optional[FeatureAttributionInput] = None,
+    contrast_target_prefixes: Optional[FeatureAttributionInput] = None,
     contrast_targets: Optional[FeatureAttributionInput] = None,
     contrast_targets_alignments: Optional[List[List[Tuple[int, int]]]] = None,
-    **kwargs,
 ):
     """Returns the probability of a generation target given contrastive context or target prediction alternative.
     If only ``contrast_targets`` are specified, the probability of the contrastive prediction is computed given same
@@ -223,27 +226,26 @@ def contrast_prob_fn(
             not specified, the alignment of the original and contrastive target texts is assumed to be 1:1 for all
             available tokens. Defaults to :obj:`None`.
     """
-    kwargs.pop("forward_output", None)
     c_output, c_tgt_ids = _get_contrast_output(
-        attribution_model=attribution_model,
+        args,
         contrast_sources=contrast_sources,
         contrast_target_prefixes=contrast_target_prefixes,
         contrast_targets=contrast_targets,
         contrast_targets_alignments=contrast_targets_alignments,
         return_contrastive_target_ids=True,
-        **kwargs,
     )
-    if c_tgt_ids is None:
-        c_tgt_ids = target_ids
-    return probability_fn(attribution_model, c_output, c_tgt_ids)
+    if c_tgt_ids:
+        args.target_ids = c_tgt_ids
+    args.forward_output = c_output
+    return probability_fn(args)
 
 
 def pcxmi_fn(
-    attribution_model: "AttributionModel",
-    forward_output: ModelOutput,
-    target_ids: TargetIdsTensor,
+    args: StepFunctionArgs,
     contrast_sources: Optional[FeatureAttributionInput] = None,
     contrast_target_prefixes: Optional[FeatureAttributionInput] = None,
+    contrast_targets: Optional[FeatureAttributionInput] = None,
+    contrast_targets_alignments: Optional[List[List[Tuple[int, int]]]] = None,
     **kwargs,
 ) -> SingleScorePerStepTensor:
     """Compute the pointwise conditional cross-mutual information (P-CXMI) of target ids given original and contrastive
@@ -258,26 +260,35 @@ def pcxmi_fn(
         contrast_target_prefixes (:obj:`str` or :obj:`list(str)`): Target prefix(es) used as contrastive inputs to
             compute the P-CXMI. If not specified, no target prefix beyond previously generated tokens is assumed.
             Defaults to :obj:`None`.
+        contrast_targets (:obj:`str` or :obj:`list(str)`): Contrastive target text(s) to be compared to the original
+            target text. If not specified, the original target text is used as contrastive target (will result in same
+            output unless ``contrast_sources`` or ``contrast_target_prefixes`` are specified). Defaults to :obj:`None`.
+        contrast_targets_alignments (:obj:`list(tuple(int, int))`, `optional`): A list of tuples of indices, where the
+            first element is the index of the original target token and the second element is the index of the
+            contrastive target token, used only if :obj:`contrast_targets` is specified. If an explicit alignment is
+            not specified, the alignment of the original and contrastive target texts is assumed to be 1:1 for all
+            available tokens. Defaults to :obj:`None`.
     """
-    original_probs = probability_fn(attribution_model, forward_output, target_ids)
+    original_probs = probability_fn(args)
     contrast_probs = contrast_prob_fn(
-        attribution_model=attribution_model,
+        args=args,
         contrast_sources=contrast_sources,
         contrast_target_prefixes=contrast_target_prefixes,
-        target_ids=target_ids,
-        **kwargs,
+        contrast_targets=contrast_targets,
+        contrast_targets_alignments=contrast_targets_alignments,
     )
     return -torch.log2(torch.div(original_probs, contrast_probs))
 
 
 def kl_divergence_fn(
-    attribution_model: "AttributionModel",
-    forward_output: ModelOutput,
-    target_ids: TargetIdsTensor,
+    args: StepFunctionArgs,
     contrast_sources: Optional[FeatureAttributionInput] = None,
     contrast_target_prefixes: Optional[FeatureAttributionInput] = None,
+    contrast_targets: Optional[FeatureAttributionInput] = None,
+    contrast_targets_alignments: Optional[List[List[Tuple[int, int]]]] = None,
     top_k: int = 0,
-    **kwargs,
+    top_p: float = 1.0,
+    min_tokens_to_keep: int = 1,
 ) -> SingleScorePerStepTensor:
     """Compute the pointwise Kullback-Leibler divergence of target ids given original and contrastive input options.
     The KL divergence is the expectation of the log difference between the probabilities of regular (P) and contrastive
@@ -290,20 +301,40 @@ def kl_divergence_fn(
         contrast_target_prefixes (:obj:`str` or :obj:`list(str)`): Target prefix(es) used as contrastive inputs to
             compute the KL divergence. If not specified, no target prefix beyond previously generated tokens is
             assumed. Defaults to :obj:`None`.
+        contrast_targets (:obj:`str` or :obj:`list(str)`): Contrastive target text(s) to be compared to the original
+            target text. If not specified, the original target text is used as contrastive target (will result in same
+            output unless ``contrast_sources`` or ``contrast_target_prefixes`` are specified). Defaults to :obj:`None`.
+        contrast_targets_alignments (:obj:`list(tuple(int, int))`, `optional`): A list of tuples of indices, where the
+            first element is the index of the original target token and the second element is the index of the
+            contrastive target token, used only if :obj:`contrast_targets` is specified. If an explicit alignment is
+            not specified, the alignment of the original and contrastive target texts is assumed to be 1:1 for all
+            available tokens. Defaults to :obj:`None`.
         top_k (:obj:`int`): If set to a value > 0, only the top :obj:`top_k` tokens will be considered for
-            computing the KL divergence. Defaults to :obj:`0`.
+            computing the KL divergence. Defaults to :obj:`0` (no top-k selection).
+        top_p (:obj:`float`): If set to a value > 0 and < 1, only the tokens with cumulative probability above
+            :obj:`top_p` will be considered for computing the KL divergence. Defaults to :obj:`1.0` (no filtering),
+            applied before :obj:`top_k` filtering.
+        min_tokens_to_keep (:obj:`int`): Minimum number of tokens to keep with :obj:`top_p` filtering. Defaults to
+            :obj:`1`.
     """
 
-    original_logits = attribution_model.output2logits(forward_output)
+    original_logits: torch.Tensor = args.attribution_model.output2logits(args.forward_output)
     contrast_output = _get_contrast_output(
-        attribution_model=attribution_model,
+        args=args,
         contrast_sources=contrast_sources,
+        contrast_targets=contrast_targets,
         contrast_target_prefixes=contrast_target_prefixes,
+        contrast_targets_alignments=contrast_targets_alignments,
         return_contrastive_target_ids=False,
-        **kwargs,
     )
-    contrast_logits = attribution_model.output2logits(contrast_output)
+    contrast_logits: torch.Tensor = args.attribution_model.output2logits(contrast_output)
     top_k = min(top_k, contrast_logits.size(-1))
+    if top_p < 1.0:
+        original_indices_to_remove = top_p_logits_mask(original_logits, top_p, min_tokens_to_keep)
+        contrastive_indices_to_remove = top_p_logits_mask(contrast_logits, top_p, min_tokens_to_keep)
+        joined_indices_to_remove = original_indices_to_remove & contrastive_indices_to_remove
+        original_logits = original_logits.masked_select(~joined_indices_to_remove)[None, ...]
+        contrast_logits = contrast_logits.masked_select(~joined_indices_to_remove)[None, ...]
     if top_k > 0:
         filtered_contrast_logits = torch.zeros(contrast_logits.size(0), top_k)
         filtered_original_logits = torch.zeros(original_logits.size(0), top_k)
@@ -323,14 +354,11 @@ def kl_divergence_fn(
 
 
 def contrast_prob_diff_fn(
-    attribution_model: "AttributionModel",
-    forward_output: ModelOutput,
-    target_ids: TargetIdsTensor,
-    contrast_target_prefixes: Optional[FeatureAttributionInput] = None,
+    args: StepFunctionArgs,
     contrast_sources: Optional[FeatureAttributionInput] = None,
+    contrast_target_prefixes: Optional[FeatureAttributionInput] = None,
     contrast_targets: Optional[FeatureAttributionInput] = None,
     contrast_targets_alignments: Optional[List[List[Tuple[int, int]]]] = None,
-    **kwargs,
 ):
     """Returns the difference between next step probability for a candidate generation target vs. a contrastive
     alternative. Can be used as attribution target to answer the question: "Which features were salient in the
@@ -355,72 +383,64 @@ def contrast_prob_diff_fn(
             not specified, the alignment of the original and contrastive target texts is assumed to be 1:1 for all
             available tokens. Defaults to :obj:`None`.
     """
-    model_probs = probability_fn(attribution_model, forward_output, target_ids)
+    model_probs = probability_fn(args)
     contrast_probs = contrast_prob_fn(
-        attribution_model=attribution_model,
-        target_ids=target_ids,
+        args=args,
         contrast_sources=contrast_sources,
         contrast_target_prefixes=contrast_target_prefixes,
         contrast_targets=contrast_targets,
         contrast_targets_alignments=contrast_targets_alignments,
-        **kwargs,
     )
     # Return the prob difference as target for attribution
     return model_probs - contrast_probs
 
 
 def mc_dropout_prob_avg_fn(
-    attribution_model: "AttributionModel",
-    forward_output,
-    encoder_input_embeds: EmbeddingsTensor,
-    encoder_attention_mask: IdsTensor,
-    decoder_input_ids: IdsTensor,
-    decoder_input_embeds: EmbeddingsTensor,
-    decoder_attention_mask: IdsTensor,
-    target_ids: TargetIdsTensor,
-    aux_model: Union[AutoModelForSeq2SeqLM, AutoModelForCausalLM],
+    args: StepFunctionArgs,
     n_mcd_steps: int = 5,
-    **kwargs,
 ):
     """Returns the average of probability scores using a pool of noisy prediction computed with MC Dropout. Can be
     used as an attribution target to compute more robust attribution scores.
 
+    Note:
+        In order to obtain meaningful results, the :obj:`attribution_model` must contain dropout layers or other
+        sources of noise in the forward pass.
+
     Args:
-        aux_model (:obj:`transformers.AutoModelForSeq2SeqLM` or :obj:`transformers.AutoModelForCausalLM`): Model used
-            to produce noisy probability predictions for target ids. Requirements:
-            - Must be a model of the same category as the attribution model (e.g. encoder-decoder or decoder-only)
-            - Must have the same vocabulary as the attribution model to ensure correct probability scores are computed
-            - Must contain dropout layers to enable MC Dropout.
         n_mcd_steps (:obj:`int`): The number of prediction steps that should be used to normalize the original output.
     """
-    noisy_probs = []
-    # Compute noisy predictions using the auxiliary model
-    # Important: must be in train mode to ensure noise for MCD
-    aux_model.train()
-    if attribution_model.model_name != aux_model.config.name_or_path:
-        logger.warning(
-            f"Model name mismatch between attribution model ({attribution_model.model_name}) "
-            f"and auxiliary model ({aux_model.config.name_or_path}) for MC dropout averaging. "
-            "mc_dropout_prob_avg expects models using the same vocabulary."
-        )
-    for _ in range(n_mcd_steps):
-        aux_batch = attribution_model.formatter.convert_args_to_batch(
-            encoder_input_ids=None,
-            decoder_input_ids=decoder_input_ids,
-            encoder_input_embeds=encoder_input_embeds,
-            decoder_input_embeds=decoder_input_embeds,
-            encoder_attention_mask=encoder_attention_mask,
-            decoder_attention_mask=decoder_attention_mask,
-        )
-        aux_output = attribution_model.get_forward_output(
-            aux_batch, use_embeddings=attribution_model.is_encoder_decoder
-        )
-        noisy_prob = probability_fn(attribution_model, aux_output, target_ids)
-        noisy_probs.append(noisy_prob)
     # Original probability from the model without noise
-    orig_prob = probability_fn(attribution_model, forward_output, target_ids)
+    orig_prob = probability_fn(args)
+
+    # Compute noisy predictions using the noisy model
+    # Important: must be in train mode to ensure noise for MCD
+    args.attribution_model.train()
+    noisy_probs = []
+    for _ in range(n_mcd_steps):
+        aux_batch = args.attribution_model.formatter.convert_args_to_batch(args)
+        aux_output = args.attribution_model.get_forward_output(
+            aux_batch, use_embeddings=args.attribution_model.is_encoder_decoder
+        )
+        args.forward_output = aux_output
+        noisy_prob = probability_fn(args)
+        noisy_probs.append(noisy_prob)
     # Z-score the original based on the mean and standard deviation of MC dropout predictions
     return (orig_prob - torch.stack(noisy_probs).mean(0)).div(torch.stack(noisy_probs).std(0))
+
+
+def top_p_size_fn(
+    args: StepFunctionArgs,
+    top_p: float,
+):
+    """Returns the number of tokens that have cumulative probability above :obj:`top_p` in the model's output logits.
+
+    Args:
+        top_p (:obj:`float`): The cumulative probability threshold to use for filtering the logits.
+    """
+    logits: torch.Tensor = args.attribution_model.output2logits(args.forward_output)
+    indices_to_remove = top_p_logits_mask(logits, top_p, 1)
+    logits = logits.masked_select(~indices_to_remove)[None, ...]
+    return torch.tensor(logits.size(-1))[None, ...]
 
 
 STEP_SCORES_MAP = {
@@ -434,6 +454,7 @@ STEP_SCORES_MAP = {
     "kl_divergence": kl_divergence_fn,
     "contrast_prob_diff": contrast_prob_diff_fn,
     "mc_dropout_prob_avg": mc_dropout_prob_avg_fn,
+    "top_p_size": top_p_size_fn,
 }
 
 
@@ -447,16 +468,17 @@ def check_is_step_function(identifier: str) -> None:
 
 
 def get_step_scores(
-    score_identifier: str = "probability",
-    step_scores_args: Dict[str, Any] = {},
+    score_identifier: str,
+    step_fn_args: StepFunctionArgs,
+    step_fn_extra_args: Dict[str, Any] = {},
 ) -> SingleScorePerStepTensor:
     """Returns step scores for the target tokens in the batch."""
     check_is_step_function(score_identifier)
-    return STEP_SCORES_MAP[score_identifier](**step_scores_args)
+    return STEP_SCORES_MAP[score_identifier](step_fn_args, **step_fn_extra_args)
 
 
 def get_step_scores_args(
-    score_identifiers: List[str], kwargs: Dict[str, Any], default_args: Dict[str, Any]
+    score_identifiers: List[str], kwargs: Dict[str, Any], default_args: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
     step_scores_args = {}
     for step_score in score_identifiers:

@@ -5,7 +5,7 @@ from typing import Any, Callable, Dict, List, Optional, Protocol, Tuple, TypeVar
 
 import torch
 
-from ..attr import STEP_SCORES_MAP, get_step_function_reserved_args
+from ..attr import STEP_SCORES_MAP, StepFunctionArgs
 from ..attr.feat import FeatureAttribution, extract_args, join_token_ids
 from ..data import (
     BatchEncoding,
@@ -113,7 +113,7 @@ class InputFormatter:
 
     @staticmethod
     @abstractmethod
-    def convert_args_to_batch(*args, **kwargs) -> Union[DecoderOnlyBatch, EncoderDecoderBatch]:
+    def convert_args_to_batch(args: StepFunctionArgs = None, **kwargs) -> Union[DecoderOnlyBatch, EncoderDecoderBatch]:
         raise NotImplementedError()
 
     @staticmethod
@@ -131,8 +131,7 @@ class InputFormatter:
         forward_output: ModelOutput,
         target_ids: ExpandedTargetIdsTensor,
         batch: DecoderOnlyBatch,
-        **kwargs,
-    ) -> Dict[str, Any]:
+    ) -> StepFunctionArgs:
         raise NotImplementedError()
 
     @staticmethod
@@ -141,6 +140,10 @@ class InputFormatter:
         attribution_model: "AttributionModel", batch: Union[DecoderOnlyBatch, EncoderDecoderBatch]
     ) -> TextSequences:
         raise NotImplementedError()
+
+    @staticmethod
+    def get_step_function_reserved_args() -> List[str]:
+        return [f.name for f in StepFunctionArgs.__dataclass_fields__.values()]
 
     @staticmethod
     def format_contrast_targets_alignments(
@@ -401,7 +404,11 @@ class AttributionModel(ABC, torch.nn.Module):
         attribution_method = self.get_attribution_method(method, override_default_attribution)
         attributed_fn = self.get_attributed_fn(attributed_fn)
         attribution_args, attributed_fn_args, step_scores_args = extract_args(
-            attribution_method, attributed_fn, step_scores, default_args=get_step_function_reserved_args(), **kwargs
+            attribution_method,
+            attributed_fn,
+            step_scores,
+            default_args=self.formatter.get_step_function_reserved_args(),
+            **kwargs,
         )
         if isnotebook():
             logger.debug("Pretty progress currently not supported in notebooks, falling back to tqdm.")
@@ -628,14 +635,11 @@ class AttributionModel(ABC, torch.nn.Module):
         target_ids = target_ids.squeeze(-1)
         output = self.get_forward_output(batch, use_embeddings=use_embeddings, **kwargs)
         logger.debug(f"logits: {pretty_tensor(output.logits)}")
-        step_function_args = self.formatter.format_step_function_args(
-            attribution_model=self,
-            forward_output=output,
-            target_ids=target_ids,
-            batch=batch,
-            **{k: v for k, v in zip(attributed_fn_argnames, args) if v is not None},
+        step_fn_args = self.formatter.format_step_function_args(
+            attribution_model=self, forward_output=output, target_ids=target_ids, batch=batch
         )
-        return attributed_fn(**step_function_args)
+        step_fn_extra_args = {k: v for k, v in zip(attributed_fn_argnames, args) if v is not None}
+        return attributed_fn(step_fn_args, **step_fn_extra_args)
 
     def _forward_with_output(
         self,
