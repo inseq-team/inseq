@@ -35,10 +35,10 @@ def test_get_step_prediction_probabilities(m2m100_model, encoder_decoder_batches
             batch.to(m2m100_model.device), use_embeddings=m2m100_model.attribution_method.forward_batch_embeds
         )
         target_ids = next_batch.targets.encoding.input_ids[0, -1].to(m2m100_model.device)
-        step_scores_args = m2m100_model.formatter.format_step_function_args(
+        step_fn_args = m2m100_model.formatter.format_step_function_args(
             attribution_model=m2m100_model, forward_output=output, target_ids=target_ids, batch=batch
         )
-        pred_proba = get_step_scores("probability", step_scores_args)
+        pred_proba = get_step_scores("probability", step_fn_args)
         assert float(pred_proba) == pytest.approx(probas[i], abs=1e-3)
 
 

@@ -13,9 +13,19 @@
 Step Functions
 =======================================================================================================================
 
-The following functions can be used as attribution targets or step functions in the :meth:`inseq.models.AttributionModel.attribute` function call.
-
 .. currentmodule:: inseq.attr.step_functions
+
+Step Functions Default arguments
+-----------------------------------------------------------------------------------------------------------------------
+
+The default arguments passed to all step functions are collected in the :class:`StepFunctionArgs` class.
+
+.. autoclass:: StepFunctionArgs
+
+Pre-registered Step Functions
+-----------------------------------------------------------------------------------------------------------------------
+
+The following functions can be used out-of-the-box as attribution targets or step functions in the :meth:`inseq.models.AttributionModel.attribute` function call simply by passing their string identifier (function name minus the ``_fn`` suffix).
 
 .. autofunction:: logit_fn
 
@@ -36,3 +46,5 @@ The following functions can be used as attribution targets or step functions in 
 .. autofunction:: contrast_prob_diff_fn
 
 .. autofunction:: mc_dropout_prob_avg_fn
+
+.. autofunction:: top_p_size_fn

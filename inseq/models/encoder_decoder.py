@@ -3,6 +3,7 @@ from functools import wraps
 from typing import Any, Callable, Dict, List, Optional, Tuple, TypeVar, Union
 
 from ..attr.feat import join_token_ids
+from ..attr.step_functions import StepFunctionEncoderDecoderArgs
 from ..data import (
     Batch,
     BatchEmbedding,
@@ -176,32 +177,37 @@ class EncoderDecoderInputFormatter(InputFormatter):
         forward_output: ModelOutput,
         target_ids: ExpandedTargetIdsTensor,
         batch: EncoderDecoderBatch,
-        **kwargs,
-    ) -> Dict[str, Any]:
-        return {
-            **kwargs,
-            **{
-                "attribution_model": attribution_model,
-                "forward_output": forward_output,
-                "encoder_input_ids": batch.source_ids,
-                "decoder_input_ids": batch.target_ids,
-                "encoder_input_embeds": batch.source_embeds,
-                "decoder_input_embeds": batch.target_embeds,
-                "target_ids": target_ids,
-                "encoder_attention_mask": batch.source_mask,
-                "decoder_attention_mask": batch.target_mask,
-            },
-        }
+    ) -> StepFunctionEncoderDecoderArgs:
+        return StepFunctionEncoderDecoderArgs(
+            attribution_model=attribution_model,
+            forward_output=forward_output,
+            target_ids=target_ids,
+            encoder_input_ids=batch.source_ids,
+            decoder_input_ids=batch.target_ids,
+            encoder_input_embeds=batch.source_embeds,
+            decoder_input_embeds=batch.target_embeds,
+            encoder_attention_mask=batch.source_mask,
+            decoder_attention_mask=batch.target_mask,
+        )
 
     @staticmethod
     def convert_args_to_batch(
+        args: StepFunctionEncoderDecoderArgs = None,
         encoder_input_ids: Optional[IdsTensor] = None,
         decoder_input_ids: Optional[IdsTensor] = None,
         encoder_attention_mask: Optional[IdsTensor] = None,
         decoder_attention_mask: Optional[IdsTensor] = None,
         encoder_input_embeds: Optional[EmbeddingsTensor] = None,
         decoder_input_embeds: Optional[EmbeddingsTensor] = None,
+        **kwargs,
     ) -> EncoderDecoderBatch:
+        if args is not None:
+            encoder_input_ids = args.encoder_input_ids
+            decoder_input_ids = args.decoder_input_ids
+            encoder_attention_mask = args.encoder_attention_mask
+            decoder_attention_mask = args.decoder_attention_mask
+            encoder_input_embeds = args.encoder_input_embeds
+            decoder_input_embeds = args.decoder_input_embeds
         source_encoding = BatchEncoding(encoder_input_ids, encoder_attention_mask)
         source_embedding = BatchEmbedding(encoder_input_embeds)
         source_batch = Batch(source_encoding, source_embedding)
@@ -250,6 +256,10 @@ class EncoderDecoderInputFormatter(InputFormatter):
             sources=attribution_model.convert_tokens_to_string(batch.sources.input_tokens),
             targets=attribution_model.decode(batch.targets.input_ids),
         )
+
+    @staticmethod
+    def get_step_function_reserved_args() -> List[str]:
+        return [f.name for f in StepFunctionEncoderDecoderArgs.__dataclass_fields__.values()]
 
 
 class EncoderDecoderAttributionModel(AttributionModel):

@@ -5,6 +5,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, TypeVar, Union
 import torch
 
 from ..attr.feat import join_token_ids
+from ..attr.step_functions import StepFunctionDecoderOnlyArgs
 from ..data import (
     BatchEmbedding,
     BatchEncoding,
@@ -135,30 +136,28 @@ class DecoderOnlyInputFormatter(InputFormatter):
         forward_output: ModelOutput,
         target_ids: ExpandedTargetIdsTensor,
         batch: DecoderOnlyBatch,
-        **kwargs,
-    ) -> Dict[str, Any]:
-        return {
-            **kwargs,
-            **{
-                "attribution_model": attribution_model,
-                "forward_output": forward_output,
-                "encoder_input_ids": None,
-                "decoder_input_ids": batch.target_ids,
-                "encoder_input_embeds": None,
-                "decoder_input_embeds": batch.target_embeds,
-                "target_ids": target_ids,
-                "encoder_attention_mask": None,
-                "decoder_attention_mask": batch.target_mask,
-            },
-        }
+    ) -> StepFunctionDecoderOnlyArgs:
+        return StepFunctionDecoderOnlyArgs(
+            attribution_model=attribution_model,
+            forward_output=forward_output,
+            target_ids=target_ids,
+            decoder_input_ids=batch.target_ids,
+            decoder_attention_mask=batch.target_mask,
+            decoder_input_embeds=batch.target_embeds,
+        )
 
     @staticmethod
     def convert_args_to_batch(
+        args: StepFunctionDecoderOnlyArgs = None,
         decoder_input_ids: Optional[IdsTensor] = None,
         decoder_attention_mask: Optional[IdsTensor] = None,
         decoder_input_embeds: Optional[EmbeddingsTensor] = None,
         **kwargs,
     ) -> DecoderOnlyBatch:
+        if args is not None:
+            decoder_input_ids = args.decoder_input_ids
+            decoder_attention_mask = args.decoder_attention_mask
+            decoder_input_embeds = args.decoder_input_embeds
         encoding = BatchEncoding(decoder_input_ids, decoder_attention_mask)
         embedding = BatchEmbedding(decoder_input_embeds)
         return DecoderOnlyBatch(encoding, embedding)
@@ -195,6 +194,10 @@ class DecoderOnlyInputFormatter(InputFormatter):
             sources=None,
             targets=attribution_model.decode(batch.target_ids),
         )
+
+    @staticmethod
+    def get_step_function_reserved_args() -> List[str]:
+        return [f.name for f in StepFunctionDecoderOnlyArgs.__dataclass_fields__.values()]
 
 
 class DecoderOnlyAttributionModel(AttributionModel):

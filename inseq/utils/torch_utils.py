@@ -53,6 +53,28 @@ def normalize(
     return attributions
 
 
+def top_p_logits_mask(logits: torch.Tensor, top_p: float, min_tokens_to_keep: int) -> torch.Tensor:
+    """Adapted from https://github.com/huggingface/transformers/blob/main/src/transformers/generation/logits_process.py
+    """
+    # Compute cumulative probabilities of sorted tokens
+    if top_p < 0 or top_p > 1.0:
+        raise ValueError(f"`top_p` has to be a float > 0 and < 1, but is {top_p}")
+    if not isinstance(min_tokens_to_keep, int) or (min_tokens_to_keep < 1):
+        raise ValueError(f"`min_tokens_to_keep` has to be a positive integer, but is {min_tokens_to_keep}")
+    sorted_logits, sorted_indices = torch.sort(logits, descending=False)
+    cumulative_probs = sorted_logits.softmax(dim=-1).cumsum(dim=-1)
+
+    # Remove tokens with cumulative top_p above the threshold (token with 0 are kept)
+    sorted_indices_to_remove = cumulative_probs <= (1 - top_p)
+
+    # Keep at least min_tokens_to_keep
+    sorted_indices_to_remove[..., -min_tokens_to_keep:] = 0
+
+    # scatter sorted tensors to original indexing
+    indices_to_remove = sorted_indices_to_remove.scatter(1, sorted_indices, sorted_indices_to_remove)
+    return indices_to_remove
+
+
 def euclidean_distance(vec_a: torch.Tensor, vec_b: torch.Tensor) -> torch.Tensor:
     """Compute the Euclidean distance between two points."""
     return (vec_a - vec_b).pow(2).sum(-1).sqrt()
