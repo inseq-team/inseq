@@ -3,12 +3,11 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Protocol, Tuple
 
 import torch
-from torch.nn.functional import kl_div, log_softmax
 from transformers.modeling_outputs import ModelOutput
 
 from ..data import DecoderOnlyBatch, FeatureAttributionInput, get_batch_from_inputs, slice_batch_from_position
 from ..data.aggregation_functions import DEFAULT_ATTRIBUTION_AGGREGATE_DICT
-from ..utils import extract_signature_args, top_p_logits_mask
+from ..utils import extract_signature_args, logits_kl_divergence, top_p_logits_mask
 from ..utils.typing import EmbeddingsTensor, IdsTensor, SingleScorePerStepTensor, TargetIdsTensor
 
 if TYPE_CHECKING:
@@ -122,6 +121,7 @@ def _get_contrast_output(
     contrast_targets: Optional[FeatureAttributionInput] = None,
     contrast_targets_alignments: Optional[List[List[Tuple[int, int]]]] = None,
     return_contrastive_target_ids: bool = False,
+    **forward_kwargs,
 ) -> ModelOutput:
     """Utility function to return the output of the model for given contrastive inputs.
 
@@ -142,6 +142,7 @@ def _get_contrast_output(
             available tokens. Defaults to :obj:`None`.
         return_contrastive_target_ids (:obj:`bool`, `optional`, defaults to :obj:`False`): Whether to return the
             contrastive target ids as well as the model output. Defaults to :obj:`False`.
+        **forward_kwargs: Additional keyword arguments to be passed to the model's forward pass.
     """
     c_tgt_ids = None
     is_enc_dec = args.attribution_model.is_encoder_decoder
@@ -192,7 +193,7 @@ def _get_contrast_output(
             args.encoder_attention_mask = c_enc_in.attention_mask
             args.encoder_input_embeds = args.attribution_model.embed(args.encoder_input_ids, as_targets=False)
     c_batch = args.attribution_model.formatter.convert_args_to_batch(args)
-    c_out = args.attribution_model.get_forward_output(c_batch, use_embeddings=is_enc_dec)
+    c_out = args.attribution_model.get_forward_output(c_batch, use_embeddings=is_enc_dec, **forward_kwargs)
     if return_contrastive_target_ids:
         return c_out, c_tgt_ids
     return c_out
@@ -328,29 +329,13 @@ def kl_divergence_fn(
         return_contrastive_target_ids=False,
     )
     contrast_logits: torch.Tensor = args.attribution_model.output2logits(contrast_output)
-    top_k = min(top_k, contrast_logits.size(-1))
-    if top_p < 1.0:
-        original_indices_to_remove = top_p_logits_mask(original_logits, top_p, min_tokens_to_keep)
-        contrastive_indices_to_remove = top_p_logits_mask(contrast_logits, top_p, min_tokens_to_keep)
-        joined_indices_to_remove = original_indices_to_remove & contrastive_indices_to_remove
-        original_logits = original_logits.masked_select(~joined_indices_to_remove)[None, ...]
-        contrast_logits = contrast_logits.masked_select(~joined_indices_to_remove)[None, ...]
-    if top_k > 0:
-        filtered_contrast_logits = torch.zeros(contrast_logits.size(0), top_k)
-        filtered_original_logits = torch.zeros(original_logits.size(0), top_k)
-        indices_to_remove = contrast_logits < contrast_logits.topk(top_k).values[..., -1, None]
-        for i in range(contrast_logits.size(0)):
-            filtered_contrast_logits[i] = contrast_logits[i].masked_select(~indices_to_remove[i])
-            filtered_original_logits[i] = original_logits[i].masked_select(~indices_to_remove[i])
-    else:
-        filtered_contrast_logits = contrast_logits
-        filtered_original_logits = original_logits
-    original_logprobs = log_softmax(filtered_original_logits, dim=-1)
-    contrast_logprobs = log_softmax(filtered_contrast_logits, dim=-1)
-    kl_divergence = torch.zeros(original_logprobs.size(0))
-    for i in range(original_logprobs.size(0)):
-        kl_divergence[i] = kl_div(contrast_logprobs[i], original_logprobs[i], reduction="sum", log_target=True)
-    return kl_divergence
+    return logits_kl_divergence(
+        original_logits=original_logits,
+        contrast_logits=contrast_logits,
+        top_p=top_p,
+        top_k=top_k,
+        min_tokens_to_keep=min_tokens_to_keep,
+    )
 
 
 def contrast_prob_diff_fn(

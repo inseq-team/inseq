@@ -1,7 +1,6 @@
 """HuggingFace Seq2seq model."""
 import logging
 from abc import abstractmethod
-from inspect import getfullargspec
 from typing import Dict, List, NoReturn, Optional, Tuple, Union
 
 import torch
@@ -210,21 +209,12 @@ class HuggingfaceModel(AttributionModel):
         ):
             inputs = self.encode(inputs)
         inputs = inputs.to(self.device)
-        if "input_ids" not in getfullargspec(self.model.generate).args:
-            logger.warning(
-                "Model does not support input_ids in generation. "
-                "Assuming a petals AutoDistributedModelForCausalLM is being used."
-            )
-            return_generation_output = False
-            sequences = self.model.generate(inputs=inputs.input_ids, **kwargs)
-        else:
-            generation_out = self.model.generate(
-                input_ids=inputs.input_ids,
-                attention_mask=inputs.attention_mask,
-                return_dict_in_generate=True,
-                **kwargs,
-            )
-            sequences = generation_out.sequences
+        generation_out = self.model.generate(
+            inputs=inputs.input_ids,
+            return_dict_in_generate=True,
+            **kwargs,
+        )
+        sequences = generation_out.sequences
         texts = self.tokenizer.batch_decode(
             sequences,
             skip_special_tokens=True,
