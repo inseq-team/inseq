@@ -9,7 +9,6 @@ from typing import List, Optional, Tuple, Union
 import torch
 from transformers import AutoModel, AutoTokenizer, PreTrainedModel, PreTrainedTokenizerBase
 
-from .errors import MissingAlignmentsError
 from .misc import clean_tokens
 
 logger = logging.getLogger(__name__)
@@ -232,11 +231,22 @@ def auto_align_sequences(
         clean_a_tokens, removed_a_token_idxs = clean_tokens(a_tokens, filter_special_tokens)
         clean_b_tokens, removed_b_token_idxs = clean_tokens(b_tokens, filter_special_tokens)
         if len(removed_a_token_idxs) != len(removed_b_token_idxs):
-            raise ValueError(
+            logger.warning(
                 "The number of special tokens in the target and contrast sequences do not match. "
-                "Please provide sequences with the same number of special tokens."
+                "Trying to match special tokens based on their identity."
             )
-        aligned_special_tokens = [(rm_a, rm_b) for rm_a, rm_b in zip(removed_a_token_idxs, removed_b_token_idxs)]
+            removed_a_tokens = [a_tokens[idx] for idx in removed_a_token_idxs]
+            removed_b_tokens = [b_tokens[idx] for idx in removed_b_token_idxs]
+            aligned_special_tokens = []
+            for curr_idx, rm_a in enumerate(removed_a_tokens):
+                rm_a_idx = removed_a_token_idxs[curr_idx]
+                if rm_a not in removed_b_tokens:
+                    aligned_special_tokens.append((rm_a_idx, rm_a_idx))
+                else:
+                    rm_b_idx = removed_b_token_idxs[removed_b_tokens.index(rm_a)]
+                    aligned_special_tokens.append((rm_a_idx, rm_b_idx))
+        else:
+            aligned_special_tokens = [(rm_a, rm_b) for rm_a, rm_b in zip(removed_a_token_idxs, removed_b_token_idxs)]
         a_word_to_token_align = align_tokenizations(a_words, clean_a_tokens)
         b_word_to_token_align = align_tokenizations(b_words, clean_b_tokens)
         # 3. Propagate word-level alignments to token-level alignments.
@@ -272,6 +282,7 @@ def get_adjusted_alignments(
     do_sort: bool = True,
     fill_missing: bool = False,
     special_tokens: List[str] = [],
+    start_pos: int = 0,
 ) -> List[Tuple[int, int]]:
     is_auto_aligned = False
     if fill_missing and not target_tokens:
@@ -301,7 +312,7 @@ def get_adjusted_alignments(
     # Filling alignments with missing tokens
     if fill_missing:
         filled_alignments = []
-        for pair_idx in range(len(target_tokens)):
+        for pair_idx in range(start_pos, len(target_tokens)):
             match_pairs = [pair for pair in alignments if pair[0] == pair_idx]
 
             if not match_pairs:
@@ -314,10 +325,11 @@ def get_adjusted_alignments(
                 filled_alignments.append(valid_match)
         if alignments != filled_alignments:
             logger.warning(
-                f"Provided alignments do not cover all {len(target_tokens)} tokens from the original sequence.\n"
-                "Filling missing position with 1:1 position alignments."
+                f"Provided alignments do not cover all {len(target_tokens) - start_pos} tokens from the original"
+                " sequence.\nFilling missing position with 1:1 position alignments."
             )
         if is_auto_aligned:
+            filled_alignments = [(a_idx, b_idx) for a_idx, b_idx in filled_alignments if a_idx >= start_pos]
             logger.warning(
                 f"Using {ALIGN_MODEL_ID} for automatic alignments. Provide custom alignments for non-linguistic "
                 f"sequences, or for languages not covered by the aligner.\nGenerated alignments: {filled_alignments}"
@@ -331,10 +343,8 @@ def get_aligned_idx(a_idx: int, alignments: List[Tuple[int, int]]) -> int:
         # Find all alignment pairs for the current original target
         aligned_idxs = [t_idx for s_idx, t_idx in alignments if s_idx == a_idx]
         if not aligned_idxs:
-            raise MissingAlignmentsError(
-                f"No alignment found for token at index {a_idx}. "
-                "Please provide alignment pairs that cover all original target tokens."
-            )
+            # To be handled separately
+            return -1
         # Select the minimum index to identify the next target token
         return min(aligned_idxs)
     return a_idx
