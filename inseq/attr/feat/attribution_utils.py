@@ -106,7 +106,7 @@ def join_token_ids(
         curr_seq = []
         for pos_idx, (token, token_idx) in enumerate(zip(target_tokens_seq, input_ids_seq)):
             contrast_pos_idx = get_aligned_idx(pos_idx, alignments_seq)
-            if token != contrast_target_tokens_seq[contrast_pos_idx]:
+            if contrast_pos_idx != -1 and token != contrast_target_tokens_seq[contrast_pos_idx]:
                 curr_seq.append(TokenWithId(f"{contrast_target_tokens_seq[contrast_pos_idx]} → {token}", -1))
             else:
                 curr_seq.append(TokenWithId(token, token_idx))
