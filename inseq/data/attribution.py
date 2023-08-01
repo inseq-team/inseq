@@ -72,6 +72,48 @@ def get_batch_from_inputs(
     return batch
 
 
+def merge_attributions(attributions: List["FeatureAttributionOutput"]) -> "FeatureAttributionOutput":
+    """Merges multiple :class:`~inseq.data.FeatureAttributionOutput` objects into a single one.
+
+    Merging is allowed only if the two outputs match on the fields specified in ``_merge_match_info_fields``.
+
+    Args:
+        attributions (`list(FeatureAttributionOutput)`): The FeatureAttributionOutput objects to be merged.
+
+    Returns:
+        `FeatureAttributionOutput`: Merged object
+    """
+    assert all(
+        isinstance(x, FeatureAttributionOutput) for x in attributions
+    ), "Only FeatureAttributionOutput objects can be merged."
+    first = attributions[0]
+    for match_field in FeatureAttributionOutput._merge_match_info_fields:
+        assert all(
+            (
+                attr.info[match_field] == first.info[match_field]
+                if match_field in first.info
+                else match_field not in attr.info
+            )
+            for attr in attributions
+        ), f"Cannot merge: incompatible values for field {match_field}"
+    out_info = first.info.copy()
+    if "attr_pos_end" in first.info:
+        out_info.update({"attr_pos_end": max(attr.info["attr_pos_end"] for attr in attributions)})
+    if "generated_texts" in first.info:
+        out_info.update({"generated_texts": [text for attr in attributions for text in attr.info["generated_texts"]]})
+    if "input_texts" in first.info:
+        out_info.update({"input_texts": [text for attr in attributions for text in attr.info["input_texts"]]})
+    return FeatureAttributionOutput(
+        sequence_attributions=[seqattr for attr in attributions for seqattr in attr.sequence_attributions],
+        step_attributions=(
+            [stepattr for attr in attributions for stepattr in attr.step_attributions]
+            if first.step_attributions is not None
+            else None
+        ),
+        info=out_info,
+    )
+
+
 @dataclass(eq=False, repr=False)
 class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
     """Output produced by a standard attribution method.
@@ -467,7 +509,7 @@ class FeatureAttributionOutput:
         return iter(self.sequence_attributions)
 
     def __add__(self, other) -> "FeatureAttributionOutput":
-        return self.merge_attributions([self, other])
+        return merge_attributions([self, other])
 
     def __radd__(self, other) -> "FeatureAttributionOutput":
         return self.__add__(other)
@@ -609,50 +651,6 @@ class FeatureAttributionOutput:
                 attr.show(min_val, max_val, display, return_html, aggregator, do_aggregation, **kwargs)
         if return_html:
             return out_str
-
-    @classmethod
-    def merge_attributions(cls, attributions: List["FeatureAttributionOutput"]) -> "FeatureAttributionOutput":
-        """Merges multiple :class:`~inseq.data.FeatureAttributionOutput` objects into a single one.
-
-        Merging is allowed only if the two outputs match on the fields specified in ``_merge_match_info_fields``.
-
-        Args:
-            attributions (`list(FeatureAttributionOutput)`): The FeatureAttributionOutput objects to be merged.
-
-        Returns:
-            `FeatureAttributionOutput`: Merged object
-        """
-        assert all(
-            isinstance(x, FeatureAttributionOutput) for x in attributions
-        ), "Only FeatureAttributionOutput objects can be merged."
-        first = attributions[0]
-        for match_field in cls._merge_match_info_fields:
-            assert all(
-                (
-                    attr.info[match_field] == first.info[match_field]
-                    if match_field in first.info
-                    else match_field not in attr.info
-                )
-                for attr in attributions
-            ), f"Cannot merge: incompatible values for field {match_field}"
-        out_info = first.info.copy()
-        if "attr_pos_end" in first.info:
-            out_info.update({"attr_pos_end": max(attr.info["attr_pos_end"] for attr in attributions)})
-        if "generated_texts" in first.info:
-            out_info.update(
-                {"generated_texts": [text for attr in attributions for text in attr.info["generated_texts"]]}
-            )
-        if "input_texts" in first.info:
-            out_info.update({"input_texts": [text for attr in attributions for text in attr.info["input_texts"]]})
-        return cls(
-            sequence_attributions=[seqattr for attr in attributions for seqattr in attr.sequence_attributions],
-            step_attributions=(
-                [stepattr for attr in attributions for stepattr in attr.step_attributions]
-                if first.step_attributions is not None
-                else None
-            ),
-            info=out_info,
-        )
 
     def weight_attributions(self, step_score_id: str):
         for i, attr in enumerate(self.sequence_attributions):
