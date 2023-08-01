@@ -34,4 +34,5 @@ __all__ = [
     "list_step_functions",
     "list_supported_frameworks",
     "register_step_function",
+    "merge_attributions",
 ]
