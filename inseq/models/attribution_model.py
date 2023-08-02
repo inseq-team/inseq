@@ -14,6 +14,7 @@ from ..data import (
     FeatureAttributionInput,
     FeatureAttributionOutput,
     FeatureAttributionStepOutput,
+    merge_attributions,
 )
 from ..utils import (
     MissingAttributionMethodError,
@@ -451,7 +452,7 @@ class AttributionModel(ABC, torch.nn.Module):
             attributed_fn_args=attributed_fn_args,
             step_scores_args=step_scores_args,
         )
-        attribution_output = FeatureAttributionOutput.merge_attributions(attribution_outputs)
+        attribution_output = merge_attributions(attribution_outputs)
         attribution_output.info["input_texts"] = input_texts
         attribution_output.info["generated_texts"] = (
             [generated_texts] if isinstance(generated_texts, str) else generated_texts

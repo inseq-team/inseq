@@ -21,6 +21,7 @@ from .attribution import (
     GranularFeatureAttributionStepOutput,
     MultiDimensionalFeatureAttributionStepOutput,
     get_batch_from_inputs,
+    merge_attributions,
 )
 from .batch import (
     Batch,
@@ -60,6 +61,7 @@ __all__ = [
     "list_aggregation_functions",
     "MultiDimensionalFeatureAttributionStepOutput",
     "get_batch_from_inputs",
+    "merge_attributions",
     "list_aggregators",
     "slice_batch_from_position",
 ]

@@ -5,6 +5,7 @@ from .data import (
     FeatureAttributionOutput,
     list_aggregation_functions,
     list_aggregators,
+    merge_attributions,
     show_attributions,
 )
 from .models import AttributionModel, list_supported_frameworks, load_model
@@ -33,4 +34,5 @@ __all__ = [
     "list_step_functions",
     "list_supported_frameworks",
     "register_step_function",
+    "merge_attributions",
 ]
