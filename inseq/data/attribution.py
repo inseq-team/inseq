@@ -78,10 +78,11 @@ def merge_attributions(attributions: List["FeatureAttributionOutput"]) -> "Featu
     Merging is allowed only if the two outputs match on the fields specified in ``_merge_match_info_fields``.
 
     Args:
-        attributions (`list(FeatureAttributionOutput)`): The FeatureAttributionOutput objects to be merged.
+        attributions (:obj:`list` of :class:`~inseq.data.FeatureAttributionOutput`): The FeatureAttributionOutput
+            objects to be merged.
 
     Returns:
-        `FeatureAttributionOutput`: Merged object
+        :class:`~inseq.data.FeatureAttributionOutput`: Merged object.
     """
     assert all(
         isinstance(x, FeatureAttributionOutput) for x in attributions
@@ -373,9 +374,9 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
             if aggr.source_attributions is not None:
                 return_dict["source_attributions"][(tgt_idx, tgt_tok.token)] = {}
                 for src_idx, src_tok in enumerate(aggr.source):
-                    return_dict["source_attributions"][(tgt_idx, tgt_tok.token)][
-                        (src_idx, src_tok.token)
-                    ] = aggr.source_attributions[src_idx, tgt_idx - aggr.attr_pos_start].item()
+                    return_dict["source_attributions"][(tgt_idx, tgt_tok.token)][(src_idx, src_tok.token)] = (
+                        aggr.source_attributions[src_idx, tgt_idx - aggr.attr_pos_start].item()
+                    )
             if aggr.target_attributions is not None:
                 return_dict["target_attributions"][(tgt_idx, tgt_tok.token)] = {}
                 for tgt_idx_attr in range(aggr.attr_pos_end):
