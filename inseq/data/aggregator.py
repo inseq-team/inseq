@@ -711,6 +711,14 @@ class SubwordAggregator(ContiguousSpanAggregator):
     def get_spans(tokens: List[TokenWithId], special_symbol: str, is_suffix_symbol: bool):
         spans = []
         last_prefix_idx = 0
+        has_special_symbol = any(sym in token.token for token in tokens for sym in special_symbol)
+        if not has_special_symbol:
+            logger.warning(
+                f"ATTENTION: The {special_symbol} symbol is currently used for subword aggregation, but no instances "
+                "have been detected in the sequence. Change the special symbols using e.g. special_symbol=('Ġ', 'Ċ')"
+                ", and set is_suffix_symbol=True if they are used as suffix word separators (e.g. Hello</w> world</w>)"
+            )
+            return spans
         for curr_idx, token in enumerate(tokens):
             # Suffix if token start with special suffix symbol, or if it doesn't have the special prefix symbol.
             is_suffix = token.token.startswith(special_symbol) == is_suffix_symbol
