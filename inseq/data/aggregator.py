@@ -562,7 +562,7 @@ class ContiguousSpanAggregator(SequenceAttributionAggregator):
         spans = cls.format_spans(spans)
         prev_span_max = -1
         for span in spans:
-            assert len(span) == 2, f"Spans must contain at least two indexes, got {spans}"
+            assert len(span) == 2, f"Spans must contain two indexes, got {spans}"
             assert span[1] > span[0] + 1, f"Spans must be non-empty, got {spans}"
             assert (
                 span[0] >= prev_span_max
@@ -579,6 +579,14 @@ class ContiguousSpanAggregator(SequenceAttributionAggregator):
         return scores_aggregated_x
 
     @staticmethod
+    def _relativize_target_spans(spans: List[Tuple[int, int]], start: int):
+        if start != 0 and spans:
+            # Remove target spans referring to the unattributed prefix, rescale remaining spans to relative idxs
+            # of the generated sequences and set 0 if the span starts before the generation begins.
+            spans = [(s[0] - start if s[0] > start else 0, s[1] - start) for s in spans if s[1] > start]
+        return spans
+
+    @staticmethod
     def aggregate_source(attr, source_spans, **kwargs):
         return aggregate_token_sequence(attr.source, source_spans)
 
@@ -590,6 +598,8 @@ class ContiguousSpanAggregator(SequenceAttributionAggregator):
     def aggregate_source_attributions(attr, source_spans, target_spans, aggregate_fn, **kwargs):
         if attr.source_attributions is None:
             return attr.source_attributions
+        # Handle the case in which generation starts from a prefix
+        target_spans = ContiguousSpanAggregator._relativize_target_spans(target_spans, attr.attr_pos_start)
         # First aggregate along generated target sequence, then along attributed source
         return ContiguousSpanAggregator._aggregate_sequential_scores(
             attr.source_attributions, source_spans, target_spans, aggregate_fn
@@ -599,9 +609,11 @@ class ContiguousSpanAggregator(SequenceAttributionAggregator):
     def aggregate_target_attributions(attr, target_spans, aggregate_fn, **kwargs):
         if attr.target_attributions is None:
             return attr.target_attributions
+        # Handle the case in which generation starts from a prefix
+        gen_spans = ContiguousSpanAggregator._relativize_target_spans(target_spans, attr.attr_pos_start)
         # First aggregate along generated target sequence, then along attributed prefix
         return ContiguousSpanAggregator._aggregate_sequential_scores(
-            attr.target_attributions, target_spans, target_spans, aggregate_fn
+            attr.target_attributions, target_spans, gen_spans, aggregate_fn
         )
 
     @staticmethod
@@ -609,6 +621,8 @@ class ContiguousSpanAggregator(SequenceAttributionAggregator):
         if not attr.step_scores:
             return attr.step_scores
         out_dict = {}
+        # Handle the case in which generation starts from a prefix
+        target_spans = ContiguousSpanAggregator._relativize_target_spans(target_spans, attr.attr_pos_start)
         for name, step_scores in attr.step_scores.items():
             agg_fn = aggregate_fn[name] if isinstance(aggregate_fn, dict) else aggregate_fn
             out_dict[name] = aggregate_contiguous(step_scores, target_spans, agg_fn, aggregate_dim=0)
@@ -620,6 +634,8 @@ class ContiguousSpanAggregator(SequenceAttributionAggregator):
         if not attr.sequence_scores:
             return attr.sequence_scores
         out_dict = {}
+        # Handle the case in which generation starts from a prefix
+        target_spans = ContiguousSpanAggregator._relativize_target_spans(target_spans, attr.attr_pos_start)
         for name, step_scores in attr.sequence_scores.items():
             aggregate_fn = aggregate_fn[name] if isinstance(aggregate_fn, dict) else aggregate_fn
             if name.startswith("decoder"):
@@ -635,6 +651,34 @@ class ContiguousSpanAggregator(SequenceAttributionAggregator):
                     step_scores, source_spans, target_spans, aggregate_fn
                 )
         return out_dict
+
+    @staticmethod
+    def aggregate_attr_pos_start(attr, target_spans, **kwargs):
+        if not target_spans:
+            return attr.attr_pos_start
+        tot_merged_prefix = sum([s[1] - s[0] - 1 for s in target_spans if s[1] <= attr.attr_pos_start])
+        new_pos_start = attr.attr_pos_start - tot_merged_prefix
+
+        # Handle the case in which tokens before and after the starting position are merged
+        # The resulting merged span will include the full merged token, but merged scores will reflect only the portion
+        # that was actually attributed. E.g. if "Hello world" if the prefix, ", how are you?" is the generation and the
+        # token "world," is formed during merging, the "world," token will be included in the attributed targets, but
+        # only scores of "," will be used for aggregation (i.e. no aggregation since it's a single token).
+        overlapping = [s for s in target_spans if s[0] < attr.attr_pos_start < s[1]]
+        if overlapping and len(overlapping) == 1:
+            new_pos_start -= attr.attr_pos_start - overlapping[0][0]
+        elif len(overlapping) > 1:
+            raise RuntimeError(f"Multiple overlapping spans detected for the starting position {attr.attr_pos_start}.")
+        return new_pos_start
+
+    @staticmethod
+    def aggregate_attr_pos_end(attr, target_spans, **kwargs):
+        if not target_spans:
+            return attr.attr_pos_end
+        new_start = ContiguousSpanAggregator.aggregate_attr_pos_start(attr, target_spans, **kwargs)
+        target_spans = ContiguousSpanAggregator._relativize_target_spans(target_spans, attr.attr_pos_start)
+        tot_merged_sequence = sum([s[1] - s[0] - 1 for s in target_spans])
+        return new_start + ((attr.attr_pos_end - attr.attr_pos_start) - tot_merged_sequence)
 
 
 class SubwordAggregator(ContiguousSpanAggregator):
@@ -679,6 +723,14 @@ class SubwordAggregator(ContiguousSpanAggregator):
     def get_spans(tokens: List[TokenWithId], special_symbol: str, is_suffix_symbol: bool):
         spans = []
         last_prefix_idx = 0
+        has_special_symbol = any(sym in token.token for token in tokens for sym in special_symbol)
+        if not has_special_symbol:
+            logger.warning(
+                f"ATTENTION: The {special_symbol} symbol is currently used for subword aggregation, but no instances "
+                "have been detected in the sequence. Change the special symbols using e.g. special_symbol=('Ġ', 'Ċ')"
+                ", and set is_suffix_symbol=True if they are used as suffix word separators (e.g. Hello</w> world</w>)"
+            )
+            return spans
         for curr_idx, token in enumerate(tokens):
             # Suffix if token start with special suffix symbol, or if it doesn't have the special prefix symbol.
             is_suffix = token.token.startswith(special_symbol) == is_suffix_symbol
