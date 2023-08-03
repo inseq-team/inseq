@@ -656,16 +656,28 @@ class ContiguousSpanAggregator(SequenceAttributionAggregator):
     def aggregate_attr_pos_start(attr, target_spans, **kwargs):
         if not target_spans:
             return attr.attr_pos_start
-        tot_merged_prefix = sum([s[1] - s[0] - 1 for s in target_spans if s[1] < attr.attr_pos_start])
-        return attr.attr_pos_start - tot_merged_prefix
+        tot_merged_prefix = sum([s[1] - s[0] - 1 for s in target_spans if s[1] <= attr.attr_pos_start])
+        new_pos_start = attr.attr_pos_start - tot_merged_prefix
+
+        # Handle the case in which tokens before and after the starting position are merged
+        # The resulting merged span will include the full merged token, but merged scores will reflect only the portion
+        # that was actually attributed. E.g. if "Hello world" if the prefix, ", how are you?" is the generation and the
+        # token "world," is formed during merging, the "world," token will be included in the attributed targets, but
+        # only scores of "," will be used for aggregation (i.e. no aggregation since it's a single token).
+        overlapping = [s for s in target_spans if s[0] < attr.attr_pos_start < s[1]]
+        if overlapping and len(overlapping) == 1:
+            new_pos_start -= attr.attr_pos_start - overlapping[0][0]
+        elif len(overlapping) > 1:
+            raise RuntimeError(f"Multiple overlapping spans detected for the starting position {attr.attr_pos_start}.")
+        return new_pos_start
 
     @staticmethod
     def aggregate_attr_pos_end(attr, target_spans, **kwargs):
         if not target_spans:
             return attr.attr_pos_end
-        tot_merged_prefix = sum([s[1] - s[0] - 1 for s in target_spans if s[1] < attr.attr_pos_start])
-        new_start = attr.attr_pos_start - tot_merged_prefix
-        tot_merged_sequence = sum([s[1] - s[0] - 1 for s in target_spans if s[1] > attr.attr_pos_start])
+        new_start = ContiguousSpanAggregator.aggregate_attr_pos_start(attr, target_spans, **kwargs)
+        target_spans = ContiguousSpanAggregator._relativize_target_spans(target_spans, attr.attr_pos_start)
+        tot_merged_sequence = sum([s[1] - s[0] - 1 for s in target_spans])
         return new_start + ((attr.attr_pos_end - attr.attr_pos_start) - tot_merged_sequence)
 
 
