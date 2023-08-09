@@ -468,7 +468,7 @@ class AttributionModel(ABC, torch.nn.Module):
 
     def embed(self, inputs: Union[TextInput, IdsTensor], as_targets: bool = False):
         if isinstance(inputs, str) or (
-            isinstance(inputs, list) and len(inputs) > 0 and all([isinstance(x, str) for x in inputs])
+            isinstance(inputs, list) and len(inputs) > 0 and all(isinstance(x, str) for x in inputs)
         ):
             batch = self.encode(inputs, as_targets)
             inputs = batch.input_ids
