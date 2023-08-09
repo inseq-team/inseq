@@ -1,8 +1,10 @@
+from .alignment_utils import get_adjusted_alignments, get_aligned_idx
 from .argparse import InseqArgumentParser
 from .cache import INSEQ_ARTIFACTS_CACHE, INSEQ_HOME_CACHE, cache_results
 from .errors import (
     InseqDeprecationWarning,
     LengthMismatchError,
+    MissingAlignmentsError,
     MissingAttributionMethodError,
     UnknownAttributionMethodError,
 )
@@ -51,14 +53,17 @@ from .torch_utils import (
     get_default_device,
     get_front_padding,
     get_sequences_from_batched_steps,
+    logits_kl_divergence,
     normalize,
     remap_from_filtered,
+    top_p_logits_mask,
 )
 
 __all__ = [
     "LengthMismatchError",
     "MissingAttributionMethodError",
     "UnknownAttributionMethodError",
+    "MissingAlignmentsError",
     "cache_results",
     "optional",
     "pad",
@@ -110,5 +115,8 @@ __all__ = [
     "json_advanced_load",
     "get_nn_submodule",
     "find_block_stack",
-    "get_post_variable_assignment_hook",
+    "get_adjusted_alignments",
+    "get_aligned_idx",
+    "top_p_logits_mask",
+    "logits_kl_divergence",
 ]

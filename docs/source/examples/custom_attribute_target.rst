@@ -40,28 +40,28 @@ with Contrastive Explanations" <https://arxiv.org/abs/2202.10419>`__ by Yin and 
 by complementing the output probabilities with the ones from their contrastive counterpart, and using the difference between the two as attribution
 target.
 
-We can define such attribution function using the standard template adopted by Inseq.
+We can define such attribution function using the standard template adopted by Inseq. The :class:`~inseq.attr.step_functions.StepFunctionArgs` class is used for convenience to encapsulate all default arguments passed to step functions, namely:
+
+- :obj:`attribution_model`: the attribution model used to compute attributions.
+
+- :obj:`forward_output`: the output of the forward pass of the attribution model.
+
+- :obj:`target_ids`: the ids corresponding to the next predicted tokens for the current generation step.
+
+- :obj:`ids`, :obj:`embeddings` and :obj:`attention mask` corresponding to the model input at the present step, including inputs for the encoder in case of encoder-decoder models.
 
 .. code-block:: python
 
-    from inseq.attr.step_functions import probability_fn
+    from inseq.attr.step_functions import probability_fn, StepFunctionArgs
 
     # Simplified implementation of inseq.attr.step_functions.contrast_prob_diff_fn
     # Works only for encoder-decoder models!
     def example_prob_diff_fn(
-        # Default arguments in attribution_model.forward
-        attribution_model,
-        forward_output,
-        encoder_input_embeds,
-        encoder_attention_mask,
-        decoder_input_ids,
-        decoder_attention_mask,
-        target_ids,
+        # Default arguments for all step functions
+        args: StepFunctionArgs,
         # Extra arguments for our use case
         contrast_ids,
         contrast_attention_mask,
-        # We use kwargs to collect unused default arguments
-        **kwargs,
     ):
         """Custom attribution function returning the difference between next step probability for
         candidate generation vs. a contrastive alternative, answering the question "Which features
@@ -73,22 +73,24 @@ We can define such attribution function using the standard template adopted by I
             contrast_attention_mask: Tensor containing the attention mask for the contrastive input
         """
         # We truncate contrastive ids and their attention map to the current generation step
-        contrast_decoder_input_ids = contrast_ids[:, : decoder_input_ids.shape[1]].to(attribution_model.device)
-        contrast_decoder_attention_mask = contrast_attention_mask[:, : decoder_attention_mask.shape[1]].to(
-            attribution_model.device
-        )
+        device = args.attribution_model.device
+        len_inputs = args.decoder_input_ids.shape[1]
+        contrast_decoder_input_ids = contrast_ids[:, : len_inputs].to(device)
+        contrast_decoder_attention_mask = contrast_attention_mask[:, : len_inputs].to(device)
         # We select the next contrastive token as target
-        contrast_target_ids = contrast_ids[:, decoder_input_ids.shape[1]].to(attribution_model.device)
+        contrast_target_ids = contrast_ids[:, len_inputs].to(device)
         # Forward pass with the same model used for the main generation, but using contrastive inputs instead
-        contrast_output = attribution_model.model(
-            inputs_embeds=encoder_input_embeds,
-            attention_mask=encoder_attention_mask,
+        contrast_output = args.attribution_model.model(
+            inputs_embeds=args.encoder_input_embeds,
+            attention_mask=args.encoder_attention_mask,
             decoder_input_ids=contrast_decoder_input_ids,
             decoder_attention_mask=contrast_decoder_attention_mask,
         )
         # Return the prob difference as target for attribution
-        model_probs = probability_fn(attribution_model, forward_output, target_ids)
-        contrast_probs = probability_fn(attribution_model, contrast_output, contrast_target_ids)
+        model_probs = probability_fn(args)
+        args.forward_output = contrast_output
+        args.target_ids = contrast_target_ids
+        contrast_probs = probability_fn(args)
         return model_probs - contrast_probs
 
 Besides common arguments such as the attribution model, its outputs after the forward pass and all the input ids
@@ -101,8 +103,6 @@ Now that we have our custom attribution function, integrating it in Inseq is ver
 .. code-block:: python
 
     import inseq
-    from inseq.data.aggregator import AggregatorPipeline
-
 
     # Register the function defined above
     # Since outputs are still probabilities, contiguous tokens can still be aggregated using product

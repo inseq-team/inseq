@@ -48,5 +48,21 @@
                 "Le idee verdi senza colore dormono furiosamente"
             ]
         ]
+    ],
+    "short_texts_decoder": [
+        [
+            "",
+            "Hello world! Today is a great day."
+        ],
+        [
+            [
+                "",
+                "Colorless green ideas"
+            ],
+            [
+                "Hello world! Today is a great day.",
+                "Colorless green ideas sleep furiously."
+            ]
+        ]
     ]
 }

@@ -17,17 +17,21 @@
 </div>
 <div align="center">
 
+  [![Follow Inseq on Twitter]( 	https://img.shields.io/badge/Twitter-1DA1F2?style=for-the-badge&logo=twitter&logoColor=white)](https://twitter.com/InseqLib)
+  [![Join the Inseq Discord server](https://img.shields.io/badge/Discord-7289DA?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/V5VgwwFPbu)
+  <!--[![Follow Inseq on Mastodon](https://img.shields.io/mastodon/follow/109308976376923913?domain=https%3A%2F%2Fsigmoid.social&label=Inseq&style=social)](https://sigmoid.social/@inseq)-->
 
-  [![Follow Inseq on Twitter](https://img.shields.io/twitter/follow/inseqlib?label=InseqLib&style=social)](https://twitter.com/InseqLib)
-  [![Follow Inseq on Mastodon](https://img.shields.io/mastodon/follow/109308976376923913?domain=https%3A%2F%2Fsigmoid.social&label=Inseq&style=social)](https://sigmoid.social/@inseq)
+</div>
+<div align="center">
+
+  <a href="http://arxiv.org/abs/2302.13942"><b>Paper</b></a> |
+  <a href="https://inseq.readthedocs.io"><b>Documentation</b></a> |
+  <a href="https://github.com/inseq-team/inseq/blob/main/examples/inseq_tutorial.ipynb"><b>Tutorial</b></a> |
+  <a href="https://pypi.org/project/inseq"><b>PyPI Package</b></a>
+
 </div>
 
 Inseq is a Pytorch-based hackable toolkit to democratize the access to common post-hoc **in**terpretability analyses of **seq**uence generation models.
-
-- **Paper:** [http://arxiv.org/abs/2302.13942](http://arxiv.org/abs/2302.13942)
-- **Documentation:** [https://inseq.readthedocs.io](https://inseq.readthedocs.io)
-- **PyPI Package:** [https://pypi.org/project/inseq](https://pypi.org/project/inseq)
-- **MT Gender Bias Demo:** [oskarvanderwal/MT-bias-demo](https://huggingface.co/spaces/oskarvanderwal/MT-bias-demo)
 
 ## Installation
 
@@ -161,9 +165,10 @@ Step functions are used to extract custom scores from the model at each step of 
 - `perplexity`: Perplexity of the target token.
 - `contrast_prob`: Probability of the target token when different contrastive inputs are provided to the model. Equivalent to `probability` when no contrastive inputs are provided.
 - `pcxmi`: Point-wise Contextual Cross-Mutual Information (P-CXMI) for the target token given original and contrastive contexts [(Yin et al. 2021)](https://arxiv.org/abs/2109.07446).
-- `kl_divergence`: KL divergence of the predictive distribution given original and contrastive contexts. Can be limited to top-K most likely target token options using the `top_k` parameter.
+- `kl_divergence`: KL divergence of the predictive distribution given original and contrastive contexts. Can be restricted to most likely target token options using the `top_k` and `top_p` parameters.
 - `contrast_prob_diff`: Difference in probability between original and foil target tokens pair, can be used for contrastive evaluation as in [Contrastive Attribution](https://aclanthology.org/2022.emnlp-main.14/) (Yin and Neubig, 2022).
 - `mc_dropout_prob_avg`: Average probability of the target token across multiple samples using [MC Dropout](https://arxiv.org/abs/1506.02142) (Gal and Ghahramani, 2016).
+- `top_p_size`: The number of tokens with cumulative probability greater than `top_p` in the predictive distribution of the model.
 
 The following example computes contrastive attributions using the `contrast_prob_diff` step function:
 
@@ -242,3 +247,17 @@ If you use Inseq in your research we suggest to include a mention to the specifi
     url = {https://arxiv.org/abs/2302.13942}
 }
 ```
+
+## Research using Inseq
+
+Inseq has been used in various research projects. A list of known publications that use Inseq to conduct interpretability analyses of generative models is shown below. If you know more, please let us know or submit a pull request (*last updated: May 2023*).
+
+<details>
+  <summary><b>2023</b></summary>
+  <ol>
+    <li> <a href="https://arxiv.org/abs/2302.13942">Inseq: An Interpretability Toolkit for Sequence Generation Models</a> (Sarti et al., 2023) </li>
+    <li> <a href="https://arxiv.org/abs/2302.14220">Are Character-level Translations Worth the Wait? Comparing Character- and Subword-level Models for Machine Translation</a> (Edman et al., 2023) </li>
+    <li> <a href="https://arxiv.org/abs/2305.15908">Response Generation in Longitudinal Dialogues: Which Knowledge Representation Helps?</a> (Mousavi et al., 2023)  </li>
+  </ol>
+
+</details>

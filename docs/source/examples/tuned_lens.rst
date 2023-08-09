@@ -17,6 +17,12 @@ Estimating Prediction Confidence with Tuned Lens
 The Tuned Lens method
 ---------------------
 
+.. warning::
+
+    The tutorial is deprecated and won't work with the most recent release of ``tuned-lens``. It will be updated as
+    soon as possible.
+
+
 .. note::
 
     This tutorial adopts the "Tuned Lens" name for the affine transformation proposed by
@@ -70,10 +76,7 @@ The first step is to install the tuned lens library using ``pip install tuned-le
 
     def confidence_from_prediction_depth(
         # Default arguments for Inseq step functions
-        attribution_model,
-        decoder_input_ids,
-        decoder_attention_mask,
-        target_ids,
+        args,
         # Extra arguments for our use case
         lens: Lens,
         # We use kwargs to collect unused default arguments
@@ -89,11 +92,7 @@ The first step is to install the tuned lens library using ``pip install tuned-le
         14 is the number of layers in the model, plus the embedding layer, plus 1 to account for the case
         where the token is not predicted by the model.
         """
-        batch = attribution_model.formatter.convert_args_to_batch(
-            decoder_input_ids=decoder_input_ids,
-            decoder_input_embeds=None,
-            decoder_attention_mask=decoder_attention_mask,
-        )
+        batch = attribution_model.formatter.convert_args_to_batch(args)
         # Record activations at every model layer
         with record_residual_stream(attribution_model.model) as stream:
             outputs = attribution_model.get_forward_output(batch, use_embeddings=False)
@@ -112,11 +111,11 @@ The first step is to install the tuned lens library using ``pip install tuned-le
         probs = hidden_lps.map(lambda x: x.exp() * 100)
         probs = torch.stack(list(probs))
         top_idx_per_layer = probs.abs().topk(1, dim=-1).indices.squeeze(-1).reshape(-1, num_layers)
-        if target_ids.ndim == 0:
-            target_ids = target_ids.unsqueeze(0)
+        if args.target_ids.ndim == 0:
+            args.target_ids = args.target_ids.unsqueeze(0)
         # Set to max denominator to return 0 only if the target token is not predicted by the model
-        indices = torch.ones_like(target_ids) * (num_layers + 1)
-        for i, t in enumerate(target_ids):
+        indices = torch.ones_like(args.target_ids) * (num_layers + 1)
+        for i, t in enumerate(args.target_ids):
             pos = torch.where(top_idx_per_layer[i, :] == t.int())[0]
             if pos.numel() > 0:
                 indices[i] = pos[0] + 1

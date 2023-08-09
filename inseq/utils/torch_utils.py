@@ -54,6 +54,61 @@ def normalize(
     return attributions
 
 
+def top_p_logits_mask(logits: torch.Tensor, top_p: float, min_tokens_to_keep: int) -> torch.Tensor:
+    """Adapted from https://github.com/huggingface/transformers/blob/main/src/transformers/generation/logits_process.py
+    """
+    # Compute cumulative probabilities of sorted tokens
+    if top_p < 0 or top_p > 1.0:
+        raise ValueError(f"`top_p` has to be a float > 0 and < 1, but is {top_p}")
+    if not isinstance(min_tokens_to_keep, int) or (min_tokens_to_keep < 1):
+        raise ValueError(f"`min_tokens_to_keep` has to be a positive integer, but is {min_tokens_to_keep}")
+    sorted_logits, sorted_indices = torch.sort(logits, descending=False)
+    cumulative_probs = sorted_logits.softmax(dim=-1).cumsum(dim=-1)
+
+    # Remove tokens with cumulative top_p above the threshold (token with 0 are kept)
+    sorted_indices_to_remove = cumulative_probs <= (1 - top_p)
+
+    # Keep at least min_tokens_to_keep
+    sorted_indices_to_remove[..., -min_tokens_to_keep:] = 0
+
+    # scatter sorted tensors to original indexing
+    indices_to_remove = sorted_indices_to_remove.scatter(1, sorted_indices, sorted_indices_to_remove)
+    return indices_to_remove
+
+
+def logits_kl_divergence(
+    original_logits: torch.Tensor,
+    contrast_logits: torch.Tensor,
+    top_p: float = 1.0,
+    top_k: int = 0,
+    min_tokens_to_keep: int = 1,
+) -> torch.Tensor:
+    """Compute the KL divergence between two sets of logits, with optional top-k and top-p filtering."""
+    top_k = min(top_k, contrast_logits.size(-1))
+    if top_p < 1.0:
+        original_indices_to_remove = top_p_logits_mask(original_logits, top_p, min_tokens_to_keep)
+        contrastive_indices_to_remove = top_p_logits_mask(contrast_logits, top_p, min_tokens_to_keep)
+        joined_indices_to_remove = original_indices_to_remove & contrastive_indices_to_remove
+        original_logits = original_logits.masked_select(~joined_indices_to_remove)[None, ...]
+        contrast_logits = contrast_logits.masked_select(~joined_indices_to_remove)[None, ...]
+    if top_k > 0:
+        filtered_contrast_logits = torch.zeros(contrast_logits.size(0), top_k)
+        filtered_original_logits = torch.zeros(original_logits.size(0), top_k)
+        indices_to_remove = contrast_logits < contrast_logits.topk(top_k).values[..., -1, None]
+        for i in range(contrast_logits.size(0)):
+            filtered_contrast_logits[i] = contrast_logits[i].masked_select(~indices_to_remove[i])
+            filtered_original_logits[i] = original_logits[i].masked_select(~indices_to_remove[i])
+    else:
+        filtered_contrast_logits = contrast_logits
+        filtered_original_logits = original_logits
+    original_logprobs = F.log_softmax(filtered_original_logits, dim=-1)
+    contrast_logprobs = F.log_softmax(filtered_contrast_logits, dim=-1)
+    kl_divergence = torch.zeros(original_logprobs.size(0))
+    for i in range(original_logprobs.size(0)):
+        kl_divergence[i] = F.kl_div(contrast_logprobs[i], original_logprobs[i], reduction="sum", log_target=True)
+    return kl_divergence
+
+
 def euclidean_distance(vec_a: torch.Tensor, vec_b: torch.Tensor) -> torch.Tensor:
     """Compute the Euclidean distance between two points."""
     return (vec_a - vec_b).pow(2).sum(-1).sqrt()

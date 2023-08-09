@@ -52,3 +52,9 @@ class LengthMismatchError(Exception):
     """Raised when lengths do not match."""
 
     pass
+
+
+class MissingAlignmentsError(Exception):
+    """Raised when lengths do not match."""
+
+    pass

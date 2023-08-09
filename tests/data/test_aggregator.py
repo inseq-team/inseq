@@ -12,7 +12,7 @@ from inseq.data.aggregator import (
     SequenceAttributionAggregator,
     SubwordAggregator,
 )
-from inseq.models import HuggingfaceEncoderDecoderModel
+from inseq.models import HuggingfaceDecoderOnlyModel, HuggingfaceEncoderDecoderModel
 
 EXAMPLES_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../fixtures/aggregator.json")
 EXAMPLES = json.load(open(EXAMPLES_FILE))
@@ -21,6 +21,11 @@ EXAMPLES = json.load(open(EXAMPLES_FILE))
 @fixture(scope="session")
 def saliency_mt_model() -> HuggingfaceEncoderDecoderModel:
     return inseq.load_model("Helsinki-NLP/opus-mt-en-it", "saliency", device="cpu")
+
+
+@fixture(scope="session")
+def saliency_gpt_model() -> HuggingfaceDecoderOnlyModel:
+    return inseq.load_model("gpt2", "saliency", device="cpu")
 
 
 def test_sequence_attribution_aggregator(saliency_mt_model: HuggingfaceEncoderDecoderModel):
@@ -54,6 +59,14 @@ def test_continuous_span_aggregator(saliency_mt_model: HuggingfaceEncoderDecoder
     assert out_agg.source_attributions.shape == (5, 4, 512)
     assert out_agg.target_attributions.shape == (4, 4, 512)
     assert out_agg.step_scores["probability"].shape == (4,)
+
+
+def test_span_aggregator_with_prefix(saliency_gpt_model: HuggingfaceDecoderOnlyModel):
+    out = saliency_gpt_model.attribute("Hello, world! I am,:.", "Hello, world! I am,:.!,. Last")
+    aggregated = out.aggregate("subwords", special_symbol=("Ġ", "Ċ")).aggregate()
+    assert aggregated[0].target_attributions.shape == (5, 2)
+    assert aggregated[0].attr_pos_start == 3
+    assert aggregated[0].attr_pos_end == 5
 
 
 def test_aggregator_pipeline(saliency_mt_model: HuggingfaceEncoderDecoderModel):

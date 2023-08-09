@@ -15,6 +15,7 @@ from transformers import (
 )
 from transformers.modeling_outputs import CausalLMOutput, ModelOutput, Seq2SeqLMOutput
 
+from ..attr.attribution_decorators import batched
 from ..data import BatchEncoding
 from ..utils import check_device
 from ..utils.typing import (
@@ -155,13 +156,18 @@ class HuggingfaceModel(AttributionModel):
     def device(self, new_device: str) -> None:
         check_device(new_device)
         self._device = new_device
+        is_loaded_in_8bit = getattr(self.model, "is_loaded_in_8bit", False)
+        is_loaded_in_4bit = getattr(self.model, "is_loaded_in_4bit", False)
+        is_quantized = is_loaded_in_8bit or is_loaded_in_4bit
+
         # Enable compatibility with 8bit models
         if self.model:
-            if not (hasattr(self.model, "is_loaded_in_8bit") and self.model.is_loaded_in_8bit):
+            if not is_quantized:
                 self.model.to(self._device)
             else:
+                mode = "8bit" if is_loaded_in_8bit else "4bit"
                 logger.warning(
-                    "The model is loaded in 8bit mode. The device cannot be changed after loading the model."
+                    f"The model is loaded in {mode} mode. The device cannot be changed after loading the model."
                 )
 
     @abstractmethod
@@ -180,6 +186,7 @@ class HuggingfaceModel(AttributionModel):
         return dic_info
 
     @unhooked
+    @batched
     def generate(
         self,
         inputs: Union[TextInput, BatchEncoding],
@@ -204,13 +211,13 @@ class HuggingfaceModel(AttributionModel):
             inputs = self.encode(inputs)
         inputs = inputs.to(self.device)
         generation_out = self.model.generate(
-            input_ids=inputs.input_ids,
-            attention_mask=inputs.attention_mask,
+            inputs=inputs.input_ids,
             return_dict_in_generate=True,
             **kwargs,
         )
+        sequences = generation_out.sequences
         texts = self.tokenizer.batch_decode(
-            generation_out.sequences,
+            sequences,
             skip_special_tokens=True,
         )
         if return_generation_output:
@@ -284,6 +291,13 @@ class HuggingfaceModel(AttributionModel):
             baseline_ids=baseline_ids,
         )
 
+    def decode(
+        self,
+        ids: Union[List[int], List[List[int]], IdsTensor],
+        skip_special_tokens: bool = True,
+    ) -> List[str]:
+        return self.tokenizer.batch_decode(ids, skip_special_tokens=skip_special_tokens)
+
     def embed_ids(self, ids: IdsTensor, as_targets: bool = False) -> EmbeddingsTensor:
         if as_targets and not self.is_encoder_decoder:
             raise ValueError("Decoder-only models should use tokenization as source only.")
@@ -337,9 +351,44 @@ class HuggingfaceModel(AttributionModel):
             ids = self.tokenizer(
                 text=text if not as_targets else None,
                 text_target=text if as_targets else None,
+                add_special_tokens=not skip_special_tokens,
             )["input_ids"]
             return self.tokenizer.convert_ids_to_tokens(ids, skip_special_tokens)
         return [self.convert_string_to_tokens(t, skip_special_tokens, as_targets) for t in text]
+
+    def clean_tokens(
+        self,
+        tokens: OneOrMoreTokenSequences,
+        skip_special_tokens: bool = False,
+        as_targets: bool = False,
+    ) -> OneOrMoreTokenSequences:
+        """Cleans special characters from tokens.
+
+        Args:
+            tokens (`OneOrMoreTokenSequences`):
+                A list containing one or more lists of tokens.
+            skip_special_tokens (`bool`, *optional*, defaults to True):
+                If true, special tokens are skipped.
+            as_targets (`bool`, *optional*, defaults to False):
+                If true, a target tokenizer is used to clean the tokens.
+
+        Returns:
+            `OneOrMoreTokenSequences`: A list containing one or more lists of cleaned tokens.
+        """
+        if isinstance(tokens, list) and len(tokens) == 0:
+            return []
+        elif isinstance(tokens[0], str):
+            clean_tokens = []
+            for tok in tokens:
+                clean_tok = self.convert_tokens_to_string(
+                    [tok], skip_special_tokens=skip_special_tokens, as_targets=as_targets
+                )
+                if clean_tok:
+                    clean_tokens.append(clean_tok)
+                elif tok:
+                    clean_tokens.append(" ")
+            return clean_tokens
+        return [self.clean_tokens(token_seq, skip_special_tokens, as_targets) for token_seq in tokens]
 
     @property
     def special_tokens(self) -> List[str]:
@@ -396,6 +445,8 @@ class HuggingfaceEncoderDecoderModel(HuggingfaceModel, EncoderDecoderAttribution
     def get_attentions_dict(
         output: Seq2SeqLMOutput,
     ) -> Dict[str, MultiLayerMultiUnitScoreTensor]:
+        if output.encoder_attentions is None or output.decoder_attentions is None:
+            raise ValueError("Model does not support attribution relying on attention outputs.")
         return {
             "encoder_self_attentions": torch.stack(output.encoder_attentions, dim=1),
             "decoder_self_attentions": torch.stack(output.decoder_attentions, dim=1),
@@ -442,6 +493,8 @@ class HuggingfaceDecoderOnlyModel(HuggingfaceModel, DecoderOnlyAttributionModel)
 
     @staticmethod
     def get_attentions_dict(output: CausalLMOutput) -> Dict[str, MultiLayerMultiUnitScoreTensor]:
+        if output.attentions is None:
+            raise ValueError("Model does not support attribution relying on attention outputs.")
         return {
             "decoder_self_attentions": torch.stack(output.attentions, dim=1),
         }

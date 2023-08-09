@@ -99,7 +99,7 @@ def pretty_dict(d: Dict[str, Any], lpad: int = 4) -> str:
             out_txt += pretty_tensor(v, lpad + 4)
         elif isinstance(v, dict):
             out_txt += pretty_dict(v, lpad + 4)
-        elif hasattr(v, "to_dict"):
+        elif hasattr(v, "to_dict") and not isinstance(v, type):
             out_txt += f"{v.__class__.__name__}({pretty_dict(v.to_dict(), lpad + 4)})"
         else:
             out_txt += "None" if v is None else str(v)
@@ -423,3 +423,15 @@ def get_cls_from_instance_type(mod, name, cls_lookup_map):
             if curr_class is None:
                 raise ImportError(f"{imp_err}; add the class to `cls_lookup_map={{'{name}': Class}}` argument")
     return curr_class
+
+
+def clean_tokens(tokens: List[str], remove_tokens: List[str]) -> Tuple[List[str], List[int]]:
+    """Removes tokens from a list of tokens and returns the cleaned list and the removed token indexes."""
+    clean_tokens = []
+    removed_token_idxs = []
+    for idx, tok in enumerate(tokens):
+        if tok not in remove_tokens:
+            clean_tokens += [tok.strip()]
+        else:
+            removed_token_idxs += [idx]
+    return clean_tokens, removed_token_idxs

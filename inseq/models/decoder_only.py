@@ -5,6 +5,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, TypeVar, Union
 import torch
 
 from ..attr.feat import join_token_ids
+from ..attr.step_functions import StepFunctionDecoderOnlyArgs
 from ..data import (
     BatchEmbedding,
     BatchEncoding,
@@ -13,6 +14,7 @@ from ..data import (
     FeatureAttributionStepOutput,
     get_batch_from_inputs,
 )
+from ..utils import get_aligned_idx
 from ..utils.typing import (
     AttributionForwardInputs,
     EmbeddingsTensor,
@@ -23,7 +25,6 @@ from ..utils.typing import (
     SingleScorePerStepTensor,
     TargetIdsTensor,
     TextSequences,
-    TokenWithId,
 )
 from .attribution_model import AttributionModel, ForwardMethod, InputFormatter, ModelOutput
 
@@ -89,10 +90,13 @@ class DecoderOnlyInputFormatter(InputFormatter):
 
     @staticmethod
     def enrich_step_output(
+        attribution_model: "DecoderOnlyAttributionModel",
         step_output: FeatureAttributionStepOutput,
         batch: DecoderOnlyBatch,
         target_tokens: OneOrMoreTokenSequences,
         target_ids: TargetIdsTensor,
+        contrast_batch: Optional[DecoderOnlyBatch] = None,
+        contrast_targets_alignments: Optional[List[List[Tuple[int, int]]]] = None,
     ) -> FeatureAttributionStepOutput:
         r"""Enriches the attribution output with token information, producing the finished
         :class:`~inseq.data.FeatureAttributionStepOutput` object.
@@ -110,8 +114,20 @@ class DecoderOnlyInputFormatter(InputFormatter):
         if target_ids.ndim == 0:
             target_ids = target_ids.unsqueeze(0)
         step_output.source = None
-        step_output.target = [[TokenWithId(token[0], id)] for token, id in zip(target_tokens, target_ids.tolist())]
-        step_output.prefix = join_token_ids(batch.target_tokens, batch.input_ids.tolist())
+        if contrast_batch is not None:
+            contrast_aligned_idx = get_aligned_idx(len(batch.target_tokens[0]), contrast_targets_alignments[0])
+            contrast_target_ids = contrast_batch.target_ids[:, contrast_aligned_idx]
+            step_output.target = join_token_ids(
+                tokens=target_tokens,
+                ids=attribution_model.convert_ids_to_tokens(contrast_target_ids),
+                contrast_tokens=attribution_model.convert_ids_to_tokens(
+                    contrast_target_ids[None, ...], skip_special_tokens=False
+                ),
+            )
+            step_output.prefix = join_token_ids(tokens=batch.target_tokens, ids=batch.target_ids.tolist())
+        else:
+            step_output.target = join_token_ids(target_tokens, [[idx] for idx in target_ids.tolist()])
+            step_output.prefix = join_token_ids(batch.target_tokens, batch.target_ids.tolist())
         return step_output
 
     @staticmethod
@@ -120,30 +136,28 @@ class DecoderOnlyInputFormatter(InputFormatter):
         forward_output: ModelOutput,
         target_ids: ExpandedTargetIdsTensor,
         batch: DecoderOnlyBatch,
-        **kwargs,
-    ) -> Dict[str, Any]:
-        return {
-            **kwargs,
-            **{
-                "attribution_model": attribution_model,
-                "forward_output": forward_output,
-                "encoder_input_ids": None,
-                "decoder_input_ids": batch.target_ids,
-                "encoder_input_embeds": None,
-                "decoder_input_embeds": batch.target_embeds,
-                "target_ids": target_ids,
-                "encoder_attention_mask": None,
-                "decoder_attention_mask": batch.target_mask,
-            },
-        }
+    ) -> StepFunctionDecoderOnlyArgs:
+        return StepFunctionDecoderOnlyArgs(
+            attribution_model=attribution_model,
+            forward_output=forward_output,
+            target_ids=target_ids,
+            decoder_input_ids=batch.target_ids,
+            decoder_attention_mask=batch.target_mask,
+            decoder_input_embeds=batch.target_embeds,
+        )
 
     @staticmethod
     def convert_args_to_batch(
+        args: StepFunctionDecoderOnlyArgs = None,
         decoder_input_ids: Optional[IdsTensor] = None,
         decoder_attention_mask: Optional[IdsTensor] = None,
         decoder_input_embeds: Optional[EmbeddingsTensor] = None,
         **kwargs,
     ) -> DecoderOnlyBatch:
+        if args is not None:
+            decoder_input_ids = args.decoder_input_ids
+            decoder_attention_mask = args.decoder_attention_mask
+            decoder_input_embeds = args.decoder_input_embeds
         encoding = BatchEncoding(decoder_input_ids, decoder_attention_mask)
         embedding = BatchEmbedding(decoder_input_embeds)
         return DecoderOnlyBatch(encoding, embedding)
@@ -178,8 +192,12 @@ class DecoderOnlyInputFormatter(InputFormatter):
     def get_text_sequences(attribution_model: "DecoderOnlyAttributionModel", batch: DecoderOnlyBatch) -> TextSequences:
         return TextSequences(
             sources=None,
-            targets=attribution_model.convert_tokens_to_string(batch.input_tokens, as_targets=True),
+            targets=attribution_model.decode(batch.target_ids),
         )
+
+    @staticmethod
+    def get_step_function_reserved_args() -> List[str]:
+        return [f.name for f in StepFunctionDecoderOnlyArgs.__dataclass_fields__.values()]
 
 
 class DecoderOnlyAttributionModel(AttributionModel):
@@ -196,7 +214,11 @@ class DecoderOnlyAttributionModel(AttributionModel):
         return self.model(
             input_ids=batch.input_ids if not use_embeddings else None,
             inputs_embeds=batch.input_embeds if use_embeddings else None,
-            attention_mask=batch.attention_mask,
+            # Hacky fix for petals' distributed models while awaiting attention_mask support:
+            # https://github.com/bigscience-workshop/petals/pull/206
+            attention_mask=(
+                batch.attention_mask if not self.model.__class__.__name__.startswith("Distributed") else None
+            ),
             **kwargs,
         )
 

@@ -37,3 +37,5 @@ functionalities required for its usage.
 .. autofunction:: list_aggregation_functions
 
 .. autofunction:: show_attributions
+
+.. autofunction:: merge_attributions

@@ -86,6 +86,7 @@ sphinxemoji = "^0.2.0"
 sphinxext-opengraph = "^0.4.2"
 sphinx-copybutton = "^0.4.0"
 sphinx-gitstamp = "^0.3.2"
+sphinx-design = "^0.4.1"
 furo = "^2022.12.7"
 
 [tool.poetry.group.lint]

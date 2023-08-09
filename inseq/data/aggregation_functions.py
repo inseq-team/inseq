@@ -84,7 +84,7 @@ class AbsMaxAggregationFunction(AggregationFunction):
     aggregation_function_name = "absmax"
 
     def __call__(self, scores: torch.Tensor, dim: int) -> ScoreTensor:
-        return scores.gather(dim, scores.abs().argmax(dim, keepdim=True)).squeeze(dim)
+        return scores.gather(dim, torch.nan_to_num(scores).abs().argmax(dim, keepdim=True)).squeeze(dim)
 
 
 class VectorNormAggregationFunction(AggregationFunction):

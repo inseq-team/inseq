@@ -156,6 +156,29 @@ def test_batched_attribution_consistency_seq2seq(
         )
 
 
+def test_batched_attribution_consistency_decoder_only(saliency_gpt2_model):
+    texts_single, reference_single = EXAMPLES["short_texts_decoder"][0]
+    texts_batch, reference_batch = EXAMPLES["short_texts_decoder"][1]
+    out_single = saliency_gpt2_model.attribute(
+        texts_single,
+        reference_single,
+        show_progress=False,
+        device=get_default_device(),
+    )
+    out_batch = saliency_gpt2_model.attribute(
+        texts_batch,
+        reference_batch,
+        show_progress=False,
+        device=get_default_device(),
+    )
+    assert torch.allclose(
+        out_single.sequence_attributions[0].target_attributions,
+        out_batch.sequence_attributions[0].target_attributions,
+        atol=8e-2,
+        equal_nan=True,
+    )
+
+
 @mark.slow
 @mark.parametrize(("texts", "reference_texts"), EXAMPLES["texts"])
 @mark.parametrize("attribution_method", ATTRIBUTION_METHODS)
@@ -280,12 +303,12 @@ def test_attribute_decoder(saliency_gpt2_model):
     assert ex1.target_attributions.shape[1] == ex1.attr_pos_end - ex1.attr_pos_start
     assert ex1.target_attributions.shape[0] == ex1.attr_pos_end
     # Empty attributions outputs have start and end set to seq length
-    assert ex2.attr_pos_start == 8
-    assert ex2.attr_pos_end == 13
+    assert ex2.attr_pos_start == 17
+    assert ex2.attr_pos_end == 22
     assert ex2.target_attributions.shape[1] == ex2.attr_pos_end - ex2.attr_pos_start
     assert ex2.target_attributions.shape[0] == ex2.attr_pos_end
-    assert ex3.attr_pos_start == 12
-    assert ex3.attr_pos_end == 17
+    assert ex3.attr_pos_start == 17
+    assert ex3.attr_pos_end == 22
     assert ex3.target_attributions.shape[1] == ex3.attr_pos_end - ex3.attr_pos_start
     assert ex3.target_attributions.shape[0] == ex3.attr_pos_end
     assert out.info["attr_pos_start"] == 17

@@ -72,6 +72,49 @@ def get_batch_from_inputs(
     return batch
 
 
+def merge_attributions(attributions: List["FeatureAttributionOutput"]) -> "FeatureAttributionOutput":
+    """Merges multiple :class:`~inseq.data.FeatureAttributionOutput` objects into a single one.
+
+    Merging is allowed only if the two outputs match on the fields specified in ``_merge_match_info_fields``.
+
+    Args:
+        attributions (:obj:`list` of :class:`~inseq.data.FeatureAttributionOutput`): The FeatureAttributionOutput
+            objects to be merged.
+
+    Returns:
+        :class:`~inseq.data.FeatureAttributionOutput`: Merged object.
+    """
+    assert all(
+        isinstance(x, FeatureAttributionOutput) for x in attributions
+    ), "Only FeatureAttributionOutput objects can be merged."
+    first = attributions[0]
+    for match_field in FeatureAttributionOutput._merge_match_info_fields:
+        assert all(
+            (
+                attr.info[match_field] == first.info[match_field]
+                if match_field in first.info
+                else match_field not in attr.info
+            )
+            for attr in attributions
+        ), f"Cannot merge: incompatible values for field {match_field}"
+    out_info = first.info.copy()
+    if "attr_pos_end" in first.info:
+        out_info.update({"attr_pos_end": max(attr.info["attr_pos_end"] for attr in attributions)})
+    if "generated_texts" in first.info:
+        out_info.update({"generated_texts": [text for attr in attributions for text in attr.info["generated_texts"]]})
+    if "input_texts" in first.info:
+        out_info.update({"input_texts": [text for attr in attributions for text in attr.info["input_texts"]]})
+    return FeatureAttributionOutput(
+        sequence_attributions=[seqattr for attr in attributions for seqattr in attr.sequence_attributions],
+        step_attributions=(
+            [stepattr for attr in attributions for stepattr in attr.step_attributions]
+            if first.step_attributions is not None
+            else None
+        ),
+        info=out_info,
+    )
+
+
 @dataclass(eq=False, repr=False)
 class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
     """Output produced by a standard attribution method.
@@ -164,6 +207,11 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
         ]
         if tokenized_target_sentences is None:
             tokenized_target_sentences = targets
+        if has_bos_token:
+            tokenized_target_sentences = [tok_seq[1:] for tok_seq in tokenized_target_sentences]
+        tokenized_target_sentences = [
+            drop_padding(tokenized_target_sentences[seq_id], pad_id) for seq_id in range(num_sequences)
+        ]
         if attr_pos_end is None:
             attr_pos_end = max([len(t) for t in tokenized_target_sentences])
         pos_start = [
@@ -321,29 +369,27 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
         # If no aggregator is specified, the default aggregator for the class is used
         aggr = self.aggregate(aggregator, **kwargs) if do_aggregation else self
         return_dict = {"source_attributions": {}, "target_attributions": {}, "step_scores": {}}
-        if aggr.source_attributions is not None:
-            score_map_source = {}
-            for tgt_idx, tgt_tok in enumerate(aggr.target):
-                score_map_source[tgt_tok.token] = {}
+        for tgt_idx in range(aggr.attr_pos_start, aggr.attr_pos_end):
+            tgt_tok = aggr.target[tgt_idx]
+            if aggr.source_attributions is not None:
+                return_dict["source_attributions"][(tgt_idx, tgt_tok.token)] = {}
                 for src_idx, src_tok in enumerate(aggr.source):
-                    score_map_source[tgt_tok.token][src_tok.token] = aggr.source_attributions[src_idx, tgt_idx].item()
-            return_dict["source_attributions"] = score_map_source
-        if aggr.target_attributions is not None:
-            score_map_target = {}
-            for tgt_idx_b, tgt_tok_b in enumerate(aggr.target):
-                score_map_target[tgt_tok_b.token] = {}
-                for tgt_idx_a, tgt_tok_a in enumerate(aggr.target):
-                    score_map_target[tgt_tok_b.token][tgt_tok_a.token] = aggr.target_attributions[
-                        tgt_idx_a, tgt_idx_b
-                    ].item()
-            return_dict["target_attributions"] = score_map_target
-        if aggr.step_scores is not None:
-            step_scores_map = {}
-            for tgt_idx, tgt_tok in enumerate(aggr.target):
-                step_scores_map[tgt_tok.token] = {}
+                    return_dict["source_attributions"][(tgt_idx, tgt_tok.token)][
+                        (src_idx, src_tok.token)
+                    ] = aggr.source_attributions[src_idx, tgt_idx - aggr.attr_pos_start].item()
+            if aggr.target_attributions is not None:
+                return_dict["target_attributions"][(tgt_idx, tgt_tok.token)] = {}
+                for tgt_idx_attr in range(aggr.attr_pos_end):
+                    tgt_tok_attr = aggr.target[tgt_idx_attr]
+                    return_dict["target_attributions"][(tgt_idx, tgt_tok.token)][
+                        (tgt_idx_attr, tgt_tok_attr.token)
+                    ] = aggr.target_attributions[tgt_idx_attr, tgt_idx - aggr.attr_pos_start].item()
+            if aggr.step_scores is not None:
+                return_dict["step_scores"][(tgt_idx, tgt_tok.token)] = {}
                 for step_score_id, step_score in aggr.step_scores.items():
-                    step_scores_map[tgt_tok.token][step_score_id] = step_score[tgt_idx].item()
-            return_dict["step_scores"] = step_scores_map
+                    return_dict["step_scores"][(tgt_idx, tgt_tok.token)][step_score_id] = step_score[
+                        tgt_idx - aggr.attr_pos_start
+                    ].item()
         return return_dict
 
 
@@ -384,21 +430,21 @@ class FeatureAttributionStepOutput(TensorWrapper):
             )
         if self.target_attributions is not None:
             self.target_attributions = remap_from_filtered(
-                original_shape=(len(batch.targets.input_tokens), *self.target_attributions.shape[1:]),
+                original_shape=(len(batch.target_tokens), *self.target_attributions.shape[1:]),
                 mask=target_attention_mask,
                 filtered=self.target_attributions,
             )
         if self.step_scores is not None:
             for score_name, score_tensor in self.step_scores.items():
                 self.step_scores[score_name] = remap_from_filtered(
-                    original_shape=(len(batch.targets.input_tokens), 1),
+                    original_shape=(len(batch.target_tokens), 1),
                     mask=target_attention_mask,
                     filtered=score_tensor.unsqueeze(-1),
                 ).squeeze(-1)
         if self.sequence_scores is not None:
             for score_name, score_tensor in self.sequence_scores.items():
                 self.sequence_scores[score_name] = remap_from_filtered(
-                    original_shape=(len(batch.targets.input_tokens), *self.source_attributions.shape[1:]),
+                    original_shape=(len(batch.target_tokens), *self.source_attributions.shape[1:]),
                     mask=target_attention_mask,
                     filtered=score_tensor,
                 )
@@ -464,7 +510,7 @@ class FeatureAttributionOutput:
         return iter(self.sequence_attributions)
 
     def __add__(self, other) -> "FeatureAttributionOutput":
-        return self.merge_attributions([self, other])
+        return merge_attributions([self, other])
 
     def __radd__(self, other) -> "FeatureAttributionOutput":
         return self.__add__(other)
@@ -606,46 +652,6 @@ class FeatureAttributionOutput:
                 attr.show(min_val, max_val, display, return_html, aggregator, do_aggregation, **kwargs)
         if return_html:
             return out_str
-
-    @classmethod
-    def merge_attributions(cls, attributions: List["FeatureAttributionOutput"]) -> "FeatureAttributionOutput":
-        """Merges multiple :class:`~inseq.data.FeatureAttributionOutput` objects into a single one.
-
-        Merging is allowed only if the two outputs match on the fields specified in ``_merge_match_info_fields``.
-
-        Args:
-            attributions (`list(FeatureAttributionOutput)`): The FeatureAttributionOutput objects to be merged.
-
-        Returns:
-            `FeatureAttributionOutput`: Merged object
-        """
-        assert all(
-            isinstance(x, FeatureAttributionOutput) for x in attributions
-        ), "Only FeatureAttributionOutput objects can be merged."
-        first = attributions[0]
-        for match_field in cls._merge_match_info_fields:
-            assert all(
-                attr.info[match_field] == first.info[match_field]
-                if match_field in first.info
-                else match_field not in attr.info
-                for attr in attributions
-            ), f"Cannot merge: incompatible values for field {match_field}"
-        out_info = first.info.copy()
-        if "attr_pos_end" in first.info:
-            out_info.update({"attr_pos_end": max(attr.info["attr_pos_end"] for attr in attributions)})
-        if "generated_texts" in first.info:
-            out_info.update(
-                {"generated_texts": [text for attr in attributions for text in attr.info["generated_texts"]]}
-            )
-        if "input_texts" in first.info:
-            out_info.update({"input_texts": [text for attr in attributions for text in attr.info["input_texts"]]})
-        return cls(
-            sequence_attributions=[seqattr for attr in attributions for seqattr in attr.sequence_attributions],
-            step_attributions=[stepattr for attr in attributions for stepattr in attr.step_attributions]
-            if first.step_attributions is not None
-            else None,
-            info=out_info,
-        )
 
     def weight_attributions(self, step_score_id: str):
         for i, attr in enumerate(self.sequence_attributions):

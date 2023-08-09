@@ -56,6 +56,7 @@ extensions = [
     "sphinxext.opengraph",
     "sphinx_copybutton",
     "sphinxemoji.sphinxemoji",
+    "sphinx_design",
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -102,9 +103,9 @@ copybutton_prompt_is_regexp = True
 
 # Example configuration for intersphinx: refer to the Python standard library.
 intersphinx_mapping = {
-    "python": ("https://docs.python.org/3", None),
-    "torch": ("https://pytorch.org/docs/stable/", None),
-    "numpy": ("https://numpy.org/doc/stable/", None),
+    #    "python": ("https://docs.python.org/3", None),
+    #    "torch": ("https://pytorch.org/docs/stable/", None),
+    #    "numpy": ("https://numpy.org/doc/stable/", None),
 }
 
 # -- Options for HTML output -------------------------------------------------

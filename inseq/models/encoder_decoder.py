@@ -3,15 +3,18 @@ from functools import wraps
 from typing import Any, Callable, Dict, List, Optional, Tuple, TypeVar, Union
 
 from ..attr.feat import join_token_ids
+from ..attr.step_functions import StepFunctionEncoderDecoderArgs
 from ..data import (
     Batch,
     BatchEmbedding,
     BatchEncoding,
+    DecoderOnlyBatch,
     EncoderDecoderBatch,
     FeatureAttributionInput,
     FeatureAttributionStepOutput,
     get_batch_from_inputs,
 )
+from ..utils import get_aligned_idx
 from ..utils.typing import (
     AttributionForwardInputs,
     EmbeddingsTensor,
@@ -22,7 +25,6 @@ from ..utils.typing import (
     SingleScorePerStepTensor,
     TargetIdsTensor,
     TextSequences,
-    TokenWithId,
 )
 from .attribution_model import AttributionModel, ForwardMethod, InputFormatter, ModelOutput
 
@@ -129,10 +131,13 @@ class EncoderDecoderInputFormatter(InputFormatter):
 
     @staticmethod
     def enrich_step_output(
+        attribution_model: "EncoderDecoderAttributionModel",
         step_output: FeatureAttributionStepOutput,
         batch: EncoderDecoderBatch,
         target_tokens: OneOrMoreTokenSequences,
         target_ids: TargetIdsTensor,
+        contrast_batch: Optional[DecoderOnlyBatch] = None,
+        contrast_targets_alignments: Optional[List[List[Tuple[int, int]]]] = None,
     ) -> FeatureAttributionStepOutput:
         r"""Enriches the attribution output with token information, producing the finished
         :class:`~inseq.data.FeatureAttributionStepOutput` object.
@@ -150,8 +155,20 @@ class EncoderDecoderInputFormatter(InputFormatter):
         if target_ids.ndim == 0:
             target_ids = target_ids.unsqueeze(0)
         step_output.source = join_token_ids(batch.sources.input_tokens, batch.sources.input_ids.tolist())
-        step_output.target = [[TokenWithId(token[0], id)] for token, id in zip(target_tokens, target_ids.tolist())]
-        step_output.prefix = join_token_ids(batch.targets.input_tokens, batch.targets.input_ids.tolist())
+        if contrast_batch is not None:
+            contrast_aligned_idx = get_aligned_idx(len(batch.target_tokens[0]), contrast_targets_alignments[0])
+            contrast_target_ids = contrast_batch.target_ids[:, contrast_aligned_idx]
+            step_output.target = join_token_ids(
+                tokens=target_tokens,
+                ids=[[idx] for idx in target_ids.tolist()],
+                contrast_tokens=attribution_model.convert_ids_to_tokens(
+                    contrast_target_ids[None, ...], skip_special_tokens=False
+                ),
+            )
+            step_output.prefix = join_token_ids(tokens=batch.target_tokens, ids=batch.target_ids.tolist())
+        else:
+            step_output.target = join_token_ids(target_tokens, [[idx] for idx in target_ids.tolist()])
+            step_output.prefix = join_token_ids(batch.targets.input_tokens, batch.targets.input_ids.tolist())
         return step_output
 
     @staticmethod
@@ -160,32 +177,37 @@ class EncoderDecoderInputFormatter(InputFormatter):
         forward_output: ModelOutput,
         target_ids: ExpandedTargetIdsTensor,
         batch: EncoderDecoderBatch,
-        **kwargs,
-    ) -> Dict[str, Any]:
-        return {
-            **kwargs,
-            **{
-                "attribution_model": attribution_model,
-                "forward_output": forward_output,
-                "encoder_input_ids": batch.source_ids,
-                "decoder_input_ids": batch.target_ids,
-                "encoder_input_embeds": batch.source_embeds,
-                "decoder_input_embeds": batch.target_embeds,
-                "target_ids": target_ids,
-                "encoder_attention_mask": batch.source_mask,
-                "decoder_attention_mask": batch.target_mask,
-            },
-        }
+    ) -> StepFunctionEncoderDecoderArgs:
+        return StepFunctionEncoderDecoderArgs(
+            attribution_model=attribution_model,
+            forward_output=forward_output,
+            target_ids=target_ids,
+            encoder_input_ids=batch.source_ids,
+            decoder_input_ids=batch.target_ids,
+            encoder_input_embeds=batch.source_embeds,
+            decoder_input_embeds=batch.target_embeds,
+            encoder_attention_mask=batch.source_mask,
+            decoder_attention_mask=batch.target_mask,
+        )
 
     @staticmethod
     def convert_args_to_batch(
+        args: StepFunctionEncoderDecoderArgs = None,
         encoder_input_ids: Optional[IdsTensor] = None,
         decoder_input_ids: Optional[IdsTensor] = None,
         encoder_attention_mask: Optional[IdsTensor] = None,
         decoder_attention_mask: Optional[IdsTensor] = None,
         encoder_input_embeds: Optional[EmbeddingsTensor] = None,
         decoder_input_embeds: Optional[EmbeddingsTensor] = None,
+        **kwargs,
     ) -> EncoderDecoderBatch:
+        if args is not None:
+            encoder_input_ids = args.encoder_input_ids
+            decoder_input_ids = args.decoder_input_ids
+            encoder_attention_mask = args.encoder_attention_mask
+            decoder_attention_mask = args.decoder_attention_mask
+            encoder_input_embeds = args.encoder_input_embeds
+            decoder_input_embeds = args.decoder_input_embeds
         source_encoding = BatchEncoding(encoder_input_ids, encoder_attention_mask)
         source_embedding = BatchEmbedding(encoder_input_embeds)
         source_batch = Batch(source_encoding, source_embedding)
@@ -227,11 +249,17 @@ class EncoderDecoderInputFormatter(InputFormatter):
         return formatted_forward_input_wrapper
 
     @staticmethod
-    def get_text_sequences(self, batch: EncoderDecoderBatch) -> TextSequences:
+    def get_text_sequences(
+        attribution_model: "EncoderDecoderAttributionModel", batch: EncoderDecoderBatch
+    ) -> TextSequences:
         return TextSequences(
-            sources=self.convert_tokens_to_string(batch.sources.input_tokens),
-            targets=self.convert_tokens_to_string(batch.targets.input_tokens, as_targets=True),
+            sources=attribution_model.convert_tokens_to_string(batch.sources.input_tokens),
+            targets=attribution_model.decode(batch.targets.input_ids),
         )
+
+    @staticmethod
+    def get_step_function_reserved_args() -> List[str]:
+        return [f.name for f in StepFunctionEncoderDecoderArgs.__dataclass_fields__.values()]
 
 
 class EncoderDecoderAttributionModel(AttributionModel):

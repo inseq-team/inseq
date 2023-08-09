@@ -5,7 +5,7 @@ from typing import Any, Callable, Dict, List, Optional, Protocol, Tuple, TypeVar
 
 import torch
 
-from ..attr import STEP_SCORES_MAP, get_step_function_reserved_args
+from ..attr import STEP_SCORES_MAP, StepFunctionArgs
 from ..attr.feat import FeatureAttribution, extract_args, join_token_ids
 from ..data import (
     BatchEncoding,
@@ -14,11 +14,13 @@ from ..data import (
     FeatureAttributionInput,
     FeatureAttributionOutput,
     FeatureAttributionStepOutput,
+    merge_attributions,
 )
 from ..utils import (
     MissingAttributionMethodError,
     check_device,
     format_input_texts,
+    get_adjusted_alignments,
     get_default_device,
     isnotebook,
     pretty_tensor,
@@ -87,10 +89,13 @@ class InputFormatter:
     @staticmethod
     @abstractmethod
     def enrich_step_output(
+        attribution_model: "AttributionModel",
         step_output: FeatureAttributionStepOutput,
         batch: Union[DecoderOnlyBatch, EncoderDecoderBatch],
         target_tokens: OneOrMoreTokenSequences,
         target_ids: TargetIdsTensor,
+        contrast_batch: Optional[DecoderOnlyBatch] = None,
+        contrast_targets_alignments: Optional[List[List[Tuple[int, int]]]] = None,
     ) -> FeatureAttributionStepOutput:
         r"""Enriches the attribution output with token information, producing the finished
         :class:`~inseq.data.FeatureAttributionStepOutput` object.
@@ -110,7 +115,7 @@ class InputFormatter:
 
     @staticmethod
     @abstractmethod
-    def convert_args_to_batch(*args, **kwargs) -> Union[DecoderOnlyBatch, EncoderDecoderBatch]:
+    def convert_args_to_batch(args: StepFunctionArgs = None, **kwargs) -> Union[DecoderOnlyBatch, EncoderDecoderBatch]:
         raise NotImplementedError()
 
     @staticmethod
@@ -128,8 +133,7 @@ class InputFormatter:
         forward_output: ModelOutput,
         target_ids: ExpandedTargetIdsTensor,
         batch: DecoderOnlyBatch,
-        **kwargs,
-    ) -> Dict[str, Any]:
+    ) -> StepFunctionArgs:
         raise NotImplementedError()
 
     @staticmethod
@@ -138,6 +142,51 @@ class InputFormatter:
         attribution_model: "AttributionModel", batch: Union[DecoderOnlyBatch, EncoderDecoderBatch]
     ) -> TextSequences:
         raise NotImplementedError()
+
+    @staticmethod
+    def get_step_function_reserved_args() -> List[str]:
+        return [f.name for f in StepFunctionArgs.__dataclass_fields__.values()]
+
+    @staticmethod
+    def format_contrast_targets_alignments(
+        contrast_targets_alignments: Union[List[Tuple[int, int]], List[List[Tuple[int, int]]], str],
+        target_sequences: List[str],
+        target_tokens: List[List[str]],
+        contrast_sequences: List[str],
+        contrast_tokens: List[List[str]],
+        special_tokens: List[str] = [],
+        start_pos: int = 0,
+    ) -> Tuple[DecoderOnlyBatch, Optional[List[List[Tuple[int, int]]]]]:
+        # Ensure that the contrast_targets_alignments are in the correct format (list of lists of idxs pairs)
+        if contrast_targets_alignments:
+            if isinstance(contrast_targets_alignments, list) and len(contrast_targets_alignments) > 0:
+                if isinstance(contrast_targets_alignments[0], tuple):
+                    contrast_targets_alignments = [contrast_targets_alignments]
+                if not isinstance(contrast_targets_alignments[0], list):
+                    raise ValueError("Invalid contrast_targets_alignments were provided.")
+            elif not isinstance(contrast_targets_alignments, str):
+                raise ValueError("Invalid contrast_targets_alignments were provided.")
+
+        adjusted_alignments = []
+        aligns = contrast_targets_alignments
+        for seq_idx, (tgt_seq, tgt_tok, c_seq, c_tok) in enumerate(
+            zip(target_sequences, target_tokens, contrast_sequences, contrast_tokens)
+        ):
+            if isinstance(contrast_targets_alignments, list):
+                aligns = contrast_targets_alignments[seq_idx]
+            adjusted_alignments.append(
+                get_adjusted_alignments(
+                    aligns,
+                    target_sequence=tgt_seq,
+                    target_tokens=tgt_tok,
+                    contrast_sequence=c_seq,
+                    contrast_tokens=c_tok,
+                    fill_missing=True,
+                    special_tokens=special_tokens,
+                    start_pos=start_pos,
+                )
+            )
+        return adjusted_alignments
 
 
 class AttributionModel(ABC, torch.nn.Module):
@@ -348,7 +397,9 @@ class AttributionModel(ABC, torch.nn.Module):
             if generate_from_target_prefix:
                 decoder_input = self.encode(generated_texts, as_targets=True)
                 generation_args["decoder_input_ids"] = decoder_input.input_ids
-            generated_texts = self.generate(encoded_input, return_generation_output=False, **generation_args)
+            generated_texts = self.generate(
+                encoded_input, return_generation_output=False, batch_size=batch_size, **generation_args
+            )
         else:
             if generation_args:
                 logger.warning(
@@ -358,7 +409,11 @@ class AttributionModel(ABC, torch.nn.Module):
         attribution_method = self.get_attribution_method(method, override_default_attribution)
         attributed_fn = self.get_attributed_fn(attributed_fn)
         attribution_args, attributed_fn_args, step_scores_args = extract_args(
-            attribution_method, attributed_fn, step_scores, default_args=get_step_function_reserved_args(), **kwargs
+            attribution_method,
+            attributed_fn,
+            step_scores,
+            default_args=self.formatter.get_step_function_reserved_args(),
+            **kwargs,
         )
         if isnotebook():
             logger.debug("Pretty progress currently not supported in notebooks, falling back to tqdm.")
@@ -399,7 +454,7 @@ class AttributionModel(ABC, torch.nn.Module):
             attributed_fn_args=attributed_fn_args,
             step_scores_args=step_scores_args,
         )
-        attribution_output = FeatureAttributionOutput.merge_attributions(attribution_outputs)
+        attribution_output = merge_attributions(attribution_outputs)
         attribution_output.info["input_texts"] = input_texts
         attribution_output.info["generated_texts"] = (
             [generated_texts] if isinstance(generated_texts, str) else generated_texts
@@ -419,14 +474,20 @@ class AttributionModel(ABC, torch.nn.Module):
             inputs = batch.input_ids
         return self.embed_ids(inputs, as_targets=as_targets)
 
-    def tokenize_with_ids(
-        self, inputs: TextInput, as_targets: bool = False, skip_special_tokens: bool = True
+    def get_token_with_ids(
+        self,
+        batch: Union[EncoderDecoderBatch, DecoderOnlyBatch],
+        contrast_target_tokens: Optional[OneOrMoreTokenSequences] = None,
+        contrast_targets_alignments: Optional[List[List[Tuple[int, int]]]] = None,
     ) -> List[List[TokenWithId]]:
-        tokenized_sentences = self.convert_string_to_tokens(
-            inputs, as_targets=as_targets, skip_special_tokens=skip_special_tokens
-        )
-        ids_sentences = self.convert_tokens_to_ids(tokenized_sentences)
-        return join_token_ids(tokenized_sentences, ids_sentences)
+        if contrast_target_tokens is not None:
+            return join_token_ids(
+                batch.target_tokens,
+                batch.target_ids.tolist(),
+                contrast_target_tokens,
+                contrast_targets_alignments,
+            )
+        return join_token_ids(batch.target_tokens, batch.target_ids.tolist())
 
     # Framework-specific methods
 
@@ -453,6 +514,10 @@ class AttributionModel(ABC, torch.nn.Module):
         return_baseline: bool = False,
         include_eos_baseline: bool = False,
     ) -> BatchEncoding:
+        pass
+
+    @abstractmethod
+    def decode(self, ids: IdsTensor, skip_special_tokens: bool = True) -> List[str]:
         pass
 
     @abstractmethod
@@ -488,6 +553,15 @@ class AttributionModel(ABC, torch.nn.Module):
         skip_special_tokens: bool = True,
         as_targets: bool = False,
     ) -> OneOrMoreTokenSequences:
+        pass
+
+    @abstractmethod
+    def clean_tokens(
+        self,
+        tokens: OneOrMoreTokenSequences,
+        skip_special_tokens: bool = False,
+        as_targets: bool = False,
+    ):
         pass
 
     @property
@@ -571,14 +645,11 @@ class AttributionModel(ABC, torch.nn.Module):
         target_ids = target_ids.squeeze(-1)
         output = self.get_forward_output(batch, use_embeddings=use_embeddings, **kwargs)
         logger.debug(f"logits: {pretty_tensor(output.logits)}")
-        step_function_args = self.formatter.format_step_function_args(
-            attribution_model=self,
-            forward_output=output,
-            target_ids=target_ids,
-            batch=batch,
-            **{k: v for k, v in zip(attributed_fn_argnames, args) if v is not None},
+        step_fn_args = self.formatter.format_step_function_args(
+            attribution_model=self, forward_output=output, target_ids=target_ids, batch=batch
         )
-        return attributed_fn(**step_function_args)
+        step_fn_extra_args = {k: v for k, v in zip(attributed_fn_argnames, args) if v is not None}
+        return attributed_fn(step_fn_args, **step_fn_extra_args)
 
     def _forward_with_output(
         self,
