@@ -93,7 +93,7 @@ class ValueZeroing(Attribution):
         """
 
         def states_extract_and_patch_forward_hook(module, args, output) -> None:
-            self.corrupted_block_output_states[block_idx] = output[hidden_state_idx].clone().detach().cpu()
+            self.corrupted_block_output_states[block_idx] = output[hidden_state_idx].clone().float().detach().cpu()
 
             # Rebuild the output tuple patching the clean states at the place of the corrupted ones
             output = (
@@ -195,7 +195,7 @@ class ValueZeroing(Attribution):
                 handle.remove()
             for block_idx in range(len(decoder_stack)):
                 similarity_scores = self.SIMILARITY_METRICS[similarity_metric](
-                    self.clean_block_output_states[block_idx], self.corrupted_block_output_states[block_idx]
+                    self.clean_block_output_states[block_idx].float(), self.corrupted_block_output_states[block_idx]
                 )
                 scores[:, block_idx, :, token_idx] = torch.ones_like(similarity_scores) - similarity_scores
         for handle in states_extraction_hook_handles:

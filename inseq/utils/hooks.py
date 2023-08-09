@@ -80,6 +80,7 @@ def get_post_variable_assignment_hook(
             event == "line"
             and curr_line_num >= hook_line_num
             and curr_func_name == fname
+            and isinstance(frame.f_locals.get("self"), nn.Module)
             and frame.f_locals.get("self")._get_name() == module._get_name()
         ):
             # Call the custom hook providing the current frame and any additional arguments as context

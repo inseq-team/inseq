@@ -219,6 +219,7 @@ class AttributionModel(ABC, torch.nn.Module):
         self.is_hooked: bool = False
         self._default_attributed_fn_id: str = "probability"
         self.config: Optional[ModelConfig] = None
+        self.is_distributed: Optional[bool] = None
 
     @property
     def device(self) -> Optional[str]:
@@ -238,6 +239,7 @@ class AttributionModel(ABC, torch.nn.Module):
             self.model.eval()
             self.model.zero_grad()
             self.attribution_method = self.get_attribution_method(attribution_method, **kwargs)
+            self.is_distributed = self.model.__class__.__name__.startswith("Distributed")
 
     @property
     def default_attributed_fn_id(self) -> str:

@@ -257,6 +257,21 @@ class FeatureAttribution(Registry):
         attribution_output.info["step_scores_args"] = step_scores_args
         return attribution_output
 
+    def _run_compatibility_checks(self, attributed_fn) -> None:
+        default_attributed_fn = get_step_function(self.attribution_model.default_attributed_fn_id)
+        if not self.use_predicted_target and attributed_fn != default_attributed_fn:
+            logger.warning(
+                "Internals attribution methods are output agnostic, since they do not rely on specific output"
+                " targets to compute importance scores. Using a custom attributed function in this context does not"
+                " influence in any way the method's results."
+            )
+        if self.use_model_config and self.attribution_model.is_distributed:
+            raise RuntimeError(
+                "Distributed models are incompatible with attribution methods requiring access to models' internals "
+                "for storing or intervention purposes. Please use a non-distributed model with the current attribution"
+                " method."
+            )
+
     def attribute(
         self,
         batch: Union[DecoderOnlyBatch, EncoderDecoderBatch],
@@ -308,13 +323,7 @@ class FeatureAttribution(Registry):
             raise ValueError(
                 "Layer attribution methods do not support attribute_target=True. Use regular attributions instead."
             )
-        default_attributed_fn = get_step_function(self.attribution_model.default_attributed_fn_id)
-        if not self.use_predicted_target and attributed_fn != default_attributed_fn:
-            logger.warning(
-                "Internals attribution methods are output agnostic, since they do not rely on specific output"
-                " targets to compute importance scores. Using a custom attributed function in this context does not"
-                " influence in any way the method's results."
-            )
+        self._run_compatibility_checks(attributed_fn)
         attr_pos_start, attr_pos_end = check_attribute_positions(
             batch.max_generation_length,
             attr_pos_start,
