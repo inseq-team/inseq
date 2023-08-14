@@ -39,6 +39,7 @@ from ..utils.typing import (
     TokenWithId,
     VocabularyEmbeddingsTensor,
 )
+from .model_config import ModelConfig
 from .model_decorators import unhooked
 
 ModelOutput = TypeVar("ModelOutput")
@@ -217,6 +218,8 @@ class AttributionModel(ABC, torch.nn.Module):
         self.attribution_method: Optional[FeatureAttribution] = None
         self.is_hooked: bool = False
         self._default_attributed_fn_id: str = "probability"
+        self.config: Optional[ModelConfig] = None
+        self.is_distributed: Optional[bool] = None
 
     @property
     def device(self) -> Optional[str]:
@@ -236,6 +239,7 @@ class AttributionModel(ABC, torch.nn.Module):
             self.model.eval()
             self.model.zero_grad()
             self.attribution_method = self.get_attribution_method(attribution_method, **kwargs)
+            self.is_distributed = self.model.__class__.__name__.startswith("Distributed")
 
     @property
     def default_attributed_fn_id(self) -> str:
@@ -466,7 +470,7 @@ class AttributionModel(ABC, torch.nn.Module):
 
     def embed(self, inputs: Union[TextInput, IdsTensor], as_targets: bool = False):
         if isinstance(inputs, str) or (
-            isinstance(inputs, list) and len(inputs) > 0 and all([isinstance(x, str) for x in inputs])
+            isinstance(inputs, list) and len(inputs) > 0 and all(isinstance(x, str) for x in inputs)
         ):
             batch = self.encode(inputs, as_targets)
             inputs = batch.input_ids
@@ -620,6 +624,11 @@ class AttributionModel(ABC, torch.nn.Module):
     @staticmethod
     @abstractmethod
     def get_attentions_dict(output: ModelOutput) -> Dict[str, torch.Tensor]:
+        pass
+
+    @staticmethod
+    @abstractmethod
+    def get_hidden_states_dict(output: ModelOutput) -> Dict[str, torch.Tensor]:
         pass
 
     # Model forward

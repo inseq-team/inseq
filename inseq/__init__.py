@@ -8,7 +8,7 @@ from .data import (
     merge_attributions,
     show_attributions,
 )
-from .models import AttributionModel, list_supported_frameworks, load_model
+from .models import AttributionModel, list_supported_frameworks, load_model, register_model_config
 from .utils.id_utils import explain
 
 
@@ -34,5 +34,6 @@ __all__ = [
     "list_step_functions",
     "list_supported_frameworks",
     "register_step_function",
+    "register_model_config",
     "merge_attributions",
 ]
