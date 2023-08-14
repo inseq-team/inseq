@@ -26,6 +26,8 @@ functionalities required for its usage.
 
 .. autofunction:: register_step_function
 
+.. autofunction:: register_model_config
+
 .. autofunction:: list_feature_attribution_methods
 
 .. autofunction:: list_aggregators

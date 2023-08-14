@@ -216,9 +216,7 @@ class DecoderOnlyAttributionModel(AttributionModel):
             inputs_embeds=batch.input_embeds if use_embeddings else None,
             # Hacky fix for petals' distributed models while awaiting attention_mask support:
             # https://github.com/bigscience-workshop/petals/pull/206
-            attention_mask=(
-                batch.attention_mask if not self.model.__class__.__name__.startswith("Distributed") else None
-            ),
+            attention_mask=batch.attention_mask if not self.is_distributed else None,
             **kwargs,
         )
 

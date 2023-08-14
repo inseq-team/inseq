@@ -9,6 +9,7 @@ from .attribution_model import AttributionModel, InputFormatter
 from .decoder_only import DecoderOnlyAttributionModel
 from .encoder_decoder import EncoderDecoderAttributionModel
 from .huggingface_model import HuggingfaceDecoderOnlyModel, HuggingfaceEncoderDecoderModel, HuggingfaceModel
+from .model_config import ModelConfig, register_model_config
 
 logger = logging.getLogger(__name__)
 
@@ -63,4 +64,6 @@ __all__ = [
     "EncoderDecoderAttributionModel",
     "load_model",
     "list_supported_frameworks",
+    "ModelConfig",
+    "register_model_config",
 ]

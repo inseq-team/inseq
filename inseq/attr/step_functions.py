@@ -452,26 +452,31 @@ def check_is_step_function(identifier: str) -> None:
         )
 
 
+def get_step_function(score_identifier: str) -> StepFunction:
+    """Returns the step function corresponding to the provided identifier."""
+    check_is_step_function(score_identifier)
+    return STEP_SCORES_MAP[score_identifier]
+
+
 def get_step_scores(
     score_identifier: str,
     step_fn_args: StepFunctionArgs,
     step_fn_extra_args: Dict[str, Any] = {},
 ) -> SingleScorePerStepTensor:
     """Returns step scores for the target tokens in the batch."""
-    check_is_step_function(score_identifier)
-    return STEP_SCORES_MAP[score_identifier](step_fn_args, **step_fn_extra_args)
+    return get_step_function(score_identifier)(step_fn_args, **step_fn_extra_args)
 
 
 def get_step_scores_args(
     score_identifiers: List[str], kwargs: Dict[str, Any], default_args: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
     step_scores_args = {}
-    for step_score in score_identifiers:
-        check_is_step_function(step_score)
+    for step_fn_id in score_identifiers:
+        step_fn = get_step_function(step_fn_id)
         step_scores_args.update(
             **extract_signature_args(
                 kwargs,
-                STEP_SCORES_MAP[step_score],
+                step_fn,
                 exclude_args=default_args,
                 return_remaining=False,
             )

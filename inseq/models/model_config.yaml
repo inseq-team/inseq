@@ -1,0 +1,2 @@
+GPT2LMHeadModel:
+    attention_module: "attn"

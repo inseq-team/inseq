@@ -22,6 +22,7 @@ from ..utils.typing import (
     EmbeddingsTensor,
     IdsTensor,
     LogitsTensor,
+    MultiLayerEmbeddingsTensor,
     MultiLayerMultiUnitScoreTensor,
     OneOrMoreIdSequences,
     OneOrMoreTokenSequences,
@@ -453,6 +454,13 @@ class HuggingfaceEncoderDecoderModel(HuggingfaceModel, EncoderDecoderAttribution
             "cross_attentions": torch.stack(output.cross_attentions, dim=1),
         }
 
+    @staticmethod
+    def get_hidden_states_dict(output: Seq2SeqLMOutput) -> Dict[str, MultiLayerEmbeddingsTensor]:
+        return {
+            "encoder_hidden_states": torch.stack(output.encoder_hidden_states, dim=1),
+            "decoder_hidden_states": torch.stack(output.decoder_hidden_states, dim=1),
+        }
+
 
 class HuggingfaceDecoderOnlyModel(HuggingfaceModel, DecoderOnlyAttributionModel):
     """Model wrapper for any ForCausalLM or LMHead model on the HuggingFace Hub used to enable
@@ -490,4 +498,10 @@ class HuggingfaceDecoderOnlyModel(HuggingfaceModel, DecoderOnlyAttributionModel)
             raise ValueError("Model does not support attribution relying on attention outputs.")
         return {
             "decoder_self_attentions": torch.stack(output.attentions, dim=1),
+        }
+
+    @staticmethod
+    def get_hidden_states_dict(output: CausalLMOutput) -> Dict[str, MultiLayerEmbeddingsTensor]:
+        return {
+            "decoder_hidden_states": torch.stack(output.hidden_states, dim=1),
         }
