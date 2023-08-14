@@ -216,10 +216,7 @@ class HuggingfaceModel(AttributionModel):
             **kwargs,
         )
         sequences = generation_out.sequences
-        texts = self.tokenizer.batch_decode(
-            sequences,
-            skip_special_tokens=True,
-        )
+        texts = self.decode(ids=sequences, skip_special_tokens=True)
         if return_generation_output:
             return texts, generation_out
         return texts
@@ -296,7 +293,11 @@ class HuggingfaceModel(AttributionModel):
         ids: Union[List[int], List[List[int]], IdsTensor],
         skip_special_tokens: bool = True,
     ) -> List[str]:
-        return self.tokenizer.batch_decode(ids, skip_special_tokens=skip_special_tokens)
+        return self.tokenizer.batch_decode(
+            ids,
+            skip_special_tokens=skip_special_tokens,
+            clean_up_tokenization_spaces=False,
+        )
 
     def embed_ids(self, ids: IdsTensor, as_targets: bool = False) -> EmbeddingsTensor:
         if as_targets and not self.is_encoder_decoder:
