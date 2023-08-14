@@ -202,6 +202,10 @@ class AttributionModel(ABC, torch.nn.Module):
         attribution_method (:class:`~inseq.attr.FeatureAttribution`): The attribution method used alongside the model.
         is_hooked (:obj:`bool`): Whether the model is currently hooked by the attribution method.
         default_attributed_fn_id (:obj:`str`): The id for the default step function used as attribution target.
+        config (:class:`~inseq.models.ModelConfig`): The model configuration.
+        is_distributed (:obj:`bool`): Whether the model is distributed (Petals distributed classes)
+        modules_inputs (:obj:`dict`): A dictionary containing the inputs of each module in the model.
+        modules_outputs (:obj:`dict`): A dictionary containing the outputs of each module in the model.
     """
 
     formatter = InputFormatter
@@ -220,6 +224,8 @@ class AttributionModel(ABC, torch.nn.Module):
         self._default_attributed_fn_id: str = "probability"
         self.config: Optional[ModelConfig] = None
         self.is_distributed: Optional[bool] = None
+        self.modules_inputs: Optional[Dict[str, List[torch.Tensor]]] = None
+        self.modules_outputs: Optional[Dict[str, List[torch.Tensor]]] = None
 
     @property
     def device(self) -> Optional[str]:
@@ -631,6 +637,14 @@ class AttributionModel(ABC, torch.nn.Module):
     def get_hidden_states_dict(output: ModelOutput) -> Dict[str, torch.Tensor]:
         pass
 
+    def get_modules_inputs_outputs_dict(self) -> Dict[str, List[torch.Tensor]]:
+        if self.modules_inputs is None or self.modules_outputs is None:
+            raise ValueError("Model does not support attribution methods relying on module inputs and outputs.")
+        return {
+            "modules_inputs": self.modules_inputs,
+            "modules_outputs": self.modules_outputs,
+        }
+
     # Model forward
 
     def _forward(
@@ -669,3 +683,9 @@ class AttributionModel(ABC, torch.nn.Module):
     @formatter.format_forward_args
     def forward_with_output(self, *args, **kwargs) -> ModelOutput:
         return self._forward_with_output(*args, **kwargs)
+
+    # Hooks
+
+    def save_modules_inputs_outputs(self, module_name, module, module_input, module_output):
+        self.modules_inputs[module_name].append(module_input)
+        self.modules_outputs[module_name].append(module_output)

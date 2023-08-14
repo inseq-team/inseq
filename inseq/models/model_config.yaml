@@ -1,2 +1,36 @@
 GPT2LMHeadModel:
     attention_module: "attn"
+    layer: 'transformer.h'
+    ln1: 'ln_1'
+    ln2: 'ln_2'
+    values: 'attn.c_attn'
+    dense: 'attn.c_proj'
+    lnf: 'transformer.ln_f'
+    fc1: 'mlp.c_fc'
+    fc2: 'mlp.c_proj'
+    unembed: 'lm_head'
+    layer_norm_type: 'pre'
+OPTForCausalLM:
+    attention_module: "self_attn"
+    layer: 'model.decoder.layers'
+    ln1: 'self_attn_layer_norm'
+    ln2: 'final_layer_norm'
+    values: 'self_attn.v_proj'
+    dense: 'self_attn.out_proj'
+    lnf: 'model.decoder.final_layer_norm'
+    fc1: 'fc1'
+    fc2: 'fc2'
+    unembed: 'lm_head'
+    layer_norm_type: 'pre'
+BloomForCausalLM:
+    attention_module: "self_attn"
+    layer: 'transformer.h'
+    ln1: 'input_layernorm'
+    ln2: 'post_attention_layernorm'
+    values: 'self_attention.query_key_value'
+    dense: 'self_attention.dense'
+    lnf: 'transformer.ln_f'
+    fc1: 'mlp.dense_h_to_4h'
+    fc2: 'mlp.dense_4h_to_h'
+    unembed: 'lm_head'
+    layer_norm_type: 'pre'

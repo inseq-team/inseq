@@ -17,7 +17,9 @@ Todo:
     * 🟡: Allow custom arguments for model loading in the :class:`FeatureAttribution` :meth:`load` method.
 """
 import logging
+from collections import defaultdict
 from datetime import datetime
+from functools import partial
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Union
 
 import torch
@@ -103,6 +105,10 @@ class FeatureAttribution(Registry):
             use_model_config (:obj:`bool`, default `False`): Whether the attribution method uses the model config. If
                 True, the method will try to load the config matching the model when hooking to the model. Missing
                 configurations can be registered using :meth:`~inseq.models.register_model_config`.
+            use_modules_inputs_outputs (:obj:`bool`, default `False`): Whether the attribution method uses the
+                intermediate inputs and outputs of the model. If True, the method will register hooks to the model
+                modules to save their inputs and outputs during the forward pass. The inputs and outputs are then
+                retrieved using :meth:`~inseq.models.AttributionModel.get_modules_inputs_outputs_dict`.
         """
         super().__init__()
         self.attribution_model = attribution_model
@@ -114,6 +120,7 @@ class FeatureAttribution(Registry):
         self.use_hidden_states: bool = False
         self.use_predicted_target: bool = True
         self.use_model_config: bool = False
+        self.use_modules_inputs_outputs: bool = False
         if hook_to_model:
             self.hook(**kwargs)
 
@@ -530,6 +537,14 @@ class FeatureAttribution(Registry):
             use_baselines=self.use_baselines,
         )
         if len(step_scores) > 0 or self.use_attention_weights or self.use_hidden_states:
+            if self.use_modules_inputs_outputs:
+                self.attribution_model.modules_inputs = defaultdict(list)
+                self.attribution_model.modules_outputs = defaultdict(list)
+                handles = {}
+                for module_name, module in self.attribution_model.model.named_modules():
+                    handles[module_name] = module.register_forward_hook(
+                        partial(self.attribution_model.save_modules_inputs_outputs, module_name)
+                    )
             with torch.no_grad():
                 output = self.attribution_model.get_forward_output(
                     batch,
@@ -537,6 +552,11 @@ class FeatureAttribution(Registry):
                     output_attentions=self.use_attention_weights,
                     output_hidden_states=self.use_hidden_states,
                 )
+            if self.use_modules_inputs_outputs:
+                for module_name in handles.keys():
+                    handles[module_name].remove()
+                modules_inputs_outputs_dict = self.attribution_model.get_modules_inputs_outputs_dict()
+                attribution_args = {**attribution_args, **modules_inputs_outputs_dict}
             if self.use_attention_weights:
                 attentions_dict = self.attribution_model.get_attentions_dict(output)
                 attribution_args = {**attribution_args, **attentions_dict}
