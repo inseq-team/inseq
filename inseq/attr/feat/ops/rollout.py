@@ -10,6 +10,50 @@ from ....utils.typing import (
 )
 
 
+def _check_matrix_shape(
+    scores: Union[MultiUnitScoreTensor, Tuple[MultiUnitScoreTensor, MultiUnitScoreTensor, MultiUnitScoreTensor]]
+) -> None:
+    """Checks that the shape of the provided scores is compatible with the rollout aggregation method."""
+
+    def fix_target_scores(target_scores: MultiUnitScoreTensor) -> MultiUnitScoreTensor:
+        has_prefix_target = False
+        if target_scores.size(-2) - target_scores.size(-1) == 1:
+            target_scores = torch.cat([torch.zeros_like(target_scores[..., -1])[..., None], target_scores], dim=-1)
+            target_scores[..., 0, 0] = 1.0
+            has_prefix_target = True
+        if target_scores.size(-1) != target_scores.size(-2):
+            raise ValueError(
+                "Expected scores to be a tensor of shape (T, T) but got shape "
+                f"{target_scores.size(-2), target_scores.size(-1)}. {msg}"
+            )
+        target_scores[target_scores.isnan()] = 0.0
+        return target_scores, has_prefix_target
+
+    msg = (
+        "This can be due to a non-zero starting index used in generation, which is not supported by the rollout "
+        "aggregation method. Use attribute_full_target=True in model.attribute to attribute the full target sequence."
+    )
+    if isinstance(scores, tuple):
+        source_scores, cross_scores, target_scores = scores
+        dim0, dim1 = -2, -1
+        source_dim = source_scores.size(dim0)
+        target_dim = target_scores.size(dim0)
+        try:
+            assert source_scores.size(dim1) == source_dim  # source scores S x S
+            assert cross_scores.size(dim0) == source_dim and cross_scores.size(dim1) == target_dim  # x-scores S x T
+            assert target_scores.size(dim1) == target_dim  # target scores T x T
+        except AssertionError as e:
+            raise ValueError(
+                "Expected scores to be a tuple of tensors of shape (S, S), (S, T), (T, T) but got shapes "
+                f"{source_dim, source_scores.size(dim1)}, {cross_scores.size(dim0), cross_scores.size(dim1)}, "
+                f"{target_dim, target_scores.size(dim1)}. {msg}"
+            ) from e
+        target_scores, has_prefix_target = fix_target_scores(target_scores)
+        return (source_scores, cross_scores, target_scores), has_prefix_target
+    else:
+        return fix_target_scores(scores)
+
+
 def _rollout_single(
     scores: MultiUnitScoreTensor,
     normalize: bool = False,
@@ -83,7 +127,6 @@ def rollout_fn(
             rollout is performed, a tuple of tensors ``(source_scores, target_scores)``.
     """
     squeeze_batch_dim = False
-    remove_padding = False
     if isinstance(scores, tuple):
         if dim < 0:
             dim = scores[0].ndim + dim
@@ -94,12 +137,15 @@ def rollout_fn(
         if dim != 1:
             swap_dim = dim if dim < 2 else dim + 1
             scores = tuple(s[:, None, ...].transpose(swap_dim, 1).squeeze(swap_dim) for s in scores)
+        scores, has_target_prefix = _check_matrix_shape(scores)
         source_scores, cross_scores, target_scores = scores
 
         # Get rolled out scores of encoder last layer with respect to source input
         final_source_scores = _rollout_single(source_scores.mT)[:, -1, ...].mT
 
         source_rollout_scores, target_rollout_scores = _rollout_joint(final_source_scores, cross_scores, target_scores)
+        if has_target_prefix:
+            target_rollout_scores = target_rollout_scores[..., 1:]
         source_rollout_scores = source_rollout_scores[:, -1, ...].unsqueeze(1)
         target_rollout_scores = target_rollout_scores[:, -1, ...].unsqueeze(1)
         if dim != 1:
@@ -125,15 +171,10 @@ def rollout_fn(
             scores = scores[:, None, ...]
             swap_dim = dim if dim < 2 else dim + 1
             scores = scores.transpose(swap_dim, 1).squeeze(swap_dim)
-        scores[scores.isnan()] = 0.0
-        # If the matrix is not square (e.g. generating from a prefix), prepend zeros to make it square.
-        if scores.size(-1) < scores.size(-2):
-            pad_size = scores.size(-2) - scores.size(-1)
-            scores = torch.cat([torch.zeros(*tuple(scores.shape[:-1]), pad_size), scores], dim=-1)
-            remove_padding = True
-        target_rollout_scores = _rollout_single(scores.mT, normalize=True)[:, -1, ...].mT
+        scores, has_target_prefix = _check_matrix_shape(scores)
+        target_rollout_scores = _rollout_single(scores.mT)[:, -1, ...].mT
+        if has_target_prefix:
+            target_rollout_scores = target_rollout_scores[..., 1:]
         if squeeze_batch_dim:
             target_rollout_scores = target_rollout_scores.squeeze(0)
-        if remove_padding:
-            target_rollout_scores = target_rollout_scores[..., pad_size:]
         return target_rollout_scores
