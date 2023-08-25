@@ -102,14 +102,17 @@ def show_attributions(
             display(HTML(curr_html))
         html_out += curr_html
         if not isnotebook():
-            curr_color = colors[idx]
+            curr_color = None
             if attribution.source_attributions is not None:
+                curr_color = colors[idx]
                 if display:
                     print("\n\n")
                     rprint(get_heatmap_type(attribution, curr_color, "Source", use_html=False))
                 if attribution.target_attributions is not None:
                     curr_color = colors[idx + 1]
             if attribution.target_attributions is not None and display:
+                if curr_color is None and colors:
+                    curr_color = colors[idx]
                 print("\n\n")
                 rprint(get_heatmap_type(attribution, curr_color, "Target", use_html=False))
         if any(x is None for x in [attribution.source_attributions, attribution.target_attributions]):

@@ -191,6 +191,7 @@ class HuggingfaceModel(AttributionModel):
         self,
         inputs: Union[TextInput, BatchEncoding],
         return_generation_output: bool = False,
+        skip_special_tokens: bool = True,
         **kwargs,
     ) -> Union[List[str], Tuple[List[str], ModelOutput]]:
         """Wrapper of model.generate to handle tokenization and decoding.
@@ -216,7 +217,7 @@ class HuggingfaceModel(AttributionModel):
             **kwargs,
         )
         sequences = generation_out.sequences
-        texts = self.decode(ids=sequences, skip_special_tokens=True)
+        texts = self.decode(ids=sequences, skip_special_tokens=skip_special_tokens)
         if return_generation_output:
             return texts, generation_out
         return texts
