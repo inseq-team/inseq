@@ -156,6 +156,7 @@ class InputFormatter:
         contrast_tokens: List[List[str]],
         special_tokens: List[str] = [],
         start_pos: int = 0,
+        end_pos: Optional[int] = None,
     ) -> Tuple[DecoderOnlyBatch, Optional[List[List[Tuple[int, int]]]]]:
         # Ensure that the contrast_targets_alignments are in the correct format (list of lists of idxs pairs)
         if contrast_targets_alignments:
@@ -184,6 +185,7 @@ class InputFormatter:
                     fill_missing=True,
                     special_tokens=special_tokens,
                     start_pos=start_pos,
+                    end_pos=end_pos,
                 )
             )
         return adjusted_alignments

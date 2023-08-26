@@ -354,6 +354,7 @@ class FeatureAttribution(Registry):
                 ),
                 special_tokens=self.attribution_model.special_tokens,
                 start_pos=attr_pos_start,
+                end_pos=attr_pos_end,
             )
             attributed_fn_args["contrast_targets_alignments"] = contrast_targets_alignments
             if "contrast_targets" in step_scores_args:

@@ -283,6 +283,7 @@ def get_adjusted_alignments(
     fill_missing: bool = False,
     special_tokens: List[str] = [],
     start_pos: int = 0,
+    end_pos: Optional[int] = None,
 ) -> List[Tuple[int, int]]:
     is_auto_aligned = False
     if fill_missing and not target_tokens:
@@ -312,12 +313,17 @@ def get_adjusted_alignments(
     # Filling alignments with missing tokens
     if fill_missing:
         filled_alignments = []
-        for pair_idx in range(start_pos, len(target_tokens)):
-            match_pairs = [pair for pair in alignments if pair[0] == pair_idx]
+        if end_pos is None:
+            end_pos = len(target_tokens)
+        for pair_idx in range(start_pos, end_pos):
+            match_pairs = [pair for pair in alignments if pair[0] == pair_idx and 0 <= pair[1] < len(contrast_tokens)]
 
             if not match_pairs:
-                # Assuming 1:1 mapping to cover all tokens from the original sequence
-                filled_alignments.append((pair_idx, pair_idx))
+                if pair_idx < len(contrast_tokens):
+                    # Assuming 1:1 mapping to cover all tokens from the original sequence
+                    filled_alignments.append((pair_idx, pair_idx))
+                else:
+                    filled_alignments.append((pair_idx, len(contrast_tokens) - 1))
             else:
                 match_pairs_unaligned = [p for p in match_pairs if p[1] not in [f[1] for f in filled_alignments]]
                 # If found, use the first match that containing an unaligned target token, first match otherwise
@@ -329,7 +335,7 @@ def get_adjusted_alignments(
                 " sequence.\nFilling missing position with 1:1 position alignments."
             )
         if is_auto_aligned:
-            filled_alignments = [(a_idx, b_idx) for a_idx, b_idx in filled_alignments if a_idx >= start_pos]
+            filled_alignments = [(a_idx, b_idx) for a_idx, b_idx in filled_alignments if start_pos <= a_idx < end_pos]
             logger.warning(
                 f"Using {ALIGN_MODEL_ID} for automatic alignments. Provide custom alignments for non-linguistic "
                 f"sequences, or for languages not covered by the aligner.\nGenerated alignments: {filled_alignments}"
