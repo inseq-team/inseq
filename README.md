@@ -235,15 +235,24 @@ Our vision for Inseq is to create a centralized, comprehensive and robust set of
 If you use Inseq in your research we suggest to include a mention to the specific release (e.g. v0.4.0) and we kindly ask you to cite our reference paper as:
 
 ```bibtex
-@article{sarti-etal-2023-inseq,
-    author = {Gabriele Sarti and Nils Feldhus and Ludwig Sickert and Oskar van der Wal and Malvina Nissim and Arianna Bisazza},
-    title = {Inseq: An Interpretability Toolkit for Sequence Generation Models},
-    month = feb,
-    year = 2023,
-    journal = {ArXiv},
-    volume = {abs/2302.13942},
-    url = {https://arxiv.org/abs/2302.13942}
+@inproceedings{sarti-etal-2023-inseq,
+    title = "Inseq: An Interpretability Toolkit for Sequence Generation Models",
+    author = "Sarti, Gabriele  and
+      Feldhus, Nils  and
+      Sickert, Ludwig  and
+      van der Wal, Oskar and
+      Nissim, Malvina and
+      Bisazza, Arianna",
+    booktitle = "Proceedings of the 61st Annual Meeting of the Association for Computational Linguistics (Volume 3: System Demonstrations)",
+    month = jul,
+    year = "2023",
+    address = "Toronto, Canada",
+    publisher = "Association for Computational Linguistics",
+    url = "https://aclanthology.org/2023.acl-demo.40",
+    doi = "10.18653/v1/2023.acl-demo.40",
+    pages = "421--435",
 }
+
 ```
 
 ## Research using Inseq

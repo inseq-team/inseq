@@ -17,8 +17,10 @@ authors:
     orcid: "https://orcid.org/0000-0003-4087-3714"
   - family-names: Nissim
     given-names: Malvina
+    orcid: "https://orcid.org/0000-0001-5289-0971"
   - family-names: Bisazza
     given-names: Arianna
+    orcid: "https://orcid.org/0000-0003-1270-3048"
 preferred-citation:
   type: article
   authors:
@@ -34,11 +36,16 @@ preferred-citation:
     orcid: "https://orcid.org/0000-0003-4087-3714"
   - family-names: Nissim
     given-names: Malvina
+    orcid: "https://orcid.org/0000-0001-5289-0971"
   - family-names: Bisazza
     given-names: Arianna
-  journal: "ArXiv"
-  month: 2
+    orcid: "https://orcid.org/0000-0003-1270-3048"
+  booktitle: "Proceedings of the 61st Annual Meeting of the Association for Computational Linguistics (Volume 3: System Demonstrations)"
+  month: 7
   title: "Inseq: An Interpretability Toolkit for Sequence Generation Models"
   year: 2023
-  url: "http://arxiv.org/abs/2302.13942"
-  volume: "abs/2302.13942"
+  url: "https://aclanthology.org/2023.acl-demo.40"
+  start: 421
+  end: 435
+  publisher: "Association for Computational Linguistics"
+  address: "Toronto, Canada"
