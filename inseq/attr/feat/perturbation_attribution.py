@@ -111,4 +111,4 @@ class LimeAttribution(PerturbationAttributionRegistry):
             raise NotImplementedError(
                 "LIME attribution with attribute_target=True currently not supported for encoder-decoder models."
             )
-        super().attribute_step(attribute_fn_main_args, attribution_args)
+        return super().attribute_step(attribute_fn_main_args, attribution_args)
