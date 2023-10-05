@@ -4,7 +4,7 @@ from typing import Any, Dict
 from captum.attr import Occlusion
 
 from ...data import (
-    CoarseFeatureAttributionSequenceOutput,
+    CoarseFeatureAttributionStepOutput,
     GranularFeatureAttributionStepOutput,
 )
 from ...utils import Registry
@@ -46,7 +46,7 @@ class OcclusionAttribution(PerturbationAttributionRegistry):
         self,
         attribute_fn_main_args: Dict[str, Any],
         attribution_args: Dict[str, Any] = {},
-    ) -> CoarseFeatureAttributionSequenceOutput:
+    ) -> CoarseFeatureAttributionStepOutput:
         r"""Sliding window shapes is defined as a tuple.
         First entry is between 1 and length of input.
         Second entry is given by the embedding dimension of the underlying model.
@@ -76,7 +76,7 @@ class OcclusionAttribution(PerturbationAttributionRegistry):
         if target_attributions is not None:
             target_attributions = target_attributions[:, :, 0].abs()
 
-        return CoarseFeatureAttributionSequenceOutput(
+        return CoarseFeatureAttributionStepOutput(
             source_attributions=source_attributions,
             target_attributions=target_attributions,
         )
@@ -111,4 +111,9 @@ class LimeAttribution(PerturbationAttributionRegistry):
             raise NotImplementedError(
                 "LIME attribution with attribute_target=True currently not supported for encoder-decoder models."
             )
-        return super().attribute_step(attribute_fn_main_args, attribution_args)
+        out = super().attribute_step(attribute_fn_main_args, attribution_args)
+        return GranularFeatureAttributionStepOutput(
+            source_attributions=out.source_attributions,
+            target_attributions=out.target_attributions,
+            sequence_scores=out.sequence_scores,
+        )
