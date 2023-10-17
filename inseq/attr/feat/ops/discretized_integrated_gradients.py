@@ -31,7 +31,6 @@ from captum._utils.typing import BaselineType, TargetType, TensorOrTupleOfTensor
 from captum.attr._core.integrated_gradients import IntegratedGradients
 from captum.attr._utils.batching import _batch_attribution
 from captum.attr._utils.common import _format_input_baseline, _reshape_and_sum, _validate_input
-from captum.log import log_usage
 from torch import Tensor
 
 from ....utils import INSEQ_ARTIFACTS_CACHE
@@ -87,7 +86,6 @@ class DiscretetizedIntegratedGradients(IntegratedGradients):
         )
         return inputs, baselines
 
-    @log_usage()
     def attribute(  # type: ignore
         self,
         inputs: MultiStepEmbeddingsTensor,
