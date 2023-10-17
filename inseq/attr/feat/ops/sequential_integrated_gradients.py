@@ -80,7 +80,8 @@ class SequentialIntegratedGradients(GradientAttribution):
             (inputs - baselines).
 
     References:
-        `Sequential Integrated Gradients: a simple but effective method for explaining language models <https://arxiv.org/abs/2305.15853>`_
+        `Sequential Integrated Gradients: a simple but effective method for explaining language models
+        <https://arxiv.org/abs/2305.15853>`_
 
     Examples:
         >>> import torch as th
