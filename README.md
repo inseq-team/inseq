@@ -130,27 +130,29 @@ Use the `inseq.list_feature_attribution_methods` function to list all available 
 
 #### Gradient-based attribution
 
-- `saliency`: [Saliency](https://arxiv.org/abs/1312.6034) (Simonyan et al., 2013)
+- `saliency`: [Deep Inside Convolutional Networks: Visualising Image Classification Models and Saliency Maps](https://arxiv.org/abs/1312.6034) (Simonyan et al., 2013)
 
-- `input_x_gradient`: [Input x Gradient](https://arxiv.org/abs/1312.6034) (Simonyan et al., 2013)
+- `input_x_gradient`: [Deep Inside Convolutional Networks: Visualising Image Classification Models and Saliency Maps](https://arxiv.org/abs/1312.6034) (Simonyan et al., 2013)
 
-- `integrated_gradients`: [Integrated Gradients](https://arxiv.org/abs/1703.01365) (Sundararajan et al., 2017)
+- `integrated_gradients`: [Axiomatic Attribution for Deep Networks](https://arxiv.org/abs/1703.01365) (Sundararajan et al., 2017)
 
-- `deeplift`: [DeepLIFT](https://arxiv.org/abs/1704.02685) (Shrikumar et al., 2017)
+- `deeplift`: [Learning Important Features Through Propagating Activation Differences](https://arxiv.org/abs/1704.02685) (Shrikumar et al., 2017)
 
-- `gradient_shap`: [Gradient SHAP](https://dl.acm.org/doi/10.5555/3295222.3295230) (Lundberg and Lee, 2017)
+- `gradient_shap`: [A unified approach to interpreting model predictions](https://dl.acm.org/doi/10.5555/3295222.3295230) (Lundberg and Lee, 2017)
 
-- `discretized_integrated_gradients`: [Discretized Integrated Gradients](https://aclanthology.org/2021.emnlp-main.805/) (Sanyal and Ren, 2021)
+- `discretized_integrated_gradients`: [Discretized Integrated Gradients for Explaining Language Models](https://aclanthology.org/2021.emnlp-main.805/) (Sanyal and Ren, 2021)
+
+- `sequential_integrated_gradients`: [Sequential Integrated Gradients: a simple but effective method for explaining language models](https://aclanthology.org/2023.findings-acl.477/) (Enguehard, 2023)
 
 #### Internals-based attribution
 
-- `attention`: [Attention Weight Attribution](https://arxiv.org/abs/1409.0473) (Bahdanau et al., 2014)
+- `attention`: Attention Weight Attribution, from [Neural Machine Translation by Jointly Learning to Align and Translate](https://arxiv.org/abs/1409.0473) (Bahdanau et al., 2014)
 
 #### Perturbation-based attribution
 
-- `occlusion`: [Occlusion](https://link.springer.com/chapter/10.1007/978-3-319-10590-1_53) (Zeiler and Fergus, 2014)
+- `occlusion`: [Visualizing and Understanding Convolutional Networks](https://link.springer.com/chapter/10.1007/978-3-319-10590-1_53) (Zeiler and Fergus, 2014)
 
-- `lime`: [LIME](https://arxiv.org/abs/1602.04938) (Ribeiro et al., 2016)
+- `lime`: ["Why Should I Trust You?": Explaining the Predictions of Any Classifier](https://arxiv.org/abs/1602.04938) (Ribeiro et al., 2016)
 
 #### Step functions
 
@@ -262,9 +264,10 @@ Inseq has been used in various research projects. A list of known publications t
 <details>
   <summary><b>2023</b></summary>
   <ol>
-    <li> <a href="https://arxiv.org/abs/2302.13942">Inseq: An Interpretability Toolkit for Sequence Generation Models</a> (Sarti et al., 2023) </li>
+    <li> <a href="https://aclanthology.org/2023.acl-demo.40/">Inseq: An Interpretability Toolkit for Sequence Generation Models</a> (Sarti et al., 2023) </li>
     <li> <a href="https://arxiv.org/abs/2302.14220">Are Character-level Translations Worth the Wait? Comparing Character- and Subword-level Models for Machine Translation</a> (Edman et al., 2023) </li>
-    <li> <a href="https://arxiv.org/abs/2305.15908">Response Generation in Longitudinal Dialogues: Which Knowledge Representation Helps?</a> (Mousavi et al., 2023)  </li>
+    <li> <a href="https://aclanthology.org/2023.nlp4convai-1.1/">Response Generation in Longitudinal Dialogues: Which Knowledge Representation Helps?</a> (Mousavi et al., 2023)  </li>
+    <li> <a href="https://arxiv.org/abs/2310.01188">Quantifying the Plausibility of Context Reliance in Neural Machine Translation</a> (Sarti et al., 2023)</li>
   </ol>
 
 </details>

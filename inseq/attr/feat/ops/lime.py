@@ -62,7 +62,6 @@ class Lime(LimeBase):
         )
         self.attribution_model = attribution_model
 
-    # @log_usage
     def attribute(
         self,
         inputs: TensorOrTupleOfTensorsGeneric,
