@@ -74,10 +74,10 @@ def _get_aligner_subword_aligns(
 ) -> torch.Tensor:
     aligner = get_aligner_model()
     tokenizer = get_aligner_tokenizer()
-    tok_aenized = [tokenizer.tokenize(word) for word in src]
-    tok_benized = [tokenizer.tokenize(word) for word in tgt]
-    ids_src, sub2word_map_src = _preprocess_sequence_for_alignment(tok_aenized)
-    ids_tgt, sub2word_map_tgt = _preprocess_sequence_for_alignment(tok_benized)
+    tokenized_src = [tokenizer.tokenize(word) for word in src]
+    tokenized_tgt = [tokenizer.tokenize(word) for word in tgt]
+    ids_src, sub2word_map_src = _preprocess_sequence_for_alignment(tokenized_src)
+    ids_tgt, sub2word_map_tgt = _preprocess_sequence_for_alignment(tokenized_tgt)
     aligner.eval()
     with torch.no_grad():
         out_src = aligner(ids_src.unsqueeze(0), output_hidden_states=True)[2][align_layer][0, 1:-1]

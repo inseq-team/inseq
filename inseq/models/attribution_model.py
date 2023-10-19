@@ -404,11 +404,10 @@ class AttributionModel(ABC, torch.nn.Module):
             generated_texts = self.generate(
                 encoded_input, return_generation_output=False, batch_size=batch_size, **generation_args
             )
-        else:
-            if generation_args:
-                logger.warning(
-                    f"Generation arguments {generation_args} are provided, but will be ignored (constrained decoding)."
-                )
+        elif generation_args:
+            logger.warning(
+                f"Generation arguments {generation_args} are provided, but will be ignored (constrained decoding)."
+            )
         logger.debug(f"reference_texts={generated_texts}")
         attribution_method = self.get_attribution_method(method, override_default_attribution)
         attributed_fn = self.get_attributed_fn(attributed_fn)
