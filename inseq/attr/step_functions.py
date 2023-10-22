@@ -222,7 +222,7 @@ def _get_contrast_output(
 
 
 @contrast_fn_docstring()
-def contrast_logit_fn(
+def contrast_logits_fn(
     args: StepFunctionArgs,
     contrast_sources: Optional[FeatureAttributionInput] = None,
     contrast_target_prefixes: Optional[FeatureAttributionInput] = None,
@@ -383,7 +383,7 @@ def contrast_prob_diff_fn(
 
 
 @contrast_fn_docstring()
-def contrast_logit_diff_fn(
+def contrast_logits_diff_fn(
     args: StepFunctionArgs,
     contrast_sources: Optional[FeatureAttributionInput] = None,
     contrast_target_prefixes: Optional[FeatureAttributionInput] = None,
@@ -394,7 +394,7 @@ def contrast_logit_diff_fn(
     `Yin and Neubig (2022) <https://aclanthology.org/2022.emnlp-main.14>`__
     """
     model_logits = logit_fn(args)
-    contrast_logits = contrast_logit_fn(
+    contrast_logits = contrast_logits_fn(
         args=args,
         contrast_sources=contrast_sources,
         contrast_target_prefixes=contrast_target_prefixes,
@@ -489,9 +489,9 @@ STEP_SCORES_MAP = {
     "entropy": entropy_fn,
     "crossentropy": crossentropy_fn,
     "perplexity": perplexity_fn,
-    "contrast_logit": contrast_logit_fn,
+    "contrast_logits": contrast_logits_fn,
     "contrast_prob": contrast_prob_fn,
-    "contrast_logit_diff": contrast_logit_diff_fn,
+    "contrast_logits_diff": contrast_logits_diff_fn,
     "contrast_prob_diff": contrast_prob_diff_fn,
     "pcxmi": pcxmi_fn,
     "kl_divergence": kl_divergence_fn,

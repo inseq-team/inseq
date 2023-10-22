@@ -159,14 +159,15 @@ Use the `inseq.list_feature_attribution_methods` function to list all available 
 Step functions are used to extract custom scores from the model at each step of the attribution process with the `step_scores` argument in `model.attribute`. They can also be used as targets for attribution methods relying on model outputs (e.g. gradient-based methods) by passing them as the `attributed_fn` argument. The following step functions are currently supported:
 
 - `logits`: Logits of the target token.
-- `probability`: Probability of the target token.
+- `probability`: Probability of the target token. Can also be used for log-probability by passing `logprob=True`.
 - `entropy`: Entropy of the predictive distribution.
 - `crossentropy`: Cross-entropy loss between target token and predicted distribution.
 - `perplexity`: Perplexity of the target token.
-- `contrast_prob`: Probability of the target token when different contrastive inputs are provided to the model. Equivalent to `probability` when no contrastive inputs are provided.
+- `contrast_logits`/`contrast_prob`: Logits/probabilities of the target token when different contrastive inputs are provided to the model. Equivalent to `logits`/`probability` when no contrastive inputs are provided.
+- `contrast_logits_diff`/`contrast_prob_diff`: Difference in logits/probability between original and foil target tokens pair, can be used for contrastive evaluation as in [contrastive attribution](https://aclanthology.org/2022.emnlp-main.14/) (Yin and Neubig, 2022).
 - `pcxmi`: Point-wise Contextual Cross-Mutual Information (P-CXMI) for the target token given original and contrastive contexts [(Yin et al. 2021)](https://arxiv.org/abs/2109.07446).
 - `kl_divergence`: KL divergence of the predictive distribution given original and contrastive contexts. Can be restricted to most likely target token options using the `top_k` and `top_p` parameters.
-- `contrast_prob_diff`: Difference in probability between original and foil target tokens pair, can be used for contrastive evaluation as in [Contrastive Attribution](https://aclanthology.org/2022.emnlp-main.14/) (Yin and Neubig, 2022).
+- `in_context_pvi`: In-context Pointwise V-usable Information (PVI) to measure the amount of contextual information used in model predictions [(Lu et al. 2023)](https://arxiv.org/abs/2310.12300).
 - `mc_dropout_prob_avg`: Average probability of the target token across multiple samples using [MC Dropout](https://arxiv.org/abs/1506.02142) (Gal and Ghahramani, 2016).
 - `top_p_size`: The number of tokens with cumulative probability greater than `top_p` in the predictive distribution of the model.
 

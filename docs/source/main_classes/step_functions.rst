@@ -37,11 +37,11 @@ The following functions can be used out-of-the-box as attribution targets or ste
 
 .. autofunction:: perplexity_fn
 
-.. autofunction:: contrast_logit_fn
+.. autofunction:: contrast_logits_fn
 
 .. autofunction:: contrast_prob_fn
 
-.. autofunction:: contrast_logit_diff_fn
+.. autofunction:: contrast_logits_diff_fn
 
 .. autofunction:: contrast_prob_diff_fn
 
