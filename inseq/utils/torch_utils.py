@@ -1,5 +1,5 @@
 import logging
-from typing import TYPE_CHECKING, Any, Callable, List, Optional, Sequence, Tuple, Union
+from typing import TYPE_CHECKING, Any, Callable, List, Literal, Optional, Sequence, Tuple, Union
 
 import torch
 import torch.nn.functional as F
@@ -75,37 +75,65 @@ def top_p_logits_mask(logits: torch.Tensor, top_p: float, min_tokens_to_keep: in
     return indices_to_remove
 
 
-def logits_kl_divergence(
+def top_k_logits_mask(logits: torch.Tensor, top_k: int, min_tokens_to_keep: int) -> torch.Tensor:
+    """Adapted from https://github.com/huggingface/transformers/blob/main/src/transformers/generation/logits_process.py
+    """
+    top_k = max(top_k, min_tokens_to_keep)
+    return logits < logits.topk(top_k).values[..., -1, None]
+
+
+def get_logits_from_filter_strategy(
+    filter_strategy: Union[Literal["original"], Literal["contrast"], Literal["merged"]],
     original_logits: torch.Tensor,
-    contrast_logits: torch.Tensor,
+    contrast_logits: Optional[torch.Tensor] = None,
+) -> torch.Tensor:
+    if filter_strategy == "original":
+        return original_logits
+    elif filter_strategy == "contrast":
+        return contrast_logits
+    elif filter_strategy == "merged":
+        return original_logits + contrast_logits
+
+
+def filter_logits(
+    original_logits: torch.Tensor,
+    contrast_logits: Optional[torch.Tensor] = None,
     top_p: float = 1.0,
     top_k: int = 0,
     min_tokens_to_keep: int = 1,
-) -> torch.Tensor:
-    """Compute the KL divergence between two sets of logits, with optional top-k and top-p filtering."""
-    top_k = min(top_k, contrast_logits.size(-1))
+    filter_strategy: Union[Literal["original"], Literal["contrast"], Literal["merged"], None] = None,
+) -> Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
+    """Applies top-k and top-p filtering to logits, and optionally to an additional set of contrastive logits."""
+    if top_k > original_logits.size(-1) or top_k < 0:
+        raise ValueError(f"`top_k` has to be a positive integer < {original_logits.size(-1)}, but is {top_k}")
+    if filter_strategy and filter_strategy != "original" and contrast_logits is None:
+        raise ValueError(f"`filter_strategy` {filter_strategy} can only be used if `contrast_logits` is provided")
+    if not filter_strategy:
+        if contrast_logits is None:
+            filter_strategy = "original"
+        else:
+            filter_strategy = "merged"
     if top_p < 1.0:
-        original_indices_to_remove = top_p_logits_mask(original_logits, top_p, min_tokens_to_keep)
-        contrastive_indices_to_remove = top_p_logits_mask(contrast_logits, top_p, min_tokens_to_keep)
-        joined_indices_to_remove = original_indices_to_remove & contrastive_indices_to_remove
-        original_logits = original_logits.masked_select(~joined_indices_to_remove)[None, ...]
-        contrast_logits = contrast_logits.masked_select(~joined_indices_to_remove)[None, ...]
+        indices_to_remove = top_p_logits_mask(
+            get_logits_from_filter_strategy(filter_strategy, original_logits, contrast_logits),
+            top_p,
+            min_tokens_to_keep,
+        )
+        original_logits = original_logits.masked_fill(indices_to_remove, float("-inf"))
+        if contrast_logits is not None:
+            contrast_logits = contrast_logits.masked_fill(indices_to_remove, float("-inf"))
     if top_k > 0:
-        filtered_contrast_logits = torch.zeros(contrast_logits.size(0), top_k)
-        filtered_original_logits = torch.zeros(original_logits.size(0), top_k)
-        indices_to_remove = contrast_logits < contrast_logits.topk(top_k).values[..., -1, None]
-        for i in range(contrast_logits.size(0)):
-            filtered_contrast_logits[i] = contrast_logits[i].masked_select(~indices_to_remove[i])
-            filtered_original_logits[i] = original_logits[i].masked_select(~indices_to_remove[i])
-    else:
-        filtered_contrast_logits = contrast_logits
-        filtered_original_logits = original_logits
-    original_logprobs = F.log_softmax(filtered_original_logits, dim=-1)
-    contrast_logprobs = F.log_softmax(filtered_contrast_logits, dim=-1)
-    kl_divergence = torch.zeros(original_logprobs.size(0))
-    for i in range(original_logprobs.size(0)):
-        kl_divergence[i] = F.kl_div(contrast_logprobs[i], original_logprobs[i], reduction="sum", log_target=True)
-    return kl_divergence
+        indices_to_remove = top_k_logits_mask(
+            get_logits_from_filter_strategy(filter_strategy, original_logits, contrast_logits),
+            top_k,
+            min_tokens_to_keep,
+        )
+        original_logits = original_logits.masked_fill(indices_to_remove, float("-inf"))
+        if contrast_logits is not None:
+            contrast_logits = contrast_logits.masked_fill(indices_to_remove, float("-inf"))
+    if contrast_logits is not None:
+        return original_logits, contrast_logits
+    return original_logits
 
 
 def euclidean_distance(vec_a: torch.Tensor, vec_b: torch.Tensor) -> torch.Tensor:
