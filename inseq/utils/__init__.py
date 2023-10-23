@@ -48,10 +48,10 @@ from .torch_utils import (
     aggregate_contiguous,
     check_device,
     euclidean_distance,
+    filter_logits,
     get_default_device,
     get_front_padding,
     get_sequences_from_batched_steps,
-    logits_kl_divergence,
     normalize,
     remap_from_filtered,
     top_p_logits_mask,
@@ -116,5 +116,5 @@ __all__ = [
     "get_adjusted_alignments",
     "get_aligned_idx",
     "top_p_logits_mask",
-    "logits_kl_divergence",
+    "filter_logits",
 ]
