@@ -18,9 +18,9 @@ Step Functions
 Step Functions Default arguments
 -----------------------------------------------------------------------------------------------------------------------
 
-The default arguments passed to all step functions are collected in the :class:`StepFunctionArgs` class.
+The default arguments passed to all step functions are collected in the :class:`StepFunctionBaseArgs` class.
 
-.. autoclass:: StepFunctionArgs
+.. autoclass:: StepFunctionBaseArgs
 
 Pre-registered Step Functions
 -----------------------------------------------------------------------------------------------------------------------

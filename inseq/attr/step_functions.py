@@ -1,6 +1,6 @@
 import logging
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Protocol, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Protocol, Tuple, Union
 
 import torch
 import torch.nn.functional as F
@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
-class StepFunctionArgs:
+class StepFunctionBaseArgs:
     """Base class for step function base arguments. These arguments are passed to all step functions and are
     complemented by the ones defined in the step function signature.
 
@@ -53,15 +53,18 @@ class StepFunctionArgs:
 
 
 @dataclass
-class StepFunctionEncoderDecoderArgs(StepFunctionArgs):
+class StepFunctionEncoderDecoderArgs(StepFunctionBaseArgs):
     encoder_input_ids: IdsTensor
     encoder_input_embeds: EmbeddingsTensor
     encoder_attention_mask: IdsTensor
 
 
 @dataclass
-class StepFunctionDecoderOnlyArgs(StepFunctionArgs):
+class StepFunctionDecoderOnlyArgs(StepFunctionBaseArgs):
     pass
+
+
+StepFunctionArgs = Union[StepFunctionEncoderDecoderArgs, StepFunctionDecoderOnlyArgs]
 
 
 class StepFunction(Protocol):
@@ -77,12 +80,9 @@ CONTRAST_FN_ARGS_DOCSTRING = """Args:
         contrast_sources (:obj:`str` or :obj:`list(str)`): Source text(s) used as contrastive inputs to compute
             the contrastive step function for encoder-decoder models. If not specified, the source text is assumed to
             match the original source text. Defaults to :obj:`None`.
-        contrast_target_prefixes (:obj:`str` or :obj:`list(str)`): Target prefix(es) used as contrastive inputs to
-            compute the contrastive step function. If not specified, no target prefix beyond previously generated
-            tokens is assumed. Defaults to :obj:`None`.
         contrast_targets (:obj:`str` or :obj:`list(str)`): Contrastive target text(s) to be compared to the original
             target text. If not specified, the original target text is used as contrastive target (will result in same
-            output unless ``contrast_sources`` or ``contrast_target_prefixes`` are specified). Defaults to :obj:`None`.
+            output unless ``contrast_sources`` are specified). Defaults to :obj:`None`.
         contrast_targets_alignments (:obj:`list(tuple(int, int))`, `optional`): A list of tuples of indices, where the
             first element is the index of the original target token and the second element is the index of the
             contrastive target token, used only if :obj:`contrast_targets` is specified. If an explicit alignment is
@@ -126,10 +126,10 @@ def probability_fn(args: StepFunctionArgs, logprob: bool = False) -> SingleScore
 def entropy_fn(args: StepFunctionArgs) -> SingleScorePerStepTensor:
     """Compute the entropy of the model's output distribution."""
     logits = args.attribution_model.output2logits(args.forward_output)
-    out = torch.distributions.Categorical(logits=logits).entropy()
-    if out.ndim > 1:
-        out = out.squeeze(-1)
-    return out
+    entropy = torch.zeros(logits.size(0))
+    for i in range(logits.size(0)):
+        entropy[i] = torch.distributions.Categorical(logits=logits[i]).entropy()
+    return entropy
 
 
 def crossentropy_fn(args: StepFunctionArgs) -> SingleScorePerStepTensor:
@@ -152,7 +152,6 @@ def perplexity_fn(args: StepFunctionArgs) -> SingleScorePerStepTensor:
 @contrast_fn_docstring()
 def _get_contrast_output(
     args: StepFunctionArgs,
-    contrast_target_prefixes: Optional[FeatureAttributionInput] = None,
     contrast_sources: Optional[FeatureAttributionInput] = None,
     contrast_targets: Optional[FeatureAttributionInput] = None,
     contrast_targets_alignments: Optional[List[List[Tuple[int, int]]]] = None,
@@ -185,35 +184,22 @@ def _get_contrast_output(
             raise ValueError(
                 f"Contrastive batch size ({c_batch.target_ids.size(0)}) must match candidate batch size"
                 f" ({args.decoder_input_ids.size(0)}). Multi-sentence attribution and methods expanding inputs to"
-                " multiple steps (e.g. Integrated Gradients) are not supported for contrastive feature attribution."
+                " multiple steps (e.g. Integrated Gradients) are not yet supported for contrastive attribution."
             )
 
         args.decoder_input_ids = c_batch.target_ids
         args.decoder_input_embeds = c_batch.target_embeds
         args.decoder_attention_mask = c_batch.target_mask
-    if contrast_target_prefixes:
-        c_dec_in = args.attribution_model.encode(
-            contrast_target_prefixes, as_targets=is_enc_dec, add_special_tokens=False
-        )
-        if is_enc_dec:
-            # Remove the first token of the decoder input ids and attention mask if it's BOS
-            if torch.all(torch.eq(args.decoder_input_ids[:, 0], args.attribution_model.bos_token_id)):
-                args.decoder_input_ids = args.decoder_input_ids[:, 1:]
-                args.decoder_attention_mask = args.decoder_attention_mask[:, 1:]
-        args.decoder_input_ids = torch.cat((c_dec_in.input_ids, args.decoder_input_ids), dim=1)
-        args.decoder_attention_mask = torch.cat((c_dec_in.attention_mask, args.decoder_attention_mask), dim=1)
-        args.decoder_input_embeds = args.attribution_model.embed(args.decoder_input_ids, as_targets=is_enc_dec)
     if contrast_sources:
-        if not is_enc_dec:
+        if not (is_enc_dec and isinstance(args, StepFunctionEncoderDecoderArgs)):
             raise ValueError(
                 "Contrastive source inputs can only be used with encoder-decoder models. "
-                "Use `contrast_target_prefixes` to set a contrastive target prefix for decoder-only models."
+                "Use `contrast_targets` to set a contrastive target containing a prefix for decoder-only models."
             )
         c_enc_in = args.attribution_model.encode(contrast_sources)
-        if is_enc_dec and isinstance(args, StepFunctionEncoderDecoderArgs):
-            args.encoder_input_ids = c_enc_in.input_ids
-            args.encoder_attention_mask = c_enc_in.attention_mask
-            args.encoder_input_embeds = args.attribution_model.embed(args.encoder_input_ids, as_targets=False)
+        args.encoder_input_ids = c_enc_in.input_ids
+        args.encoder_attention_mask = c_enc_in.attention_mask
+        args.encoder_input_embeds = args.attribution_model.embed(args.encoder_input_ids, as_targets=False)
     c_batch = args.attribution_model.formatter.convert_args_to_batch(args)
     c_out = args.attribution_model.get_forward_output(c_batch, use_embeddings=is_enc_dec, **forward_kwargs)
     if return_contrastive_target_ids:
@@ -225,19 +211,17 @@ def _get_contrast_output(
 def contrast_logits_fn(
     args: StepFunctionArgs,
     contrast_sources: Optional[FeatureAttributionInput] = None,
-    contrast_target_prefixes: Optional[FeatureAttributionInput] = None,
     contrast_targets: Optional[FeatureAttributionInput] = None,
     contrast_targets_alignments: Optional[List[List[Tuple[int, int]]]] = None,
 ):
     """Returns the logit of a generation target given contrastive context or target prediction alternative.
     If only ``contrast_targets`` are specified, the logit of the contrastive prediction is computed given same
     context. The logit for the same token given contrastive source/target preceding context can also be computed
-    using ``contrast_sources`` and ``contrast_target_prefixes`` without specifying ``contrast_targets``.
+    using ``contrast_sources`` without specifying ``contrast_targets``.
     """
     c_output, c_tgt_ids = _get_contrast_output(
         args,
         contrast_sources=contrast_sources,
-        contrast_target_prefixes=contrast_target_prefixes,
         contrast_targets=contrast_targets,
         contrast_targets_alignments=contrast_targets_alignments,
         return_contrastive_target_ids=True,
@@ -252,7 +236,6 @@ def contrast_logits_fn(
 def contrast_prob_fn(
     args: StepFunctionArgs,
     contrast_sources: Optional[FeatureAttributionInput] = None,
-    contrast_target_prefixes: Optional[FeatureAttributionInput] = None,
     contrast_targets: Optional[FeatureAttributionInput] = None,
     contrast_targets_alignments: Optional[List[List[Tuple[int, int]]]] = None,
     logprob: bool = False,
@@ -260,12 +243,11 @@ def contrast_prob_fn(
     """Returns the probability of a generation target given contrastive context or target prediction alternative.
     If only ``contrast_targets`` are specified, the probability of the contrastive prediction is computed given same
     context. The probability for the same token given contrastive source/target preceding context can also be computed
-    using ``contrast_sources`` and ``contrast_target_prefixes`` without specifying ``contrast_targets``.
+    using ``contrast_sources`` without specifying ``contrast_targets``.
     """
     c_output, c_tgt_ids = _get_contrast_output(
         args,
         contrast_sources=contrast_sources,
-        contrast_target_prefixes=contrast_target_prefixes,
         contrast_targets=contrast_targets,
         contrast_targets_alignments=contrast_targets_alignments,
         return_contrastive_target_ids=True,
@@ -280,7 +262,6 @@ def contrast_prob_fn(
 def pcxmi_fn(
     args: StepFunctionArgs,
     contrast_sources: Optional[FeatureAttributionInput] = None,
-    contrast_target_prefixes: Optional[FeatureAttributionInput] = None,
     contrast_targets: Optional[FeatureAttributionInput] = None,
     contrast_targets_alignments: Optional[List[List[Tuple[int, int]]]] = None,
     **kwargs,
@@ -294,7 +275,6 @@ def pcxmi_fn(
     contrast_probs = contrast_prob_fn(
         args=args,
         contrast_sources=contrast_sources,
-        contrast_target_prefixes=contrast_target_prefixes,
         contrast_targets=contrast_targets,
         contrast_targets_alignments=contrast_targets_alignments,
     )
@@ -305,7 +285,6 @@ def pcxmi_fn(
 def kl_divergence_fn(
     args: StepFunctionArgs,
     contrast_sources: Optional[FeatureAttributionInput] = None,
-    contrast_target_prefixes: Optional[FeatureAttributionInput] = None,
     contrast_targets: Optional[FeatureAttributionInput] = None,
     contrast_targets_alignments: Optional[List[List[Tuple[int, int]]]] = None,
     top_k: int = 0,
@@ -331,7 +310,6 @@ def kl_divergence_fn(
         args=args,
         contrast_sources=contrast_sources,
         contrast_targets=contrast_targets,
-        contrast_target_prefixes=contrast_target_prefixes,
         contrast_targets_alignments=contrast_targets_alignments,
         return_contrastive_target_ids=False,
     )
@@ -357,7 +335,6 @@ def kl_divergence_fn(
 def contrast_prob_diff_fn(
     args: StepFunctionArgs,
     contrast_sources: Optional[FeatureAttributionInput] = None,
-    contrast_target_prefixes: Optional[FeatureAttributionInput] = None,
     contrast_targets: Optional[FeatureAttributionInput] = None,
     contrast_targets_alignments: Optional[List[List[Tuple[int, int]]]] = None,
     logprob: bool = False,
@@ -367,18 +344,16 @@ def contrast_prob_diff_fn(
     choice of picking the selected token rather than its contrastive alternative?". Follows the implementation
     of `Yin and Neubig (2022) <https://aclanthology.org/2022.emnlp-main.14>`__. Can also be used to compute the
     difference in probability for the same token given contrastive source/target preceding context using
-    ``contrast_sources`` and ``contrast_target_prefixes`` without specifying ``contrast_targets``.
+    ``contrast_sources`` without specifying ``contrast_targets``.
     """
     model_probs = probability_fn(args, logprob=logprob)
     contrast_probs = contrast_prob_fn(
         args=args,
         contrast_sources=contrast_sources,
-        contrast_target_prefixes=contrast_target_prefixes,
         contrast_targets=contrast_targets,
         contrast_targets_alignments=contrast_targets_alignments,
         logprob=logprob,
     )
-    # Return the prob difference as target for attribution
     return model_probs - contrast_probs
 
 
@@ -386,7 +361,6 @@ def contrast_prob_diff_fn(
 def contrast_logits_diff_fn(
     args: StepFunctionArgs,
     contrast_sources: Optional[FeatureAttributionInput] = None,
-    contrast_target_prefixes: Optional[FeatureAttributionInput] = None,
     contrast_targets: Optional[FeatureAttributionInput] = None,
     contrast_targets_alignments: Optional[List[List[Tuple[int, int]]]] = None,
 ):
@@ -397,11 +371,9 @@ def contrast_logits_diff_fn(
     contrast_logits = contrast_logits_fn(
         args=args,
         contrast_sources=contrast_sources,
-        contrast_target_prefixes=contrast_target_prefixes,
         contrast_targets=contrast_targets,
         contrast_targets_alignments=contrast_targets_alignments,
     )
-    # Return the logit difference as target for attribution
     return model_logits - contrast_logits
 
 
@@ -409,7 +381,6 @@ def contrast_logits_diff_fn(
 def in_context_pvi_fn(
     args: StepFunctionArgs,
     contrast_sources: Optional[FeatureAttributionInput] = None,
-    contrast_target_prefixes: Optional[FeatureAttributionInput] = None,
     contrast_targets: Optional[FeatureAttributionInput] = None,
     contrast_targets_alignments: Optional[List[List[Tuple[int, int]]]] = None,
 ):
@@ -426,7 +397,6 @@ def in_context_pvi_fn(
     contrast_logprob = contrast_prob_fn(
         args=args,
         contrast_sources=contrast_sources,
-        contrast_target_prefixes=contrast_target_prefixes,
         contrast_targets=contrast_targets,
         contrast_targets_alignments=contrast_targets_alignments,
         logprob=True,
