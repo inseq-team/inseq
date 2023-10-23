@@ -5,7 +5,7 @@ from typing import Any, Callable, Dict, List, Optional, Protocol, Tuple, TypeVar
 
 import torch
 
-from ..attr import STEP_SCORES_MAP, StepFunctionArgs
+from ..attr import STEP_SCORES_MAP, StepFunctionArgs, StepFunctionEncoderDecoderArgs
 from ..attr.feat import FeatureAttribution, extract_args, join_token_ids
 from ..data import (
     BatchEncoding,
@@ -145,7 +145,7 @@ class InputFormatter:
 
     @staticmethod
     def get_step_function_reserved_args() -> List[str]:
-        return [f.name for f in StepFunctionArgs.__dataclass_fields__.values()]
+        return [f.name for f in StepFunctionEncoderDecoderArgs.__dataclass_fields__.values()]
 
     @staticmethod
     def format_contrast_targets_alignments(

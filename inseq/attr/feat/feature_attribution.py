@@ -42,7 +42,7 @@ from ...utils import (
     get_front_padding,
     pretty_tensor,
 )
-from ...utils.typing import ModelIdentifier, SingleScorePerStepTensor
+from ...utils.typing import ModelIdentifier, OneOrMoreTokenSequences, SingleScorePerStepTensor, TextSequences
 from ..attribution_decorators import batched, set_hook, unset_hook
 from ..step_functions import get_step_function, get_step_scores, get_step_scores_args
 from .attribution_utils import (
@@ -272,6 +272,51 @@ class FeatureAttribution(Registry):
                 " method."
             )
 
+    def format_contrastive_targets(
+        self,
+        target_sequences: TextSequences,
+        target_tokens: OneOrMoreTokenSequences,
+        attributed_fn_args: Dict[str, Any],
+        step_scores_args: Dict[str, Any],
+        attr_pos_start: int,
+        attr_pos_end: int,
+    ) -> Tuple[Optional[DecoderOnlyBatch], Optional[List[List[Tuple[int, int]]]], Dict[str, Any], Dict[str, Any]]:
+        contrast_batch, contrast_targets_alignments = None, None
+        contrast_targets = attributed_fn_args.get("contrast_targets", None)
+        if contrast_targets is None:
+            contrast_targets = step_scores_args.get("contrast_targets", None)
+        contrast_targets_alignments = attributed_fn_args.get("contrast_targets_alignments", None)
+        if contrast_targets_alignments is None:
+            contrast_targets_alignments = step_scores_args.get("contrast_targets_alignments", None)
+        if contrast_targets_alignments is not None and contrast_targets is None:
+            raise ValueError("contrast_targets_alignments requires contrast_targets to be specified.")
+        contrast_targets = [contrast_targets] if isinstance(contrast_targets, str) else contrast_targets
+        if contrast_targets is not None:
+            as_targets = self.attribution_model.is_encoder_decoder
+            contrast_batch = get_batch_from_inputs(
+                attribution_model=self.attribution_model,
+                inputs=contrast_targets,
+                as_targets=as_targets,
+            )
+            contrast_batch = DecoderOnlyBatch.from_batch(contrast_batch)
+            clean_tgt_tokens = self.attribution_model.clean_tokens(target_tokens, as_targets=as_targets)
+            clean_c_tokens = self.attribution_model.clean_tokens(contrast_batch.target_tokens, as_targets=as_targets)
+            contrast_targets_alignments = self.attribution_model.formatter.format_contrast_targets_alignments(
+                contrast_targets_alignments=contrast_targets_alignments,
+                target_sequences=target_sequences,
+                target_tokens=clean_tgt_tokens,
+                contrast_sequences=contrast_targets,
+                contrast_tokens=clean_c_tokens,
+                special_tokens=self.attribution_model.special_tokens,
+                start_pos=attr_pos_start,
+                end_pos=attr_pos_end,
+            )
+            if "contrast_targets" in step_scores_args:
+                step_scores_args["contrast_targets_alignments"] = contrast_targets_alignments
+            if "contrast_targets" in attributed_fn_args:
+                attributed_fn_args["contrast_targets_alignments"] = contrast_targets_alignments
+        return contrast_batch, contrast_targets_alignments, attributed_fn_args, step_scores_args
+
     def attribute(
         self,
         batch: Union[DecoderOnlyBatch, EncoderDecoderBatch],
@@ -332,33 +377,19 @@ class FeatureAttribution(Registry):
         logger.debug("=" * 30 + f"\nfull batch: {batch}\n" + "=" * 30)
         # Sources are empty for decoder-only models
         sequences = self.attribution_model.formatter.get_text_sequences(self.attribution_model, batch)
-        contrast_targets = attributed_fn_args.get("contrast_targets", None)
-        contrast_targets_alignments = attributed_fn_args.get("contrast_targets_alignments", None)
-        contrast_targets = [contrast_targets] if isinstance(contrast_targets, str) else contrast_targets
-        contrast_batch = None
-        if contrast_targets is not None:
-            as_targets = self.attribution_model.is_encoder_decoder
-            contrast_batch = get_batch_from_inputs(
-                attribution_model=self.attribution_model,
-                inputs=contrast_targets,
-                as_targets=as_targets,
-            )
-            contrast_batch = DecoderOnlyBatch.from_batch(contrast_batch)
-            contrast_targets_alignments = self.attribution_model.formatter.format_contrast_targets_alignments(
-                contrast_targets_alignments=contrast_targets_alignments,
-                target_sequences=sequences.targets,
-                target_tokens=self.attribution_model.clean_tokens(batch.target_tokens, as_targets=as_targets),
-                contrast_sequences=contrast_targets,
-                contrast_tokens=self.attribution_model.clean_tokens(
-                    contrast_batch.target_tokens, as_targets=as_targets
-                ),
-                special_tokens=self.attribution_model.special_tokens,
-                start_pos=attr_pos_start,
-                end_pos=attr_pos_end,
-            )
-            attributed_fn_args["contrast_targets_alignments"] = contrast_targets_alignments
-            if "contrast_targets" in step_scores_args:
-                step_scores_args["contrast_targets_alignments"] = contrast_targets_alignments
+        (
+            contrast_batch,
+            contrast_targets_alignments,
+            attributed_fn_args,
+            step_scores_args,
+        ) = self.format_contrastive_targets(
+            sequences.targets,
+            batch.target_tokens,
+            attributed_fn_args,
+            step_scores_args,
+            attr_pos_start,
+            attr_pos_end,
+        )
         target_tokens_with_ids = self.attribution_model.get_token_with_ids(
             batch,
             contrast_target_tokens=contrast_batch.target_tokens if contrast_batch is not None else None,
