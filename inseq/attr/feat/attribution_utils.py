@@ -43,7 +43,7 @@ def rescale_attributions_to_tokens(
     attributions: OneOrMoreAttributionSequences, tokens: OneOrMoreTokenSequences
 ) -> OneOrMoreAttributionSequences:
     return [
-        attr[: len(tokens)] if not all([math.isnan(x) for x in attr]) else []
+        attr[: len(tokens)] if not all(math.isnan(x) for x in attr) else []
         for attr, tokens in zip(attributions, tokens)
     ]
 
@@ -154,8 +154,7 @@ def get_source_target_attributions(
             return attr[0], None
         else:
             return attr, None
+    elif isinstance(attr, tuple):
+        return None, attr[0]
     else:
-        if isinstance(attr, tuple):
-            return None, attr[0]
-        else:
-            return None, attr
+        return None, attr
