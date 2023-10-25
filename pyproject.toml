@@ -208,15 +208,16 @@ exclude = [
 ]
 fix = true
 ignore = [
-    "C901",
-    "E731",
-    "E741",
-    "F821",
-    "C901",
-    "B006",
-    "PLR2004",
-    "PLR0913",
-    "PLR0915",
+    "B006", # mutable default argument
+    "C901", # function too complex
+    "E501", # line too long (handled by format)
+    "E731", # do not assign a lambda expression, use a def
+    "E741", # ambiguous variable name
+    "F821", # undefined name
+    "PLR2004", # unnamed numerical constants used
+    "PLR0913", # too many arguments
+    "PLR0915", # too many statements
+    "W191", # indentation contains tabs (handled by format)
 ]
 line-length = 119
 select = [
@@ -226,7 +227,6 @@ select = [
     "C", # flake8-comprehensions
     #"D", # flake8-docstrings
     "B", # flake8-bugbear
-    "Q", # flake8-quotes
     "I", # isort
     "UP", # flake8-pyupgrade
     "PLC", # flake8-pylint

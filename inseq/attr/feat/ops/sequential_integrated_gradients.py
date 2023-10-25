@@ -151,7 +151,10 @@ class SequentialIntegratedGradients(GradientAttribution):
         method: str = "gausslegendre",
         internal_batch_size: Union[None, int] = None,
         return_convergence_delta: bool = False,
-    ) -> Union[TensorOrTupleOfTensorsGeneric, Tuple[TensorOrTupleOfTensorsGeneric, Tensor],]:
+    ) -> Union[
+        TensorOrTupleOfTensorsGeneric,
+        Tuple[TensorOrTupleOfTensorsGeneric, Tensor],
+    ]:
         r"""
         This method attributes the output of the model with given target index
         (in case it is provided, otherwise it assumes that output is a

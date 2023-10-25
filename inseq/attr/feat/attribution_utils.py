@@ -19,7 +19,6 @@ if TYPE_CHECKING:
     from ...models import AttributionModel
     from .feature_attribution import FeatureAttribution
 
-
 logger = logging.getLogger(__name__)
 
 

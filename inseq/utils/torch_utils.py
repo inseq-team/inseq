@@ -54,8 +54,7 @@ def normalize(
 
 
 def top_p_logits_mask(logits: torch.Tensor, top_p: float, min_tokens_to_keep: int) -> torch.Tensor:
-    """Adapted from https://github.com/huggingface/transformers/blob/main/src/transformers/generation/logits_process.py
-    """
+    """Adapted from https://github.com/huggingface/transformers/blob/main/src/transformers/generation/logits_process.py"""
     # Compute cumulative probabilities of sorted tokens
     if top_p < 0 or top_p > 1.0:
         raise ValueError(f"`top_p` has to be a float > 0 and < 1, but is {top_p}")
@@ -76,8 +75,7 @@ def top_p_logits_mask(logits: torch.Tensor, top_p: float, min_tokens_to_keep: in
 
 
 def top_k_logits_mask(logits: torch.Tensor, top_k: int, min_tokens_to_keep: int) -> torch.Tensor:
-    """Adapted from https://github.com/huggingface/transformers/blob/main/src/transformers/generation/logits_process.py
-    """
+    """Adapted from https://github.com/huggingface/transformers/blob/main/src/transformers/generation/logits_process.py"""
     top_k = max(top_k, min_tokens_to_keep)
     return logits < logits.topk(top_k).values[..., -1, None]
 
