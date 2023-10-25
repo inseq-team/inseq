@@ -114,7 +114,7 @@ class TensorWrapper:
             if isinstance(self_attr, torch.Tensor):
                 return torch.allclose(self_attr, other_attr, equal_nan=True)
             elif isinstance(self_attr, dict):
-                return all([TensorWrapper._eq(self_attr[k], other_attr[k]) for k in self_attr.keys()])
+                return all(TensorWrapper._eq(self_attr[k], other_attr[k]) for k in self_attr.keys())
             else:
                 return self_attr == other_attr
         except:  # noqa: E722

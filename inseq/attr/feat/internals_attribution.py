@@ -29,6 +29,7 @@ logger = logging.getLogger(__name__)
 
 class InternalsAttributionRegistry(FeatureAttribution, Registry):
     r"""Model Internals-based attribution method registry."""
+
     pass
 
 

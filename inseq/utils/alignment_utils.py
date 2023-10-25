@@ -107,7 +107,7 @@ def compute_word_aligns(
     align_words = set()
     for i, j in align_subwords:
         align_words.add((sub2word_map_src[i], sub2word_map_tgt[j]))
-    word_alignments = [(a_idx, b_idx) for a_idx, b_idx in sorted(align_words, key=lambda x: (x[0], x[1]))]
+    word_alignments = sorted(align_words, key=lambda x: (x[0], x[1]))
     return AlignedSequences(
         source_tokens=src.copy(),
         target_tokens=tgt.copy(),
@@ -246,7 +246,7 @@ def auto_align_sequences(
                     rm_b_idx = removed_b_token_idxs[removed_b_tokens.index(rm_a)]
                     aligned_special_tokens.append((rm_a_idx, rm_b_idx))
         else:
-            aligned_special_tokens = [(rm_a, rm_b) for rm_a, rm_b in zip(removed_a_token_idxs, removed_b_token_idxs)]
+            aligned_special_tokens = list(zip(removed_a_token_idxs, removed_b_token_idxs))
         a_word_to_token_align = align_tokenizations(a_words, clean_a_tokens)
         b_word_to_token_align = align_tokenizations(b_words, clean_b_tokens)
         # 3. Propagate word-level alignments to token-level alignments.

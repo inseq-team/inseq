@@ -1,24 +1,20 @@
 import inspect
+import logging
 import math
-import warnings
 from functools import partial
 from typing import Any, Callable, Optional, cast
 
 import torch
-from captum._utils.common import (
-    _expand_additional_forward_args,
-    _expand_target,
-)
+from captum._utils.common import _expand_additional_forward_args, _expand_target
 from captum._utils.models.linear_model import SkLearnLinearModel
 from captum._utils.models.model import Model
 from captum._utils.progress import progress
-from captum._utils.typing import (
-    TargetType,
-    TensorOrTupleOfTensorsGeneric,
-)
+from captum._utils.typing import TargetType, TensorOrTupleOfTensorsGeneric
 from captum.attr import LimeBase
 from torch import Tensor
 from torch.utils.data import DataLoader, TensorDataset
+
+logger = logging.getLogger(__name__)
 
 
 class Lime(LimeBase):
@@ -135,7 +131,7 @@ class Lime(LimeBase):
                     try:
                         curr_sample = next(perturb_generator)
                     except StopIteration:
-                        warnings.warn("Generator completed prior to given n_samples iterations!")
+                        logger.warning("Generator completed prior to given n_samples iterations!")
                         break
                 else:
                     curr_sample = self.perturb_func(inputs, **kwargs)
