@@ -112,29 +112,6 @@ upgrade-pip = "python -m pip install --upgrade pip"
 torch-cpu = "python -m pip install torch --index-url https://download.pytorch.org/whl/cpu"
 torch-cuda = "python -m pip install torch"
 
-[tool.black]
-# https://github.com/psf/black
-target-version = ["py38"]
-preview = true
-line-length = 119
-color = true
-
-exclude = '''
-/(
-    \.git
-    | \.hg
-    | \.mypy_cache
-    | \.tox
-    | \.venv
-    | _build
-    | buck-out
-    | build
-    | dist
-    | env
-    | venv
-)/
-'''
-
 
 [tool.mypy]
 # https://mypy.readthedocs.io/en/latest/config_file.html#using-a-pyproject-toml-file
@@ -234,11 +211,13 @@ select = [
     "PLR", # flake8-pylint
     "PLW", # flake8-pylint
 ]
-src = ["inseq", "tests"]
+src = ["inseq", "examples", "tests"]
+extend-include = ["*.ipynb"]
 
 
 [tool.ruff.per-file-ignores]
 "__init__.py" = ["F401"]
+"**/examples/*" = ["B018", "E402"]
 
 [tool.ruff.isort]
 known-first-party = ["inseq"]

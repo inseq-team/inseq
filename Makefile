@@ -78,15 +78,15 @@ update-deps:
 #* Linting
 .PHONY: check-style
 check-style:
-	poetry run black --diff --check --config pyproject.toml ./
-	poetry run ruff  --no-fix --config pyproject.toml ./
+	poetry run ruff format --check --config pyproject.toml ./
+	poetry run ruff check --no-fix --config pyproject.toml ./
 #   poetry run darglint --verbosity 2 inseq tests
 #	poetry run mypy --config-file pyproject.toml ./
 
 .PHONY: fix-style
 fix-style:
-	poetry run black --config pyproject.toml ./
-	poetry run ruff --config pyproject.toml ./
+	poetry run ruff format --config pyproject.toml ./
+	poetry run ruff check --config pyproject.toml ./
 
 .PHONY: check-safety
 check-safety:
