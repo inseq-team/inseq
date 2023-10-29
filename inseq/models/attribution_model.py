@@ -133,6 +133,7 @@ class InputFormatter:
         forward_output: ModelOutput,
         target_ids: ExpandedTargetIdsTensor,
         batch: DecoderOnlyBatch,
+        is_attributed_fn: bool = False,
     ) -> StepFunctionArgs:
         raise NotImplementedError()
 
@@ -650,7 +651,7 @@ class AttributionModel(ABC, torch.nn.Module):
         output = self.get_forward_output(batch, use_embeddings=use_embeddings, **kwargs)
         logger.debug(f"logits: {pretty_tensor(output.logits)}")
         step_fn_args = self.formatter.format_step_function_args(
-            attribution_model=self, forward_output=output, target_ids=target_ids, batch=batch
+            attribution_model=self, forward_output=output, target_ids=target_ids, is_attributed_fn=True, batch=batch
         )
         step_fn_extra_args = {k: v for k, v in zip(attributed_fn_argnames, args) if v is not None}
         return attributed_fn(step_fn_args, **step_fn_extra_args)
