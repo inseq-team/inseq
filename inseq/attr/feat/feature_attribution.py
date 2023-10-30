@@ -23,7 +23,7 @@ from functools import partial
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Union
 
 import torch
-from torchtyping import TensorType
+from jaxtyping import Int
 
 from ...data import (
     DecoderOnlyBatch,
@@ -504,9 +504,9 @@ class FeatureAttribution(Registry):
     def filtered_attribute_step(
         self,
         batch: Union[DecoderOnlyBatch, EncoderDecoderBatch],
-        target_ids: TensorType["batch_size", 1, int],
+        target_ids: Int[torch.Tensor, "batch_size 1"],
         attributed_fn: Callable[..., SingleScorePerStepTensor],
-        target_attention_mask: Optional[TensorType["batch_size", 1, int]] = None,
+        target_attention_mask: Optional[Int[torch.Tensor, "batch_size 1"]] = None,
         attribute_target: bool = False,
         step_scores: List[str] = [],
         attribution_args: Dict[str, Any] = {},

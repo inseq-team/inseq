@@ -1,14 +1,14 @@
 import logging
-from typing import TYPE_CHECKING, Any, Callable, List, Literal, Optional, Sequence, Tuple, Union
+from typing import TYPE_CHECKING, Callable, List, Literal, Optional, Sequence, Tuple, Union
 
 import torch
 import torch.nn.functional as F
+from jaxtyping import Int, Num
 from torch import nn
 from torch.backends.cuda import is_built as is_cuda_built
 from torch.backends.mps import is_available as is_mps_available
 from torch.backends.mps import is_built as is_mps_built
 from torch.cuda import is_available as is_cuda_available
-from torchtyping import TensorType
 
 if TYPE_CHECKING:
     pass
@@ -24,9 +24,9 @@ TORCH_BACKEND_DEVICE_MAP = {
 @torch.no_grad()
 def remap_from_filtered(
     original_shape: Tuple[int, ...],
-    mask: TensorType["batch_size", 1, int],
-    filtered: TensorType["filtered_batch_size", Any],
-) -> TensorType["batch_size", Any]:
+    mask: Int[torch.Tensor, "batch_size 1"],
+    filtered: Num[torch.Tensor, "filtered_batch_size"],
+) -> Num[torch.Tensor, "batch_size"]:
     index = mask.squeeze(-1).nonzero().reshape(-1, 1)
     while index.ndim < filtered.ndim:
         index = index.unsqueeze(-1)
