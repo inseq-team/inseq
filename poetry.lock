@@ -229,9 +229,6 @@ files = [
     {file = "Babel-2.13.1.tar.gz", hash = "sha256:33e0952d7dd6374af8dbf6768cc4ddf3ccfefc244f9986d4074704f2fbd18900"},
 ]
 
-[package.dependencies]
-pytz = {version = ">=2015.7", markers = "python_version < \"3.9\""}
-
 [package.extras]
 dev = ["freezegun (>=1.0,<2.0)", "pytest (>=6.0)", "pytest-cov"]
 
@@ -1341,6 +1338,22 @@ widgetsnbextension = ">=4.0.9,<4.1.0"
 
 [package.extras]
 test = ["ipykernel", "jsonschema", "pytest (>=3.6.0)", "pytest-cov", "pytz"]
+
+[[package]]
+name = "jaxtyping"
+version = "0.2.23"
+description = "Type annotations and runtime checking for shape and dtype of JAX arrays, and PyTrees."
+optional = false
+python-versions = "~=3.9"
+files = [
+    {file = "jaxtyping-0.2.23-py3-none-any.whl", hash = "sha256:c8df034f8403dc6289117723cb43386a2f27e73dff63c8169cc4bbf3e81261bf"},
+    {file = "jaxtyping-0.2.23.tar.gz", hash = "sha256:8a666257ea5b333bb7485598fd3312420fadeb193b8a6f9e4fe0fdc51b64df94"},
+]
+
+[package.dependencies]
+numpy = ">=1.20.0"
+typeguard = ">=2.13.3,<3"
+typing-extensions = ">=3.7.4.1"
 
 [[package]]
 name = "jedi"
@@ -2619,7 +2632,7 @@ six = ">=1.5"
 name = "pytz"
 version = "2023.3.post1"
 description = "World timezone definitions, modern and historical"
-optional = false
+optional = true
 python-versions = "*"
 files = [
     {file = "pytz-2023.3.post1-py2.py3-none-any.whl", hash = "sha256:ce42d816b81b68506614c11e8937d3aa9e41007ceb50bfdcb0749b921bf646c7"},
@@ -2945,7 +2958,6 @@ files = [
 [package.dependencies]
 markdown-it-py = ">=2.2.0"
 pygments = ">=2.13.0,<3.0.0"
-typing-extensions = {version = ">=4.0.0,<5.0", markers = "python_version < \"3.9\""}
 
 [package.extras]
 jupyter = ["ipywidgets (>=7.5.1,<9)"]
@@ -3881,21 +3893,6 @@ typing-extensions = "*"
 opt-einsum = ["opt-einsum (>=3.3)"]
 
 [[package]]
-name = "torchtyping"
-version = "0.1.4"
-description = "Runtime type annotations for the shape, dtype etc. of PyTorch Tensors."
-optional = false
-python-versions = ">=3.7.0"
-files = [
-    {file = "torchtyping-0.1.4-py3-none-any.whl", hash = "sha256:485fb6ef3965c39b0de15f00d6f49373e0a3a6993e9733942a63c5e207d35390"},
-    {file = "torchtyping-0.1.4.tar.gz", hash = "sha256:4763375d17752641bd1bff0faaddade29be3c125fca6355e3cee7700e975fdb5"},
-]
-
-[package.dependencies]
-torch = ">=1.7.0"
-typeguard = ">=2.11.1"
-
-[[package]]
 name = "tornado"
 version = "6.3.3"
 description = "Tornado is a Python web framework and asynchronous networking library, originally developed at FriendFeed."
@@ -4396,5 +4393,5 @@ sklearn = ["joblib", "scikit-learn"]
 
 [metadata]
 lock-version = "2.0"
-python-versions = ">=3.8.1,<3.12"
-content-hash = "8badb98d875488607f9d7fe1147050d100f3d39c6d56ece149ab070e0b67c145"
+python-versions = ">=3.9,<3.12"
+content-hash = "d9f882788f456d5afd62064d84c5c145f3b6bf0e8513a613ece86665ae1cb5aa"
