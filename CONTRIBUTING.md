@@ -9,7 +9,7 @@ To install dependencies and prepare [`pre-commit`](https://pre-commit.com/) hook
 
 ```bash
 make install
-make pre-commit-install
+make install-dev
 ```
 
 To activate your `virtualenv` run `poetry shell`.
