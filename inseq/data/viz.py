@@ -177,8 +177,7 @@ def get_heatmap_type(
         )
     elif heatmap_type == "Target":
         if attribution.target_attributions is not None:
-            mask = np.where(attribution.target_attributions.numpy() == 0, float("nan"), 0)
-            target_attributions = attribution.target_attributions.numpy() + mask
+            target_attributions = attribution.target_attributions.numpy()
         else:
             target_attributions = None
         return heatmap_func(
