@@ -1,8 +1,8 @@
 from dataclasses import dataclass
 from typing import Optional, Sequence, Tuple, Union
 
-from torch import float32, long
-from torchtyping import TensorType
+import torch
+from jaxtyping import Float, Float32, Int64
 from transformers import PreTrainedModel
 
 TextInput = Union[str, Sequence[str]]
@@ -40,26 +40,26 @@ OneOrMoreAttributionSequences = Sequence[Sequence[float]]
 
 IndexSpan = Union[Tuple[int, int], Sequence[Tuple[int, int]]]
 
-IdsTensor = TensorType["batch_size", "seq_len", long]
-TargetIdsTensor = TensorType["batch_size", long]
-ExpandedTargetIdsTensor = TensorType["batch_size", 1, long]
-EmbeddingsTensor = TensorType["batch_size", "seq_len", "embed_size", float]
-MultiStepEmbeddingsTensor = TensorType["batch_size_x_n_steps", "seq_len", "embed_size", float]
-VocabularyEmbeddingsTensor = TensorType["vocab_size", "embed_size", float]
-LogitsTensor = TensorType["batch_size", "vocab_size", float]
-ScoreTensor = TensorType["batch_size", "other_dims", float]
-MultiUnitScoreTensor = TensorType["batch_size", "n_units", "other_dims", float]
-MultiLayerScoreTensor = TensorType["batch_size", "n_layers", "other_dims", float]
-MultiLayerMultiUnitScoreTensor = TensorType["batch_size", "n_layers", "n_units", "seq_len", "seq_len", float]
-MultiLayerEmbeddingsTensor = TensorType["batch_size", "n_layers", "seq_len", "embed_size", float]
+IdsTensor = Int64[torch.Tensor, "batch_size seq_len"]
+TargetIdsTensor = Int64[torch.Tensor, "batch_size"]
+ExpandedTargetIdsTensor = Int64[torch.Tensor, "batch_size 1"]
+EmbeddingsTensor = Float[torch.Tensor, "batch_size seq_len embed_size"]
+MultiStepEmbeddingsTensor = Float[Float, "batch_size_x_n_steps seq_len embed_size"]
+VocabularyEmbeddingsTensor = Float[torch.Tensor, "vocab_size embed_size"]
+LogitsTensor = Float[torch.Tensor, "batch_size vocab_size"]
+ScoreTensor = Float[torch.Tensor, "batch_size other_dims"]
+MultiUnitScoreTensor = Float[torch.Tensor, "batch_size n_units other_dims"]
+MultiLayerScoreTensor = Float[torch.Tensor, "batch_size n_layers other_dims"]
+MultiLayerMultiUnitScoreTensor = Float[torch.Tensor, "batch_size n_layers n_units seq_len seq_len"]
+MultiLayerEmbeddingsTensor = Float[torch.Tensor, "batch_size n_layers seq_len embed_size"]
 
 # Step and sequence objects used for stepwise scores (e.g. convergence deltas, probabilities)
-SingleScorePerStepTensor = TensorType["batch_size", float32]
-SingleScoresPerSequenceTensor = TensorType["generated_seq_len", float32]
+SingleScorePerStepTensor = Float32[torch.Tensor, "batch_size"]
+SingleScoresPerSequenceTensor = Float32[torch.Tensor, "generated_seq_len"]
 
 # Step and sequence objects used for sequence scores (e.g. attributions over tokens)
-MultipleScoresPerStepTensor = TensorType["batch_size", "attributed_seq_len", float32]
-MultipleScoresPerSequenceTensor = TensorType["attributed_seq_len", "generated_seq_len", float32]
+MultipleScoresPerStepTensor = Float32[torch.Tensor, "batch_size attributed_seq_len"]
+MultipleScoresPerSequenceTensor = Float32[torch.Tensor, "attributed_seq_len generated_seq_len"]
 
 # One attribution score per embedding value for every attributed token
 # in a single attribution step. Produced by gradient attribution methods.
@@ -75,7 +75,7 @@ StepAttributionTensor = Union[GranularStepAttributionTensor, TokenStepAttributio
 # One attribution score per embedding value for every attributed token in attributed_seq
 # for all generated tokens in generated_seq. Produced by aggregating GranularStepAttributionTensor
 # across multiple steps and separating batches.
-GranularSequenceAttributionTensor = TensorType["attributed_seq_len", "generated_seq_len", "embed_size", float32]
+GranularSequenceAttributionTensor = Float32[torch.Tensor, "attributed_seq_len generated_seq_len embed_size"]
 
 # One attribution score for every token in attributed_seq for every generated token
 # in generated_seq. Produced by aggregating GranularSequenceAttributionTensor over the last dimension,
