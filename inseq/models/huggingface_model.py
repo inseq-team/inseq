@@ -234,7 +234,6 @@ class HuggingfaceModel(AttributionModel):
         as_targets: bool = False,
         return_baseline: bool = False,
         include_eos_baseline: bool = False,
-        max_input_length: int = 512,
         add_bos_token: bool = True,
         add_special_tokens: bool = True,
     ) -> BatchEncoding:
@@ -249,21 +248,12 @@ class HuggingfaceModel(AttributionModel):
         """
         if as_targets and not self.is_encoder_decoder:
             raise ValueError("Decoder-only models should use tokenization as source only.")
-        max_length = self.tokenizer.max_len_single_sentence
-        # Some tokenizer have weird values for max_len_single_sentence
-        # Cap length with max_model_input_sizes instead
-        if max_length > 1e6:
-            if hasattr(self.tokenizer, "max_model_input_sizes") and self.tokenizer.max_model_input_sizes:
-                max_length = max(v for _, v in self.tokenizer.max_model_input_sizes.items())
-            else:
-                max_length = max_input_length
         batch = self.tokenizer(
             text=texts if not as_targets else None,
             text_target=texts if as_targets else None,
             add_special_tokens=add_special_tokens,
             padding=True,
             truncation=True,
-            max_length=max_length,
             return_tensors="pt",
         ).to(self.device)
         baseline_ids = None
