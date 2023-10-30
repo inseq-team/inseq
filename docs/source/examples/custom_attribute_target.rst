@@ -40,7 +40,7 @@ with Contrastive Explanations" <https://arxiv.org/abs/2202.10419>`__ by Yin and 
 by complementing the output probabilities with the ones from their contrastive counterpart, and using the difference between the two as attribution
 target.
 
-We can define such attribution function using the standard template adopted by Inseq. The :class:`~inseq.attr.step_functions.StepFunctionArgs` class is used for convenience to encapsulate all default arguments passed to step functions, namely:
+We can define such attribution function using the standard template adopted by Inseq. The :class:`~inseq.attr.step_functions.StepFunctionDecoderOnlyArgs` and :class:`~inseq.attr.step_functions.StepFunctionEncoderDecoderArgs` classes are used for convenience to encapsulate all default arguments passed to step functions, namely:
 
 - :obj:`attribution_model`: the attribution model used to compute attributions.
 

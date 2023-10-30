@@ -130,41 +130,44 @@ Use the `inseq.list_feature_attribution_methods` function to list all available 
 
 #### Gradient-based attribution
 
-- `saliency`: [Saliency](https://arxiv.org/abs/1312.6034) (Simonyan et al., 2013)
+- `saliency`: [Deep Inside Convolutional Networks: Visualising Image Classification Models and Saliency Maps](https://arxiv.org/abs/1312.6034) (Simonyan et al., 2013)
 
-- `input_x_gradient`: [Input x Gradient](https://arxiv.org/abs/1312.6034) (Simonyan et al., 2013)
+- `input_x_gradient`: [Deep Inside Convolutional Networks: Visualising Image Classification Models and Saliency Maps](https://arxiv.org/abs/1312.6034) (Simonyan et al., 2013)
 
-- `integrated_gradients`: [Integrated Gradients](https://arxiv.org/abs/1703.01365) (Sundararajan et al., 2017)
+- `integrated_gradients`: [Axiomatic Attribution for Deep Networks](https://arxiv.org/abs/1703.01365) (Sundararajan et al., 2017)
 
-- `deeplift`: [DeepLIFT](https://arxiv.org/abs/1704.02685) (Shrikumar et al., 2017)
+- `deeplift`: [Learning Important Features Through Propagating Activation Differences](https://arxiv.org/abs/1704.02685) (Shrikumar et al., 2017)
 
-- `gradient_shap`: [Gradient SHAP](https://dl.acm.org/doi/10.5555/3295222.3295230) (Lundberg and Lee, 2017)
+- `gradient_shap`: [A unified approach to interpreting model predictions](https://dl.acm.org/doi/10.5555/3295222.3295230) (Lundberg and Lee, 2017)
 
-- `discretized_integrated_gradients`: [Discretized Integrated Gradients](https://aclanthology.org/2021.emnlp-main.805/) (Sanyal and Ren, 2021)
+- `discretized_integrated_gradients`: [Discretized Integrated Gradients for Explaining Language Models](https://aclanthology.org/2021.emnlp-main.805/) (Sanyal and Ren, 2021)
+
+- `sequential_integrated_gradients`: [Sequential Integrated Gradients: a simple but effective method for explaining language models](https://aclanthology.org/2023.findings-acl.477/) (Enguehard, 2023)
 
 #### Internals-based attribution
 
-- `attention`: [Attention Weight Attribution](https://arxiv.org/abs/1409.0473) (Bahdanau et al., 2014)
+- `attention`: Attention Weight Attribution, from [Neural Machine Translation by Jointly Learning to Align and Translate](https://arxiv.org/abs/1409.0473) (Bahdanau et al., 2014)
 
 #### Perturbation-based attribution
 
-- `occlusion`: [Occlusion](https://link.springer.com/chapter/10.1007/978-3-319-10590-1_53) (Zeiler and Fergus, 2014)
+- `occlusion`: [Visualizing and Understanding Convolutional Networks](https://link.springer.com/chapter/10.1007/978-3-319-10590-1_53) (Zeiler and Fergus, 2014)
 
-- `lime`: [LIME](https://arxiv.org/abs/1602.04938) (Ribeiro et al., 2016)
+- `lime`: ["Why Should I Trust You?": Explaining the Predictions of Any Classifier](https://arxiv.org/abs/1602.04938) (Ribeiro et al., 2016)
 
 #### Step functions
 
 Step functions are used to extract custom scores from the model at each step of the attribution process with the `step_scores` argument in `model.attribute`. They can also be used as targets for attribution methods relying on model outputs (e.g. gradient-based methods) by passing them as the `attributed_fn` argument. The following step functions are currently supported:
 
 - `logits`: Logits of the target token.
-- `probability`: Probability of the target token.
+- `probability`: Probability of the target token. Can also be used for log-probability by passing `logprob=True`.
 - `entropy`: Entropy of the predictive distribution.
 - `crossentropy`: Cross-entropy loss between target token and predicted distribution.
 - `perplexity`: Perplexity of the target token.
-- `contrast_prob`: Probability of the target token when different contrastive inputs are provided to the model. Equivalent to `probability` when no contrastive inputs are provided.
+- `contrast_logits`/`contrast_prob`: Logits/probabilities of the target token when different contrastive inputs are provided to the model. Equivalent to `logits`/`probability` when no contrastive inputs are provided.
+- `contrast_logits_diff`/`contrast_prob_diff`: Difference in logits/probability between original and foil target tokens pair, can be used for contrastive evaluation as in [contrastive attribution](https://aclanthology.org/2022.emnlp-main.14/) (Yin and Neubig, 2022).
 - `pcxmi`: Point-wise Contextual Cross-Mutual Information (P-CXMI) for the target token given original and contrastive contexts [(Yin et al. 2021)](https://arxiv.org/abs/2109.07446).
 - `kl_divergence`: KL divergence of the predictive distribution given original and contrastive contexts. Can be restricted to most likely target token options using the `top_k` and `top_p` parameters.
-- `contrast_prob_diff`: Difference in probability between original and foil target tokens pair, can be used for contrastive evaluation as in [Contrastive Attribution](https://aclanthology.org/2022.emnlp-main.14/) (Yin and Neubig, 2022).
+- `in_context_pvi`: In-context Pointwise V-usable Information (PVI) to measure the amount of contextual information used in model predictions [(Lu et al. 2023)](https://arxiv.org/abs/2310.12300).
 - `mc_dropout_prob_avg`: Average probability of the target token across multiple samples using [MC Dropout](https://arxiv.org/abs/1506.02142) (Gal and Ghahramani, 2016).
 - `top_p_size`: The number of tokens with cumulative probability greater than `top_p` in the predictive distribution of the model.
 
@@ -235,15 +238,24 @@ Our vision for Inseq is to create a centralized, comprehensive and robust set of
 If you use Inseq in your research we suggest to include a mention to the specific release (e.g. v0.4.0) and we kindly ask you to cite our reference paper as:
 
 ```bibtex
-@article{sarti-etal-2023-inseq,
-    author = {Gabriele Sarti and Nils Feldhus and Ludwig Sickert and Oskar van der Wal and Malvina Nissim and Arianna Bisazza},
-    title = {Inseq: An Interpretability Toolkit for Sequence Generation Models},
-    month = feb,
-    year = 2023,
-    journal = {ArXiv},
-    volume = {abs/2302.13942},
-    url = {https://arxiv.org/abs/2302.13942}
+@inproceedings{sarti-etal-2023-inseq,
+    title = "Inseq: An Interpretability Toolkit for Sequence Generation Models",
+    author = "Sarti, Gabriele  and
+      Feldhus, Nils  and
+      Sickert, Ludwig  and
+      van der Wal, Oskar and
+      Nissim, Malvina and
+      Bisazza, Arianna",
+    booktitle = "Proceedings of the 61st Annual Meeting of the Association for Computational Linguistics (Volume 3: System Demonstrations)",
+    month = jul,
+    year = "2023",
+    address = "Toronto, Canada",
+    publisher = "Association for Computational Linguistics",
+    url = "https://aclanthology.org/2023.acl-demo.40",
+    doi = "10.18653/v1/2023.acl-demo.40",
+    pages = "421--435",
 }
+
 ```
 
 ## Research using Inseq
@@ -253,9 +265,11 @@ Inseq has been used in various research projects. A list of known publications t
 <details>
   <summary><b>2023</b></summary>
   <ol>
-    <li> <a href="https://arxiv.org/abs/2302.13942">Inseq: An Interpretability Toolkit for Sequence Generation Models</a> (Sarti et al., 2023) </li>
+    <li> <a href="https://aclanthology.org/2023.acl-demo.40/">Inseq: An Interpretability Toolkit for Sequence Generation Models</a> (Sarti et al., 2023) </li>
     <li> <a href="https://arxiv.org/abs/2302.14220">Are Character-level Translations Worth the Wait? Comparing Character- and Subword-level Models for Machine Translation</a> (Edman et al., 2023) </li>
-    <li> <a href="https://arxiv.org/abs/2305.15908">Response Generation in Longitudinal Dialogues: Which Knowledge Representation Helps?</a> (Mousavi et al., 2023)  </li>
+    <li> <a href="https://aclanthology.org/2023.nlp4convai-1.1/">Response Generation in Longitudinal Dialogues: Which Knowledge Representation Helps?</a> (Mousavi et al., 2023)  </li>
+    <li> <a href="https://arxiv.org/abs/2310.01188">Quantifying the Plausibility of Context Reliance in Neural Machine Translation</a> (Sarti et al., 2023)</li>
+    <li> <a href="https://arxiv.org/abs/2310.12127">A Tale of Pronouns: Interpretability Informs Gender Bias Mitigation for Fairer Instruction-Tuned Machine Translation</a> (Attanasio et al., 2023)</li>
   </ol>
 
 </details>

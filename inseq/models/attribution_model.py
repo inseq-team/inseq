@@ -133,6 +133,7 @@ class InputFormatter:
         forward_output: ModelOutput,
         target_ids: ExpandedTargetIdsTensor,
         batch: DecoderOnlyBatch,
+        is_attributed_fn: bool = False,
     ) -> StepFunctionArgs:
         raise NotImplementedError()
 
@@ -144,8 +145,9 @@ class InputFormatter:
         raise NotImplementedError()
 
     @staticmethod
+    @abstractmethod
     def get_step_function_reserved_args() -> List[str]:
-        return [f.name for f in StepFunctionArgs.__dataclass_fields__.values()]
+        raise NotImplementedError()
 
     @staticmethod
     def format_contrast_targets_alignments(
@@ -156,6 +158,7 @@ class InputFormatter:
         contrast_tokens: List[List[str]],
         special_tokens: List[str] = [],
         start_pos: int = 0,
+        end_pos: Optional[int] = None,
     ) -> Tuple[DecoderOnlyBatch, Optional[List[List[Tuple[int, int]]]]]:
         # Ensure that the contrast_targets_alignments are in the correct format (list of lists of idxs pairs)
         if contrast_targets_alignments:
@@ -184,6 +187,7 @@ class InputFormatter:
                     fill_missing=True,
                     special_tokens=special_tokens,
                     start_pos=start_pos,
+                    end_pos=end_pos,
                 )
             )
         return adjusted_alignments
@@ -408,11 +412,10 @@ class AttributionModel(ABC, torch.nn.Module):
             generated_texts = self.generate(
                 encoded_input, return_generation_output=False, batch_size=batch_size, **generation_args
             )
-        else:
-            if generation_args:
-                logger.warning(
-                    f"Generation arguments {generation_args} are provided, but will be ignored (constrained decoding)."
-                )
+        elif generation_args:
+            logger.warning(
+                f"Generation arguments {generation_args} are provided, but will be ignored (constrained decoding)."
+            )
         logger.debug(f"reference_texts={generated_texts}")
         attribution_method = self.get_attribution_method(method, override_default_attribution)
         attributed_fn = self.get_attributed_fn(attributed_fn)
@@ -662,7 +665,7 @@ class AttributionModel(ABC, torch.nn.Module):
         output = self.get_forward_output(batch, use_embeddings=use_embeddings, **kwargs)
         logger.debug(f"logits: {pretty_tensor(output.logits)}")
         step_fn_args = self.formatter.format_step_function_args(
-            attribution_model=self, forward_output=output, target_ids=target_ids, batch=batch
+            attribution_model=self, forward_output=output, target_ids=target_ids, is_attributed_fn=True, batch=batch
         )
         step_fn_extra_args = {k: v for k, v in zip(attributed_fn_argnames, args) if v is not None}
         return attributed_fn(step_fn_args, **step_fn_extra_args)

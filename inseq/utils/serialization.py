@@ -330,9 +330,8 @@ def class_instance_hook(dct: Any, cls_lookup_map: Optional[Dict[str, type]] = No
         if "attributes" in dct:
             properties.update(dct["attributes"])
         obj.__json_decode__(**properties)
-    else:
-        if "attributes" in dct:
-            obj.__dict__ = dict(dct["attributes"])
+    elif "attributes" in dct:
+        obj.__dict__ = dict(dct["attributes"])
     return obj
 
 

@@ -177,11 +177,13 @@ class EncoderDecoderInputFormatter(InputFormatter):
         forward_output: ModelOutput,
         target_ids: ExpandedTargetIdsTensor,
         batch: EncoderDecoderBatch,
+        is_attributed_fn: bool = False,
     ) -> StepFunctionEncoderDecoderArgs:
         return StepFunctionEncoderDecoderArgs(
             attribution_model=attribution_model,
             forward_output=forward_output,
             target_ids=target_ids,
+            is_attributed_fn=is_attributed_fn,
             encoder_input_ids=batch.source_ids,
             decoder_input_ids=batch.target_ids,
             encoder_input_embeds=batch.source_embeds,

@@ -74,10 +74,10 @@ def _get_aligner_subword_aligns(
 ) -> torch.Tensor:
     aligner = get_aligner_model()
     tokenizer = get_aligner_tokenizer()
-    tok_aenized = [tokenizer.tokenize(word) for word in src]
-    tok_benized = [tokenizer.tokenize(word) for word in tgt]
-    ids_src, sub2word_map_src = _preprocess_sequence_for_alignment(tok_aenized)
-    ids_tgt, sub2word_map_tgt = _preprocess_sequence_for_alignment(tok_benized)
+    tokenized_src = [tokenizer.tokenize(word) for word in src]
+    tokenized_tgt = [tokenizer.tokenize(word) for word in tgt]
+    ids_src, sub2word_map_src = _preprocess_sequence_for_alignment(tokenized_src)
+    ids_tgt, sub2word_map_tgt = _preprocess_sequence_for_alignment(tokenized_tgt)
     aligner.eval()
     with torch.no_grad():
         out_src = aligner(ids_src.unsqueeze(0), output_hidden_states=True)[2][align_layer][0, 1:-1]
@@ -107,7 +107,7 @@ def compute_word_aligns(
     align_words = set()
     for i, j in align_subwords:
         align_words.add((sub2word_map_src[i], sub2word_map_tgt[j]))
-    word_alignments = [(a_idx, b_idx) for a_idx, b_idx in sorted(align_words, key=lambda x: (x[0], x[1]))]
+    word_alignments = sorted(align_words, key=lambda x: (x[0], x[1]))
     return AlignedSequences(
         source_tokens=src.copy(),
         target_tokens=tgt.copy(),
@@ -246,7 +246,7 @@ def auto_align_sequences(
                     rm_b_idx = removed_b_token_idxs[removed_b_tokens.index(rm_a)]
                     aligned_special_tokens.append((rm_a_idx, rm_b_idx))
         else:
-            aligned_special_tokens = [(rm_a, rm_b) for rm_a, rm_b in zip(removed_a_token_idxs, removed_b_token_idxs)]
+            aligned_special_tokens = list(zip(removed_a_token_idxs, removed_b_token_idxs))
         a_word_to_token_align = align_tokenizations(a_words, clean_a_tokens)
         b_word_to_token_align = align_tokenizations(b_words, clean_b_tokens)
         # 3. Propagate word-level alignments to token-level alignments.
@@ -279,62 +279,67 @@ def get_adjusted_alignments(
     target_tokens: Optional[List[str]] = None,
     contrast_sequence: Optional[str] = None,
     contrast_tokens: Optional[List[str]] = None,
-    do_sort: bool = True,
     fill_missing: bool = False,
     special_tokens: List[str] = [],
     start_pos: int = 0,
+    end_pos: Optional[int] = None,
 ) -> List[Tuple[int, int]]:
     is_auto_aligned = False
     if fill_missing and not target_tokens:
         raise ValueError("Missing target tokens. Please provide target tokens to fill missing alignments.")
-    if alignments is None and fill_missing:
-        alignments = [(idx, idx) for idx in range(len(target_tokens))]
+    if alignments is None:
+        alignments = []
+    if end_pos is None:
+        end_pos = len(target_tokens)
     elif isinstance(alignments, str):
         if alignments == AlignmentMethod.AUTO.value:
-            auto_aligned = auto_align_sequences(
+            alignments = auto_align_sequences(
                 a_sequence=target_sequence,
                 a_tokens=target_tokens,
                 b_sequence=contrast_sequence,
                 b_tokens=contrast_tokens,
                 filter_special_tokens=special_tokens,
-            )
+            ).alignments
+            alignments = [(a_idx, b_idx) for a_idx, b_idx in alignments if start_pos <= a_idx < end_pos]
             is_auto_aligned = True
-            alignments = auto_aligned.alignments
         else:
             raise ValueError(
                 f"Unknown alignment method: {alignments}. "
                 f"Available methods: {','.join([m.value for m in AlignmentMethod])}"
             )
-    if do_sort:
-        # Sort alignments
-        alignments = sorted(set(alignments), key=lambda x: (x[0], x[1]))
+    # Sort alignments
+    alignments = sorted(set(alignments), key=lambda x: (x[0], x[1]))
 
     # Filling alignments with missing tokens
     if fill_missing:
         filled_alignments = []
-        for pair_idx in range(start_pos, len(target_tokens)):
-            match_pairs = [pair for pair in alignments if pair[0] == pair_idx]
+        for step_idx, pair_idx in enumerate(reversed(range(start_pos, end_pos)), start=1):
+            match_pairs = [pair for pair in alignments if pair[0] == pair_idx and 0 <= pair[1] < len(contrast_tokens)]
 
+            # Default behavior: fill missing alignments with 1:1 position alignments starting from the bottom of the
+            # two sequences
             if not match_pairs:
-                # Assuming 1:1 mapping to cover all tokens from the original sequence
-                filled_alignments.append((pair_idx, pair_idx))
+                if (len(contrast_tokens) - step_idx) < start_pos:
+                    filled_alignments.append((pair_idx, len(contrast_tokens) - 1))
+                else:
+                    filled_alignments.append((pair_idx, len(contrast_tokens) - step_idx))
             else:
-                match_pairs_unaligned = [p for p in match_pairs if p[1] not in [f[1] for f in filled_alignments]]
                 # If found, use the first match that containing an unaligned target token, first match otherwise
+                match_pairs_unaligned = [p for p in match_pairs if p[1] not in [f[1] for f in filled_alignments]]
                 valid_match = match_pairs_unaligned[0] if match_pairs_unaligned else match_pairs[0]
                 filled_alignments.append(valid_match)
         if alignments != filled_alignments:
+            alignments = filled_alignments
             logger.warning(
-                f"Provided alignments do not cover all {len(target_tokens) - start_pos} tokens from the original"
-                " sequence.\nFilling missing position with 1:1 position alignments."
+                f"Provided alignments do not cover all {end_pos - start_pos} tokens from the original"
+                " sequence.\nFilling missing position with right-aligned 1:1 position alignments.\n"
+                f"Generated alignments: {alignments}"
             )
-        if is_auto_aligned:
-            filled_alignments = [(a_idx, b_idx) for a_idx, b_idx in filled_alignments if a_idx >= start_pos]
-            logger.warning(
-                f"Using {ALIGN_MODEL_ID} for automatic alignments. Provide custom alignments for non-linguistic "
-                f"sequences, or for languages not covered by the aligner.\nGenerated alignments: {filled_alignments}"
-            )
-        alignments = filled_alignments
+    if is_auto_aligned:
+        logger.warning(
+            f"Using {ALIGN_MODEL_ID} for automatic alignments. Provide custom alignments for non-linguistic "
+            f"sequences, or for languages not covered by the aligner.\nGenerated alignments: {alignments}"
+        )
     return alignments
 
 

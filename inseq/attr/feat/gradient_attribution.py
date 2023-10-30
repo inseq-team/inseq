@@ -32,7 +32,7 @@ from ...utils import Registry, extract_signature_args, rgetattr
 from ..attribution_decorators import set_hook, unset_hook
 from .attribution_utils import get_source_target_attributions
 from .feature_attribution import FeatureAttribution
-from .ops import DiscretetizedIntegratedGradients
+from .ops import DiscretetizedIntegratedGradients, SequentialIntegratedGradients
 
 logger = logging.getLogger(__name__)
 
@@ -210,6 +210,22 @@ class SaliencyAttribution(GradientAttributionRegistry):
     def __init__(self, attribution_model):
         super().__init__(attribution_model)
         self.method = Saliency(self.attribution_model)
+
+
+class SequentialIntegratedGradientsAttribution(GradientAttributionRegistry):
+    """Sequential Integrated Gradients attribution method.
+
+    Reference: https://aclanthology.org/2023.findings-acl.477/
+
+    Original implementation: https://github.com/josephenguehard/time_interpret/blob/main/tint/attr/seq_ig.py
+    """
+
+    method_name = "sequential_integrated_gradients"
+
+    def __init__(self, attribution_model, multiply_by_inputs: bool = True, **kwargs):
+        super().__init__(attribution_model)
+        self.method = SequentialIntegratedGradients(self.attribution_model, multiply_by_inputs)
+        self.use_baselines = True
 
 
 # Layer methods

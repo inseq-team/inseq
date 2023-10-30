@@ -55,6 +55,7 @@ def register_model_config(
 ) -> None:
     """Allows to register a model configuration for a given model type. The configuration is a dictionary containing
     information required the methods for which the attribute ``use_model_config=True``.
+
     Args:
         model_type (`str`):
             The class of the model for which the configuration is registered, used as key in the stored configuration.
@@ -67,6 +68,7 @@ def register_model_config(
         allow_partial (`bool`, *optional*, defaults to False):
             If `True`, the configuration can be partial, i.e. it can contain only a subset of the fields of the
             :class:`~inseq.models.ModelConfig` class. The missing fields will be set to `None`.
+
     Raises:
         `ValueError`: If the model type is already registered and `overwrite=False`, or if the configuration is partial
             and `allow_partial=False`.

@@ -196,7 +196,7 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
         """
         attr = attributions[0]
         num_sequences = len(attr.prefix)
-        if not all([len(attr.prefix) == num_sequences for attr in attributions]):
+        if not all(len(attr.prefix) == num_sequences for attr in attributions):
             raise ValueError("All the attributions must include the same number of sequences.")
         seq_attributions = []
         sources = None
@@ -716,6 +716,7 @@ class CoarseFeatureAttributionSequenceOutput(FeatureAttributionSequenceOutput):
 
     def __post_init__(self):
         super().__post_init__()
+        self._aggregator = []
 
 
 @dataclass(eq=False, repr=False)
