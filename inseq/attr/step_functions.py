@@ -9,7 +9,7 @@ from transformers.modeling_outputs import ModelOutput
 from ..data import FeatureAttributionInput
 from ..data.aggregation_functions import DEFAULT_ATTRIBUTION_AGGREGATE_DICT
 from ..utils import extract_signature_args, filter_logits, top_p_logits_mask
-from ..utils.contrast_utils import _get_contrast_output, _setup_contrast_args
+from ..utils.contrast_utils import _get_contrast_output, _setup_contrast_args, contrast_fn_docstring
 from ..utils.typing import EmbeddingsTensor, IdsTensor, SingleScorePerStepTensor, TargetIdsTensor
 
 if TYPE_CHECKING:
