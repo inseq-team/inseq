@@ -586,6 +586,7 @@ class FeatureAttribution(Registry):
                 attribution_model=self.attribution_model,
                 forward_output=output,
                 target_ids=target_ids,
+                is_attributed_fn=False,
                 batch=batch,
             )
             step_fn_extra_args = get_step_scores_args([step_score], step_scores_args)

@@ -319,8 +319,8 @@ def get_adjusted_alignments(
             # Default behavior: fill missing alignments with 1:1 position alignments starting from the bottom of the
             # two sequences
             if not match_pairs:
-                if len(contrast_tokens) < step_idx:
-                    filled_alignments.append((pair_idx, 0))
+                if (len(contrast_tokens) - step_idx) < start_pos:
+                    filled_alignments.append((pair_idx, len(contrast_tokens) - 1))
                 else:
                     filled_alignments.append((pair_idx, len(contrast_tokens) - step_idx))
             else:
@@ -329,11 +329,12 @@ def get_adjusted_alignments(
                 valid_match = match_pairs_unaligned[0] if match_pairs_unaligned else match_pairs[0]
                 filled_alignments.append(valid_match)
         if alignments != filled_alignments:
+            alignments = filled_alignments
             logger.warning(
                 f"Provided alignments do not cover all {end_pos - start_pos} tokens from the original"
-                " sequence.\nFilling missing position with right-aligned 1:1 position alignments."
+                " sequence.\nFilling missing position with right-aligned 1:1 position alignments.\n"
+                f"Generated alignments: {alignments}"
             )
-        alignments = filled_alignments
     if is_auto_aligned:
         logger.warning(
             f"Using {ALIGN_MODEL_ID} for automatic alignments. Provide custom alignments for non-linguistic "
