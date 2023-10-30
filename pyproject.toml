@@ -54,7 +54,7 @@ numpy = ">=1.21.6"
 jaxtyping = "^0.2.23"
 typeguard = "<=2.13.3"
 # Omitting future torch releases as they don't install nvidia dependencies: https://github.com/pytorch/pytorch/issues/100974
-torch = ">=2.0.0"
+torch = "2.0.0"
 matplotlib = ">=3.5.3"
 tqdm = ">=4.64.0"
 poethepoet = ">=0.13.1"
