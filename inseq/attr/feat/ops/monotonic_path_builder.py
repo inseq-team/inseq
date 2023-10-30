@@ -26,7 +26,7 @@ from pathlib import Path
 from typing import Any, List, Optional, Tuple, Union
 
 import torch
-from torchtyping import TensorType
+from jaxtyping import Float, Int
 
 from ....utils import is_joblib_available, is_scikitlearn_available
 
@@ -138,8 +138,8 @@ class MonotonicPathBuilder:
 
     def scale_inputs(
         self,
-        input_ids: TensorType["batch_size", "seq_len", int],
-        baseline_ids: TensorType["batch_size", "seq_len", int],
+        input_ids: Int[torch.Tensor, "batch_size seq_len"],
+        baseline_ids: Int[torch.Tensor, "batch_size seq_len"],
         n_steps: Optional[int] = None,
         scale_strategy: Optional[str] = None,
     ) -> MultiStepEmbeddingsTensor:
@@ -208,7 +208,7 @@ class MonotonicPathBuilder:
 
     def build_monotonic_path_embedding(
         self, word_path: List[int], baseline_idx: int, n_steps: int = 30
-    ) -> TensorType["n_steps", "embed_size", float]:
+    ) -> Float[torch.Tensor, "n_steps embed_size"]:
         """Build a monotonic path embedding from a word path."""
         baseline_vec = self.vocabulary_embeddings[baseline_idx]
         monotonic_embs = [self.vocabulary_embeddings[word_path[0]]]

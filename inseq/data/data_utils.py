@@ -4,7 +4,7 @@ from typing import Any, Dict, TypeVar
 
 import numpy as np
 import torch
-from torchtyping import TensorType
+from jaxtyping import Int
 
 from ..utils import pretty_dict
 
@@ -133,7 +133,7 @@ class TensorWrapper:
             **{field.name: self._slice_batch(getattr(self, field.name), subscript) for field in fields(self.__class__)}
         )
 
-    def select_active(self: TensorClass, mask: TensorType["batch_size", 1, int]) -> TensorClass:
+    def select_active(self: TensorClass, mask: Int[torch.Tensor, "batch_size 1"]) -> TensorClass:
         return self.__class__(
             **{field.name: self._select_active(getattr(self, field.name), mask) for field in fields(self.__class__)}
         )

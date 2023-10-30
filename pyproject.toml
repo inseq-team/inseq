@@ -51,7 +51,7 @@ transformers =  { version = ">=4.22.0", extras = ["sentencepiece", "tokenizers",
 protobuf = ">=3.20.1"
 captum = ">=0.6.0"
 numpy = ">=1.21.6"
-torchtyping = ">=0.1.4"
+jaxtyping = "^0.2.23"
 typeguard = "<=2.13.3"
 # Omitting future torch releases as they don't install nvidia dependencies: https://github.com/pytorch/pytorch/issues/100974
 torch = ">=2.0.0"
@@ -189,6 +189,7 @@ ignore = [
     "E501", # line too long (handled by format)
     "E731", # do not assign a lambda expression, use a def
     "E741", # ambiguous variable name
+    "F722", # syntax error in forward annotation (as used by jaxtyping)
     "F821", # undefined name
     "PLR2004", # unnamed numerical constants used
     "PLR0913", # too many arguments
