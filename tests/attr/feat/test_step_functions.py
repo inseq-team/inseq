@@ -2,7 +2,7 @@ import torch
 from pytest import fixture
 
 import inseq
-from inseq.attr.step_functions import StepFunctionArgs, _get_contrast_output, probability_fn
+from inseq.attr.step_functions import StepFunctionArgs, _get_contrast_inputs, probability_fn
 from inseq.models import DecoderOnlyAttributionModel, EncoderDecoderAttributionModel
 
 
@@ -62,7 +62,7 @@ def attr_prob_diff_fn(
     logprob: bool = False,
 ):
     model_probs = probability_fn(args, logprob=logprob)
-    c_out = _get_contrast_output(
+    c_out = _get_contrast_inputs(
         args,
         contrast_targets=contrast_targets,
         contrast_targets_alignments=contrast_targets_alignments,
