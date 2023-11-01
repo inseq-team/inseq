@@ -302,6 +302,10 @@ def get_adjusted_alignments(
             ).alignments
             alignments = [(a_idx, b_idx) for a_idx, b_idx in alignments if start_pos <= a_idx < end_pos]
             is_auto_aligned = True
+            logger.warning(
+                f"Using {ALIGN_MODEL_ID} for automatic alignments. Provide custom alignments for non-linguistic "
+                f"sequences, or for languages not covered by the aligner."
+            )
         else:
             raise ValueError(
                 f"Unknown alignment method: {alignments}. "
@@ -310,11 +314,21 @@ def get_adjusted_alignments(
     # Sort alignments
     alignments = sorted(set(alignments), key=lambda x: (x[0], x[1]))
 
+    # Filter alignments (restrict to one per token)
+    filter_aligns = []
+    for pair_idx in range(start_pos, end_pos):
+        match_pairs = [(p0, p1) for p0, p1 in alignments if p0 == pair_idx and 0 <= p1 < len(contrast_tokens)]
+        if match_pairs:
+            # If found, use the first match that containing an unaligned target token, first match otherwise
+            match_pairs_unaligned = [p for p in match_pairs if p[1] not in [f[1] for f in filter_aligns]]
+            valid_match = match_pairs_unaligned[0] if match_pairs_unaligned else match_pairs[0]
+            filter_aligns.append(valid_match)
+
     # Filling alignments with missing tokens
     if fill_missing:
-        filled_alignments = []
+        filled_alignments = filter_aligns.copy()
         for step_idx, pair_idx in enumerate(reversed(range(start_pos, end_pos)), start=1):
-            match_pairs = [pair for pair in alignments if pair[0] == pair_idx and 0 <= pair[1] < len(contrast_tokens)]
+            match_pairs = [(p0, p1) for p0, p1 in filter_aligns if p0 == pair_idx and 0 <= p1 < len(contrast_tokens)]
 
             # Default behavior: fill missing alignments with 1:1 position alignments starting from the bottom of the
             # two sequences
@@ -323,24 +337,23 @@ def get_adjusted_alignments(
                     filled_alignments.append((pair_idx, len(contrast_tokens) - 1))
                 else:
                     filled_alignments.append((pair_idx, len(contrast_tokens) - step_idx))
-            else:
-                # If found, use the first match that containing an unaligned target token, first match otherwise
-                match_pairs_unaligned = [p for p in match_pairs if p[1] not in [f[1] for f in filled_alignments]]
-                valid_match = match_pairs_unaligned[0] if match_pairs_unaligned else match_pairs[0]
-                filled_alignments.append(valid_match)
-        if alignments != filled_alignments:
-            alignments = filled_alignments
-            logger.warning(
-                f"Provided alignments do not cover all {end_pos - start_pos} tokens from the original"
-                " sequence.\nFilling missing position with right-aligned 1:1 position alignments.\n"
-                f"Generated alignments: {alignments}"
+
+        if filter_aligns != filled_alignments:
+            existing_aligns_message = (
+                f"Provided target alignments do not cover all {end_pos - start_pos} tokens from the original sequence."
             )
-    if is_auto_aligned:
-        logger.warning(
-            f"Using {ALIGN_MODEL_ID} for automatic alignments. Provide custom alignments for non-linguistic "
-            f"sequences, or for languages not covered by the aligner.\nGenerated alignments: {alignments}"
-        )
-    return alignments
+            no_aligns_message = (
+                "No target alignments were provided for the contrastive target. "
+                "Use e.g. 'contrast_targets_alignments=[(0,1), ...] to provide them in model.attribute"
+            )
+            logger.warning(
+                f"{existing_aligns_message if filter_aligns else no_aligns_message}\n"
+                "Filling missing position with right-aligned 1:1 position alignments."
+            )
+            filter_aligns = sorted(set(filled_alignments), key=lambda x: (x[0], x[1]))
+    if is_auto_aligned or (fill_missing and filter_aligns != filled_alignments):
+        logger.warning(f"Generated alignments: {filter_aligns}")
+    return filter_aligns
 
 
 def get_aligned_idx(a_idx: int, alignments: List[Tuple[int, int]]) -> int:

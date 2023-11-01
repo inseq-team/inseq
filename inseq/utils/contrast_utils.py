@@ -3,7 +3,7 @@ import warnings
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Callable, List, Optional, Tuple, Union
 
-from transformers.modeling_outputs import ModelOutput
+import torch
 
 from ..data import (
     DecoderOnlyBatch,
@@ -52,13 +52,12 @@ def contrast_fn_docstring() -> Callable[..., "StepFunction"]:
 
 
 @dataclass
-class ContrastOutput:
-    forward_output: ModelOutput
+class ContrastInputs:
     batch: Union[EncoderDecoderBatch, DecoderOnlyBatch, None] = None
     target_ids: Optional[TargetIdsTensor] = None
 
 
-def _get_contrast_output(
+def _get_contrast_inputs(
     args: "StepFunctionArgs",
     contrast_sources: Optional[FeatureAttributionInput] = None,
     contrast_targets: Optional[FeatureAttributionInput] = None,
@@ -66,7 +65,7 @@ def _get_contrast_output(
     return_contrastive_target_ids: bool = False,
     return_contrastive_batch: bool = False,
     **forward_kwargs,
-) -> ContrastOutput:
+) -> ContrastInputs:
     """Utility function to return the output of the model for given contrastive inputs.
 
     Args:
@@ -93,10 +92,13 @@ def _get_contrast_output(
                 f" ({args.decoder_input_ids.size(0)}). Multi-sentence attribution and methods expanding inputs to"
                 " multiple steps (e.g. Integrated Gradients) are not yet supported for contrastive attribution."
             )
-
-        args.decoder_input_ids = c_batch.target_ids
-        args.decoder_input_embeds = c_batch.target_embeds
-        args.decoder_attention_mask = c_batch.target_mask
+        if (
+            args.decoder_input_ids.shape != c_batch.target_ids.shape
+            or torch.ne(args.decoder_input_ids, c_batch.target_ids).any()
+        ):
+            args.decoder_input_ids = c_batch.target_ids
+            args.decoder_input_embeds = c_batch.target_embeds
+            args.decoder_attention_mask = c_batch.target_mask
     if contrast_sources:
         from ..attr.step_functions import StepFunctionEncoderDecoderArgs
 
@@ -106,12 +108,15 @@ def _get_contrast_output(
                 "Use `contrast_targets` to set a contrastive target containing a prefix for decoder-only models."
             )
         c_enc_in = args.attribution_model.encode(contrast_sources)
-        args.encoder_input_ids = c_enc_in.input_ids
-        args.encoder_attention_mask = c_enc_in.attention_mask
-        args.encoder_input_embeds = args.attribution_model.embed(args.encoder_input_ids, as_targets=False)
+        if (
+            args.encoder_input_ids.shape != c_enc_in.input_ids.shape
+            or torch.ne(args.encoder_input_ids, c_enc_in.input_ids).any()
+        ):
+            args.encoder_input_ids = c_enc_in.input_ids
+            args.encoder_input_embeds = args.attribution_model.embed(args.encoder_input_ids, as_targets=False)
+            args.encoder_attention_mask = c_enc_in.attention_mask
     c_batch = args.attribution_model.formatter.convert_args_to_batch(args)
-    return ContrastOutput(
-        forward_output=args.attribution_model.get_forward_output(c_batch, use_embeddings=is_enc_dec, **forward_kwargs),
+    return ContrastInputs(
         batch=c_batch if return_contrastive_batch else None,
         target_ids=c_tgt_ids if return_contrastive_target_ids else None,
     )
@@ -124,7 +129,7 @@ def _setup_contrast_args(
     contrast_targets_alignments: Optional[List[List[Tuple[int, int]]]] = None,
     contrast_force_inputs: bool = False,
 ):
-    c_output = _get_contrast_output(
+    c_inputs = _get_contrast_inputs(
         args,
         contrast_sources=contrast_sources,
         contrast_targets=contrast_targets,
@@ -132,8 +137,6 @@ def _setup_contrast_args(
         return_contrastive_target_ids=True,
         return_contrastive_batch=True,
     )
-    if c_output.target_ids is not None:
-        args.target_ids = c_output.target_ids
     if args.is_attributed_fn:
         if contrast_force_inputs:
             warnings.warn(
@@ -141,7 +144,6 @@ def _setup_contrast_args(
                 "gradient-based attribution methods.",
                 stacklevel=1,
             )
-            args.forward_output = c_output.forward_output
         else:
             warnings.warn(
                 "Contrastive inputs do not match original inputs when using a contrastive attributed function.\n"
@@ -151,6 +153,18 @@ def _setup_contrast_args(
                 "set --contrast_force_inputs to True to use the contrastive inputs for attribution instead.",
                 stacklevel=1,
             )
+    use_original_output = args.is_attributed_fn and not contrast_force_inputs
+    if use_original_output:
+        forward_output = args.forward_output
     else:
-        args.forward_output = c_output.forward_output
-    return args
+        forward_output = args.attribution_model.get_forward_output(
+            c_inputs.batch, use_embeddings=args.attribution_model.is_encoder_decoder
+        )
+    c_args = args.attribution_model.formatter.format_step_function_args(
+        args.attribution_model,
+        forward_output=forward_output,
+        target_ids=c_inputs.target_ids if c_inputs.target_ids is not None else args.target_ids,
+        batch=c_inputs.batch,
+        is_attributed_fn=args.is_attributed_fn,
+    )
+    return c_args
