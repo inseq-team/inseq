@@ -231,6 +231,7 @@ def kl_divergence_fn(
         contrast_targets=contrast_targets,
         contrast_targets_alignments=contrast_targets_alignments,
         return_contrastive_target_ids=False,
+        return_contrastive_batch=True,
     )
     c_forward_output = args.attribution_model.get_forward_output(
         contrast_inputs.batch, use_embeddings=args.attribution_model.is_encoder_decoder

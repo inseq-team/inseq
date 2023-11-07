@@ -268,9 +268,12 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
                 # that are not source-to-target (default for encoder-decoder) or target-to-target
                 # (default for decoder only).
                 remove_pad_fn = cls.get_remove_pad_fn(attr, seq_score_name)
-                out_seq_scores = get_sequences_from_batched_steps(
-                    [att.sequence_scores[seq_score_name] for att in attributions]
-                )
+                if seq_score_name.startswith("encoder"):
+                    out_seq_scores = [attr.sequence_scores[seq_score_name][i, ...] for i in range(num_sequences)]
+                else:
+                    out_seq_scores = get_sequences_from_batched_steps(
+                        [att.sequence_scores[seq_score_name] for att in attributions]
+                    )
                 for seq_id in range(num_sequences):
                     seq_scores[seq_id][seq_score_name] = remove_pad_fn(out_seq_scores, sources, targets, seq_id)
             for seq_id in range(num_sequences):

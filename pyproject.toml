@@ -224,7 +224,7 @@ known-first-party = ["inseq"]
 order-by-type = true
 
 [tool.ruff.pylint]
-max-branches = 20
+max-branches = 22
 
 [tool.ruff.pyupgrade]
 keep-runtime-typing = true
