@@ -47,6 +47,8 @@ pip install git+https://github.com/inseq-team/inseq.git
 
 Install extras for visualization in Jupyter Notebooks and 🤗 datasets attribution as `pip install inseq[notebook,datasets]`.
 
+Install [Jax](https://github.com/google/jax) (optional) with ```poetry install --with jax```.
+
 <details>
   <summary>Dev Installation</summary>
 To install the package, clone the repository and run the following commands:
@@ -71,6 +73,8 @@ After installation, you should be able to run `make fast-test` and `make lint` w
 
 - Installing `sentencepiece` requires various packages, install with `sudo apt-get install cmake build-essential pkg-config` or `brew install cmake gperftools pkg-config`.
 
+- Inseq does not work with older versions of `jaxlib`.
+Install a compatible version with ```poetry install --with jax```.
 </details>
 
 ## Example usage in Python
