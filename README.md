@@ -47,8 +47,6 @@ pip install git+https://github.com/inseq-team/inseq.git
 
 Install extras for visualization in Jupyter Notebooks and 🤗 datasets attribution as `pip install inseq[notebook,datasets]`.
 
-Install [Jax](https://github.com/google/jax) (optional) with ```poetry install --with jax```.
-
 <details>
   <summary>Dev Installation</summary>
 To install the package, clone the repository and run the following commands:
