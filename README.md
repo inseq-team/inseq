@@ -71,6 +71,8 @@ After installation, you should be able to run `make fast-test` and `make lint` w
 
 - Installing `sentencepiece` requires various packages, install with `sudo apt-get install cmake build-essential pkg-config` or `brew install cmake gperftools pkg-config`.
 
+- Inseq does not work with older versions of `jaxlib`.
+Install a compatible version with ```poetry install --with jax```.
 </details>
 
 ## Example usage in Python

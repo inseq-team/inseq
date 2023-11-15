@@ -101,6 +101,13 @@ pytest = ">=7.2.0"
 pytest-cov = ">=4.0.0"
 ruff  = ">=0.1.2"
 
+[tool.poetry.group.jax]
+optional = true
+
+[tool.poetry.group.jax.dependencies]
+jax = ">=0.4.20"
+jaxlib = ">=0.4.20"
+
 [tool.poetry.extras]
 sklearn = ["scikit-learn", "joblib"]
 datasets = ["datasets"]
