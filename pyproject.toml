@@ -5,7 +5,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 name = "inseq"
-version = "0.5.0.dev0"
+version = "0.5.0"
 description = "Interpretability for Sequence Generation Models 🔍"
 readme = "README.md"
 authors = ["The Inseq Team"]

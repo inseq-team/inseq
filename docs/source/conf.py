@@ -27,7 +27,7 @@ author = "The Inseq Team"
 # The short X.Y version
 version = "0.5"
 # The full version, including alpha/beta/rc tags
-release = "0.5.0.dev0"
+release = "0.5.0"
 
 
 # Prefix link to point to master, comment this during version release and uncomment below line
