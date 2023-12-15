@@ -18,7 +18,6 @@ from typing import Any, Dict, Optional
 
 from captum._utils.typing import TensorOrTupleOfTensorsGeneric
 from captum.attr._utils.attribution import Attribution
-from captum.log import log_usage
 
 from ...data import MultiDimensionalFeatureAttributionStepOutput
 from ...utils import Registry
@@ -30,6 +29,7 @@ logger = logging.getLogger(__name__)
 
 class InternalsAttributionRegistry(FeatureAttribution, Registry):
     r"""Model Internals-based attribution method registry."""
+
     pass
 
 
@@ -43,7 +43,6 @@ class AttentionWeightsAttribution(InternalsAttributionRegistry):
         def has_convergence_delta() -> bool:
             return False
 
-        @log_usage()
         def attribute(
             self,
             inputs: TensorOrTupleOfTensorsGeneric,
@@ -85,9 +84,7 @@ class AttentionWeightsAttribution(InternalsAttributionRegistry):
                 else:
                     target_attributions = None
                     sequence_scores["decoder_self_attentions"] = decoder_self_attentions
-                sequence_scores["encoder_self_attentions"] = (
-                    encoder_self_attentions[..., -1, :].clone().permute(0, 3, 1, 2)
-                )
+                sequence_scores["encoder_self_attentions"] = encoder_self_attentions.clone().permute(0, 3, 4, 1, 2)
                 return MultiDimensionalFeatureAttributionStepOutput(
                     source_attributions=cross_attentions[..., -1, :].clone().permute(0, 3, 1, 2),
                     target_attributions=target_attributions,

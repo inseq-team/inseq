@@ -1,6 +1,8 @@
+import torch
 from pytest import fixture
 
 import inseq
+from inseq.attr.step_functions import StepFunctionArgs, _get_contrast_inputs, probability_fn
 from inseq.models import DecoderOnlyAttributionModel, EncoderDecoderAttributionModel
 
 
@@ -20,7 +22,7 @@ def test_contrast_prob_consistency_decoder(saliency_gpt2: DecoderOnlyAttribution
         " the manager opened her own restaurant.",
         attribute_target=True,
         step_scores=["contrast_prob"],
-        contrast_target_prefixes="After returning to her hometown,",
+        contrast_targets="After returning to her hometown, the manager opened her own restaurant.",
     )
     contrast_prob = out_contrast.sequence_attributions[0].step_scores["contrast_prob"]
     out_regular = saliency_gpt2.attribute(
@@ -35,12 +37,12 @@ def test_contrast_prob_consistency_decoder(saliency_gpt2: DecoderOnlyAttribution
 
 def test_contrast_prob_consistency_enc_dec(saliency_mt_model: EncoderDecoderAttributionModel):
     out_contrast = saliency_mt_model.attribute(
-        " started working as a cook in London.",
-        " ha iniziato a lavorare come cuoca a Londra.",
+        "she started working as a cook in London.",
+        "ha iniziato a lavorare come cuoca a Londra.",
         attribute_target=True,
         step_scores=["contrast_prob"],
         contrast_sources="After finishing her studies, she started working as a cook in London.",
-        contrast_target_prefixes="Dopo aver terminato gli studi,",
+        contrast_targets="Dopo aver terminato gli studi, ha iniziato a lavorare come cuoca a Londra.",
     )
     contrast_prob = out_contrast.sequence_attributions[0].step_scores["contrast_prob"]
     out_regular = saliency_mt_model.attribute(
@@ -53,86 +55,77 @@ def test_contrast_prob_consistency_enc_dec(saliency_mt_model: EncoderDecoderAttr
     assert all(c == r for c, r in zip(contrast_prob, regular_prob[-len(contrast_prob) :]))
 
 
-def test_contrast_prob_diff_contrast_targets_auto_align_seq2seq(saliency_mt_model: EncoderDecoderAttributionModel):
-    out = saliency_mt_model.attribute(
-        (
-            " UN peacekeepers, whom arrived in Haiti after the 2010 earthquake, are being blamed for the spread of the"
-            " disease which started near the troop's encampment."
-        ),
-        (
-            "I soldati della pace dell'ONU, che sono arrivati ad Haiti dopo il terremoto del 2010, sono stati"
-            " incolpati per la diffusione della malattia che è iniziata vicino al campo delle truppe."
-        ),
-        attributed_fn="contrast_prob_diff",
-        step_scores=["contrast_prob_diff"],
-        contrast_targets=(
-            "Le forze di pace delle Nazioni Unite, arrivate ad Haiti dopo il terremoto del 2010, sono state accusate"
-            " di aver diffuso la malattia iniziata nei pressi dell'accampamento delle truppe."
-        ),
-        contrast_targets_alignments="auto",
+def attr_prob_diff_fn(
+    args: StepFunctionArgs,
+    contrast_targets,
+    contrast_targets_alignments=None,
+    logprob: bool = False,
+):
+    model_probs = probability_fn(args, logprob=logprob)
+    c_out = _get_contrast_inputs(
+        args,
+        contrast_targets=contrast_targets,
+        contrast_targets_alignments=contrast_targets_alignments,
+        return_contrastive_target_ids=True,
     )
-    contrast_targets = [
-        "▁Le → ▁I",
-        "▁forze → ▁soldati",
-        "▁di → ▁della",
-        "▁pace",
-        "▁delle → ▁dell",
-        "▁delle → '",
-        "▁Nazioni → ONU",
-        ",",
-        "▁arriva → ▁che",
-        "te → ▁sono",
-        "▁arriva → ▁arrivati",
-        "▁ad",
-        "▁Haiti",
-        "▁dopo",
-        "▁il",
-        "▁terremoto",
-        "▁del",
-        "▁2010,",
-        "▁sono",
-        "▁state → ▁stati",
-        "▁accusa → ▁in",
-        "te → col",
-        "▁accusa → pati",
-        "▁di → ▁per",
-        "▁aver → ▁la",
-        "▁diffuso → ▁diffusione",
-        "▁la → ▁della",
-        "▁malattia",
-        "▁iniziata → ▁che",
-        "▁dell → ▁è",
-        "▁iniziata",
-        "▁pressi → ▁vicino",
-        "▁nei → ▁al",
-        "acca → ▁campo",
-        "▁delle",
-        "▁truppe",
-        ".",
-        "</s>",
-    ]
-    assert [t.token for t in out[0].target] == contrast_targets
+    args.target_ids = c_out.target_ids
+    contrast_probs = probability_fn(args, logprob=logprob)
+    return model_probs - contrast_probs
 
 
-def test_contrast_prob_diff_contrast_targets_auto_align_gpt(saliency_gpt2: DecoderOnlyAttributionModel):
-    out = saliency_gpt2.attribute(
-        "",
-        "UN peacekeepers were deployed in the region.",
-        attributed_fn="contrast_prob_diff",
-        contrast_targets="<|endoftext|> UN peacekeepers were sent to the war-torn region.",
-        contrast_targets_alignments="auto",
-        step_scores=["contrast_prob_diff"],
+def test_contrast_attribute_target_only_enc_dec(saliency_mt_model: EncoderDecoderAttributionModel):
+    inseq.register_step_function(fn=attr_prob_diff_fn, identifier="attr_prob_diff", overwrite=True)
+    src = "The nurse was tired and went home."
+    tgt = "L'infermiere era stanco e andò a casa."
+    contrast_tgt = "L'infermiera era stanca e andò a casa."
+    out_explicit_logit_prob_diff = saliency_mt_model.attribute(
+        src,
+        tgt,
+        contrast_targets=contrast_tgt,
+        attributed_fn="attr_prob_diff",
+        step_scores=["attr_prob_diff", "contrast_prob_diff"],
+        attribute_target=True,
     )
-    contrast_targets = [
-        "<|endoftext|>",
-        "ĠUN",
-        "Ġpeace",
-        "keepers",
-        "Ġwere",
-        "Ġsent → Ġdeployed",
-        "Ġto → Ġin",
-        "Ġthe",
-        "Ġregion",
-        ".",
-    ]
-    assert [t.token for t in out[0].target] == contrast_targets
+    out_default_prob_diff = saliency_mt_model.attribute(
+        src,
+        tgt,
+        contrast_targets=contrast_tgt,
+        attributed_fn="contrast_prob_diff",
+        step_scores=["contrast_prob_diff"],
+        attribute_target=True,
+    )
+    assert torch.allclose(
+        out_explicit_logit_prob_diff[0].step_scores["contrast_prob_diff"],
+        out_default_prob_diff[0].step_scores["contrast_prob_diff"],
+    )
+    assert torch.allclose(
+        out_explicit_logit_prob_diff[0].source_attributions,
+        out_default_prob_diff[0].source_attributions,
+    )
+    assert torch.allclose(
+        out_explicit_logit_prob_diff[0].target_attributions,
+        out_default_prob_diff[0].target_attributions,
+        equal_nan=True,
+    )
+    out_contrast_force_inputs_prob_diff = saliency_mt_model.attribute(
+        src,
+        tgt,
+        contrast_targets=contrast_tgt,
+        attributed_fn="contrast_prob_diff",
+        step_scores=["contrast_prob_diff"],
+        attribute_target=True,
+        contrast_force_inputs=True,
+    )
+    assert not torch.allclose(
+        out_explicit_logit_prob_diff[0].source_attributions,
+        out_contrast_force_inputs_prob_diff[0].source_attributions,
+    )
+    assert not torch.allclose(
+        out_explicit_logit_prob_diff[0].target_attributions,
+        out_contrast_force_inputs_prob_diff[0].target_attributions,
+        equal_nan=True,
+    )
+    assert torch.allclose(
+        out_explicit_logit_prob_diff[0].step_scores["contrast_prob_diff"],
+        out_default_prob_diff[0].step_scores["contrast_prob_diff"],
+    )

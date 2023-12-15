@@ -248,8 +248,6 @@ Inseq allows users to specify custom attribution targets using the ``attributed_
         step_scores=["contrast_prob_diff"]
     )
 
-    # Weight attribution scores by the difference in probabilities
-    out.weight_attributions("contrast_prob_diff")
     out.show()
 
 .. raw:: html

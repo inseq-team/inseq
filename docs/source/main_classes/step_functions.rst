@@ -18,9 +18,9 @@ Step Functions
 Step Functions Default arguments
 -----------------------------------------------------------------------------------------------------------------------
 
-The default arguments passed to all step functions are collected in the :class:`StepFunctionArgs` class.
+The default arguments passed to all step functions are collected in the :class:`StepFunctionBaseArgs` class.
 
-.. autoclass:: StepFunctionArgs
+.. autoclass:: StepFunctionBaseArgs
 
 Pre-registered Step Functions
 -----------------------------------------------------------------------------------------------------------------------
@@ -37,13 +37,19 @@ The following functions can be used out-of-the-box as attribution targets or ste
 
 .. autofunction:: perplexity_fn
 
+.. autofunction:: contrast_logits_fn
+
 .. autofunction:: contrast_prob_fn
+
+.. autofunction:: contrast_logits_diff_fn
+
+.. autofunction:: contrast_prob_diff_fn
 
 .. autofunction:: pcxmi_fn
 
 .. autofunction:: kl_divergence_fn
 
-.. autofunction:: contrast_prob_diff_fn
+.. autofunction:: in_context_pvi_fn
 
 .. autofunction:: mc_dropout_prob_avg_fn
 

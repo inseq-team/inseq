@@ -9,7 +9,7 @@ To install dependencies and prepare [`pre-commit`](https://pre-commit.com/) hook
 
 ```bash
 make install
-make pre-commit-install
+make install-dev
 ```
 
 To activate your `virtualenv` run `poetry shell`.
@@ -24,7 +24,7 @@ make lint
 
 ### Checks
 
-Many checks are configured for this project. Command `make check-style` will check black and isort.
+Many checks are configured for this project. Command `make check-style` will check style with `ruff`.
 The `make check-safety` command will look at the security of your code.
 
 Comand `make lint` applies all checks.

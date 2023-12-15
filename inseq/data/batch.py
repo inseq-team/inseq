@@ -235,6 +235,8 @@ class DecoderOnlyBatch(Batch):
 def slice_batch_from_position(
     batch: DecoderOnlyBatch, curr_idx: int, alignments: Optional[List[Tuple[int, int]]] = None
 ) -> Tuple[DecoderOnlyBatch, IdsTensor]:
+    if len(alignments) > 0 and isinstance(alignments[0], list):
+        alignments = alignments[0]
     truncate_idx = get_aligned_idx(curr_idx, alignments)
     tgt_ids = batch.target_ids[:, truncate_idx]
     return batch[:truncate_idx], tgt_ids

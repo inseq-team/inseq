@@ -102,14 +102,18 @@ def show_attributions(
             display(HTML(curr_html))
         html_out += curr_html
         if not isnotebook():
-            curr_color = colors[idx]
+            curr_color = None
             if attribution.source_attributions is not None:
+                curr_color = colors[idx]
                 if display:
                     print("\n\n")
                     rprint(get_heatmap_type(attribution, curr_color, "Source", use_html=False))
                 if attribution.target_attributions is not None:
                     curr_color = colors[idx + 1]
-            if attribution.target_attributions is not None and display:
+            display_scores = attribution.source_attributions is None and attribution.step_scores
+            if (attribution.target_attributions is not None or display_scores) and display:
+                if curr_color is None and colors:
+                    curr_color = colors[idx]
                 print("\n\n")
                 rprint(get_heatmap_type(attribution, curr_color, "Target", use_html=False))
         if any(x is None for x in [attribution.source_attributions, attribution.target_attributions]):
@@ -173,8 +177,7 @@ def get_heatmap_type(
         )
     elif heatmap_type == "Target":
         if attribution.target_attributions is not None:
-            mask = np.where(attribution.target_attributions.numpy() == 0, float("nan"), 0)
-            target_attributions = attribution.target_attributions.numpy() + mask
+            target_attributions = attribution.target_attributions.numpy()
         else:
             target_attributions = None
         return heatmap_func(
@@ -277,10 +280,7 @@ def get_saliency_heatmap_rich(
             style = lambda val, limit: "bold" if abs(val) >= limit and isinstance(val, float) else ""
             score_row = [Text(step_score_name, style="bold")]
             for score in step_score_values:
-                if isinstance(step_score_values[col_index].item(), float):
-                    curr_score = round(step_score_values[col_index].item(), 2)
-                else:
-                    curr_score = step_score_values[col_index].item()
+                curr_score = round(score.item(), 2) if isinstance(score, float) else score.item()
                 score_row.append(Text(f"{score:.2f}", justify="center", style=style(curr_score, threshold)))
             table.add_row(*score_row, end_section=True)
     return table

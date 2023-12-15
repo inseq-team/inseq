@@ -3,7 +3,6 @@ import gzip
 import io
 import logging
 import math
-import warnings
 from base64 import standard_b64decode, standard_b64encode
 from collections import OrderedDict
 from contextlib import contextmanager
@@ -49,13 +48,12 @@ def _pretty_list(l: Optional[Sequence[Any]], lpad: int = 8) -> str:
     if all(isinstance(x, list) for x in l):
         line_sep = f" ],\n{' ' * lpad}[ "
         contents = " " * lpad + "[ " + line_sep.join([_pretty_list_contents(subl) for subl in l]) + " ]"
+    elif all(hasattr(x, "to_dict") for x in l):
+        contents = ",\n".join(
+            [f"{' ' * lpad + x.__class__.__name__}({pretty_dict(x.to_dict(), lpad + 4)})" for x in l]
+        )
     else:
-        if all([hasattr(x, "to_dict") for x in l]):
-            contents = ",\n".join(
-                [f"{' ' * lpad + x.__class__.__name__}({pretty_dict(x.to_dict(), lpad + 4)})" for x in l]
-            )
-        else:
-            contents = " " * lpad + _pretty_list_contents(l)
+        contents = " " * lpad + _pretty_list_contents(l)
     return "[\n" + contents + f"\n{' ' * (lpad - 4)}]"
 
 
@@ -65,9 +63,9 @@ def pretty_list(l: Optional[Sequence[Any]], lpad: int = 8) -> str:
     if len(l) == 0:
         return "list with 0 elements"
     out_txt = f"list with {len(l)} elements of type {l[0].__class__.__name__}"
-    if all([isinstance(x, list) for x in l]):
+    if all(isinstance(x, list) for x in l):
         out_txt = f"list with {len(l)} sub-lists"
-        if any([len(sl) > 20 for sl in l]) or len(l) > 15:
+        if any(len(sl) > 20 for sl in l) or len(l) > 15:
             return out_txt
         if all(isinstance(ssl, list) for sl in l for ssl in sl):
             return out_txt
@@ -79,7 +77,7 @@ def pretty_list(l: Optional[Sequence[Any]], lpad: int = 8) -> str:
 def pretty_tensor(t: Optional[Tensor] = None, lpad: int = 8) -> str:
     if t is None:
         return "None"
-    if t.ndim > 2 or any([x > 20 for x in t.shape]):
+    if t.ndim > 2 or any(x > 20 for x in t.shape):
         return f"{t.dtype} tensor of shape {list(t.shape)} on {t.device}"
     else:
         out_list = t.tolist()
@@ -288,7 +286,7 @@ def get_module_name_from_object(obj):
     mod = obj.__class__.__module__
     if mod == "__main__":
         mod = None
-        warnings.warn(
+        logger.warning(
             f"class {obj.__class__} seems to have been defined in the main file; unfortunately this means"
             " that it's module/import path is unknown, so you might have to provide cls_lookup_map when decoding"
         )
@@ -330,8 +328,7 @@ def save_to_file(f: Callable[[Any], Any]) -> Callable[[Any], Any]:
                 fh.write(txt)
             except TypeError as err:
                 err.args = (
-                    err.args[0]
-                    + ". A possible reason is that the file is not opened in binary mode; "
+                    err.args[0] + ". A possible reason is that the file is not opened in binary mode; "
                     "be sure to set file mode to something like 'wb'.",
                 )
                 raise
@@ -356,9 +353,7 @@ def bin_str_to_ndarray(data, order, shape, dtype):
     assert order in [
         None,
         "C",
-    ], "specifying different memory order is not (yet) supported for binary numpy format (got order = {})".format(
-        order
-    )
+    ], f"specifying different memory order is not (yet) supported for binary numpy format (got order = {order})"
     if data.startswith("b64.gz:"):
         data = standard_b64decode(data[7:])
         data = gzip_decompress(data)
@@ -376,7 +371,7 @@ def lists_of_numbers_to_ndarray(data, order, shape, dtype):
     if 0 in shape:
         return arr.reshape(shape)
     if shape != arr.shape:
-        warnings.warn(f"size mismatch decoding numpy array: expected {shape}, got {arr.shape}")
+        logger.warning(f"size mismatch decoding numpy array: expected {shape}, got {arr.shape}")
     return arr
 
 

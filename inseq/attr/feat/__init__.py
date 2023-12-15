@@ -11,6 +11,7 @@ from .gradient_attribution import (
     LayerGradientXActivationAttribution,
     LayerIntegratedGradientsAttribution,
     SaliencyAttribution,
+    SequentialIntegratedGradientsAttribution,
 )
 from .internals_attribution import AttentionWeightsAttribution, InternalsAttributionRegistry
 from .perturbation_attribution import (
@@ -37,4 +38,5 @@ __all__ = [
     "AttentionWeightsAttribution",
     "OcclusionAttribution",
     "LimeAttribution",
+    "SequentialIntegratedGradientsAttribution",
 ]

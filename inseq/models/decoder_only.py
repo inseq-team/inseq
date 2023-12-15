@@ -136,11 +136,13 @@ class DecoderOnlyInputFormatter(InputFormatter):
         forward_output: ModelOutput,
         target_ids: ExpandedTargetIdsTensor,
         batch: DecoderOnlyBatch,
+        is_attributed_fn: bool = False,
     ) -> StepFunctionDecoderOnlyArgs:
         return StepFunctionDecoderOnlyArgs(
             attribution_model=attribution_model,
             forward_output=forward_output,
             target_ids=target_ids,
+            is_attributed_fn=is_attributed_fn,
             decoder_input_ids=batch.target_ids,
             decoder_attention_mask=batch.target_mask,
             decoder_input_embeds=batch.target_embeds,
