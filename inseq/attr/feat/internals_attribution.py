@@ -85,9 +85,7 @@ class AttentionWeightsAttribution(InternalsAttributionRegistry):
                 else:
                     target_attributions = None
                     sequence_scores["decoder_self_attentions"] = decoder_self_attentions
-                sequence_scores["encoder_self_attentions"] = (
-                    encoder_self_attentions[..., -1, :].clone().permute(0, 3, 1, 2)
-                )
+                sequence_scores["encoder_self_attentions"] = encoder_self_attentions.clone().permute(0, 3, 4, 1, 2)
                 return MultiDimensionalFeatureAttributionStepOutput(
                     source_attributions=cross_attentions[..., -1, :].clone().permute(0, 3, 1, 2),
                     target_attributions=target_attributions,

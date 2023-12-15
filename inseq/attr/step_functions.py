@@ -9,7 +9,7 @@ from transformers.modeling_outputs import ModelOutput
 from ..data import FeatureAttributionInput
 from ..data.aggregation_functions import DEFAULT_ATTRIBUTION_AGGREGATE_DICT
 from ..utils import extract_signature_args, filter_logits, top_p_logits_mask
-from ..utils.contrast_utils import _get_contrast_output, _setup_contrast_args, contrast_fn_docstring
+from ..utils.contrast_utils import _get_contrast_inputs, _setup_contrast_args, contrast_fn_docstring
 from ..utils.typing import EmbeddingsTensor, IdsTensor, SingleScorePerStepTensor, TargetIdsTensor
 
 if TYPE_CHECKING:
@@ -225,14 +225,18 @@ def kl_divergence_fn(
             "method used. Use --contrast_force_inputs in the model.attribute call to proceed."
         )
     original_logits: torch.Tensor = args.attribution_model.output2logits(args.forward_output)
-    contrast_output = _get_contrast_output(
+    contrast_inputs = _get_contrast_inputs(
         args=args,
         contrast_sources=contrast_sources,
         contrast_targets=contrast_targets,
         contrast_targets_alignments=contrast_targets_alignments,
         return_contrastive_target_ids=False,
+        return_contrastive_batch=True,
     )
-    contrast_logits: torch.Tensor = args.attribution_model.output2logits(contrast_output.forward_output)
+    c_forward_output = args.attribution_model.get_forward_output(
+        contrast_inputs.batch, use_embeddings=args.attribution_model.is_encoder_decoder
+    )
+    contrast_logits: torch.Tensor = args.attribution_model.output2logits(c_forward_output)
     filtered_original_logits, filtered_contrast_logits = filter_logits(
         original_logits=original_logits,
         contrast_logits=contrast_logits,

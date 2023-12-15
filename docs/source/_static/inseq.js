@@ -1,4 +1,4 @@
-var curr_width = $(window).width();
+var curr_width = window.innerWidth;
 
 function resizeHtmlExamples() {
     var examples = document.getElementsByClassName("html-example");
@@ -23,7 +23,7 @@ function onLoad() {
 
 window.addEventListener("load", onLoad);
 window.onresize = function() {
-    var wwidth = $(window).width();
+    var wwidth = window.innerWidth;
     if( curr_width !== wwidth ){
         window.location.reload();
         curr_width = wwidth;

@@ -35,7 +35,7 @@ Inseq is a Pytorch-based hackable toolkit to democratize the access to common po
 
 ## Installation
 
-Inseq is available on PyPI and can be installed with `pip`:
+Inseq is available on PyPI and can be installed with `pip` for Python >= 3.9, <= 3.11:
 
 ```bash
 # Install latest stable version
@@ -71,6 +71,8 @@ After installation, you should be able to run `make fast-test` and `make lint` w
 
 - Installing `sentencepiece` requires various packages, install with `sudo apt-get install cmake build-essential pkg-config` or `brew install cmake gperftools pkg-config`.
 
+- Inseq does not work with older versions of `jaxlib`.
+Install a compatible version with ```poetry install --with jax```.
 </details>
 
 ## Example usage in Python
@@ -260,7 +262,7 @@ If you use Inseq in your research we suggest to include a mention to the specifi
 
 ## Research using Inseq
 
-Inseq has been used in various research projects. A list of known publications that use Inseq to conduct interpretability analyses of generative models is shown below. If you know more, please let us know or submit a pull request (*last updated: May 2023*).
+Inseq has been used in various research projects. A list of known publications that use Inseq to conduct interpretability analyses of generative models is shown below. If you know more, please let us know or submit a pull request (*last updated: December 2023*).
 
 <details>
   <summary><b>2023</b></summary>
@@ -270,6 +272,8 @@ Inseq has been used in various research projects. A list of known publications t
     <li> <a href="https://aclanthology.org/2023.nlp4convai-1.1/">Response Generation in Longitudinal Dialogues: Which Knowledge Representation Helps?</a> (Mousavi et al., 2023)  </li>
     <li> <a href="https://arxiv.org/abs/2310.01188">Quantifying the Plausibility of Context Reliance in Neural Machine Translation</a> (Sarti et al., 2023)</li>
     <li> <a href="https://arxiv.org/abs/2310.12127">A Tale of Pronouns: Interpretability Informs Gender Bias Mitigation for Fairer Instruction-Tuned Machine Translation</a> (Attanasio et al., 2023)</li>
+    <li> <a href="https://arxiv.org/abs/2310.09820">Assessing the Reliability of Large Language Model Knowledge</a> (Wang et al., 2023)</li>
+    <li> <a href="https://aclanthology.org/2023.conll-1.18/">Attribution and Alignment: Effects of Local Context Repetition on Utterance Production and Comprehension in Dialogue</a> (Molnar et al., 2023)</li>
   </ol>
 
 </details>

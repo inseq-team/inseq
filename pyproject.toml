@@ -5,7 +5,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 name = "inseq"
-version = "0.5.0.dev0"
+version = "0.5.0"
 description = "Interpretability for Sequence Generation Models 🔍"
 readme = "README.md"
 authors = ["The Inseq Team"]
@@ -100,6 +100,13 @@ pre-commit = ">=2.19.0"
 pytest = ">=7.2.0"
 pytest-cov = ">=4.0.0"
 ruff  = ">=0.1.2"
+
+[tool.poetry.group.jax]
+optional = true
+
+[tool.poetry.group.jax.dependencies]
+jax = ">=0.4.20"
+jaxlib = ">=0.4.20"
 
 [tool.poetry.extras]
 sklearn = ["scikit-learn", "joblib"]
@@ -224,7 +231,7 @@ known-first-party = ["inseq"]
 order-by-type = true
 
 [tool.ruff.pylint]
-max-branches = 20
+max-branches = 22
 
 [tool.ruff.pyupgrade]
 keep-runtime-typing = true
