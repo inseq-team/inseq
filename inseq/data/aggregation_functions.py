@@ -121,17 +121,16 @@ class RolloutAggregationFunction(AggregationFunction):
                 enc_match = sequence_scores[enc_match[0]]
                 dec_match = sequence_scores[dec_match[0]]
                 return rollout_fn((enc_match, scores, dec_match), dim=dim)[0]
+        elif not enc_match:
+            raise KeyError(
+                "Could not find encoder self-importance scores in sequence scores. "
+                "Encoder self-importance scores are required for encoder-decoder rollout. They should be provided "
+                f"as an entry in the sequence scores dictionary with key starting with '{enc_self_prefix}', and "
+                "value being a tensor of shape (src_seq_len, src_seq_len, ..., rollout_dim)."
+            )
         else:
-            if not enc_match:
-                raise KeyError(
-                    "Could not find encoder self-importance scores in sequence scores. "
-                    "Encoder self-importance scores are required for encoder-decoder rollout. They should be provided "
-                    f"as an entry in the sequence scores dictionary with key starting with '{enc_self_prefix}', and "
-                    "value being a tensor of shape (src_seq_len, src_seq_len, ..., rollout_dim)."
-                )
-            else:
-                enc_match = sequence_scores[enc_match[0]]
-                return rollout_fn((enc_match,) + scores, dim=dim)
+            enc_match = sequence_scores[enc_match[0]]
+            return rollout_fn((enc_match,) + scores, dim=dim)
 
 
 DEFAULT_ATTRIBUTION_AGGREGATE_DICT = {

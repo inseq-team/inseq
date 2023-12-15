@@ -3,8 +3,8 @@ from typing import TYPE_CHECKING, Callable, List, Literal, Optional, Sequence, T
 
 import torch
 import torch.nn.functional as F
-from torch import nn
 from jaxtyping import Int, Num
+from torch import nn
 from torch.backends.cuda import is_built as is_cuda_built
 from torch.backends.mps import is_available as is_mps_available
 from torch.backends.mps import is_built as is_mps_built
