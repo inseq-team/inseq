@@ -1,12 +1,14 @@
 """Adapted from https://github.com/huggingface/transformers/blob/main/src/transformers/commands/transformers_cli.py."""
 import sys
+from typing import List
 
 from ..utils import InseqArgumentParser
 from .attribute import AttributeCommand
 from .attribute_context import AttributeContextCommand
 from .attribute_dataset import AttributeDatasetCommand
+from .base import BaseCLICommand
 
-COMMANDS = [AttributeCommand, AttributeDatasetCommand, AttributeContextCommand]
+COMMANDS: List[BaseCLICommand] = [AttributeCommand, AttributeDatasetCommand, AttributeContextCommand]
 
 
 def main():

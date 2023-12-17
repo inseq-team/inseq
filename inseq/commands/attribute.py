@@ -1,138 +1,110 @@
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import List, Optional
 
 from .. import list_feature_attribution_methods, load_model
-from ..utils import get_default_device
+from ..utils import cli_arg, get_default_device
 from .base import BaseCLICommand
 
 
 @dataclass
 class AttributeBaseArgs:
-    model_name_or_path: str = field(
-        metadata={"alias": "-m", "help": "The name or path of the model on which attribution is performed."},
+    model_name_or_path: str = cli_arg(
+        aliases=["-m"], help="The name or path of the model on which attribution is performed."
     )
-    attribution_method: Optional[str] = field(
+    attribution_method: Optional[str] = cli_arg(
         default="integrated_gradients",
-        metadata={
-            "alias": "-a",
-            "help": "The attribution method used to perform feature attribution.",
-            "choices": list_feature_attribution_methods(),
-        },
+        aliases=["-a"],
+        help="The attribution method used to perform feature attribution.",
+        choices=list_feature_attribution_methods(),
     )
-    do_prefix_attribution: bool = field(
+    do_prefix_attribution: bool = cli_arg(
         default=False,
-        metadata={
-            "help": "Performs the attribution procedure including the generated prefix at every step.",
-        },
+        help="Performs the attribution procedure including the generated prefix at every step.",
     )
-    generate_from_target_prefix: bool = field(
+    generate_from_target_prefix: bool = cli_arg(
         default=False,
-        metadata={
-            "help": (
-                "Whether the ``generated_texts`` should be used as"
-                "target prefixes for the generation process. If False, the ``generated_texts`` will be used as full"
-                "targets. This option is only available for encoder-decoder models, since the same behavior can be"
-                "achieved by modifying the input texts for decoder-only models. Default: False."
-            )
-        },
+        help=(
+            "Whether the ``generated_texts`` should be used as target prefixes for the generation process. If False,"
+            " the ``generated_texts`` are used as full targets. Option only available for encoder-decoder models,"
+            " since for decoder-only ones it is sufficient to add prefix to input string. Default: False."
+        ),
     )
-    step_scores: List[str] = field(
-        default_factory=list, metadata={"help": "Adds step scores to the attribution output."}
+    step_scores: List[str] = cli_arg(
+        default_factory=list, help="Adds the specified step scores to the attribution output."
     )
-    output_step_attributions: bool = field(
-        default=False, metadata={"help": "Adds step-level feature attributions to the output."}
-    )
-    include_eos_baseline: bool = field(
+    output_step_attributions: bool = cli_arg(default=False, help="Adds step-level feature attributions to the output.")
+    include_eos_baseline: bool = cli_arg(
         default=False,
-        metadata={
-            "alias": "--eos",
-            "help": "Whether the EOS token should be included in the baseline, used for some attribution methods.",
-        },
+        aliases=["--eos"],
+        help="Whether the EOS token should be included in the baseline, used for some attribution methods.",
     )
-    n_approximation_steps: Optional[int] = field(
-        default=100,
-        metadata={"alias": "-n", "help": "Number of approximation steps, used for some attribution methods."},
+    batch_size: int = cli_arg(
+        default=8, aliases=["-bs"], help="The batch size used for the attribution computation. Default: no batching."
     )
-    return_convergence_delta: bool = field(
+    aggregate_output: bool = cli_arg(
         default=False,
-        metadata={
-            "help": "Returns the convergence delta of the approximation, used for some attribution methods.",
-        },
+        help="If specified, the attribution output is aggregated using its default aggregator before saving.",
     )
-    batch_size: int = field(
-        default=8,
-        metadata={
-            "alias": "-bs",
-            "help": "The batch size used for the attribution computation. By default, no batching is performed.",
-        },
-    )
-    attribution_batch_size: Optional[int] = field(
-        default=50,
-        metadata={
-            "help": "The internal batch size used by the attribution method, used for some attribution methods.",
-        },
-    )
-    aggregate_output: bool = field(
-        default=False,
-        metadata={
-            "help": "If specified, the attribution output is aggregated using its default aggregator before saving.",
-        },
-    )
-    device: str = field(
+    device: str = cli_arg(
         default=get_default_device(),
-        metadata={"alias": "--dev", "help": "The device used for inference with Pytorch. Multi-GPU is not supported."},
+        aliases=["--dev"],
+        help="The device used for inference with Pytorch. Multi-GPU is not supported.",
     )
-    hide_attributions: bool = field(
+    hide_attributions: bool = cli_arg(
         default=False,
-        metadata={
-            "alias": "--hide",
-            "help": "If specified, the attribution visualization are not shown in the output.",
-        },
+        aliases=["--hide"],
+        help="If specified, the attribution visualization are not shown in the output.",
     )
-    save_path: Optional[str] = field(
+    save_path: Optional[str] = cli_arg(
         default=None,
-        metadata={"alias": "-o", "help": "Path where the attribution output should be saved in JSON format."},
+        aliases=["-o"],
+        help="Path where the attribution output should be saved in JSON format.",
     )
-    viz_path: Optional[str] = field(
+    viz_path: Optional[str] = cli_arg(
         default=None,
-        metadata={
-            "help": "Path where the attribution visualization should be saved in HTML format.",
-        },
+        help="Path where the attribution visualization should be saved in HTML format.",
     )
-    max_gen_length: Optional[int] = field(
+    start_pos: Optional[int] = cli_arg(
+        default=None, aliases=["-s"], help="Start position for the attribution. Default: first token"
+    )
+    end_pos: Optional[int] = cli_arg(
+        default=None, aliases=["-e"], help="End position for the attribution. Default: last token"
+    )
+    attributed_fn: Optional[str] = cli_arg(
         default=None,
-        metadata={"alias": "-l", "help": "Max generation length for model outputs. Default: 512"},
+        aliases=["-fn"],
+        help="The name of the step function used as attribution target. Default: probability.",
     )
-    start_pos: Optional[int] = field(
-        default=None,
-        metadata={"alias": "-s", "help": "Start position for the attribution. Default: first token"},
+    verbose: bool = cli_arg(
+        default=False, aliases=["-v"], help="If specified, use INFO as logging level for the attribution."
     )
-    end_pos: Optional[int] = field(
-        default=None,
-        metadata={"alias": "-e", "help": "End position for the attribution. Default: last token"},
+    very_verbose: bool = cli_arg(
+        default=False, aliases=["-vv"], help="If specified, use DEBUG as logging level for the attribution."
     )
-    verbose: bool = field(
-        default=False,
-        metadata={"alias": "-v", "help": "If specified, use INFO as logging level for the attribution."},
+    model_kwargs: dict = cli_arg(
+        default_factory=dict,
+        help="Additional keyword arguments passed to the model constructor in JSON format.",
     )
-    very_verbose: bool = field(
-        default=False,
-        metadata={"alias": "-vv", "help": "If specified, use DEBUG as logging level for the attribution."},
+    tokenizer_kwargs: dict = cli_arg(
+        default_factory=dict,
+        help="Additional keyword arguments passed to the tokenizer constructor in JSON format.",
+    )
+    generation_kwargs: dict = cli_arg(
+        default_factory=dict,
+        help="Additional keyword arguments passed to the generation method in JSON format.",
+    )
+    attribution_kwargs: dict = cli_arg(
+        default_factory=dict,
+        help="Additional keyword arguments passed to the attribution method in JSON format.",
     )
 
 
 @dataclass
 class AttributeArgs(AttributeBaseArgs):
-    input_texts: List[str] = field(
-        default=None, metadata={"alias": "-i", "help": "One or more input texts used for generation."}
-    )
-    generated_texts: Optional[List[str]] = field(
-        default=None,
-        metadata={
-            "alias": "-g",
-            "help": "If specified, constrains the decoding procedure to the specified outputs.",
-        },
+    input_texts: List[str] = cli_arg(default=None, aliases=["-i"], help="One or more input texts used for generation.")
+    generated_texts: Optional[List[str]] = cli_arg(
+        default=None, aliases=["-g"], help="If specified, constrains the decoding procedure to the specified outputs."
     )
 
     def __post_init__(self):
@@ -160,23 +132,24 @@ def attribute(input_texts, generated_texts, args: AttributeBaseArgs):
         args.model_name_or_path,
         attribution_method=args.attribution_method,
         device=args.device,
+        model_kwargs=args.model_kwargs,
+        tokenizer_kwargs=args.tokenizer_kwargs,
     )
     out = model.attribute(
         input_texts,
         generated_texts,
         batch_size=args.batch_size,
         attribute_target=args.do_prefix_attribution,
+        attributed_fn=args.attributed_fn,
         step_scores=args.step_scores,
         output_step_attributions=args.output_step_attributions,
         include_eos_baseline=args.include_eos_baseline,
-        n_steps=args.n_approximation_steps,
-        internal_batch_size=args.attribution_batch_size,
-        return_convergence_delta=args.return_convergence_delta,
         device=args.device,
-        generation_args={"max_new_tokens": args.max_gen_length},
+        generation_args=args.generation_kwargs,
         attr_pos_start=args.start_pos,
         attr_pos_end=args.end_pos,
         generate_from_target_prefix=args.generate_from_target_prefix,
+        **args.attribution_kwargs,
     )
     if args.viz_path:
         print(f"Saving visualization to {args.viz_path}")

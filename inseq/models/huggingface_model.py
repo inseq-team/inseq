@@ -1,7 +1,7 @@
 """HuggingFace Seq2seq model."""
 import logging
 from abc import abstractmethod
-from typing import Dict, List, NoReturn, Optional, Tuple, Union
+from typing import Any, Dict, List, NoReturn, Optional, Tuple, Union
 
 import torch
 from torch import long
@@ -69,6 +69,8 @@ class HuggingfaceModel(AttributionModel):
         attribution_method: Optional[str] = None,
         tokenizer: Union[str, PreTrainedTokenizerBase, None] = None,
         device: Optional[str] = None,
+        model_kwargs: Optional[Dict[str, Any]] = {},
+        tokenizer_kwargs: Optional[Dict[str, Any]] = {},
         **kwargs,
     ) -> None:
         """AttributionModel subclass for Huggingface-compatible models.
@@ -90,15 +92,13 @@ class HuggingfaceModel(AttributionModel):
             raise ValueError(
                 f"Invalid autoclass {self._autoclass}. Must be one of {[x.__name__ for x in SUPPORTED_AUTOCLASSES]}."
             )
-        model_args = kwargs.pop("model_args", {})
-        model_kwargs = kwargs.pop("model_kwargs", {})
         if isinstance(model, PreTrainedModel):
             self.model = model
         else:
             if "output_attentions" not in model_kwargs:
                 model_kwargs["output_attentions"] = True
 
-            self.model = self._autoclass.from_pretrained(model, *model_args, **model_kwargs)
+            self.model = self._autoclass.from_pretrained(model, **model_kwargs)
         self.model_name = self.model.config.name_or_path
         self.tokenizer_name = tokenizer if isinstance(tokenizer, str) else None
         if tokenizer is None:
@@ -108,13 +108,10 @@ class HuggingfaceModel(AttributionModel):
                     "Unspecified tokenizer for model loaded from scratch. Use explicit identifier as tokenizer=<ID>"
                     "during model loading."
                 )
-        tokenizer_inputs = kwargs.pop("tokenizer_inputs", {})
-        tokenizer_kwargs = kwargs.pop("tokenizer_kwargs", {})
-
         if isinstance(tokenizer, PreTrainedTokenizerBase):
             self.tokenizer = tokenizer
         else:
-            self.tokenizer = AutoTokenizer.from_pretrained(tokenizer, *tokenizer_inputs, **tokenizer_kwargs)
+            self.tokenizer = AutoTokenizer.from_pretrained(tokenizer, **tokenizer_kwargs)
         if self.model.config.pad_token_id is not None:
             self.pad_token = self.tokenizer.convert_ids_to_tokens(self.model.config.pad_token_id)
             self.tokenizer.pad_token = self.pad_token
@@ -140,6 +137,8 @@ class HuggingfaceModel(AttributionModel):
         attribution_method: Optional[str] = None,
         tokenizer: Union[str, PreTrainedTokenizerBase, None] = None,
         device: str = None,
+        model_kwargs: Optional[Dict[str, Any]] = {},
+        tokenizer_kwargs: Optional[Dict[str, Any]] = {},
         **kwargs,
     ) -> "HuggingfaceModel":
         """Loads a HuggingFace model and tokenizer and wraps them in the appropriate AttributionModel."""
@@ -148,9 +147,13 @@ class HuggingfaceModel(AttributionModel):
         else:
             is_encoder_decoder = model.config.is_encoder_decoder
         if is_encoder_decoder:
-            return HuggingfaceEncoderDecoderModel(model, attribution_method, tokenizer, device, **kwargs)
+            return HuggingfaceEncoderDecoderModel(
+                model, attribution_method, tokenizer, device, model_kwargs, tokenizer_kwargs, **kwargs
+            )
         else:
-            return HuggingfaceDecoderOnlyModel(model, attribution_method, tokenizer, device, **kwargs)
+            return HuggingfaceDecoderOnlyModel(
+                model, attribution_method, tokenizer, device, model_kwargs, tokenizer_kwargs, **kwargs
+            )
 
     @AttributionModel.device.setter
     def device(self, new_device: str) -> None:
@@ -409,16 +412,6 @@ class HuggingfaceEncoderDecoderModel(HuggingfaceModel, EncoderDecoderAttribution
 
     _autoclass = AutoModelForSeq2SeqLM
 
-    def __init__(
-        self,
-        model: Union[str, PreTrainedModel],
-        attribution_method: Optional[str] = None,
-        tokenizer: Union[str, PreTrainedTokenizerBase, None] = None,
-        device: str = None,
-        **kwargs,
-    ) -> NoReturn:
-        super().__init__(model, attribution_method, tokenizer, device, **kwargs)
-
     def configure_embeddings_scale(self):
         encoder = self.model.get_encoder()
         decoder = self.model.get_decoder()
@@ -470,9 +463,11 @@ class HuggingfaceDecoderOnlyModel(HuggingfaceModel, DecoderOnlyAttributionModel)
         attribution_method: Optional[str] = None,
         tokenizer: Union[str, PreTrainedTokenizerBase, None] = None,
         device: str = None,
+        model_kwargs: Optional[Dict[str, Any]] = {},
+        tokenizer_kwargs: Optional[Dict[str, Any]] = {},
         **kwargs,
     ) -> NoReturn:
-        super().__init__(model, attribution_method, tokenizer, device, **kwargs)
+        super().__init__(model, attribution_method, tokenizer, device, model_kwargs, tokenizer_kwargs, **kwargs)
         self.tokenizer.padding_side = "left"
         self.tokenizer.truncation_side = "left"
         if self.pad_token is None:

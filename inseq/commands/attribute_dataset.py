@@ -1,7 +1,7 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import List, Optional, Tuple
 
-from ..utils import is_datasets_available
+from ..utils import cli_arg, is_datasets_available
 from .attribute import AttributeBaseArgs, attribute
 from .base import BaseCLICommand
 
@@ -11,37 +11,35 @@ if is_datasets_available():
 
 @dataclass
 class AttributeDatasetArgs:
-    dataset_name: str = field(
-        metadata={
-            "alias": "-d",
-            "help": "The type of dataset to be loaded for attribution.",
-        },
+    dataset_name: str = cli_arg(
+        aliases=["-d"],
+        help="The type of dataset to be loaded for attribution.",
     )
-    input_text_field: Optional[str] = field(
-        metadata={"alias": "-f", "help": "Name of the field containing the input texts used for attribution."}
+    input_text_field: Optional[str] = cli_arg(
+        aliases=["-f"], help="Name of the field containing the input texts used for attribution."
     )
-    generated_text_field: Optional[str] = field(
+    generated_text_field: Optional[str] = cli_arg(
         default=None,
-        metadata={
-            "alias": "-fgen",
-            "help": "Name of the field containing the generated texts used for constrained decoding.",
-        },
+        aliases=["-fgen"],
+        help="Name of the field containing the generated texts used for constrained decoding.",
     )
-    dataset_config: Optional[str] = field(
-        default=None, metadata={"alias": "-dconf", "help": "The name of the Huggingface dataset configuration."}
+    dataset_config: Optional[str] = cli_arg(
+        default=None, aliases=["-dconf"], help="The name of the Huggingface dataset configuration."
     )
-    dataset_dir: Optional[str] = field(
-        default=None, metadata={"alias": "-ddir", "help": "Path to the directory containing the data files."}
+    dataset_dir: Optional[str] = cli_arg(
+        default=None, aliases=["-ddir"], help="Path to the directory containing the data files."
     )
-    dataset_files: Optional[List[str]] = field(
-        default=None, metadata={"alias": "-dfiles", "help": "Path to the dataset files."}
+    dataset_files: Optional[List[str]] = cli_arg(default=None, aliases=["-dfiles"], help="Path to the dataset files.")
+    dataset_split: Optional[str] = cli_arg(default="train", aliases=["-dsplit"], help="Dataset split.")
+    dataset_revision: Optional[str] = cli_arg(
+        default=None, aliases=["-drev"], help="The Huggingface dataset revision."
     )
-    dataset_split: Optional[str] = field(default="train", metadata={"alias": "-dsplit", "help": "Dataset split."})
-    dataset_revision: Optional[str] = field(
-        default=None, metadata={"alias": "-drev", "help": "The Huggingface dataset revision."}
+    dataset_auth_token: Optional[str] = cli_arg(
+        default=None, aliases=["-dauth"], help="The auth token for the Huggingface dataset."
     )
-    dataset_auth_token: Optional[str] = field(
-        default=None, metadata={"alias": "-dauth", "help": "The auth token for the Huggingface dataset."}
+    dataset_kwargs: Optional[dict] = cli_arg(
+        default_factory=dict,
+        help="Additional keyword arguments passed to the dataset constructor in JSON format.",
     )
 
 
@@ -55,7 +53,8 @@ def load_fields_from_dataset(dataset_args: AttributeDatasetArgs) -> Tuple[List[s
         data_files=dataset_args.dataset_files,
         split=dataset_args.dataset_split,
         revision=dataset_args.dataset_revision,
-        use_auth_token=dataset_args.dataset_auth_token,
+        token=dataset_args.dataset_auth_token,
+        **dataset_args.dataset_kwargs,
     )
     df = dataset.to_pandas()
     if dataset_args.input_text_field in df.columns:
