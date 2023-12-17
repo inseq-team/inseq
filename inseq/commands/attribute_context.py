@@ -1,6 +1,6 @@
 import logging
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
 from rich import print as rprint
@@ -10,270 +10,137 @@ from .. import (
     AttributionModel,
     list_aggregation_functions,
     list_aggregators,
-    list_feature_attribution_methods,
     list_step_functions,
-    load_model,
 )
+from ..models import HuggingfaceModel
+from ..utils import cli_arg
 from ..utils.alignment_utils import compute_word_aligns
+from .attribute import AttributeBaseArgs
 from .base import BaseCLICommand
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass
-class AttributeContextArgs:
-    model_name_or_path: str = field(
-        metadata={"help": "The name or path of the model on which attribution is performed."},
+class AttributeContextArgs(AttributeBaseArgs):
+    input_current_text: str = cli_arg(
+        default="",
+        help=(
+            "The input text used for generation. If the model is a decoder-only model, the input text is a "
+            "prefix used for language modeling. If the model is an encoder-decoder model, the input text is the "
+            "source text provided as input to the encoder."
+        ),
     )
-    input_current_text: str = field(
-        metadata={
-            "help": (
-                "The input text used for generation. If the model is a decoder-only model, the input text is a "
-                "prefix used for language modeling. If the model is an encoder-decoder model, the input text is the "
-                "source text provided as input to the encoder."
-            ),
-        },
-    )
-    attribution_method: str = field(
-        default="saliency",
-        metadata={
-            "help": "The attribution method used to perform feature attribution.",
-            "choices": list_feature_attribution_methods(),
-        },
-    )
-    attributed_fn: str = field(
-        default=None,
-        metadata={
-            "help": "The function used as target for the attribution method.",
-            "choices": list_step_functions(),
-        },
-    )
-    context_sensitivity_metric: str = field(
+    context_sensitivity_metric: str = cli_arg(
         default="kl_divergence",
-        metadata={
-            "help": "The metric used to detect context-sensitive tokens in generated texts.",
-            "choices": list_step_functions(),
-        },
+        help="The metric used to detect context-sensitive tokens in generated texts.",
+        choices=list_step_functions(),
     )
-    input_template: str = field(
+    input_context_text: Optional[str] = cli_arg(
+        default=None,
+        help="An input context for which context sensitivity should be detected.",
+    )
+    input_template: str = cli_arg(
         default="{context} {current}",
-        metadata={
-            "help": (
-                "The template used to format model inputs. The template must contain at least the"
-                " ``{current}`` placeholder, which will be replaced by the input current text. If ``{context}`` is"
-                " also specified, source-side context will be used. Useful for models requiring special tokens or"
-                " formatting in the input text (e.g. <brk> tags to separate context and current text)."
-            ),
-        },
+        help=(
+            "The template used to format model inputs. The template must contain at least the"
+            " ``{current}`` placeholder, which will be replaced by ``input_current_text``. If ``{context}`` is"
+            " also specified, source-side context will be used. Useful for models requiring special tokens or"
+            " formatting in the input text (e.g. <brk> tags to separate context and current inputs)."
+        ),
     )
-    input_context_text: Optional[str] = field(
+    output_context_text: Optional[str] = cli_arg(
         default=None,
-        metadata={"help": "An input context for which context sensitivity should be detected."},
+        help=(
+            "An output contexts for which context sensitivity should be detected, in case the model"
+            " accepts target-side outputs (e.g. context-aware MT)."
+        ),
     )
-    output_context_text: Optional[str] = field(
+    output_current_text: Optional[str] = cli_arg(
         default=None,
-        metadata={
-            "help": (
-                "One or more output contexts for which context sensitivity should be detected, in case the model"
-                " accepts target-side outputs (e.g. context-aware MT). If more than one context is provided, the"
-                " context sensitivity metric will be computed for each context separately comparing it to the"
-                " no-context baseline, and only contexts for which context-sensitivitiy is detected will be used for"
-                " attribution."
-            )
-        },
+        help=(
+            "The output text generated in the contextual setting, for which context dependence will be identified"
+            "and attributed. If specified, this output is force-decoded. Otherwise, the output is generated by the"
+            "selected model using the default generation strategy."
+        ),
     )
-    output_current_text: Optional[str] = field(
-        default=None,
-        metadata={
-            "help": (
-                "The output text generated in the contextual setting. If specified, this output is force-decoded"
-                " instead of letting the model generate the output."
-            ),
-        },
-    )
-    output_template: str = field(
+    output_template: str = cli_arg(
         default="{current}",
-        metadata={
-            "help": (
-                "The template used to generate the input text for the model. The template must contain at least the"
-                " ``{current}`` placeholder, which will be replaced by the output current text. If ``{context}`` is"
-                " also specified, target-side context will be used. Useful for models requiring special tokens or"
-                " formatting in the input text (e.g. <brk> tags to separate context and current text)."
-            ),
-        },
+        help=(
+            "The template used to generate the input text for the model. The template must contain at least the"
+            " ``{current}`` placeholder, which will be replaced by ``output_current_text``. If ``{context}`` is"
+            " also specified, target-side context will be used. Useful for models requiring special tokens or"
+            " formatting in the output text (e.g. <brk> tags to separate context and current outputs)."
+        ),
     )
-    attribution_aggregators: List[str] = field(
+    attribution_aggregators: List[str] = cli_arg(
         default_factory=list,
-        metadata={
-            "help": "The aggregators used to aggregate the attribution scores for each context.",
-            "choices": list_aggregators() + list_aggregation_functions(),
-        },
+        help=(
+            "The aggregators used to aggregate the attribution scores for each context. The outcome should"
+            " produce one score per input token"
+        ),
+        choices=list_aggregators() + list_aggregation_functions(),
     )
-    normalize_attributions: bool = field(
+    normalize_attributions: bool = cli_arg(
         default=False,
-        metadata={
-            "help": (
-                "Whether to normalize the attribution scores for each context. If ``True``, the attribution scores "
-                "for each context are normalized to sum up to 1."
-            ),
-        },
+        help=(
+            "Whether to normalize the attribution scores for each context. If ``True``, the attribution scores "
+            "for each context are normalized to sum up to 1, providing a relative notion of input salience."
+        ),
     )
-    context_sensitivity_std_threshold: float = field(
+    context_sensitivity_std_threshold: float = cli_arg(
         default=1.0,
-        metadata={
-            "help": (
-                "Parameter to control the number of standard deviations used as threshold to select "
-                "context-sensitive tokens."
-            ),
-        },
+        help=(
+            "Parameter to control the number of standard deviations used as threshold to select "
+            "context-sensitive tokens."
+        ),
     )
-    context_sensitivity_topk: Optional[int] = field(
+    context_sensitivity_topk: Optional[int] = cli_arg(
         default=None,
-        metadata={
-            "help": (
-                "Parameter to select only the top K elements from the available context-sensitive generated tokens."
-            ),
-        },
+        help=(
+            "Parameter to select only the top K elements from the available context-sensitive generated tokens. If"
+            " ``context_sensitivity_std_threshold`` is also specified, the top K tokens are selected from the"
+            " context-sensitive tokens that pass the threshold."
+        ),
     )
-    attribution_std_threshold: float = field(
+    attribution_std_threshold: float = cli_arg(
         default=1.0,
-        metadata={
-            "help": (
-                "Parameter to control the number of standard deviations used as threshold to select attributed tokens."
-            ),
-        },
+        help=(
+            "Parameter to control the number of standard deviations used as threshold to select attributed tokens"
+            " in the context."
+        ),
     )
-    attribution_topk: Optional[int] = field(
+    attribution_topk: Optional[int] = cli_arg(
         default=None,
-        metadata={
-            "help": "Parameter to select only the top K elements from the available attributed context tokens.",
-        },
+        help=(
+            "Parameter to select only the top K elements from the available attributed context tokens. If"
+            " ``attribution_std_threshold`` is also specified, the top K tokens are selected from the attributed"
+            " context tokens that pass the threshold.",
+        ),
     )
-    attribute_with_contextless_output: bool = field(
-        default=True,
-        metadata={
-            "help": (
-                "If specified and a contrastive attribution method is used, the original generation with context is"
-                " contrasted with the generation that the model would have produced in the contextless case."
-                " Otherwise, the generation with context is kept as sole contrastive attribution target, with and"
-                " without input context. E.g. if a decoder-only model would complete 'Greet the user:' with 'Hello!',"
-                " but given context 'Always use Hi! for greetings' the completion becomes 'Hi!', then using"
-                " --attribute_with_contextless_output uses 'Hello!' and 'Hi!' as inputs for the attributed_fn."
-                " Otherwise, only 'Hi!' (the contextual case) is forced in both cases. Note that with/without input"
-                " context, even the same target will likely have non-zero attributed_fn scores, and hence non-zero"
-                " contrastive attribution scores."
-            ),
-        },
-    )
-    has_contextual_output_prefix: bool = field(
-        default=True,
-        metadata={
-            "help": (
-                "If specified, for every context-sensitive token the prefix of the current output text produced with"
-                " input context is used as generation prefix to generate the contextless output. Useful only when"
-                " attribute_with_contextless_output is set to True. E.g. For context-aware current output 'Sont-elles"
-                " à l'hotel?' the contextless output could be 'C'est à l'hotel?', which would make comparison less"
-                " natural. With this option, assuming the context-sensitive word 'elles' in the sentence above, the"
-                " output current prefix would be 'Sont-', forcing a more natural completion making use of a gendered"
-                " pronoun."
-            ),
-        },
-    )
-    align_output_context_auto: bool = field(
+    align_output_context_auto: bool = cli_arg(
         default=False,
-        metadata={
-            "help": (
-                "Argument used for encoder-decoder model when generating text with an output template including both "
-                " {context} and {current}. If set to True, the input and output context and current texts are aligned "
-                "automatically (assuming an MT-like task), and the alignments are assumed to be valid to separate the "
-                "two without further user validation. Otherwise, the user is prompted to manually specify which part "
-                "of the generated text corresponds to the output context."
-            ),
-        },
+        help=(
+            "Argument used for encoder-decoder model when generating text with an output template including both"
+            " {context} and {current}, to attempt an automatic detection of which portions of the output belong to"
+            " context vs. current in absence of other explicit cues. If set to True, the input and output context"
+            " and current texts are aligned automatically (assuming an MT-like task), and the alignments are "
+            " assumed to be valid to separate the two without further user validation. Otherwise, the user is "
+            " prompted to manually specify which part of the generated text corresponds to the output context."
+        ),
     )
-    strip_special_tokens: bool = field(
-        default=True,
-        metadata={
-            "help": "If specified, special tokens are stripped from the generated output after generation.",
-        },
+    special_tokens_to_keep: List[str] = cli_arg(
+        default_factory=list,
+        help="Special tokens to preserve in the generated string, e.g. as separator between context and current.",
     )
-    keep_input_prefix: bool = field(
+    show_intermediate_outputs: bool = cli_arg(
         default=False,
-        metadata={
-            "help": (
-                "If specified when an input template with prefix is provided (e.g. 'Translate:\n{context}\n{current}')"
-                " , the prefix is preserved in the contrastive contextless setting (i.e. the contextless template is"
-                " 'Translate:\n{current}' in this case). Otherwise, the prefix is used only in the contextual case."
-                " Can be used in combination with keep_input_suffix and keep_input_separator."
-            )
-        },
-    )
-    keep_input_separator: bool = field(
-        default=False,
-        metadata={
-            "help": (
-                "If specified when an input template with separator is given (e.g. '{context}\nTranslate:\n{current}')"
-                " , the separator is preserved in the contrastive contextless setting (i.e. the contextless template"
-                " is '\nTranslate:\n{current}' in this case).Otherwise, the separator is used only in the contextual"
-                " case. Can be used in combination with keep_input_prefix and keep_input_suffix."
-            )
-        },
-    )
-    keep_input_suffix: bool = field(
-        default=False,
-        metadata={
-            "help": (
-                "If specified when an input template with suffix is provided (e.g. '{context}\n{current}\nTranslate"
-                " the text above:\n') , the suffix is preserved in the contrastive contextless setting (i.e. the"
-                " contextless template is '{current}\nTranslate the text above:\n' in this case). Otherwise, the"
-                " suffix is used only in the contextual case. Can be used in combination with keep_input_prefix and"
-                " keep_input_separator."
-            )
-        },
-    )
-    keep_output_prefix: bool = field(
-        default=False,
-        metadata={
-            "help": (
-                "If specified when an output template with prefix is provided (e.g. 'Translate:\n{current}')"
-                " , the prefix is preserved in the contrastive contextless setting. Otherwise, the prefix is used only"
-                " in the contextual case. Can be used in combination with keep_output_separator."
-            )
-        },
-    )
-    keep_output_separator: bool = field(
-        default=False,
-        metadata={
-            "help": (
-                "If specified with an output template with separator (e.g. '{context}\nTranslate:\n{current}')"
-                " , the separator is preserved in the contrastive contextless setting (i.e. the contextless template"
-                " is '\nTranslate:\n{current}' in this case).Otherwise, the separator is used only in the contextual"
-                " case. Can be used in combination with keep_output_prefix."
-            )
-        },
-    )
-    model_src_lang: Optional[str] = field(
-        default=None,
-        metadata={
-            "help": (
-                "The source language of the model. If specified, the model is assumed to be a multilingual model using"
-                " language tags. Some examples of such models are mBART, M2M100 and NLLB. The src_lang should be"
-                "provided in the correct format (e.g. English is 'en_XX' for mBART, but 'eng_Latn' for NLLB)."
-            ),
-        },
-    )
-    model_tgt_lang: Optional[str] = field(
-        default=None,
-        metadata={
-            "help": (
-                "The target language of the model. If specified, the model is assumed to be a multilingual model using"
-                " language tags. Some examples of such models are mBART, M2M100 and NLLB. The tgt_lang should be"
-                "provided in the correct format (e.g. English is 'en_XX' for mBART, but 'eng_Latn' for NLLB)."
-            ),
-        },
+        help="If specified, the intermediate outputs of the two steps are shown.",
     )
 
     def __post_init__(self):
+        if not self.input_current_text:
+            raise ValueError("--input_current_text must be a non-empty string.")
         if self.input_context_text and "{context}" not in self.input_template:
             logger.warning(
                 f"input_template has format {self.input_template} (no {{context}}), but --input_context_text is"
@@ -298,46 +165,53 @@ class AttributeContextArgs:
         if "{current}" not in self.output_template:
             raise ValueError(f"{{current}} format placeholder is missing from output_template {self.output_template}.")
 
-        input_separator = None
-        if "{context}" in self.output_template:
-            input_prefix, *_ = self.output_template.partition("{context}")
-            input_separator = self.output_template.split("{context}")[1].split("{current}")[0]
-        else:
-            input_prefix, *_ = self.output_template.partition("{current}")
-        *_, input_suffix = self.output_template.partition("{current}")
-        if self.keep_input_prefix and not input_prefix:
-            raise ValueError(
-                f"keep_input_prefix is specified but output_template {self.output_template} does not contain a prefix."
-            )
-        if self.keep_input_separator and not input_separator:
-            raise ValueError(
-                f"keep_input_separator is specified but output_template {self.output_template} does not contain a"
-                " separator."
-            )
-        if self.keep_input_suffix and not input_suffix:
-            raise ValueError(
-                f"keep_input_suffix is specified but output_template {self.output_template} does not contain a suffix."
-            )
 
-        output_separator = None
-        if "{context}" in self.output_template:
-            output_prefix, *_ = self.output_template.partition("{context}")
-            output_separator = self.output_template.split("{context}")[1].split("{current}")[0]
-        else:
-            output_prefix, *_ = self.output_template.partition("{current}")
-        if self.keep_output_prefix and not output_prefix:
+def format_template(template: str, current: str, context: Optional[str] = None) -> str:
+    kwargs = {"current": current}
+    if context is not None:
+        kwargs["context"] = context
+    return template.format(**kwargs)
+
+
+def generate_model_output(
+    model: AttributionModel,
+    model_input: str,
+    generation_kwargs: Dict[str, Any],
+    special_tokens_to_keep: List[str],
+    output_template: str,
+    prefix: str,
+    suffix: str,
+) -> str:
+    # Generate outputs, strip special tokens and remove prefix/suffix
+    output_gen = model.generate(model_input, skip_special_tokens=False, **generation_kwargs)[0]
+    output_tokens = [
+        t
+        for t in model.convert_string_to_tokens(output_gen, skip_special_tokens=False)
+        if t not in model.special_tokens or t in special_tokens_to_keep
+    ]
+    output_gen = model.convert_tokens_to_string(output_tokens, skip_special_tokens=False)
+
+    if prefix:
+        if not output_gen.startswith(prefix):
             raise ValueError(
-                f"keep_output_prefix is specified but output_template {self.output_template} does not contain a"
-                " prefix."
+                f"Output template {output_template} contains prefix {prefix} but output '{output_gen}' does"
+                " not match the prefix. Please check whether the template is correct, or force context/current"
+                " outputs."
             )
-        if self.keep_output_separator and not output_separator:
+        output_gen = output_gen[len(prefix) :]
+    if suffix:
+        if not output_gen.endswith(suffix):
             raise ValueError(
-                f"keep_output_separator is specified but output_template {self.output_template} does not contain a"
-                " separator."
+                f"Output template {output_template} contains suffix {suffix} but output '{output_gen}' does"
+                " not match the suffix. Please check whether the template is correct, or force context/current"
+                " outputs."
             )
+        output_gen = output_gen[: -len(suffix)]
+    return output_gen
 
 
 def prompt_user_for_context(output: str, context_candidate: Optional[str] = None) -> str:
+    """Prompt the user to provide the correct context for the provided output."""
     while True:
         if context_candidate:
             is_correct_candidate = Confirm.ask(
@@ -360,6 +234,7 @@ def prompt_user_for_context(output: str, context_candidate: Optional[str] = None
 
 
 def get_output_context_from_aligned_inputs(input_context: str, output_text: str) -> str:
+    """Retrieve the output context from alignments between input context and the full output text."""
     aligned_context = compute_word_aligns(input_context, output_text, split_pattern=r"\s+|\b")
     max_context_id = max(pair[1] for pair in aligned_context.alignments)
     output_text_boundary_token = aligned_context.target_tokens[max_context_id]
@@ -368,40 +243,6 @@ def get_output_context_from_aligned_inputs(input_context: str, output_text: str)
     tok_start_positions = list({start if start == end else end for start, end in spans})
     output_text_context_candidate_boundary = tok_start_positions[max_context_id] + len(output_text_boundary_token)
     return output_text[:output_text_context_candidate_boundary]
-
-
-def generate_model_output(
-    model: AttributionModel,
-    model_input: str,
-    generation_kwargs: Dict[str, Any],
-    strip_special_tokens: bool,
-    output_template: str,
-    prefix: str,
-    suffix: str,
-) -> str:
-    # Generate outputs, strip special tokens and remove prefix/suffix
-    output_gen = model.generate(model_input, skip_special_tokens=False, **generation_kwargs)[0]
-    if strip_special_tokens:
-        for token in model.special_tokens:
-            output_gen = output_gen.strip(token).strip(" ")
-
-    if prefix:
-        if not output_gen.startswith(prefix):
-            raise ValueError(
-                f"Output template {output_template} contains prefix {prefix} but output '{output_gen}' does"
-                " not match the prefix. Please check whether the template is correct, or force context/current"
-                " outputs."
-            )
-        output_gen = output_gen[len(prefix) :]
-    if suffix:
-        if not output_gen.endswith(suffix):
-            raise ValueError(
-                f"Output template {output_template} contains suffix {suffix} but output '{output_gen}' does"
-                " not match the suffix. Please check whether the template is correct, or force context/current"
-                " outputs."
-            )
-        output_gen = output_gen[: -len(suffix)]
-    return output_gen
 
 
 def prepare_outputs(
@@ -413,21 +254,23 @@ def prepare_outputs(
     output_template: str,
     align_output_context_auto: bool = False,
     generation_kwargs: Dict[str, Any] = {},
-    strip_special_tokens: bool = True,
+    special_tokens_to_keep: List[str] = [],
 ) -> Tuple[Optional[str], str]:
     """Handle model outputs and prepare them for attribution.
     This procedure is valid both for encoder-decoder and decoder-only models.
 
     | use_context | has_ctx | has_curr | setting
     |-------------|---------|----------|--------
-    | (MUST) True | True    | True     | 1. Use forced context + current as output
+    | True        | True    | True     | 1. Use forced context + current as output
     | False       | False   | True     | 2. Use forced current as output
-    | (MUST) True | True    | False    | 3. Set inputs with forced context, generate output, use as current
+    | True        | True    | False    | 3. Set inputs with forced context, generate output, use as current
     | False       | False   | False    | 4. Generate output, use it as current
     | True        | False   | False    | 5. Generate output, handle context/current splitting
     | True        | False   | True     | 6. Generate output, handle context/current splitting, force current
 
-    NOTE: use_context must be True if has_ctx is True (checked in __post_init__)
+    NOTE: If ``use_context`` is True but ``has_ctx`` is False, the model generation is assumed to contain both a
+    context and a current portion which need to be separated. ``has_ctx`` cannot be True if ``use_context`` is False
+    (pre-check in ``__post_init__``).
     """
     use_context = "{context}" in output_template
     has_ctx = output_context_text is not None
@@ -445,6 +288,7 @@ def prepare_outputs(
     if (has_ctx == use_context) and has_curr:
         return final_context, final_current
 
+    # Prepend output prefix and context, if available, if current output needs to be generated
     if has_ctx and not has_curr:
         if model.is_encoder_decoder:
             generation_kwargs["decoder_input_ids"] = model.encode(
@@ -454,7 +298,7 @@ def prepare_outputs(
             model_input = input_full_text + prefix + output_context_text
 
     output_gen = generate_model_output(
-        model, model_input, generation_kwargs, strip_special_tokens, output_template, prefix, suffix
+        model, model_input, generation_kwargs, special_tokens_to_keep, output_template, prefix, suffix
     )
 
     # Settings 3, 4
@@ -469,10 +313,9 @@ def prepare_outputs(
         return final_context, final_current
 
     # Settings 5, 6
-    # Try to split the output into context and current text using the substring between {context} and {current}
-    # in output_template. As we have no guarantees that this separator is unique (e.g. it could be whitespace,
-    # also found between tokens in context and current) we consider the splitting successful if 2 substrings
-    # are produced. If this fails, we try splitting on punctuation.
+    # Try splitting the output into context and current text using ``separator``. As we have no guarantees of its
+    # uniqueness (e.g. it could be whitespace, also found between tokens in context and current) we consider the
+    # splitting successful if exactly 2 substrings are produced. If this fails, we try splitting on punctuation.
     output_context_candidate = None
     separator_split_context_current_substring = output_gen.split(separator)
     if len(separator_split_context_current_substring) == 2:
@@ -484,12 +327,10 @@ def prepare_outputs(
             output_context_candidate = punctuation_split_context_current_substring[0]
 
     # Final resort: if the model is an encoder-decoder model, we align the full input and full output, identifying
-    # which tokens correspond to context and which to current. This stems from the assumption that
-    # source and target text have some relation that can be identified via alignment (e.g. source and
-    # target are translations of each other). We prompt the user a yes/no question asking whether the
-    # context identified is correct. If not, the user is asked to provide the correct context (check
-    # if input match, otherwise ask again). If align_output_context_auto, the aligned texts are
-    # assumed to be correct (no user input required, to automate the procedure)
+    # which tokens correspond to context and which to current. This assumes that input and output texts are alignable
+    # (e.g. translations of each other). We prompt the user a yes/no question asking whether the context identified is
+    # correct. If not, the user is asked to provide the correct context. If align_output_context_auto = True, aligned
+    # texts are assumed to be correct (no user input required, to automate the procedure)
     if not output_context_candidate and model.is_encoder_decoder and input_context_text is not None:
         output_context_candidate = get_output_context_from_aligned_inputs(input_context_text, output_gen)
 
@@ -514,22 +355,20 @@ def prepare_outputs(
     return final_context, final_current
 
 
-def setup(args: AttributeContextArgs):
-    tokenizer_kwargs = {}
-    generation_kwargs = {}
-    if args.model_src_lang is not None:
-        tokenizer_kwargs["src_lang"] = args.model_src_lang
-    if args.model_tgt_lang is not None:
-        tokenizer_kwargs["tgt_lang"] = args.model_tgt_lang
-    model = load_model(args.model_name_or_path, args.attribution_method, tokenizer_kwargs=tokenizer_kwargs)
-    if args.model_tgt_lang is not None:
-        generation_kwargs["forced_bos_token_id"] = model.tokenizer.lang_code_to_id[args.model_tgt_lang]
+def attribute_context(args: AttributeContextArgs):
+    model = HuggingfaceModel.load(
+        args.model_name_or_path,
+        args.attribution_method,
+        model_kwargs=args.model_kwargs,
+        tokenizer_kwargs=args.tokenizer_kwargs,
+    )
+    # Handle language tag for multilingual models - no need to specify it in generation kwargs
+    if "tgt_lang" in args.tokenizer_kwargs and "forced_bos_token_id" not in args.generation_kwargs:
+        tgt_lang = args.tokenizer_kwargs["tgt_lang"]
+        args.generation_kwargs["forced_bos_token_id"] = model.tokenizer.lang_code_to_id[tgt_lang]
 
-    in_kwargs = {"current": args.input_current_text}
-    if args.input_context_text is not None:
-        in_kwargs["context"] = args.input_context_text
-    in_text = args.input_template.format(**in_kwargs)
-
+    # Prepare input/outputs (generate if necessary)
+    in_text = format_template(args.input_template, args.input_current_text, args.input_context_text)
     args.output_context_text, args.output_current_text = prepare_outputs(
         model=model,
         input_context_text=args.input_context_text,
@@ -538,38 +377,28 @@ def setup(args: AttributeContextArgs):
         output_current_text=args.output_current_text,
         output_template=args.output_template,
         align_output_context_auto=args.align_output_context_auto,
-        generation_kwargs=generation_kwargs,
-        strip_special_tokens=args.strip_special_tokens,
+        generation_kwargs=args.generation_kwargs,
+        special_tokens_to_keep=args.special_tokens_to_keep,
     )
+    out_text = format_template(args.output_template, args.output_current_text, args.output_context_text)
 
-    out_kwargs = {"current": args.output_current_text}
-    if args.output_context_text is not None:
-        out_kwargs["context"] = args.output_context_text
-    out_text = args.output_template.format(**out_kwargs)
-    # out_text_no_suffix = (args.output_template.split("{current}")[0] + "{current}").format(**out_kwargs)
-    return model, in_text, out_text
+    # Step 1: Context-sensitive Target Identification
+    cti_out = model.attribute(
+        args.input_current_text,
+        args.output_current_text,
+        attribute_target=model.is_encoder_decoder,
+        step_scores=[args.context_sensitivity_metric],
+        contrast_sources=in_text if model.is_encoder_decoder else None,
+        contrast_targets=out_text,
+        show_progress=False,
+        method="dummy",
+    )[0]
+    if args.show_intermediate_outputs:
+        cti_out.show(do_aggregation=False)
 
+    # If using tgt language tag, ignore its context-sensitive score since its contrastive comparison is not meaningful.
+    # TODO
 
-def attribute_context(args: AttributeContextArgs):
-    model, in_text, out_text = setup(args)
-    # Remove suffix from output template if present: the suffix is only used in prepare_outputs to allow the post-hoc
-    # exclusion of generated tokens from the end of the current output from attribution.
-
-    print(in_text, out_text, args.output_context_text, args.output_current_text)
-
-    # if model.is_encoder_decoder:
-    #    contextual_input = in_text
-    #    contextual_output = out_text
-    #    contextless_input = args.input_current_text
-    #    contextless_output = args.output_current_text
-    # cti_out = model.attribute(
-    #    args.input_current_text,
-    #    attribute_target=True,
-    #    step_scores=[args.cti_metric],
-    #    contrast_sources=ex.input_full,
-    #    show_progress=False,
-    #    method="dummy",
-    # )[0]
     # Tokenize inputs and outputs
     # tokenize_inputs_outputs()
     # Apply context sensitivity metric

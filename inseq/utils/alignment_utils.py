@@ -231,7 +231,7 @@ def auto_align_sequences(
         clean_a_tokens, removed_a_token_idxs = clean_tokens(a_tokens, filter_special_tokens)
         clean_b_tokens, removed_b_token_idxs = clean_tokens(b_tokens, filter_special_tokens)
         if len(removed_a_token_idxs) != len(removed_b_token_idxs):
-            logger.warning(
+            logger.debug(
                 "The number of special tokens in the target and contrast sequences do not match. "
                 "Trying to match special tokens based on their identity."
             )
@@ -266,7 +266,7 @@ def auto_align_sequences(
             alignments=a_to_b_aligns_with_special_tokens,
         )
     except Exception as e:
-        logger.warning(
+        logger.error(
             "Failed to compute alignments using the aligner. "
             f"Please check the following error and provide custom alignments if needed.\n{e}"
         )
@@ -302,7 +302,7 @@ def get_adjusted_alignments(
             ).alignments
             alignments = [(a_idx, b_idx) for a_idx, b_idx in alignments if start_pos <= a_idx < end_pos]
             is_auto_aligned = True
-            logger.warning(
+            logger.debug(
                 f"Using {ALIGN_MODEL_ID} for automatic alignments. Provide custom alignments for non-linguistic "
                 f"sequences, or for languages not covered by the aligner."
             )
@@ -346,13 +346,13 @@ def get_adjusted_alignments(
                 "No target alignments were provided for the contrastive target. "
                 "Use e.g. 'contrast_targets_alignments=[(0,1), ...] to provide them in model.attribute"
             )
-            logger.warning(
+            logger.debug(
                 f"{existing_aligns_message if filter_aligns else no_aligns_message}\n"
                 "Filling missing position with right-aligned 1:1 position alignments."
             )
             filter_aligns = sorted(set(filled_alignments), key=lambda x: (x[0], x[1]))
     if is_auto_aligned or (fill_missing and filter_aligns != filled_alignments):
-        logger.warning(f"Generated alignments: {filter_aligns}")
+        logger.debug(f"Generated alignments: {filter_aligns}")
     return filter_aligns
 
 

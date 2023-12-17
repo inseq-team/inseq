@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import List, Optional, Tuple
 
 from ..utils import cli_arg, is_datasets_available
-from .attribute import AttributeBaseArgs, attribute
+from .attribute import AttributeExtendedArgs, attribute
 from .base import BaseCLICommand
 
 if is_datasets_available():
@@ -10,32 +10,32 @@ if is_datasets_available():
 
 
 @dataclass
-class AttributeDatasetArgs:
+class LoadDatasetArgs:
     dataset_name: str = cli_arg(
-        aliases=["-d"],
+        aliases=["-d", "--dataset"],
         help="The type of dataset to be loaded for attribution.",
     )
     input_text_field: Optional[str] = cli_arg(
-        aliases=["-f"], help="Name of the field containing the input texts used for attribution."
+        aliases=["-in", "--input"], help="Name of the field containing the input texts used for attribution."
     )
     generated_text_field: Optional[str] = cli_arg(
         default=None,
-        aliases=["-fgen"],
+        aliases=["-gen", "--generated"],
         help="Name of the field containing the generated texts used for constrained decoding.",
     )
     dataset_config: Optional[str] = cli_arg(
-        default=None, aliases=["-dconf"], help="The name of the Huggingface dataset configuration."
+        default=None, aliases=["--config"], help="The name of the Huggingface dataset configuration."
     )
     dataset_dir: Optional[str] = cli_arg(
-        default=None, aliases=["-ddir"], help="Path to the directory containing the data files."
+        default=None, aliases=["--dir"], help="Path to the directory containing the data files."
     )
-    dataset_files: Optional[List[str]] = cli_arg(default=None, aliases=["-dfiles"], help="Path to the dataset files.")
-    dataset_split: Optional[str] = cli_arg(default="train", aliases=["-dsplit"], help="Dataset split.")
+    dataset_files: Optional[List[str]] = cli_arg(default=None, aliases=["--files"], help="Path to the dataset files.")
+    dataset_split: Optional[str] = cli_arg(default="train", aliases=["--split"], help="Dataset split.")
     dataset_revision: Optional[str] = cli_arg(
-        default=None, aliases=["-drev"], help="The Huggingface dataset revision."
+        default=None, aliases=["--revision"], help="The Huggingface dataset revision."
     )
     dataset_auth_token: Optional[str] = cli_arg(
-        default=None, aliases=["-dauth"], help="The auth token for the Huggingface dataset."
+        default=None, aliases=["--auth"], help="The auth token for the Huggingface dataset."
     )
     dataset_kwargs: Optional[dict] = cli_arg(
         default_factory=dict,
@@ -43,7 +43,7 @@ class AttributeDatasetArgs:
     )
 
 
-def load_fields_from_dataset(dataset_args: AttributeDatasetArgs) -> Tuple[List[str], Optional[List[str]]]:
+def load_fields_from_dataset(dataset_args: LoadDatasetArgs) -> Tuple[List[str], Optional[List[str]]]:
     if not is_datasets_available():
         raise ImportError("The datasets library needs to be installed to use the attribute-dataset client.")
     dataset = load_dataset(
@@ -71,9 +71,9 @@ def load_fields_from_dataset(dataset_args: AttributeDatasetArgs) -> Tuple[List[s
 class AttributeDatasetCommand(BaseCLICommand):
     _name = "attribute-dataset"
     _help = "Perform feature attribution on a full dataset and save the results to a file"
-    _dataclasses = AttributeBaseArgs, AttributeDatasetArgs
+    _dataclasses = AttributeExtendedArgs, LoadDatasetArgs
 
-    def run(args: Tuple[AttributeBaseArgs, AttributeDatasetArgs]):
+    def run(args: Tuple[AttributeExtendedArgs, LoadDatasetArgs]):
         attribute_args, dataset_args = args
         input_texts, generated_texts = load_fields_from_dataset(dataset_args)
         attribute(input_texts, generated_texts, attribute_args)

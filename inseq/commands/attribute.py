@@ -2,7 +2,7 @@ import logging
 from dataclasses import dataclass
 from typing import List, Optional
 
-from .. import list_feature_attribution_methods, load_model
+from .. import list_feature_attribution_methods, list_step_functions, load_model
 from ..utils import cli_arg, get_default_device
 from .base import BaseCLICommand
 
@@ -13,14 +13,49 @@ class AttributeBaseArgs:
         aliases=["-m"], help="The name or path of the model on which attribution is performed."
     )
     attribution_method: Optional[str] = cli_arg(
-        default="integrated_gradients",
+        default="saliency",
         aliases=["-a"],
         help="The attribution method used to perform feature attribution.",
         choices=list_feature_attribution_methods(),
     )
-    do_prefix_attribution: bool = cli_arg(
+    device: str = cli_arg(
+        default=get_default_device(),
+        aliases=["--dev"],
+        help="The device used for inference with Pytorch. Multi-GPU is not supported.",
+    )
+    attributed_fn: Optional[str] = cli_arg(
+        default=None,
+        aliases=["-fn"],
+        choices=list_step_functions(),
+        help=(
+            "The attribution target used for the attribution method. Default: ``probability``. If a"
+            " step function requiring additional arguments is used (e.g. ``contrast_prob_diff``), they should be"
+            " specified using the ``attribution_kwargs`` argument."
+        ),
+    )
+    model_kwargs: dict = cli_arg(
+        default_factory=dict,
+        help="Additional keyword arguments passed to the model constructor in JSON format.",
+    )
+    tokenizer_kwargs: dict = cli_arg(
+        default_factory=dict,
+        help="Additional keyword arguments passed to the tokenizer constructor in JSON format.",
+    )
+    generation_kwargs: dict = cli_arg(
+        default_factory=dict,
+        help="Additional keyword arguments passed to the generation method in JSON format.",
+    )
+    attribution_kwargs: dict = cli_arg(
+        default_factory=dict,
+        help="Additional keyword arguments passed to the attribution method in JSON format.",
+    )
+
+
+@dataclass
+class AttributeExtendedArgs(AttributeBaseArgs):
+    attribute_target: bool = cli_arg(
         default=False,
-        help="Performs the attribution procedure including the generated prefix at every step.",
+        help="Performs the attribution procedure including the generated target prefix at every step.",
     )
     generate_from_target_prefix: bool = cli_arg(
         default=False,
@@ -31,7 +66,9 @@ class AttributeBaseArgs:
         ),
     )
     step_scores: List[str] = cli_arg(
-        default_factory=list, help="Adds the specified step scores to the attribution output."
+        default_factory=list,
+        help="Adds the specified step scores to the attribution output.",
+        choices=list_step_functions(),
     )
     output_step_attributions: bool = cli_arg(default=False, help="Adds step-level feature attributions to the output.")
     include_eos_baseline: bool = cli_arg(
@@ -45,11 +82,6 @@ class AttributeBaseArgs:
     aggregate_output: bool = cli_arg(
         default=False,
         help="If specified, the attribution output is aggregated using its default aggregator before saving.",
-    )
-    device: str = cli_arg(
-        default=get_default_device(),
-        aliases=["--dev"],
-        help="The device used for inference with Pytorch. Multi-GPU is not supported.",
     )
     hide_attributions: bool = cli_arg(
         default=False,
@@ -71,37 +103,16 @@ class AttributeBaseArgs:
     end_pos: Optional[int] = cli_arg(
         default=None, aliases=["-e"], help="End position for the attribution. Default: last token"
     )
-    attributed_fn: Optional[str] = cli_arg(
-        default=None,
-        aliases=["-fn"],
-        help="The name of the step function used as attribution target. Default: probability.",
-    )
     verbose: bool = cli_arg(
         default=False, aliases=["-v"], help="If specified, use INFO as logging level for the attribution."
     )
     very_verbose: bool = cli_arg(
         default=False, aliases=["-vv"], help="If specified, use DEBUG as logging level for the attribution."
     )
-    model_kwargs: dict = cli_arg(
-        default_factory=dict,
-        help="Additional keyword arguments passed to the model constructor in JSON format.",
-    )
-    tokenizer_kwargs: dict = cli_arg(
-        default_factory=dict,
-        help="Additional keyword arguments passed to the tokenizer constructor in JSON format.",
-    )
-    generation_kwargs: dict = cli_arg(
-        default_factory=dict,
-        help="Additional keyword arguments passed to the generation method in JSON format.",
-    )
-    attribution_kwargs: dict = cli_arg(
-        default_factory=dict,
-        help="Additional keyword arguments passed to the attribution method in JSON format.",
-    )
 
 
 @dataclass
-class AttributeArgs(AttributeBaseArgs):
+class AttributeWithInputsArgs(AttributeExtendedArgs):
     input_texts: List[str] = cli_arg(default=None, aliases=["-i"], help="One or more input texts used for generation.")
     generated_texts: Optional[List[str]] = cli_arg(
         default=None, aliases=["-g"], help="If specified, constrains the decoding procedure to the specified outputs."
@@ -116,7 +127,7 @@ class AttributeArgs(AttributeBaseArgs):
             self.generated_texts = list(self.generated_texts)
 
 
-def attribute(input_texts, generated_texts, args: AttributeBaseArgs):
+def attribute(input_texts, generated_texts, args: AttributeExtendedArgs):
     if args.very_verbose:
         log_level = logging.DEBUG
     elif args.verbose:
@@ -135,11 +146,16 @@ def attribute(input_texts, generated_texts, args: AttributeBaseArgs):
         model_kwargs=args.model_kwargs,
         tokenizer_kwargs=args.tokenizer_kwargs,
     )
+    # Handle language tag for multilingual models - no need to specify it in generation kwargs
+    if "tgt_lang" in args.tokenizer_kwargs and "forced_bos_token_id" not in args.generation_kwargs:
+        tgt_lang = args.tokenizer_kwargs["tgt_lang"]
+        args.generation_kwargs["forced_bos_token_id"] = model.tokenizer.lang_code_to_id[tgt_lang]
+
     out = model.attribute(
         input_texts,
         generated_texts,
         batch_size=args.batch_size,
-        attribute_target=args.do_prefix_attribution,
+        attribute_target=args.attribute_target,
         attributed_fn=args.attributed_fn,
         step_scores=args.step_scores,
         output_step_attributions=args.output_step_attributions,
@@ -168,7 +184,7 @@ def attribute(input_texts, generated_texts, args: AttributeBaseArgs):
 class AttributeCommand(BaseCLICommand):
     _name = "attribute"
     _help = "Perform feature attribution on one or multiple sentences"
-    _dataclasses = AttributeArgs
+    _dataclasses = AttributeWithInputsArgs
 
-    def run(args: AttributeArgs):
+    def run(args: AttributeWithInputsArgs):
         attribute(args.input_texts, args.generated_texts, args)

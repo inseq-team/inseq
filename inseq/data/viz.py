@@ -23,8 +23,8 @@ from typing import Dict, List, Literal, Optional, Tuple, Union
 import numpy as np
 from matplotlib.colors import Colormap
 from rich import box
-from rich import print as rprint
 from rich.color import Color
+from rich.console import Console
 from rich.live import Live
 from rich.padding import Padding
 from rich.panel import Panel
@@ -102,12 +102,15 @@ def show_attributions(
             display(HTML(curr_html))
         html_out += curr_html
         if not isnotebook():
+            console = Console()
             curr_color = None
             if attribution.source_attributions is not None:
                 curr_color = colors[idx]
                 if display:
                     print("\n\n")
-                    rprint(get_heatmap_type(attribution, curr_color, "Source", use_html=False))
+                    console.print(
+                        get_heatmap_type(attribution, curr_color, "Source", use_html=False), overflow="ignore"
+                    )
                 if attribution.target_attributions is not None:
                     curr_color = colors[idx + 1]
             display_scores = attribution.source_attributions is None and attribution.step_scores
@@ -115,7 +118,7 @@ def show_attributions(
                 if curr_color is None and colors:
                     curr_color = colors[idx]
                 print("\n\n")
-                rprint(get_heatmap_type(attribution, curr_color, "Target", use_html=False))
+                console.print(get_heatmap_type(attribution, curr_color, "Target", use_html=False), overflow="ignore")
         if any(x is None for x in [attribution.source_attributions, attribution.target_attributions]):
             idx += 1
         else:
@@ -250,9 +253,9 @@ def get_saliency_heatmap_rich(
     label: str = "",
     step_scores_threshold: Union[float, Dict[str, float]] = 0.5,
 ):
-    columns = [Column(header="", justify="right")]
+    columns = [Column(header="", justify="right", overflow="fold")]
     for column_label in column_labels:
-        columns.append(Column(header=column_label, justify="center"))
+        columns.append(Column(header=column_label, justify="center", overflow="fold"))
     table = Table(
         *columns,
         title=f"{label + ' ' if label else ''}Saliency Heatmap",
