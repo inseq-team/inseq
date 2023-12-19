@@ -1,6 +1,7 @@
 import logging
 import re
 from dataclasses import dataclass, field
+from inspect import signature
 from typing import Any, Dict, List, Optional, Tuple
 
 from rich import print as rprint
@@ -9,6 +10,7 @@ from rich.prompt import Confirm, Prompt
 from .. import (
     list_step_functions,
 )
+from ..attr.step_functions import get_step_function
 from ..data import FeatureAttributionSequenceOutput
 from ..models import HuggingfaceModel
 from ..utils import cli_arg, pretty_dict
@@ -483,15 +485,23 @@ def get_contextless_contextual_outputs(
     return output_contextual, output_contextless
 
 
-def get_start_attribution_position(
-    output_current_text_offset: int, cti_idx: int, model: HuggingfaceModel, has_lang_tag: bool = False
-) -> int:
-    pos_start = output_current_text_offset + cti_idx
-    if model.is_encoder_decoder:
-        pos_start += 1
-        if has_lang_tag:
-            pos_start += 1
-    return pos_start
+def get_source_target_cci_scores(
+    cci_attrib_out: FeatureAttributionSequenceOutput,
+    input_template: str,
+    input_context_tokens: List[str],
+    has_input_context: bool,
+    has_output_context: bool,
+    model_is_encoder_decoder: bool,
+    model_has_lang_tag: bool,
+) -> Tuple[Optional[List[float]], Optional[List[float]]]:
+    source_scores, target_scores = None, None
+    if model_is_encoder_decoder and has_input_context:
+        source_scores = cci_attrib_out.source_attributions[:, 0].tolist()
+        if model_has_lang_tag:
+            source_scores = source_scores[1:]
+    if has_output_context:
+        target_scores = cci_attrib_out.target_attributions[:, 0].tolist()
+    return source_scores, target_scores
 
 
 def attribute_context(args: AttributeContextArgs):
@@ -595,7 +605,15 @@ def attribute_context(args: AttributeContextArgs):
             args.special_tokens_to_keep,
             args.generation_kwargs,
         )
-        pos_start = get_start_attribution_position(output_current_text_offset, cti_idx, model, has_lang_tag)
+        cci_kwargs = {}
+        if "contrast_targets" in signature(get_step_function(args.attributed_fn)).parameters:
+            cci_kwargs["contrast_sources"] = args.input_current_text if model.is_encoder_decoder else None
+            cci_kwargs["contrast_targets"] = output_full_text
+            output_ctx_tokens = model.convert_string_to_tokens(output_full_contextual, skip_special_tokens=False)
+            output_ctxless_tokens = model.convert_string_to_tokens(output_full_contextless, skip_special_tokens=False)
+            if args.attributed_fn == "kl_divergence" or output_ctx_tokens[-1] == output_ctxless_tokens[-1]:
+                cci_kwargs["contrast_force_inputs"] = True
+        pos_start = output_current_text_offset + cti_idx + int(model.is_encoder_decoder) + int(has_lang_tag)
         cci_attrib_out = model.attribute(
             input_full_text,
             output_full_contextual,
@@ -604,8 +622,8 @@ def attribute_context(args: AttributeContextArgs):
             attr_pos_start=pos_start,
             attributed_fn=args.attributed_fn,
             method=args.attribution_method,
-            contrast_sources=args.input_current_text if model.is_encoder_decoder else None,
-            contrast_targets=output_full_contextless,
+            **cci_kwargs,
+            **args.attribution_kwargs,
         )
         cci_attrib_out = aggregate_attribution_scores(
             out=cci_attrib_out,
@@ -615,12 +633,9 @@ def attribute_context(args: AttributeContextArgs):
         )[0]
         if args.show_intermediate_outputs:
             cci_attrib_out.show(do_aggregation=False)
-        source_scores = None
-        if model.is_encoder_decoder and args.has_input_context:
-            source_scores = cci_attrib_out.source_attributions[:, 0].tolist()
-        target_scores = None
-        if args.has_output_context:
-            target_scores = cci_attrib_out.target_attributions[:, 0].tolist()
+        source_scores, target_scores = get_source_target_cci_scores(
+            cci_attrib_out,
+        )
         cci_out = CCIOutput(
             cti_idx=cti_idx,
             cti_token=cti_tok,
