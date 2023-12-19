@@ -2,7 +2,14 @@ import logging
 from dataclasses import dataclass
 from typing import List, Optional
 
-from .. import list_feature_attribution_methods, list_step_functions, load_model
+from .. import (
+    FeatureAttributionOutput,
+    list_aggregation_functions,
+    list_aggregators,
+    list_feature_attribution_methods,
+    list_step_functions,
+    load_model,
+)
 from ..utils import cli_arg, get_default_device
 from .base import BaseCLICommand
 
@@ -10,7 +17,7 @@ from .base import BaseCLICommand
 @dataclass
 class AttributeBaseArgs:
     model_name_or_path: str = cli_arg(
-        aliases=["-m"], help="The name or path of the model on which attribution is performed."
+        default=None, aliases=["-m"], help="The name or path of the model on which attribution is performed."
     )
     attribution_method: Optional[str] = cli_arg(
         default="saliency",
@@ -31,6 +38,29 @@ class AttributeBaseArgs:
             "The attribution target used for the attribution method. Default: ``probability``. If a"
             " step function requiring additional arguments is used (e.g. ``contrast_prob_diff``), they should be"
             " specified using the ``attribution_kwargs`` argument."
+        ),
+    )
+    attribution_selectors: Optional[List[int]] = cli_arg(
+        default=None,
+        help=(
+            "The indices of the attribution scores to be used for the attribution aggregation. If specified, the"
+            " aggregation function is applied only to the selected scores, and the other scores are discarded."
+            " If not specified, the aggregation function is applied to all the scores."
+        ),
+    )
+    attribution_aggregators: List[str] = cli_arg(
+        default=None,
+        help=(
+            "The aggregators used to aggregate the attribution scores for each context. The outcome should"
+            " produce one score per input token"
+        ),
+        choices=list_aggregators() + list_aggregation_functions(),
+    )
+    normalize_attributions: bool = cli_arg(
+        default=False,
+        help=(
+            "Whether to normalize the attribution scores for each context. If ``True``, the attribution scores "
+            "for each context are normalized to sum up to 1, providing a relative notion of input salience."
         ),
     )
     model_kwargs: dict = cli_arg(
@@ -127,6 +157,25 @@ class AttributeWithInputsArgs(AttributeExtendedArgs):
             self.generated_texts = list(self.generated_texts)
 
 
+def aggregate_attribution_scores(
+    out: FeatureAttributionOutput,
+    selectors: Optional[List[int]] = None,
+    aggregators: Optional[List[str]] = None,
+    normalize_attributions: bool = False,
+) -> FeatureAttributionOutput:
+    if selectors is not None and aggregators is not None:
+        for select_idx, aggregator_fn in zip(selectors, aggregators):
+            out = out.aggregate(
+                aggregator=aggregator_fn,
+                normalize=normalize_attributions,
+                select_idx=select_idx,
+                do_post_aggregation_checks=False,
+            )
+    else:
+        out = out.aggregate(aggregator=aggregators, normalize=normalize_attributions)
+    return out
+
+
 def attribute(input_texts, generated_texts, args: AttributeExtendedArgs):
     if args.very_verbose:
         log_level = logging.DEBUG
@@ -175,8 +224,13 @@ def attribute(input_texts, generated_texts, args: AttributeExtendedArgs):
     else:
         out.show(display=not args.hide_attributions)
     if args.save_path:
-        if args.aggregate_output:
-            out = out.aggregate()
+        if args.attribution_aggregators is not None:
+            out = aggregate_attribution_scores(
+                out=out,
+                selectors=args.attribution_selectors,
+                aggregators=args.attribution_aggregators,
+                normalize_attributions=args.normalize_attributions,
+            )
         print(f"Saving {'aggregated ' if args.aggregate_output else ''}attributions to {args.save_path}")
         out.save(args.save_path, overwrite=True)
 

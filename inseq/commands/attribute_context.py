@@ -1,28 +1,26 @@
 import logging
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 
 from rich import print as rprint
 from rich.prompt import Confirm, Prompt
 
 from .. import (
-    AttributionModel,
-    list_aggregation_functions,
-    list_aggregators,
     list_step_functions,
 )
+from ..data import FeatureAttributionSequenceOutput
 from ..models import HuggingfaceModel
-from ..utils import cli_arg
+from ..utils import cli_arg, pretty_dict
 from ..utils.alignment_utils import compute_word_aligns
-from .attribute import AttributeBaseArgs
+from .attribute import AttributeBaseArgs, aggregate_attribution_scores
 from .base import BaseCLICommand
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass
-class AttributeContextArgs(AttributeBaseArgs):
+class AttributeContextInputArgs:
     input_current_text: str = cli_arg(
         default="",
         help=(
@@ -30,11 +28,6 @@ class AttributeContextArgs(AttributeBaseArgs):
             "prefix used for language modeling. If the model is an encoder-decoder model, the input text is the "
             "source text provided as input to the encoder."
         ),
-    )
-    context_sensitivity_metric: str = cli_arg(
-        default="kl_divergence",
-        help="The metric used to detect context-sensitive tokens in generated texts.",
-        choices=list_step_functions(),
     )
     input_context_text: Optional[str] = cli_arg(
         default=None,
@@ -73,20 +66,75 @@ class AttributeContextArgs(AttributeBaseArgs):
             " formatting in the output text (e.g. <brk> tags to separate context and current outputs)."
         ),
     )
-    attribution_aggregators: List[str] = cli_arg(
-        default_factory=list,
-        help=(
-            "The aggregators used to aggregate the attribution scores for each context. The outcome should"
-            " produce one score per input token"
-        ),
-        choices=list_aggregators() + list_aggregation_functions(),
+    has_input_context: bool = cli_arg(init=False)
+    has_output_context: bool = cli_arg(init=False)
+
+    def __post_init__(self):
+        self.has_input_context = "{context}" in self.input_template
+        self.has_output_context = "{context}" in self.output_template
+        if not self.input_current_text:
+            raise ValueError("--input_current_text must be a non-empty string.")
+        if self.input_context_text and not self.has_input_context:
+            logger.warning(
+                f"input_template has format {self.input_template} (no {{context}}), but --input_context_text is"
+                " specified. Ignoring provided --input_context_text."
+            )
+            self.input_context_text = None
+        if self.output_context_text and not self.has_output_context:
+            logger.warning(
+                f"output_template has format {self.output_template} (no {{context}}), but --output_context_text is"
+                " specified. Ignoring provided --output_context_text."
+            )
+            self.output_context_text = None
+        if not self.input_context_text and self.has_input_context:
+            raise ValueError(
+                f"{{context}} format placeholder is present in input_template {self.input_template},"
+                " but --input_context_text is not specified."
+            )
+        if "{current}" not in self.input_template:
+            raise ValueError(f"{{current}} format placeholder is missing from input_template {self.input_template}.")
+        if "{current}" not in self.output_template:
+            raise ValueError(f"{{current}} format placeholder is missing from output_template {self.output_template}.")
+        if not self.input_current_text:
+            raise ValueError("--input_current_text must be a non-empty string.")
+        if self.has_input_context and self.input_template.find("{context}") > self.input_template.find("{current}"):
+            raise ValueError(
+                f"{{context}} placeholder must appear before {{current}} in input_template '{self.input_template}'."
+            )
+        if self.has_output_context and self.output_template.find("{context}") > self.output_template.find("{current}"):
+            raise ValueError(
+                f"{{context}} placeholder must appear before {{current}} in output_template '{self.output_template}'."
+            )
+        if not self.output_template.endswith("{current}"):
+            *_, suffix = self.output_template.partition("{current}")
+            logger.warning(
+                f"Suffix '{suffix}' was specified in output_template and will be used to ignore the specified suffix"
+                " tokens during context sensitivity detection. Make sure that the suffix corresponds to the end of the"
+                " output_current_text by forcing --output_current_text if necessary."
+            )
+
+
+@dataclass
+class AttributeContextMethodArgs(AttributeBaseArgs):
+    context_sensitivity_metric: str = cli_arg(
+        default="kl_divergence",
+        help="The metric used to detect context-sensitive tokens in generated texts.",
+        choices=list_step_functions(),
     )
-    normalize_attributions: bool = cli_arg(
+    align_output_context_auto: bool = cli_arg(
         default=False,
         help=(
-            "Whether to normalize the attribution scores for each context. If ``True``, the attribution scores "
-            "for each context are normalized to sum up to 1, providing a relative notion of input salience."
+            "Argument used for encoder-decoder model when generating text with an output template including both"
+            " {context} and {current}, to attempt an automatic detection of which portions of the output belong to"
+            " context vs. current in absence of other explicit cues. If set to True, the input and output context"
+            " and current texts are aligned automatically (assuming an MT-like task), and the alignments are "
+            " assumed to be valid to separate the two without further user validation. Otherwise, the user is "
+            " prompted to manually specify which part of the generated text corresponds to the output context."
         ),
+    )
+    special_tokens_to_keep: List[str] = cli_arg(
+        default_factory=list,
+        help="Special tokens to preserve in the generated string, e.g. <brk> separator between context and current.",
     )
     context_sensitivity_std_threshold: float = cli_arg(
         default=1.0,
@@ -118,52 +166,53 @@ class AttributeContextArgs(AttributeBaseArgs):
             " context tokens that pass the threshold.",
         ),
     )
-    align_output_context_auto: bool = cli_arg(
-        default=False,
-        help=(
-            "Argument used for encoder-decoder model when generating text with an output template including both"
-            " {context} and {current}, to attempt an automatic detection of which portions of the output belong to"
-            " context vs. current in absence of other explicit cues. If set to True, the input and output context"
-            " and current texts are aligned automatically (assuming an MT-like task), and the alignments are "
-            " assumed to be valid to separate the two without further user validation. Otherwise, the user is "
-            " prompted to manually specify which part of the generated text corresponds to the output context."
-        ),
-    )
-    special_tokens_to_keep: List[str] = cli_arg(
-        default_factory=list,
-        help="Special tokens to preserve in the generated string, e.g. as separator between context and current.",
-    )
+
+
+@dataclass
+class AttributeContextOutputArgs:
     show_intermediate_outputs: bool = cli_arg(
         default=False,
         help="If specified, the intermediate outputs of the two steps are shown.",
     )
 
-    def __post_init__(self):
-        if not self.input_current_text:
-            raise ValueError("--input_current_text must be a non-empty string.")
-        if self.input_context_text and "{context}" not in self.input_template:
-            logger.warning(
-                f"input_template has format {self.input_template} (no {{context}}), but --input_context_text is"
-                " specified. Ignoring provided --input_context_text."
-            )
-            self.input_context_text = None
-        if self.output_context_text and "{context}" not in self.output_template:
-            logger.warning(
-                f"output_template has format {self.output_template} (no {{context}}), but --output_context_text is"
-                " specified. Ignoring provided --output_context_text."
-            )
-            self.output_context_text = None
-        if not self.input_context_text and "{context}" in self.input_template:
-            raise ValueError(
-                f"{{context}} format placeholder is present in input_template {self.input_template},"
-                " but --input_context_text is not specified."
-            )
-        if "{current}" not in self.input_template:
-            raise ValueError(f"{{current}} format placeholder is missing from input_template {self.input_template}.")
-        if not self.input_current_text:
-            raise ValueError("--input_current_text must be a non-empty string.")
-        if "{current}" not in self.output_template:
-            raise ValueError(f"{{current}} format placeholder is missing from output_template {self.output_template}.")
+
+@dataclass
+class AttributeContextArgs(AttributeContextInputArgs, AttributeContextMethodArgs, AttributeContextOutputArgs):
+    pass
+
+
+@dataclass
+class CCIOutput:
+    cti_idx: int
+    cti_token: str
+    cti_score: float
+    output_contextual: str
+    output_contextless: str
+    input_context_scores: Optional[List[float]] = None
+    output_context_scores: Optional[List[float]] = None
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}({pretty_dict(self.__dict__)})"
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.__dict__.items())
+
+
+@dataclass
+class AttributeContextOutput:
+    input_context: Optional[str] = None
+    input_context_tokens: Optional[List[str]] = None
+    input_current: Optional[str] = None
+    input_current_tokens: Optional[List[str]] = None
+    output_context: Optional[str] = None
+    output_context_tokens: Optional[List[str]] = None
+    output_current: Optional[str] = None
+    output_current_tokens: Optional[List[str]] = None
+    cti_scores: List[float] = None
+    cci_scores: List[CCIOutput] = field(default_factory=list)
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}({pretty_dict(self.__dict__)})"
 
 
 def format_template(template: str, current: str, context: Optional[str] = None) -> str:
@@ -173,8 +222,34 @@ def format_template(template: str, current: str, context: Optional[str] = None) 
     return template.format(**kwargs)
 
 
+def get_filtered_tokens(
+    text: str,
+    model: HuggingfaceModel,
+    special_tokens_to_keep: List[str],
+    is_target: bool = False,
+) -> List[str]:
+    as_targets = is_target and model.is_encoder_decoder
+    return [
+        t
+        for t in model.convert_string_to_tokens(text, skip_special_tokens=False, as_targets=as_targets)
+        if t not in model.special_tokens or t in special_tokens_to_keep
+    ]
+
+
+def generate_with_special_tokens(
+    model: HuggingfaceModel,
+    model_input: str,
+    special_tokens_to_keep: List[str] = [],
+    **generation_kwargs,
+) -> str:
+    # Generate outputs, strip special tokens and remove prefix/suffix
+    output_gen = model.generate(model_input, skip_special_tokens=False, **generation_kwargs)[0]
+    output_tokens = get_filtered_tokens(output_gen, model, special_tokens_to_keep, is_target=True)
+    return model.convert_tokens_to_string(output_tokens, skip_special_tokens=False)
+
+
 def generate_model_output(
-    model: AttributionModel,
+    model: HuggingfaceModel,
     model_input: str,
     generation_kwargs: Dict[str, Any],
     special_tokens_to_keep: List[str],
@@ -182,19 +257,11 @@ def generate_model_output(
     prefix: str,
     suffix: str,
 ) -> str:
-    # Generate outputs, strip special tokens and remove prefix/suffix
-    output_gen = model.generate(model_input, skip_special_tokens=False, **generation_kwargs)[0]
-    output_tokens = [
-        t
-        for t in model.convert_string_to_tokens(output_gen, skip_special_tokens=False)
-        if t not in model.special_tokens or t in special_tokens_to_keep
-    ]
-    output_gen = model.convert_tokens_to_string(output_tokens, skip_special_tokens=False)
-
+    output_gen = generate_with_special_tokens(model, model_input, special_tokens_to_keep, **generation_kwargs)
     if prefix:
         if not output_gen.startswith(prefix):
             raise ValueError(
-                f"Output template {output_template} contains prefix {prefix} but output '{output_gen}' does"
+                f"Output template '{output_template}' contains prefix '{prefix}' but output '{output_gen}' does"
                 " not match the prefix. Please check whether the template is correct, or force context/current"
                 " outputs."
             )
@@ -246,7 +313,7 @@ def get_output_context_from_aligned_inputs(input_context: str, output_text: str)
 
 
 def prepare_outputs(
-    model: AttributionModel,
+    model: HuggingfaceModel,
     input_context_text: Optional[str],
     input_full_text: str,
     output_context_text: Optional[str],
@@ -259,55 +326,56 @@ def prepare_outputs(
     """Handle model outputs and prepare them for attribution.
     This procedure is valid both for encoder-decoder and decoder-only models.
 
-    | use_context | has_ctx | has_curr | setting
-    |-------------|---------|----------|--------
-    | True        | True    | True     | 1. Use forced context + current as output
-    | False       | False   | True     | 2. Use forced current as output
-    | True        | True    | False    | 3. Set inputs with forced context, generate output, use as current
-    | False       | False   | False    | 4. Generate output, use it as current
-    | True        | False   | False    | 5. Generate output, handle context/current splitting
-    | True        | False   | True     | 6. Generate output, handle context/current splitting, force current
+    | use_out_ctx | has_out_ctx | has_out_curr | setting
+    |-------------|-------------|--------------|--------
+    | True        | True        | True         | 1. Use forced context + current as output
+    | False       | False       | True         | 2. Use forced current as output
+    | True        | True        | False        | 3. Set inputs with forced context, generate output, use as current
+    | False       | False       | False        | 4. Generate output, use it as current
+    | True        | False       | False        | 5. Generate output, handle context/current splitting
+    | True        | False       | True         | 6. Generate output, handle context/current splitting, force current
 
-    NOTE: If ``use_context`` is True but ``has_ctx`` is False, the model generation is assumed to contain both a
-    context and a current portion which need to be separated. ``has_ctx`` cannot be True if ``use_context`` is False
-    (pre-check in ``__post_init__``).
+    NOTE: If ``use_out_ctx`` is True but ``has_out_ctx`` is False, the model generation is assumed to contain both
+    a context and a current portion which need to be separated. ``has_out_ctx`` cannot be True if ``use_out_ctx``
+    is False (pre-check in ``__post_init__``).
     """
-    use_context = "{context}" in output_template
-    has_ctx = output_context_text is not None
-    has_curr = output_current_text is not None
+    use_out_ctx = "{context}" in output_template
+    has_out_ctx = output_context_text is not None
+    has_out_curr = output_current_text is not None
     model_input = input_full_text
     final_current = output_current_text
     final_context = output_context_text
 
     # E.g. output template "A{context}B{current}C" -> prefix = "A", suffix = "C", separator = "B"
-    prefix, *_ = output_template.partition("{context}" if use_context else "{current}")
+    prefix, *_ = output_template.partition("{context}" if use_out_ctx else "{current}")
     *_, suffix = output_template.partition("{current}")
-    separator = output_template.split("{context}")[1].split("{current}")[0] if use_context else None
+    separator = output_template.split("{context}")[1].split("{current}")[0] if use_out_ctx else None
 
     # Settings 1, 2
-    if (has_ctx == use_context) and has_curr:
+    if (has_out_ctx == use_out_ctx) and has_out_curr:
         return final_context, final_current
 
     # Prepend output prefix and context, if available, if current output needs to be generated
-    if has_ctx and not has_curr:
+    if has_out_ctx and not has_out_curr:
         if model.is_encoder_decoder:
             generation_kwargs["decoder_input_ids"] = model.encode(
                 prefix + output_context_text, as_targets=True, add_special_tokens=False
             ).input_ids
         else:
-            model_input = input_full_text + prefix + output_context_text
+            model_input = input_full_text + " " + prefix + output_context_text + separator
+            prefix = model_input
 
     output_gen = generate_model_output(
         model, model_input, generation_kwargs, special_tokens_to_keep, output_template, prefix, suffix
     )
 
     # Settings 3, 4
-    if (has_ctx == use_context) and not has_curr:
-        if use_context:
+    if (has_out_ctx == use_out_ctx) and not has_out_curr:
+        if use_out_ctx:
             if model.is_encoder_decoder:
                 final_current = output_gen[len(output_context_text + separator) :]
             else:
-                final_current = output_gen[len(model_input + separator) :]
+                final_current = output_gen
         else:
             final_current = output_gen if model.is_encoder_decoder else output_gen[len(model_input) :]
         return final_context, final_current
@@ -340,19 +408,90 @@ def prepare_outputs(
         final_context = prompt_user_for_context(output_gen, output_context_candidate)
     template_output_context = output_template.split("{current}")[0].format(context=final_context)
     final_current = output_gen[min(len(template_output_context), len(output_gen)) :]
-    if not has_curr and not final_current:
+    if not has_out_curr and not final_current:
         raise ValueError(
             f"The model produced an empty current output given the specified context '{final_context}'. If no"
             " context is generated naturally by the model, you can force an output context using the"
             " --output_context_text option."
         )
-    if has_curr:
+    if has_out_curr:
         logger.warning(
             f"The model produced current text '{final_current}', but the specified output_current_text"
             f" '{output_current_text}'is used instead. If you want to use the original current output text generated"
             " by the model, remove the --output_current_text option."
         )
     return final_context, final_current
+
+
+def get_cti_ranked_tokens(
+    cti_out: FeatureAttributionSequenceOutput,
+    has_language_tag: bool = False,
+    cti_metric: Optional[str] = None,
+    cti_threshold: Optional[float] = None,
+    cti_topk: Optional[int] = None,
+) -> List[Tuple[int, float, str]]:
+    # If using tgt language tag, ignore its context-sensitive score since its contrastive comparison is not meaningful.
+    start_pos = 1 if has_language_tag else 0
+    if cti_metric is None:
+        cti_metric = cti_out.step_scores.keys()[0]
+    cti_tokens = [t.token for t in cti_out.target][start_pos + cti_out.attr_pos_start :]
+    cti_scores_t = cti_out.step_scores[cti_metric][start_pos:]
+    cti_scores = cti_scores_t.tolist()
+    cti_idxs = list(range(0, len(cti_scores)))
+    cti_idxs_and_scores = sorted(zip(cti_idxs, cti_scores, cti_tokens), key=lambda x: abs(x[1]), reverse=True)
+    if cti_threshold:
+        cti_threshold = cti_scores_t.mean() + cti_threshold * cti_scores_t.std()
+        cti_idxs_and_scores = [(i, s, t) for i, s, t in cti_idxs_and_scores if abs(s) > cti_threshold]
+    if cti_topk:
+        cti_idxs_and_scores = cti_idxs_and_scores[:cti_topk]
+    return cti_idxs_and_scores
+
+
+def get_contextless_contextual_outputs(
+    model: HuggingfaceModel,
+    input_current_text: str,
+    output_current_tokens: List[str],
+    output_full_tokens: List[str],
+    output_current_text_offset: int,
+    cti_idx: int,
+    special_tokens_to_keep: List[str] = [],
+    generation_kwargs: Dict[str, Any] = {},
+) -> Tuple[str, str]:
+    output_contextual = model.convert_tokens_to_string(
+        output_full_tokens[: output_current_text_offset + cti_idx + 1], skip_special_tokens=False
+    )
+    output_current_prefix_tokens = output_current_tokens[:cti_idx]
+    output_current_prefix = model.convert_tokens_to_string(output_current_prefix_tokens, skip_special_tokens=False)
+    if model.is_encoder_decoder:
+        # One extra token for the EOS which is always forced at the end for encoder-decoders
+        generation_kwargs["max_new_tokens"] = 2
+        decoder_input_ids = model.encode(output_current_prefix, as_targets=True).input_ids
+        if int(decoder_input_ids[0, -1]) == model.eos_token_id:
+            decoder_input_ids = decoder_input_ids[0, :-1][None, ...]
+        generation_kwargs["decoder_input_ids"] = decoder_input_ids
+        generation_input = input_current_text
+    else:
+        generation_kwargs["max_new_tokens"] = 1
+        space = " " if output_current_prefix and not output_current_prefix.startswith(" ") else ""
+        generation_input = input_current_text + space + output_current_prefix
+    output_contextless = generate_with_special_tokens(
+        model,
+        generation_input,
+        special_tokens_to_keep,
+        **generation_kwargs,
+    )
+    return output_contextual, output_contextless
+
+
+def get_start_attribution_position(
+    output_current_text_offset: int, cti_idx: int, model: HuggingfaceModel, has_lang_tag: bool = False
+) -> int:
+    pos_start = output_current_text_offset + cti_idx
+    if model.is_encoder_decoder:
+        pos_start += 1
+        if has_lang_tag:
+            pos_start += 1
+    return pos_start
 
 
 def attribute_context(args: AttributeContextArgs):
@@ -362,17 +501,19 @@ def attribute_context(args: AttributeContextArgs):
         model_kwargs=args.model_kwargs,
         tokenizer_kwargs=args.tokenizer_kwargs,
     )
+
     # Handle language tag for multilingual models - no need to specify it in generation kwargs
-    if "tgt_lang" in args.tokenizer_kwargs and "forced_bos_token_id" not in args.generation_kwargs:
+    has_lang_tag = "tgt_lang" in args.tokenizer_kwargs
+    if has_lang_tag and "forced_bos_token_id" not in args.generation_kwargs:
         tgt_lang = args.tokenizer_kwargs["tgt_lang"]
         args.generation_kwargs["forced_bos_token_id"] = model.tokenizer.lang_code_to_id[tgt_lang]
 
     # Prepare input/outputs (generate if necessary)
-    in_text = format_template(args.input_template, args.input_current_text, args.input_context_text)
+    input_full_text = format_template(args.input_template, args.input_current_text, args.input_context_text)
     args.output_context_text, args.output_current_text = prepare_outputs(
         model=model,
         input_context_text=args.input_context_text,
-        input_full_text=in_text,
+        input_full_text=input_full_text,
         output_context_text=args.output_context_text,
         output_current_text=args.output_current_text,
         output_template=args.output_template,
@@ -380,44 +521,117 @@ def attribute_context(args: AttributeContextArgs):
         generation_kwargs=args.generation_kwargs,
         special_tokens_to_keep=args.special_tokens_to_keep,
     )
-    out_text = format_template(args.output_template, args.output_current_text, args.output_context_text)
+    output_full_text = format_template(args.output_template, args.output_current_text, args.output_context_text)
 
-    # Step 1: Context-sensitive Target Identification
+    # Tokenize inputs/outputs and compute offset
+    input_current_tokens = get_filtered_tokens(args.input_current_text, model, args.special_tokens_to_keep)
+    input_context_tokens = None
+    if args.input_context_text is not None:
+        input_context_tokens = get_filtered_tokens(args.input_context_text, model, args.special_tokens_to_keep)
+    if not model.is_encoder_decoder:
+        output_full_text = input_full_text + " " + output_full_text
+    output_current_tokens = get_filtered_tokens(
+        args.output_current_text, model, args.special_tokens_to_keep, is_target=True
+    )
+    output_context_tokens = None
+    if args.output_context_text is not None:
+        output_context_tokens = get_filtered_tokens(
+            args.output_context_text, model, args.special_tokens_to_keep, is_target=True
+        )
+    output_full_tokens = get_filtered_tokens(output_full_text, model, args.special_tokens_to_keep, is_target=True)
+    output_current_text_offset = len(output_full_tokens) - len(output_current_tokens)
+    if not model.is_encoder_decoder:
+        space = " " if args.output_current_text is not None and not args.output_current_text.startswith(" ") else ""
+        prefixed_output_current_text = args.input_current_text + space + args.output_current_text
+    else:
+        prefixed_output_current_text = args.output_current_text
+
+    # Part 1: Context-sensitive Token Identification (CTI)
     cti_out = model.attribute(
         args.input_current_text,
-        args.output_current_text,
+        prefixed_output_current_text,
         attribute_target=model.is_encoder_decoder,
         step_scores=[args.context_sensitivity_metric],
-        contrast_sources=in_text if model.is_encoder_decoder else None,
-        contrast_targets=out_text,
+        contrast_sources=input_full_text if model.is_encoder_decoder else None,
+        contrast_targets=output_full_text,
         show_progress=False,
         method="dummy",
     )[0]
     if args.show_intermediate_outputs:
         cti_out.show(do_aggregation=False)
 
-    # If using tgt language tag, ignore its context-sensitive score since its contrastive comparison is not meaningful.
-    # TODO
-
-    # Tokenize inputs and outputs
-    # tokenize_inputs_outputs()
-    # Apply context sensitivity metric
-    # detect_context_sensitive_tokens()
-    # Discretize context sensitivity scores to obtain tags
-    # scores_to_tags()
-    #
-    # For every tagged output token:
-    #   If the attribution method supports contrastive inputs, prepare contextless generation, align it with current
-    #   one
-    #   and identify the start position for tokens belonging to the current output
-    #   prepare_contrastive_inputs()
-    #   Attribute the tagged output token to input (and output) context
-    #   attribute_context_sensitive_token()
-    #   Aggregate output scores
-    #   aggregate_attribution_scores()
-    #   Discretize attribution scores to obtain tags
-    #   scores_to_tags()
-    # Return JSON output with detected tokens
+    cti_ranked_tokens = get_cti_ranked_tokens(
+        cti_out=cti_out,
+        has_language_tag=has_lang_tag,
+        cti_metric=args.context_sensitivity_metric,
+        cti_threshold=args.context_sensitivity_std_threshold,
+        cti_topk=args.context_sensitivity_topk,
+    )
+    cti_scores = cti_out.step_scores[args.context_sensitivity_metric].tolist()
+    if model.is_encoder_decoder:
+        cti_scores = cti_scores[:-1]
+        if has_lang_tag:
+            cti_scores = cti_scores[1:]
+    output = AttributeContextOutput(
+        input_current=args.input_current_text,
+        input_current_tokens=input_current_tokens,
+        output_current=args.output_current_text,
+        output_current_tokens=output_current_tokens,
+        input_context=args.input_context_text,
+        input_context_tokens=input_context_tokens,
+        output_context=args.output_context_text,
+        output_context_tokens=output_context_tokens,
+        cti_scores=cti_scores,
+    )
+    # Part 2: Contextual Cues Imputation (CCI)
+    for cti_idx, cti_score, cti_tok in cti_ranked_tokens:
+        output_full_contextual, output_full_contextless = get_contextless_contextual_outputs(
+            model,
+            args.input_current_text,
+            output_current_tokens,
+            output_full_tokens,
+            output_current_text_offset,
+            cti_idx,
+            args.special_tokens_to_keep,
+            args.generation_kwargs,
+        )
+        pos_start = get_start_attribution_position(output_current_text_offset, cti_idx, model, has_lang_tag)
+        cci_attrib_out = model.attribute(
+            input_full_text,
+            output_full_contextual,
+            attribute_target=model.is_encoder_decoder and args.has_output_context,
+            show_progress=False,
+            attr_pos_start=pos_start,
+            attributed_fn=args.attributed_fn,
+            method=args.attribution_method,
+            contrast_sources=args.input_current_text if model.is_encoder_decoder else None,
+            contrast_targets=output_full_contextless,
+        )
+        cci_attrib_out = aggregate_attribution_scores(
+            out=cci_attrib_out,
+            selectors=args.attribution_selectors,
+            aggregators=args.attribution_aggregators,
+            normalize_attributions=args.normalize_attributions,
+        )[0]
+        if args.show_intermediate_outputs:
+            cci_attrib_out.show(do_aggregation=False)
+        source_scores = None
+        if model.is_encoder_decoder and args.has_input_context:
+            source_scores = cci_attrib_out.source_attributions[:, 0].tolist()
+        target_scores = None
+        if args.has_output_context:
+            target_scores = cci_attrib_out.target_attributions[:, 0].tolist()
+        cci_out = CCIOutput(
+            cti_idx=cti_idx,
+            cti_token=cti_tok,
+            cti_score=cti_score,
+            output_contextual=output_full_contextual,
+            output_contextless=output_full_contextless,
+            input_context_scores=source_scores,
+            output_context_scores=target_scores,
+        )
+        output.cci_scores.append(cci_out)
+    print(output)
 
 
 class AttributeContextCommand(BaseCLICommand):

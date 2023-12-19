@@ -316,13 +316,14 @@ def get_adjusted_alignments(
 
     # Filter alignments (restrict to one per token)
     filter_aligns = []
-    for pair_idx in range(start_pos, end_pos):
-        match_pairs = [(p0, p1) for p0, p1 in alignments if p0 == pair_idx and 0 <= p1 < len(contrast_tokens)]
-        if match_pairs:
-            # If found, use the first match that containing an unaligned target token, first match otherwise
-            match_pairs_unaligned = [p for p in match_pairs if p[1] not in [f[1] for f in filter_aligns]]
-            valid_match = match_pairs_unaligned[0] if match_pairs_unaligned else match_pairs[0]
-            filter_aligns.append(valid_match)
+    if len(alignments) > 0:
+        for pair_idx in range(start_pos, end_pos):
+            match_pairs = [(p0, p1) for p0, p1 in alignments if p0 == pair_idx and 0 <= p1 < len(contrast_tokens)]
+            if match_pairs:
+                # If found, use the first match that containing an unaligned target token, first match otherwise
+                match_pairs_unaligned = [p for p in match_pairs if p[1] not in [f[1] for f in filter_aligns]]
+                valid_match = match_pairs_unaligned[0] if match_pairs_unaligned else match_pairs[0]
+                filter_aligns.append(valid_match)
 
     # Filling alignments with missing tokens
     if fill_missing:
@@ -333,10 +334,10 @@ def get_adjusted_alignments(
             # Default behavior: fill missing alignments with 1:1 position alignments starting from the bottom of the
             # two sequences
             if not match_pairs:
-                if (len(contrast_tokens) - step_idx) < start_pos:
-                    filled_alignments.append((pair_idx, len(contrast_tokens) - 1))
-                else:
+                if (len(contrast_tokens) - step_idx) > 0:
                     filled_alignments.append((pair_idx, len(contrast_tokens) - step_idx))
+                else:
+                    filled_alignments.append((pair_idx, len(contrast_tokens) - 1))
 
         if filter_aligns != filled_alignments:
             existing_aligns_message = (
