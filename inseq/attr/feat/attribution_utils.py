@@ -2,14 +2,13 @@ import logging
 import math
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Union
 
-import torch
-
 from ...utils import extract_signature_args, get_aligned_idx
 from ...utils.typing import (
     OneOrMoreAttributionSequences,
     OneOrMoreIdSequences,
     OneOrMoreTokenSequences,
     SingleScorePerStepTensor,
+    StepAttributionTensor,
     TextInput,
     TokenWithId,
 )
@@ -143,17 +142,13 @@ def extract_args(
 
 
 def get_source_target_attributions(
-    attr: Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]],
+    attr: Union[StepAttributionTensor, Tuple[StepAttributionTensor, StepAttributionTensor]],
     is_encoder_decoder: bool,
-) -> Tuple[torch.Tensor, torch.Tensor]:
-    if is_encoder_decoder:
-        if isinstance(attr, tuple) and len(attr) > 1:
-            return attr[0], attr[1]
-        elif isinstance(attr, tuple) and len(attr) == 1:
-            return attr[0], None
+) -> Tuple[Optional[StepAttributionTensor], Optional[StepAttributionTensor]]:
+    if isinstance(attr, tuple):
+        if is_encoder_decoder:
+            return (attr[0], attr[1]) if len(attr) > 1 else (attr[0], None)
         else:
-            return attr, None
-    elif isinstance(attr, tuple):
-        return None, attr[0]
+            return (None, attr[0])
     else:
-        return None, attr
+        return (attr, None) if is_encoder_decoder else (None, attr)

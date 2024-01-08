@@ -581,7 +581,7 @@ class FeatureAttribution(Registry):
             attribution_args,
         )
         # Format step scores arguments and calculate step scores
-        for step_score in step_scores:
+        for score in step_scores:
             step_fn_args = self.attribution_model.formatter.format_step_function_args(
                 attribution_model=self.attribution_model,
                 forward_output=output,
@@ -589,8 +589,8 @@ class FeatureAttribution(Registry):
                 is_attributed_fn=False,
                 batch=batch,
             )
-            step_fn_extra_args = get_step_scores_args([step_score], step_scores_args)
-            step_output.step_scores[step_score] = get_step_scores(step_score, step_fn_args, step_fn_extra_args)
+            step_fn_extra_args = get_step_scores_args([score], step_scores_args)
+            step_output.step_scores[score] = get_step_scores(score, step_fn_args, step_fn_extra_args).to("cpu")
         # Reinsert finished sentences
         if target_attention_mask is not None and is_filtered:
             step_output.remap_from_filtered(target_attention_mask, orig_batch)

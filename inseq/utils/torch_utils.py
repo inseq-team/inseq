@@ -185,14 +185,13 @@ def get_sequences_from_batched_steps(bsteps: List[torch.Tensor]) -> List[torch.T
         # If dimension grows across batch steps, it will be padded
         if max(dim_range) > min(dim_range):
             for bstep_idx, bstep in enumerate(bsteps):
-                padded_bstep = torch.ones(
-                    *bstep.shape[:dim],
-                    max(dim_range) - bstep.shape[dim],
-                    *bstep.shape[dim + 1 :],  # noqa
+                padded_bstep = torch.full(
+                    (*bstep.shape[:dim], max(dim_range) - bstep.shape[dim], *bstep.shape[dim + 1 :]),
+                    float("nan"),
                     dtype=bstep.dtype,
                     device=bstep.device,
                 )
-                padded_bstep = torch.cat([bstep, padded_bstep * float("nan")], dim=dim)
+                padded_bstep = torch.cat([bstep, padded_bstep], dim=dim)
                 bsteps[bstep_idx] = padded_bstep
     dim = 2 if bsteps[0].ndim > 1 else 1
     sequences = torch.stack(bsteps, dim=dim)

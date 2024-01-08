@@ -213,7 +213,7 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
             drop_padding(tokenized_target_sentences[seq_id], pad_id) for seq_id in range(num_sequences)
         ]
         if attr_pos_end is None:
-            attr_pos_end = max([len(t) for t in tokenized_target_sentences])
+            attr_pos_end = max(len(t) for t in tokenized_target_sentences)
         pos_start = [
             min(len(tokenized_target_sentences[seq_id]), attr_pos_end) - len(targets[seq_id])
             for seq_id in range(num_sequences)

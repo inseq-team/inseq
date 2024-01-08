@@ -76,7 +76,7 @@ class AttentionWeightsAttribution(InternalsAttributionRegistry):
             """
             # We adopt the format [batch_size, sequence_length, num_layers, num_heads]
             # for consistency with other multi-unit methods (e.g. gradient attribution)
-            decoder_self_attentions = decoder_self_attentions[..., -1, :].clone().permute(0, 3, 1, 2)
+            decoder_self_attentions = decoder_self_attentions[..., -1, :].to("cpu").clone().permute(0, 3, 1, 2)
             if self.forward_func.is_encoder_decoder:
                 sequence_scores = {}
                 if len(inputs) > 1:
@@ -84,9 +84,11 @@ class AttentionWeightsAttribution(InternalsAttributionRegistry):
                 else:
                     target_attributions = None
                     sequence_scores["decoder_self_attentions"] = decoder_self_attentions
-                sequence_scores["encoder_self_attentions"] = encoder_self_attentions.clone().permute(0, 3, 4, 1, 2)
+                sequence_scores["encoder_self_attentions"] = (
+                    encoder_self_attentions.to("cpu").clone().permute(0, 3, 4, 1, 2)
+                )
                 return MultiDimensionalFeatureAttributionStepOutput(
-                    source_attributions=cross_attentions[..., -1, :].clone().permute(0, 3, 1, 2),
+                    source_attributions=cross_attentions[..., -1, :].to("cpu").clone().permute(0, 3, 1, 2),
                     target_attributions=target_attributions,
                     sequence_scores=sequence_scores,
                     _num_dimensions=2,  # num_layers, num_heads

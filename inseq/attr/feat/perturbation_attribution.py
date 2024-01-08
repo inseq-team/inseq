@@ -77,8 +77,8 @@ class OcclusionAttribution(PerturbationAttributionRegistry):
             target_attributions = target_attributions[:, :, 0].abs()
 
         return CoarseFeatureAttributionStepOutput(
-            source_attributions=source_attributions,
-            target_attributions=target_attributions,
+            source_attributions=source_attributions.to("cpu") if source_attributions is not None else None,
+            target_attributions=target_attributions.to("cpu") if target_attributions is not None else None,
         )
 
 
