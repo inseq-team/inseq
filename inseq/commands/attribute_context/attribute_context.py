@@ -24,13 +24,13 @@ from copy import deepcopy
 
 import transformers
 
-from .. import load_model
-from ..attr.step_functions import is_contrastive_step_function
-from ..models import HuggingfaceModel
-from .attribute import aggregate_attribution_scores
-from .base import BaseCLICommand
-from .commands_utils.attribute_context.attribute_context_args import AttributeContextArgs
-from .commands_utils.attribute_context.attribute_context_helpers import (
+from ... import load_model
+from ...attr.step_functions import is_contrastive_step_function
+from ...models import HuggingfaceModel
+from ..attribute import aggregate_attribution_scores
+from ..base import BaseCLICommand
+from .attribute_context_args import AttributeContextArgs
+from .attribute_context_helpers import (
     AttributeContextOutput,
     CCIOutput,
     filter_rank_tokens,
@@ -40,7 +40,7 @@ from .commands_utils.attribute_context.attribute_context_helpers import (
     get_source_target_cci_scores,
     prepare_outputs,
 )
-from .commands_utils.attribute_context.attribute_context_viz_helpers import handle_visualization
+from .attribute_context_viz_helpers import handle_visualization
 
 warnings.filterwarnings("ignore")
 transformers.logging.set_verbosity_error()

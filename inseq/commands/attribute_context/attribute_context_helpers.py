@@ -7,10 +7,10 @@ from rich import print as rprint
 from rich.prompt import Confirm, Prompt
 from torch import tensor
 
-from ....data import FeatureAttributionSequenceOutput
-from ....models import HuggingfaceModel
-from ....utils import pretty_dict
-from ....utils.alignment_utils import compute_word_aligns
+from ...data import FeatureAttributionSequenceOutput
+from ...models import HuggingfaceModel
+from ...utils import pretty_dict
+from ...utils.alignment_utils import compute_word_aligns
 from .attribute_context_args import AttributeContextArgs
 
 logger = logging.getLogger(__name__)

@@ -1,9 +1,11 @@
 from dataclasses import dataclass
 from typing import List, Optional
 
-from ....utils import cli_arg
+from ...utils import cli_arg
+from ..commands_utils import command_args_docstring
 
 
+@command_args_docstring
 @dataclass
 class LoadDatasetArgs:
     dataset_name: str = cli_arg(

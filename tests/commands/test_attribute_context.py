@@ -2,7 +2,8 @@ import pytest
 from pytest import fixture
 from transformers import AutoModelForCausalLM, AutoModelForSeq2SeqLM, GPT2LMHeadModel, MarianMTModel
 
-from inseq.commands.attribute_context import AttributeContextArgs, AttributeContextOutput, CCIOutput, attribute_context
+from inseq.commands.attribute_context import AttributeContextArgs, AttributeContextOutput, CCIOutput
+from inseq.commands.attribute_context.attribute_context import attribute_context
 
 
 @fixture(scope="session")

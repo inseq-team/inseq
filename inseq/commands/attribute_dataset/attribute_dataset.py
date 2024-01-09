@@ -1,9 +1,10 @@
 from typing import List, Optional, Tuple
 
-from ..utils import is_datasets_available
-from .attribute import AttributeExtendedArgs, attribute
-from .base import BaseCLICommand
-from .commands_utils.attribute_dataset.attribute_dataset_args import LoadDatasetArgs
+from ...utils import is_datasets_available
+from ..attribute import AttributeExtendedArgs
+from ..attribute.attribute import attribute
+from ..base import BaseCLICommand
+from .attribute_dataset_args import LoadDatasetArgs
 
 if is_datasets_available():
     from datasets import load_dataset

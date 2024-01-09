@@ -2,7 +2,7 @@ from typing import List, Literal, Optional
 
 from rich.console import Console
 
-from ....models import HuggingfaceModel
+from ...models import HuggingfaceModel
 from .attribute_context_args import AttributeContextArgs
 from .attribute_context_helpers import AttributeContextOutput, filter_rank_tokens, get_filtered_tokens
 

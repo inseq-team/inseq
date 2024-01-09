@@ -2,14 +2,16 @@ import logging
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
-from .... import list_step_functions
-from ....attr.step_functions import is_contrastive_step_function
-from ....utils import cli_arg, pretty_dict
-from ..attribute.attribute_args import AttributeBaseArgs
+from ... import list_step_functions
+from ...attr.step_functions import is_contrastive_step_function
+from ...utils import cli_arg, pretty_dict
+from ..attribute import AttributeBaseArgs
+from ..commands_utils import command_args_docstring
 
 logger = logging.getLogger(__name__)
 
 
+@command_args_docstring
 @dataclass
 class AttributeContextInputArgs:
     input_current_text: str = cli_arg(
@@ -123,6 +125,7 @@ class AttributeContextInputArgs:
             )
 
 
+@command_args_docstring
 @dataclass
 class AttributeContextMethodArgs(AttributeBaseArgs):
     context_sensitivity_metric: str = cli_arg(
@@ -179,6 +182,7 @@ class AttributeContextMethodArgs(AttributeBaseArgs):
     )
 
 
+@command_args_docstring
 @dataclass
 class AttributeContextOutputArgs:
     show_intermediate_outputs: bool = cli_arg(
@@ -207,6 +211,7 @@ class AttributeContextOutputArgs:
     )
 
 
+@command_args_docstring
 @dataclass
 class AttributeContextArgs(AttributeContextInputArgs, AttributeContextMethodArgs, AttributeContextOutputArgs):
     def __repr__(self):

@@ -1,15 +1,17 @@
 from dataclasses import dataclass
 from typing import List, Optional
 
-from .... import (
+from ... import (
     list_aggregation_functions,
     list_aggregators,
     list_feature_attribution_methods,
     list_step_functions,
 )
-from ....utils import cli_arg, get_default_device
+from ...utils import cli_arg, get_default_device
+from ..commands_utils import command_args_docstring
 
 
+@command_args_docstring
 @dataclass
 class AttributeBaseArgs:
     model_name_or_path: str = cli_arg(
@@ -77,6 +79,7 @@ class AttributeBaseArgs:
     )
 
 
+@command_args_docstring
 @dataclass
 class AttributeExtendedArgs(AttributeBaseArgs):
     attribute_target: bool = cli_arg(
@@ -137,6 +140,7 @@ class AttributeExtendedArgs(AttributeBaseArgs):
     )
 
 
+@command_args_docstring
 @dataclass
 class AttributeWithInputsArgs(AttributeExtendedArgs):
     input_texts: List[str] = cli_arg(default=None, aliases=["-i"], help="One or more input texts used for generation.")

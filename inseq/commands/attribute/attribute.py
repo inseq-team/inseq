@@ -1,9 +1,9 @@
 import logging
 from typing import List, Optional
 
-from .. import FeatureAttributionOutput, load_model
-from .base import BaseCLICommand
-from .commands_utils.attribute.attribute_args import AttributeExtendedArgs, AttributeWithInputsArgs
+from ... import FeatureAttributionOutput, load_model
+from ..base import BaseCLICommand
+from .attribute_args import AttributeExtendedArgs, AttributeWithInputsArgs
 
 
 def aggregate_attribution_scores(
