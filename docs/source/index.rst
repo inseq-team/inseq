@@ -104,6 +104,7 @@ Inseq is still in early development and is currently maintained by a small team 
     :maxdepth: 3
     :caption: API Documentation
 
+    main_classes/cli
     main_classes/main_functions
     main_classes/models
     main_classes/feature_attribution

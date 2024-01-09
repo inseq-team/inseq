@@ -114,17 +114,17 @@ model.attribute(
 
 - 🚀 Feature attribution of sequence generation for most `ForConditionalGeneration` (encoder-decoder) and `ForCausalLM` (decoder-only) models from 🤗 Transformers
 
-- 🚀 Support for multiple feature attribution methods, sourced in part from [Captum](https://captum.ai/docs/introduction)
+- 🚀 Support for multiple feature attribution methods, extending the ones supported by [Captum](https://captum.ai/docs/introduction)
 
-- 🚀 Post-processing of attribution maps via `Aggregator` classes.
+- 🚀 Post-processing, filtering and merging of attribution maps via `Aggregator` classes.
 
 - 🚀 Attribution visualization in notebooks, browser and command line.
 
-- 🚀 Attribute single examples or entire 🤗 datasets with the Inseq CLI.
+- 🚀 Efficient attribution of single examples or entire 🤗 datasets with the Inseq CLI.
 
-- 🚀 Custom attribution of target functions, supporting advanced use cases such as contrastive and uncertainty-weighted feature attributions.
+- 🚀 Custom attribution of target functions, supporting advanced methods such as [contrastive feature attributions](https://aclanthology.org/2022.emnlp-main.14/) and [context reliance detection](https://arxiv.org/abs/2310.01188).
 
-- 🚀 Extraction and visualization of custom step scores (e.g. probability, entropy) alongsides attribution maps.
+- 🚀 Extraction and visualization of custom scores (e.g. probability, entropy) at every generation step alongsides attribution maps.
 
 ### Supported methods
 
@@ -196,32 +196,80 @@ out.show()
 
 Refer to the [documentation](https://inseq.readthedocs.io/examples/custom_attribute_target.html) for an example including custom function registration.
 
-## Using the Inseq client
+## Using the Inseq CLI
 
 The Inseq library also provides useful client commands to enable repeated attribution of individual examples and even entire 🤗 datasets directly from the console. See the available options by typing `inseq -h` in the terminal after installing the package.
 
-For now, two commands are supported:
+Three commands are supported:
 
-- `ìnseq attribute`: Wraps the `attribute` method shown above, requires explicit inputs to be attributed.
+- `inseq attribute`: Wrapper for enabling `model.attribute` usage in console.
 
-- `inseq attribute-dataset`: Enables attribution for a full dataset using Hugging Face `datasets.load_dataset`.
+- `inseq attribute-dataset`: Extends `attribute` to full dataset using Hugging Face `datasets.load_dataset` API.
 
-Both commands support the full range of parameters available for `attribute`, attribution visualization in the console and saving outputs to disk.
+- `inseq attribute-context`: Detects and attribute context dependence for generation tasks using the approach of [Sarti et al. (2023)](https://arxiv.org/abs/2310.01188).
 
-**Example:** The following command can be used to perform attribution (both source and target-side) of Italian translations for a dummy sample of 20 English sentences taken from the FLORES-101 parallel corpus, using a MarianNMT translation model from Hugging Face `transformers`. We save the visualizations in HTML format in the file `attributions.html`. See the `--help` flag for more options.
+All commands support the full range of parameters available for `attribute`, attribution visualization in the console and saving outputs to disk.
 
-```bash
-inseq attribute-dataset \
+<details>
+  <summary><code>inseq attribute</code> example</summary>
+
+  The following example performs a simple feature attribution of an English sentence translated into Italian using a MarianNMT translation model from <code>transformers</code>. The final result is printed to the console.
+  ```bash
+  inseq attribute \
   --model_name_or_path Helsinki-NLP/opus-mt-en-it \
   --attribution_method saliency \
-  --do_prefix_attribution \
-  --dataset_name inseq/dummy_enit \
-  --input_text_field en \
-  --dataset_split "train[:20]" \
-  --viz_path attributions.html \
-  --batch_size 8 \
-  --hide
-```
+  --input_texts "Hello world this is Inseq\! Inseq is a very nice library to perform attribution analysis"
+  ```
+
+</details>
+
+<details>
+  <summary><code>inseq attribute-dataset</code> example</summary>
+
+  The following code can be used to perform attribution (both source and target-side) of Italian translations for a dummy sample of 20 English sentences taken from the FLORES-101 parallel corpus, using a MarianNMT translation model from Hugging Face <code>transformers</code>. We save the visualizations in HTML format in the file <code>attributions.html</code>. See the <code>--help</code> flag for more options.
+
+  ```bash
+  inseq attribute-dataset \
+    --model_name_or_path Helsinki-NLP/opus-mt-en-it \
+    --attribution_method saliency \
+    --do_prefix_attribution \
+    --dataset_name inseq/dummy_enit \
+    --input_text_field en \
+    --dataset_split "train[:20]" \
+    --viz_path attributions.html \
+    --batch_size 8 \
+    --hide
+  ```
+</details>
+
+<details>
+  <summary><code>inseq attribute-context</code> example</summary>
+
+  The following example uses a GPT-2 model to generate a continuation of <code>input_current_text</code>, and uses the additional context provided by <code>input_context_text</code> to estimate its influence on the the generation. In this case, the output <code>"to the hospital. He said he was fine"</code> is produced, and the generation of token <code>hospital</code> is found to be dependent on context token <code>sick</code> according to the <code>contrast_prob_diff</code> step function.
+
+  ```bash
+  inseq attribute-context \
+    --model_name_or_path gpt2 \
+    --input_context_text "George was sick yesterday." \
+    --input_current_text "His colleagues asked him to come" \
+    --attributed_fn "contrast_prob_diff"
+  ```
+
+  **Result:**
+
+  ```
+  Context with [contextual cues] (std λ=1.00) followed by output sentence with {context-sensitive target spans} (std λ=1.00)
+  (CTI = "kl_divergence", CCI = "saliency" w/ "contrast_prob_diff" target)
+
+  Input context:  George was sick yesterday.
+  Input current: His colleagues asked him to come
+  Output current: to the hospital. He said he was fine
+
+  #1.
+  Generated output (CTI > 0.428): to the {hospital}(0.548). He said he was fine
+  Input context (CCI > 0.460):    George was [sick](0.516) yesterday.
+  ```
+</details>
 
 ## Planned Development
 

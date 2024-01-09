@@ -1,5 +1,5 @@
 from .alignment_utils import get_adjusted_alignments, get_aligned_idx
-from .argparse import InseqArgumentParser
+from .argparse import InseqArgumentParser, cli_arg
 from .cache import INSEQ_ARTIFACTS_CACHE, INSEQ_HOME_CACHE, cache_results
 from .errors import (
     InseqDeprecationWarning,
@@ -117,4 +117,5 @@ __all__ = [
     "get_aligned_idx",
     "top_p_logits_mask",
     "filter_logits",
+    "cli_arg",
 ]
