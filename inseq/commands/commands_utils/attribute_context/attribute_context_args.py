@@ -1,3 +1,4 @@
+import logging
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
@@ -5,6 +6,8 @@ from .... import list_step_functions
 from ....attr.step_functions import is_contrastive_step_function
 from ....utils import cli_arg, pretty_dict
 from ..attribute.attribute_args import AttributeBaseArgs
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass

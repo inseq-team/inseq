@@ -75,11 +75,12 @@ def get_formatted_attribute_context_results(
     )
     cti_theshold_comment = f"(CTI > {cti_threshold:.3f})"
     for example_idx, cci_out in enumerate(output.cci_scores, start=1):
+        curr_output_tokens = output_current_tokens.copy()
         cti_idx = cci_out.cti_idx
         cti_score = cci_out.cti_score
-        cti_tok = output_current_tokens[cti_idx]
-        output_current_tokens[cti_idx] = f"[bold dodger_blue1]{cti_tok}({cti_score:.3f})[/bold dodger_blue1]"
-        output_current_comment = "".join(output_current_tokens)
+        cti_tok = curr_output_tokens[cti_idx]
+        curr_output_tokens[cti_idx] = f"[bold dodger_blue1]{cti_tok}({cti_score:.3f})[/bold dodger_blue1]"
+        output_current_comment = "".join(curr_output_tokens)
         input_context_comment, output_context_comment = "", ""
         if args.has_input_context:
             input_context_comment = format_context_comment(

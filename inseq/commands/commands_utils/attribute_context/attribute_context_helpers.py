@@ -140,7 +140,15 @@ def prompt_user_for_context(output: str, context_candidate: Optional[str] = None
             user_context = Prompt.ask(
                 ":writing_hand: Please enter the portion of the generated output representing the correct context"
             )
-        if user_context in output and user_context.strip():
+        if output.startswith(user_context):
+            if not user_context.strip():
+                use_empty_context = Confirm.ask(
+                    ":question: The provided context is empty. Do you want to use an empty context?"
+                )
+                if use_empty_context:
+                    user_context = ""
+                else:
+                    continue
             break
         rprint(
             "[prompt.invalid]The provided context is invalid. Please provide a non-empty substring of"
@@ -207,13 +215,15 @@ def prepare_outputs(
     # Prepend output prefix and context, if available, if current output needs to be generated
     output_current_prefix = prefix
     if has_out_ctx and not has_out_curr:
-        output_current_prefix = output_current_prefix_template.format(context=output_context_text)
+        output_current_prefix = output_current_prefix_template.strip().format(context=output_context_text)
         if model.is_encoder_decoder:
             generation_kwargs["decoder_input_ids"] = model.encode(
                 output_current_prefix, as_targets=True, add_special_tokens=False
             ).input_ids
+            if "forced_bos_token_id" in generation_kwargs:
+                generation_kwargs["decoder_input_ids"][0, 0] = generation_kwargs["forced_bos_token_id"]
         else:
-            space = " " if output_current_prefix and not output_current_prefix.startswith(" ") else ""
+            space = " " if output_current_prefix and not output_current_prefix.startswith((" ", "\n")) else ""
             model_input = input_full_text + space + output_current_prefix
             output_current_prefix = model_input
 
@@ -223,14 +233,8 @@ def prepare_outputs(
 
     # Settings 3, 4
     if (has_out_ctx == use_out_ctx) and not has_out_curr:
-        if use_out_ctx:
-            if model.is_encoder_decoder:
-                final_current = output_gen[len(output_context_text + separator) :]
-            else:
-                final_current = output_gen
-        else:
-            final_current = output_gen if model.is_encoder_decoder else output_gen[len(model_input) :]
-        return final_context, final_current
+        final_current = output_gen if model.is_encoder_decoder or use_out_ctx else output_gen[len(model_input) :]
+        return final_context, final_current.strip()
 
     # Settings 5, 6
     # Try splitting the output into context and current text using ``separator``. As we have no guarantees of its
@@ -259,6 +263,8 @@ def prepare_outputs(
     else:
         final_context = prompt_user_for_context(output_gen, output_context_candidate)
     template_output_context = output_template.split("{current}")[0].format(context=final_context)
+    if not final_context:
+        template_output_context = template_output_context.strip()
     final_current = output_gen[min(len(template_output_context), len(output_gen)) :]
     if not has_out_curr and not final_current:
         raise ValueError(
@@ -272,7 +278,7 @@ def prepare_outputs(
             f" '{output_current_text}'is used instead. If you want to use the original current output text generated"
             " by the model, remove the --output_current_text option."
         )
-    return final_context, final_current
+    return final_context, final_current.strip()
 
 
 def filter_rank_tokens(
@@ -312,7 +318,7 @@ def get_contextless_prefix(
         generation_input = input_current_text
     else:
         generation_kwargs["max_new_tokens"] = 1
-        space = " " if output_current_prefix and not output_current_prefix.startswith(" ") else ""
+        space = " " if output_current_prefix and not output_current_prefix.startswith((" ", "\n")) else ""
         generation_input = input_current_text + space + output_current_prefix
     output_contextless = generate_with_special_tokens(
         model,
@@ -328,6 +334,7 @@ def get_source_target_cci_scores(
     cci_attrib_out: FeatureAttributionSequenceOutput,
     input_template: str,
     input_context_tokens: List[str],
+    input_full_tokens: List[str],
     output_template: str,
     output_context_tokens: List[str],
     has_input_context: bool,
@@ -346,14 +353,14 @@ def get_source_target_cci_scores(
             input_scores = cci_attrib_out.target_attributions[:, 0].tolist()
         input_prefix, *_ = input_template.partition("{context}")
         input_prefix_tokens = get_filtered_tokens(input_prefix, model, special_tokens_to_keep, is_target=False)
-        input_scores = input_scores[len(input_prefix_tokens) : len(input_context_tokens) + len(input_prefix_tokens)]
+        input_prefix_len = len(input_prefix_tokens)
+        input_scores = input_scores[input_prefix_len : len(input_context_tokens) + input_prefix_len]
     if has_output_context:
         output_scores = cci_attrib_out.target_attributions[:, 0].tolist()
         if model_has_lang_tag:
             output_scores = output_scores[1:]
         output_prefix, *_ = output_template.partition("{context}")
         output_prefix_tokens = get_filtered_tokens(output_prefix, model, special_tokens_to_keep, is_target=True)
-        output_scores = output_scores[
-            len(output_prefix_tokens) : len(output_context_tokens) + len(output_prefix_tokens)
-        ]
+        prefix_len = len(output_prefix_tokens) + int(not model.is_encoder_decoder) * len(input_full_tokens)
+        output_scores = output_scores[prefix_len : len(output_context_tokens) + prefix_len]
     return input_scores, output_scores

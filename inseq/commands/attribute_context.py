@@ -81,7 +81,7 @@ def attribute_context(args: AttributeContextArgs):
     if args.input_context_text is not None:
         input_context_tokens = get_filtered_tokens(args.input_context_text, model, args.special_tokens_to_keep)
     if not model.is_encoder_decoder:
-        space = " " if not output_full_text.startswith(" ") else ""
+        space = " " if not output_full_text.startswith((" ", "\n")) else ""
         output_full_text = input_full_text + space + output_full_text
     output_current_tokens = get_filtered_tokens(
         args.output_current_text, model, args.special_tokens_to_keep, is_target=True
@@ -91,12 +91,13 @@ def attribute_context(args: AttributeContextArgs):
         output_context_tokens = get_filtered_tokens(
             args.output_context_text, model, args.special_tokens_to_keep, is_target=True
         )
+    input_full_tokens = get_filtered_tokens(input_full_text, model, args.special_tokens_to_keep)
     output_full_tokens = get_filtered_tokens(output_full_text, model, args.special_tokens_to_keep, is_target=True)
     output_current_text_offset = len(output_full_tokens) - len(output_current_tokens)
     if model.is_encoder_decoder:
         prefixed_output_current_text = args.output_current_text
     else:
-        space = " " if args.output_current_text is not None and not args.output_current_text.startswith(" ") else ""
+        space = " " if not args.output_current_text.startswith((" ", "\n")) else ""
         prefixed_output_current_text = args.input_current_text + space + args.output_current_text
 
     # Part 1: Context-sensitive Token Identification (CTI)
@@ -141,7 +142,8 @@ def attribute_context(args: AttributeContextArgs):
             output_full_tokens[: output_current_text_offset + cti_idx + 1], skip_special_tokens=False
         )
         cci_kwargs = {}
-        if is_contrastive_step_function(args.attributed_fn):
+        contextless_prefix = None
+        if args.attributed_fn is not None and is_contrastive_step_function(args.attributed_fn):
             contextless_prefix = get_contextless_prefix(
                 model,
                 args.input_current_text,
@@ -182,6 +184,7 @@ def attribute_context(args: AttributeContextArgs):
             cci_attrib_out,
             args.input_template,
             input_context_tokens,
+            input_full_tokens,
             args.output_template,
             output_context_tokens,
             args.has_input_context,
@@ -204,6 +207,7 @@ def attribute_context(args: AttributeContextArgs):
             json.dump(output.to_dict(), f, indent=4)
     if args.show_viz or args.viz_path:
         handle_visualization(args, model, output, cti_threshold)
+    return output
 
 
 class AttributeContextCommand(BaseCLICommand):
