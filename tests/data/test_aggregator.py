@@ -63,7 +63,7 @@ def test_continuous_span_aggregator(saliency_mt_model: HuggingfaceEncoderDecoder
 
 def test_span_aggregator_with_prefix(saliency_gpt_model: HuggingfaceDecoderOnlyModel):
     out = saliency_gpt_model.attribute("Hello, world! I am,:.", "Hello, world! I am,:.!,. Last")
-    aggregated = out.aggregate("subwords", special_symbol=("Ġ", "Ċ")).aggregate()
+    aggregated = out.aggregate("subwords", special_chars=("Ġ", "Ċ")).aggregate()
     assert aggregated[0].target_attributions.shape == (5, 2)
     assert aggregated[0].attr_pos_start == 3
     assert aggregated[0].attr_pos_end == 5
