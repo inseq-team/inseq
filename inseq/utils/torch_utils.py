@@ -184,31 +184,39 @@ def get_front_padding(t: torch.Tensor, pad: int = 0, dim: int = 1) -> List[int]:
     return (t != pad).int().argmax(dim).tolist()
 
 
-def get_sequences_from_batched_steps(bsteps: List[torch.Tensor]) -> List[torch.Tensor]:
+def get_sequences_from_batched_steps(
+    bsteps: List[torch.Tensor], padding_dims: Sequence[int] = [], stack_dim: int = 2
+) -> List[torch.Tensor]:
     """Given a sequence of batched step tensors of shape (batch_size, seq_len, ...) builds a sequence
     of tensors of shape (seq_len, ...) where each resulting tensor is the aggregation
     across batch steps for every batch element.
 
+    Source attribution shape: (batch_size, source_seq_len, ...)
+    Target attribution shape: (batch_size, target_seq_len, ...)
+    Step scores shape: (batch_size)
+    Sequence scores shape: (batch_size, source/target_seq_len, ...)
+
     Input tensors will be padded with nans up to max length in non-uniform dimensions to allow for stacking.
     """
-    dim_ranges = {dim: [bstep.shape[dim] for bstep in bsteps] for dim in range(bsteps[0].ndim)}
-    for dim, dim_range in dim_ranges.items():
-        # If dimension grows across batch steps, it will be padded
-        if max(dim_range) > min(dim_range):
-            for bstep_idx, bstep in enumerate(bsteps):
-                padded_bstep = torch.full(
-                    (*bstep.shape[:dim], max(dim_range) - bstep.shape[dim], *bstep.shape[dim + 1 :]),
-                    float("nan"),
-                    dtype=bstep.dtype,
-                    device=bstep.device,
-                )
-                padded_bstep = torch.cat([bstep, padded_bstep], dim=dim)
+    bsteps_num_dims = bsteps[0].ndim
+    if not padding_dims:
+        sequences = torch.stack(bsteps, dim=stack_dim).split(1, dim=0)
+        return [seq.squeeze(0) for seq in sequences]
+    for dim in padding_dims:
+        if dim >= bsteps_num_dims:
+            raise ValueError(f"Padding dimension {dim} is greater than tensor dimension {bsteps[0].ndim}")
+    padding_dims = set(padding_dims)
+    max_dims = tuple(max([bstep.shape[dim] for bstep in bsteps]) for dim in padding_dims)
+    for bstep_idx, bstep in enumerate(bsteps):
+        for curr_dim, max_dim in zip(padding_dims, max_dims):
+            bstep_dim = bstep.shape[curr_dim]
+            if bstep_dim < max_dim:
+                # Pad the end of curr_dim with nans
+                pad_shape = (0,) * ((bsteps_num_dims - curr_dim) * 2 - 1) + (max_dim - bstep_dim,)
+                padded_bstep = F.pad(bstep, pad=pad_shape, mode="constant", value=float("nan"))
                 bsteps[bstep_idx] = padded_bstep
-    dim = 2 if bsteps[0].ndim > 1 else 1
-    sequences = torch.stack(bsteps, dim=dim)
-    sequences = sequences.split(1, dim=0)
-    squeezed_sequences = [seq.squeeze(0) for seq in sequences]
-    return squeezed_sequences
+    sequences = torch.stack(bsteps, dim=stack_dim).split(1, dim=0)
+    return [seq.squeeze(0) for seq in sequences]
 
 
 def check_device(device_name: str) -> bool:
