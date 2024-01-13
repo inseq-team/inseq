@@ -199,12 +199,14 @@ def get_sequences_from_batched_steps(
     Input tensors will be padded with nans up to max length in non-uniform dimensions to allow for stacking.
     """
     bsteps_num_dims = bsteps[0].ndim
+    if stack_dim > bsteps_num_dims:
+        raise ValueError(f"Stack dimension {stack_dim} is greater than tensor dimension {bsteps_num_dims}")
     if not padding_dims:
         sequences = torch.stack(bsteps, dim=stack_dim).split(1, dim=0)
         return [seq.squeeze(0) for seq in sequences]
     for dim in padding_dims:
         if dim >= bsteps_num_dims:
-            raise ValueError(f"Padding dimension {dim} is greater than tensor dimension {bsteps[0].ndim}")
+            raise ValueError(f"Padding dimension {dim} is greater than tensor dimension {bsteps_num_dims}")
     padding_dims = set(padding_dims)
     max_dims = tuple(max([bstep.shape[dim] for bstep in bsteps]) for dim in padding_dims)
     for bstep_idx, bstep in enumerate(bsteps):
