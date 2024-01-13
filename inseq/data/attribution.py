@@ -446,8 +446,26 @@ class FeatureAttributionStepOutput(TensorWrapper):
                 ).squeeze(-1)
         if self.sequence_scores is not None:
             for score_name, score_tensor in self.sequence_scores.items():
+                if score_name.startswith("decoder"):
+                    original_shape = (
+                        len(batch.target_tokens),
+                        self.target_attributions.shape[1],
+                        *self.target_attributions.shape[1:],
+                    )
+                elif score_name.startswith("encoder"):
+                    original_shape = (
+                        len(batch.sources.input_tokens),
+                        self.source_attributions.shape[1],
+                        *self.source_attributions.shape[1:],
+                    )
+                else:  # default case: cross-attention
+                    original_shape = (
+                        len(batch.sources.input_tokens),
+                        self.target_attributions.shape[1],
+                        *self.source_attributions.shape[1:],
+                    )
                 self.sequence_scores[score_name] = remap_from_filtered(
-                    original_shape=(len(batch.target_tokens), *self.source_attributions.shape[1:]),
+                    original_shape=original_shape,
                     mask=target_attention_mask,
                     filtered=score_tensor,
                 )
