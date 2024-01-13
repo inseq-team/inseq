@@ -1,5 +1,6 @@
 import logging
 from dataclasses import dataclass
+from inspect import signature
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Protocol, Tuple, Union
 
 import torch
@@ -500,3 +501,7 @@ def register_step_function(
             if agg_name not in DEFAULT_ATTRIBUTION_AGGREGATE_DICT["step_scores"]:
                 DEFAULT_ATTRIBUTION_AGGREGATE_DICT["step_scores"][agg_name] = {}
             DEFAULT_ATTRIBUTION_AGGREGATE_DICT["step_scores"][agg_name][identifier] = aggregation_fn_identifier
+
+
+def is_contrastive_step_function(step_fn_id: str) -> bool:
+    return "contrast_targets" in signature(get_step_function(step_fn_id)).parameters

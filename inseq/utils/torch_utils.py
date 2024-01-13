@@ -143,26 +143,37 @@ def aggregate_contiguous(
     t: torch.Tensor,
     spans: Sequence[Tuple[int, int]],
     aggregate_fn: Optional[Callable] = None,
-    aggregate_dim: int = 1,
+    aggregate_dim: int = 0,
 ):
+    """Given a tensor, aggregate contiguous spans of the tensor along a given dimension using the provided
+    aggregation function. If no aggregation function is provided, the mean is used.
+
+    Args:
+        t: Tensor to aggregate
+        spans: Sequence of (start, end) tuples indicating contiguous spans to aggregate
+        aggregate_fn: Aggregation function to use. If None, torch.mean is used.
+        aggregate_dim: Dimension to aggregate along. Default is 0.
+    """
     if not spans:
         return t
     if aggregate_fn is None:
         aggregate_fn = torch.mean
-    while t.ndim < 2:
-        t = t.unsqueeze(-1)
-    t = t.transpose(aggregate_dim, 1)
+    if aggregate_dim > t.ndim:
+        raise ValueError(f"aggregate_dim {aggregate_dim} is greater than tensor dimension {t.ndim}")
+    if aggregate_dim != 0:
+        t = t.transpose(aggregate_dim, 0)
     slices = []
     base_val = 0
     for start, end in spans:
         if start > base_val:
-            slices.append(t[:, base_val:start, ...])
-        slices.append(aggregate_fn(t[:, start:end, ...], dim=1).unsqueeze(1))
+            slices.append(t[base_val:start, ...])
+        slices.append(aggregate_fn(t[start:end, ...], dim=0).unsqueeze(0))
         base_val = end
-    slices.append(t[:, base_val:])
-    out_cat = torch.cat(slices, dim=1).transpose(1, aggregate_dim)
-    if 1 in out_cat.shape:
-        out_cat = out_cat.transpose(1, 0).squeeze(0)
+    if base_val < t.shape[0]:
+        slices.append(t[base_val:, ...])
+    out_cat = torch.cat(slices, dim=0)
+    if aggregate_dim != 0:
+        out_cat = out_cat.transpose(aggregate_dim, 0)
     return out_cat
 
 
@@ -174,8 +185,8 @@ def get_front_padding(t: torch.Tensor, pad: int = 0, dim: int = 1) -> List[int]:
 
 
 def get_sequences_from_batched_steps(bsteps: List[torch.Tensor]) -> List[torch.Tensor]:
-    """Given a sequence of batched step tensors of shape (batch_size, ...) builds a sequence
-    of tensors of shape (len(sequence), ...) where each resulting tensor is the aggregation
+    """Given a sequence of batched step tensors of shape (batch_size, seq_len, ...) builds a sequence
+    of tensors of shape (seq_len, ...) where each resulting tensor is the aggregation
     across batch steps for every batch element.
 
     Input tensors will be padded with nans up to max length in non-uniform dimensions to allow for stacking.

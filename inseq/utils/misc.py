@@ -71,7 +71,7 @@ def pretty_list(l: Optional[Sequence[Any]], lpad: int = 8) -> str:
             return out_txt
     if len(l) > 20:
         return out_txt
-    return f"{out_txt}:{_pretty_list(l, lpad)}"
+    return f"{out_txt}: {_pretty_list(l, lpad)}"
 
 
 def pretty_tensor(t: Optional[Tensor] = None, lpad: int = 8) -> str:
@@ -99,8 +99,12 @@ def pretty_dict(d: Dict[str, Any], lpad: int = 4) -> str:
             out_txt += pretty_dict(v, lpad + 4)
         elif hasattr(v, "to_dict") and not isinstance(v, type):
             out_txt += f"{v.__class__.__name__}({pretty_dict(v.to_dict(), lpad + 4)})"
+        elif v is None:
+            out_txt += "None"
+        elif isinstance(v, str):
+            out_txt += f'"{v}"'
         else:
-            out_txt += "None" if v is None else str(v)
+            out_txt += str(v)
         out_txt += ",\n"
     return out_txt + f"{' ' * (lpad - 4)}}}"
 

@@ -691,10 +691,10 @@ class SubwordAggregator(ContiguousSpanAggregator):
             preserved (e.g. [0.3, -0.7, 0.1] -> -0.7).
         aggregate_source (bool, optional): Whether to aggregate over the source sequence. Defaults to True.
         aggregate_target (bool, optional): Whether to aggregate over the target sequence. Defaults to True.
-        special_symbol (str, optional): Symbol used to identify subwords. Defaults to '▁', used by SentencePiece.
-            If is_suffix_symbol=True, then this symbol is used to identify parts to be aggregated (e.g. # in WordPiece,
-            ['phen', '##omen', '##al']). Otherwise, it identifies the roots that should be preserved (e.g. ▁ in
-            SentencePiece, ['▁phen', 'omen', 'al']).
+        special_chars (str or tuple of str, optional): One or more characters used to identify subword boundaries.
+            Defaults to '▁', used by SentencePiece. If is_suffix_symbol=True, then this symbol is used to identify
+            parts to be aggregated (e.g. # in WordPiece, ['phen', '##omen', '##al']). Otherwise, it identifies the
+            roots that should be preserved (e.g. ▁ in SentencePiece, ['▁phen', 'omen', 'al']).
         is_suffix_symbol (bool, optional): Whether the special symbol is used to identify suffixes or prefixes.
             Defaults to False.
     """
@@ -707,33 +707,33 @@ class SubwordAggregator(ContiguousSpanAggregator):
         attr: "FeatureAttributionSequenceOutput",
         aggregate_source: bool = True,
         aggregate_target: bool = True,
-        special_symbol: str = "▁",
+        special_chars: Union[str, Tuple[str, ...]] = "▁",
         is_suffix_symbol: bool = False,
         **kwargs,
     ):
         source_spans = []
         target_spans = []
         if aggregate_source:
-            source_spans = cls.get_spans(attr.source, special_symbol, is_suffix_symbol)
+            source_spans = cls.get_spans(attr.source, special_chars, is_suffix_symbol)
         if aggregate_target:
-            target_spans = cls.get_spans(attr.target, special_symbol, is_suffix_symbol)
+            target_spans = cls.get_spans(attr.target, special_chars, is_suffix_symbol)
         return super().aggregate(attr, source_spans=source_spans, target_spans=target_spans, **kwargs)
 
     @staticmethod
-    def get_spans(tokens: List[TokenWithId], special_symbol: str, is_suffix_symbol: bool):
+    def get_spans(tokens: List[TokenWithId], special_chars: Union[str, Tuple[str, ...]], is_suffix_symbol: bool):
         spans = []
         last_prefix_idx = 0
-        has_special_symbol = any(sym in token.token for token in tokens for sym in special_symbol)
-        if not has_special_symbol:
+        has_special_chars = any(sym in token.token for token in tokens for sym in special_chars)
+        if not has_special_chars:
             logger.warning(
-                f"ATTENTION: The {special_symbol} symbol is currently used for subword aggregation, but no instances "
-                "have been detected in the sequence. Change the special symbols using e.g. special_symbol=('Ġ', 'Ċ')"
+                f"The {special_chars} character is currently used for subword aggregation, but no instances "
+                "have been detected in the sequence. Change the special symbols using e.g. special_chars=('Ġ', 'Ċ')"
                 ", and set is_suffix_symbol=True if they are used as suffix word separators (e.g. Hello</w> world</w>)"
             )
             return spans
         for curr_idx, token in enumerate(tokens):
             # Suffix if token start with special suffix symbol, or if it doesn't have the special prefix symbol.
-            is_suffix = token.token.startswith(special_symbol) == is_suffix_symbol
+            is_suffix = token.token.startswith(special_chars) == is_suffix_symbol
             if is_suffix:
                 if curr_idx == len(tokens) - 1 and curr_idx - last_prefix_idx > 1:
                     spans.append((last_prefix_idx, curr_idx))

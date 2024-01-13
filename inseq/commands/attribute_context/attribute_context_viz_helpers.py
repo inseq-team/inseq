@@ -1,0 +1,128 @@
+from typing import List, Literal, Optional
+
+from rich.console import Console
+
+from ...models import HuggingfaceModel
+from .attribute_context_args import AttributeContextArgs
+from .attribute_context_helpers import AttributeContextOutput, filter_rank_tokens, get_filtered_tokens
+
+
+def get_formatted_procedure_details(args: AttributeContextArgs) -> str:
+    def format_comment(std: Optional[float] = None, topk: Optional[int] = None) -> str:
+        comment = []
+        if std:
+            comment.append(f"std λ={std:.2f}")
+        if topk:
+            comment.append(f"top {topk}")
+        if len(comment) > 0:
+            return ", ".join(comment)
+        return "all"
+
+    cti_comment = format_comment(args.context_sensitivity_std_threshold, args.context_sensitivity_topk)
+    cci_comment = format_comment(args.attribution_std_threshold, args.attribution_topk)
+    input_context_comment, output_context_comment = "", ""
+    if args.has_input_context:
+        input_context_comment = f"\n[bold]Input context:[/bold]\t{args.input_context_text}"
+    if args.has_output_context:
+        output_context_comment = f"\n[bold]Output context:[/bold]\t{args.output_context_text}"
+    return (
+        f"\nContext with [bold green]contextual cues[/bold green] ({cci_comment}) followed by output"
+        f" sentence with [bold dodger_blue1]context-sensitive target spans[/bold dodger_blue1] ({cti_comment})\n"
+        f'(CTI = "{args.context_sensitivity_metric}", CCI = "{args.attribution_method}" w/ "{args.attributed_fn}" '
+        f"target)\n{input_context_comment}\n[bold]Input current:[/bold] {args.input_current_text}"
+        f"{output_context_comment}\n[bold]Output current:[/bold]\t{args.output_current_text}"
+    )
+
+
+def get_formatted_attribute_context_results(
+    model: HuggingfaceModel,
+    args: AttributeContextArgs,
+    output: AttributeContextOutput,
+    cti_threshold: float,
+) -> str:
+    """Format the results of the context attribution process."""
+
+    def format_context_comment(
+        model: HuggingfaceModel,
+        has_other_context: bool,
+        special_tokens_to_keep: List[str],
+        context: str,
+        context_scores: List[float],
+        other_context_scores: Optional[List[float]] = None,
+        is_target: bool = False,
+        context_type: Literal["Input", "Output"] = "Input",
+    ) -> str:
+        context_tokens = get_filtered_tokens(
+            context, model, special_tokens_to_keep, replace_special_characters=True, is_target=is_target
+        )
+        scores = context_scores
+        if has_other_context:
+            scores += other_context_scores
+        context_ranked_tokens, threshold = filter_rank_tokens(
+            tokens=context_tokens,
+            scores=scores,
+            std_threshold=args.attribution_std_threshold,
+            topk=args.attribution_topk,
+        )
+        for idx, score, tok in context_ranked_tokens:
+            context_tokens[idx] = f"[bold green]{tok}({score:.3f})[/bold green]"
+        cci_threshold_comment = f"(CCI > {threshold:.3f})"
+        return f"\n[bold]{context_type} context {cci_threshold_comment}:[/bold]\t{''.join(context_tokens)}"
+
+    out_string = ""
+    output_current_tokens = get_filtered_tokens(
+        output.output_current, model, args.special_tokens_to_keep, replace_special_characters=True, is_target=True
+    )
+    cti_theshold_comment = f"(CTI > {cti_threshold:.3f})"
+    for example_idx, cci_out in enumerate(output.cci_scores, start=1):
+        curr_output_tokens = output_current_tokens.copy()
+        cti_idx = cci_out.cti_idx
+        cti_score = cci_out.cti_score
+        cti_tok = curr_output_tokens[cti_idx]
+        curr_output_tokens[cti_idx] = f"[bold dodger_blue1]{cti_tok}({cti_score:.3f})[/bold dodger_blue1]"
+        output_current_comment = "".join(curr_output_tokens)
+        input_context_comment, output_context_comment = "", ""
+        if args.has_input_context:
+            input_context_comment = format_context_comment(
+                model,
+                args.has_output_context,
+                args.special_tokens_to_keep,
+                output.input_context,
+                cci_out.input_context_scores,
+                cci_out.output_context_scores,
+            )
+        if args.has_output_context:
+            output_context_comment = format_context_comment(
+                model,
+                args.has_input_context,
+                args.special_tokens_to_keep,
+                output.output_context,
+                cci_out.output_context_scores,
+                cci_out.input_context_scores,
+                is_target=True,
+                context_type="Output",
+            )
+        out_string += (
+            f"#{example_idx}."
+            f"\n[bold]Generated output {cti_theshold_comment}:[/bold]\t{output_current_comment}"
+            f"{input_context_comment}{output_context_comment}\n"
+        )
+    return out_string
+
+
+def handle_visualization(
+    args: AttributeContextArgs,
+    model: HuggingfaceModel,
+    output: AttributeContextOutput,
+    cti_threshold: float,
+) -> None:
+    console = Console(record=True)
+    viz = get_formatted_procedure_details(args)
+    viz += "\n\n" + get_formatted_attribute_context_results(model, args, output, cti_threshold)
+    if args.viz_path:
+        with console.capture() as _:
+            console.print(viz, soft_wrap=True)
+        with open(args.viz_path, "w") as f:
+            f.write(console.export_html())
+    if args.show_viz:
+        console.print(viz, soft_wrap=True)
