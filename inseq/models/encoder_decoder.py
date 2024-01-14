@@ -1,6 +1,6 @@
 import logging
 from functools import wraps
-from typing import Any, Callable, Dict, List, Optional, Tuple, TypeVar, Union
+from typing import Any, Callable, Optional, TypeVar, Union
 
 from ..attr.feat import join_token_ids
 from ..attr.step_functions import StepFunctionEncoderDecoderArgs
@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 class EncoderDecoderInputFormatter(InputFormatter):
     def prepare_inputs_for_attribution(
         attribution_model: "EncoderDecoderAttributionModel",
-        inputs: Tuple[FeatureAttributionInput, FeatureAttributionInput],
+        inputs: tuple[FeatureAttributionInput, FeatureAttributionInput],
         include_eos_baseline: bool = False,
     ) -> EncoderDecoderBatch:
         r"""Prepares sources and target to produce an :class:`~inseq.data.EncoderDecoderBatch`.
@@ -82,11 +82,11 @@ class EncoderDecoderInputFormatter(InputFormatter):
         target_ids: TargetIdsTensor,
         attributed_fn: Callable[..., SingleScorePerStepTensor],
         attribute_target: bool = False,
-        attributed_fn_args: Dict[str, Any] = {},
+        attributed_fn_args: dict[str, Any] = {},
         attribute_batch_ids: bool = False,
         forward_batch_embeds: bool = True,
         use_baselines: bool = False,
-    ) -> Tuple[Dict[str, Any], Tuple[Union[IdsTensor, EmbeddingsTensor, None], ...]]:
+    ) -> tuple[dict[str, Any], tuple[Union[IdsTensor, EmbeddingsTensor, None], ...]]:
         if attribute_batch_ids:
             inputs = (batch.sources.input_ids,)
             baselines = (batch.sources.baseline_ids,)
@@ -137,7 +137,7 @@ class EncoderDecoderInputFormatter(InputFormatter):
         target_tokens: OneOrMoreTokenSequences,
         target_ids: TargetIdsTensor,
         contrast_batch: Optional[DecoderOnlyBatch] = None,
-        contrast_targets_alignments: Optional[List[List[Tuple[int, int]]]] = None,
+        contrast_targets_alignments: Optional[list[list[tuple[int, int]]]] = None,
     ) -> FeatureAttributionStepOutput:
         r"""Enriches the attribution output with token information, producing the finished
         :class:`~inseq.data.FeatureAttributionStepOutput` object.
@@ -232,7 +232,7 @@ class EncoderDecoderInputFormatter(InputFormatter):
             encoder_attention_mask: Optional[IdsTensor] = None,
             decoder_attention_mask: Optional[IdsTensor] = None,
             use_embeddings: bool = True,
-            attributed_fn_argnames: Optional[List[str]] = None,
+            attributed_fn_argnames: Optional[list[str]] = None,
             *args,
             **kwargs,
         ) -> CustomForwardOutput:
@@ -260,7 +260,7 @@ class EncoderDecoderInputFormatter(InputFormatter):
         )
 
     @staticmethod
-    def get_step_function_reserved_args() -> List[str]:
+    def get_step_function_reserved_args() -> list[str]:
         return [f.name for f in StepFunctionEncoderDecoderArgs.__dataclass_fields__.values()]
 
 

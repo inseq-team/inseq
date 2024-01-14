@@ -18,7 +18,7 @@ Todo:
 """
 import logging
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Callable, Optional, Union
 
 import torch
 from jaxtyping import Int
@@ -173,12 +173,12 @@ class FeatureAttribution(Registry):
         pretty_progress: bool = True,
         output_step_attributions: bool = False,
         attribute_target: bool = False,
-        step_scores: List[str] = [],
+        step_scores: list[str] = [],
         include_eos_baseline: bool = False,
         attributed_fn: Union[str, Callable[..., SingleScorePerStepTensor], None] = None,
-        attribution_args: Dict[str, Any] = {},
-        attributed_fn_args: Dict[str, Any] = {},
-        step_scores_args: Dict[str, Any] = {},
+        attribution_args: dict[str, Any] = {},
+        attributed_fn_args: dict[str, Any] = {},
+        step_scores_args: dict[str, Any] = {},
     ) -> FeatureAttributionOutput:
         r"""Prepares inputs and performs attribution.
 
@@ -276,11 +276,11 @@ class FeatureAttribution(Registry):
         self,
         target_sequences: TextSequences,
         target_tokens: OneOrMoreTokenSequences,
-        attributed_fn_args: Dict[str, Any],
-        step_scores_args: Dict[str, Any],
+        attributed_fn_args: dict[str, Any],
+        step_scores_args: dict[str, Any],
         attr_pos_start: int,
         attr_pos_end: int,
-    ) -> Tuple[Optional[DecoderOnlyBatch], Optional[List[List[Tuple[int, int]]]], Dict[str, Any], Dict[str, Any]]:
+    ) -> tuple[Optional[DecoderOnlyBatch], Optional[list[list[tuple[int, int]]]], dict[str, Any], dict[str, Any]]:
         contrast_batch, contrast_targets_alignments = None, None
         contrast_targets = attributed_fn_args.get("contrast_targets", None)
         if contrast_targets is None:
@@ -327,10 +327,10 @@ class FeatureAttribution(Registry):
         pretty_progress: bool = True,
         output_step_attributions: bool = False,
         attribute_target: bool = False,
-        step_scores: List[str] = [],
-        attribution_args: Dict[str, Any] = {},
-        attributed_fn_args: Dict[str, Any] = {},
-        step_scores_args: Dict[str, Any] = {},
+        step_scores: list[str] = [],
+        attribution_args: dict[str, Any] = {},
+        attributed_fn_args: dict[str, Any] = {},
+        step_scores_args: dict[str, Any] = {},
     ) -> FeatureAttributionOutput:
         r"""Performs the feature attribution procedure using the specified attribution method.
 
@@ -501,10 +501,10 @@ class FeatureAttribution(Registry):
         attributed_fn: Callable[..., SingleScorePerStepTensor],
         target_attention_mask: Optional[Int[torch.Tensor, "batch_size 1"]] = None,
         attribute_target: bool = False,
-        step_scores: List[str] = [],
-        attribution_args: Dict[str, Any] = {},
-        attributed_fn_args: Dict[str, Any] = {},
-        step_scores_args: Dict[str, Any] = {},
+        step_scores: list[str] = [],
+        attribution_args: dict[str, Any] = {},
+        attributed_fn_args: dict[str, Any] = {},
+        step_scores_args: dict[str, Any] = {},
     ) -> FeatureAttributionStepOutput:
         r"""Performs a single attribution step for all the sequences in the batch that
         still have valid target_ids, as identified by the target_attention_mask.
@@ -597,15 +597,15 @@ class FeatureAttribution(Registry):
         step_output = step_output.detach().to("cpu")
         return step_output
 
-    def get_attribution_args(self, **kwargs) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    def get_attribution_args(self, **kwargs) -> tuple[dict[str, Any], dict[str, Any]]:
         if hasattr(self, "method") and hasattr(self.method, "attribute"):
             return extract_signature_args(kwargs, self.method.attribute, self.ignore_extra_args, return_remaining=True)
         return {}, {}
 
     def attribute_step(
         self,
-        attribute_fn_main_args: Dict[str, Any],
-        attribution_args: Dict[str, Any] = {},
+        attribute_fn_main_args: dict[str, Any],
+        attribution_args: dict[str, Any] = {},
     ) -> FeatureAttributionStepOutput:
         r"""Performs a single attribution step for the specified attribution arguments.
 
@@ -663,7 +663,7 @@ class DummyAttribution(FeatureAttribution):
     method_name = "dummy"
 
     def attribute_step(
-        self, attribute_fn_main_args: Dict[str, Any], attribution_args: Dict[str, Any] = {}
+        self, attribute_fn_main_args: dict[str, Any], attribution_args: dict[str, Any] = {}
     ) -> FeatureAttributionStepOutput:
         return FeatureAttributionStepOutput(
             source_attributions=None,

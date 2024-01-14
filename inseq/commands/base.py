@@ -1,7 +1,8 @@
 import dataclasses
 from abc import ABC, abstractstaticmethod
 from argparse import Namespace
-from typing import Any, Iterable, NewType, Union
+from collections.abc import Iterable
+from typing import Any, NewType, Union
 
 from ..utils import InseqArgumentParser
 

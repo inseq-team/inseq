@@ -1,6 +1,6 @@
 import logging
 from functools import wraps
-from typing import Any, Callable, Dict, List, Optional, Tuple, TypeVar, Union
+from typing import Any, Callable, Optional, TypeVar, Union
 
 import torch
 
@@ -54,11 +54,11 @@ class DecoderOnlyInputFormatter(InputFormatter):
         target_ids: TargetIdsTensor,
         attributed_fn: Callable[..., SingleScorePerStepTensor],
         attribute_target: bool = False,  # Needed for compatibility with EncoderDecoderAttributionModel
-        attributed_fn_args: Dict[str, Any] = {},
+        attributed_fn_args: dict[str, Any] = {},
         attribute_batch_ids: bool = False,
         forward_batch_embeds: bool = True,
         use_baselines: bool = False,
-    ) -> Tuple[Dict[str, Any], Tuple[Union[IdsTensor, EmbeddingsTensor, None], ...]]:
+    ) -> tuple[dict[str, Any], tuple[Union[IdsTensor, EmbeddingsTensor, None], ...]]:
         if attribute_batch_ids:
             inputs = (batch.input_ids,)
             baselines = (batch.baseline_ids,)
@@ -96,7 +96,7 @@ class DecoderOnlyInputFormatter(InputFormatter):
         target_tokens: OneOrMoreTokenSequences,
         target_ids: TargetIdsTensor,
         contrast_batch: Optional[DecoderOnlyBatch] = None,
-        contrast_targets_alignments: Optional[List[List[Tuple[int, int]]]] = None,
+        contrast_targets_alignments: Optional[list[list[tuple[int, int]]]] = None,
     ) -> FeatureAttributionStepOutput:
         r"""Enriches the attribution output with token information, producing the finished
         :class:`~inseq.data.FeatureAttributionStepOutput` object.
@@ -175,7 +175,7 @@ class DecoderOnlyInputFormatter(InputFormatter):
             attributed_fn: Callable[..., SingleScorePerStepTensor],
             attention_mask: Optional[IdsTensor] = None,
             use_embeddings: bool = True,
-            attributed_fn_argnames: Optional[List[str]] = None,
+            attributed_fn_argnames: Optional[list[str]] = None,
             *args,
             **kwargs,
         ) -> CustomForwardOutput:
@@ -198,7 +198,7 @@ class DecoderOnlyInputFormatter(InputFormatter):
         )
 
     @staticmethod
-    def get_step_function_reserved_args() -> List[str]:
+    def get_step_function_reserved_args() -> list[str]:
         return [f.name for f in StepFunctionDecoderOnlyArgs.__dataclass_fields__.values()]
 
 

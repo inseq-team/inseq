@@ -1,7 +1,7 @@
 import logging
 from dataclasses import dataclass
 from inspect import signature
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Protocol, Tuple, Union
+from typing import TYPE_CHECKING, Any, Optional, Protocol, Union
 
 import torch
 import torch.nn.functional as F
@@ -130,7 +130,7 @@ def contrast_logits_fn(
     args: StepFunctionArgs,
     contrast_sources: Optional[FeatureAttributionInput] = None,
     contrast_targets: Optional[FeatureAttributionInput] = None,
-    contrast_targets_alignments: Optional[List[List[Tuple[int, int]]]] = None,
+    contrast_targets_alignments: Optional[list[list[tuple[int, int]]]] = None,
     contrast_force_inputs: bool = False,
 ):
     """Returns the logit of a generation target given contrastive context or target prediction alternative.
@@ -153,7 +153,7 @@ def contrast_prob_fn(
     args: StepFunctionArgs,
     contrast_sources: Optional[FeatureAttributionInput] = None,
     contrast_targets: Optional[FeatureAttributionInput] = None,
-    contrast_targets_alignments: Optional[List[List[Tuple[int, int]]]] = None,
+    contrast_targets_alignments: Optional[list[list[tuple[int, int]]]] = None,
     logprob: bool = False,
     contrast_force_inputs: bool = False,
 ):
@@ -177,7 +177,7 @@ def pcxmi_fn(
     args: StepFunctionArgs,
     contrast_sources: Optional[FeatureAttributionInput] = None,
     contrast_targets: Optional[FeatureAttributionInput] = None,
-    contrast_targets_alignments: Optional[List[List[Tuple[int, int]]]] = None,
+    contrast_targets_alignments: Optional[list[list[tuple[int, int]]]] = None,
     contrast_force_inputs: bool = False,
 ) -> SingleScorePerStepTensor:
     """Compute the pointwise conditional cross-mutual information (P-CXMI) of target ids given original and contrastive
@@ -201,7 +201,7 @@ def kl_divergence_fn(
     args: StepFunctionArgs,
     contrast_sources: Optional[FeatureAttributionInput] = None,
     contrast_targets: Optional[FeatureAttributionInput] = None,
-    contrast_targets_alignments: Optional[List[List[Tuple[int, int]]]] = None,
+    contrast_targets_alignments: Optional[list[list[tuple[int, int]]]] = None,
     top_k: int = 0,
     top_p: float = 1.0,
     min_tokens_to_keep: int = 1,
@@ -260,7 +260,7 @@ def contrast_prob_diff_fn(
     args: StepFunctionArgs,
     contrast_sources: Optional[FeatureAttributionInput] = None,
     contrast_targets: Optional[FeatureAttributionInput] = None,
-    contrast_targets_alignments: Optional[List[List[Tuple[int, int]]]] = None,
+    contrast_targets_alignments: Optional[list[list[tuple[int, int]]]] = None,
     logprob: bool = False,
     contrast_force_inputs: bool = False,
 ):
@@ -288,7 +288,7 @@ def contrast_logits_diff_fn(
     args: StepFunctionArgs,
     contrast_sources: Optional[FeatureAttributionInput] = None,
     contrast_targets: Optional[FeatureAttributionInput] = None,
-    contrast_targets_alignments: Optional[List[List[Tuple[int, int]]]] = None,
+    contrast_targets_alignments: Optional[list[list[tuple[int, int]]]] = None,
     contrast_force_inputs: bool = False,
 ):
     """Equivalent to ``contrast_prob_diff_fn`` but for logits. The original target function used in
@@ -310,7 +310,7 @@ def in_context_pvi_fn(
     args: StepFunctionArgs,
     contrast_sources: Optional[FeatureAttributionInput] = None,
     contrast_targets: Optional[FeatureAttributionInput] = None,
-    contrast_targets_alignments: Optional[List[List[Tuple[int, int]]]] = None,
+    contrast_targets_alignments: Optional[list[list[tuple[int, int]]]] = None,
     contrast_force_inputs: bool = False,
 ):
     """Returns the in-context pointwise V-usable information as defined by `Lu et al. (2023)
@@ -419,15 +419,15 @@ def get_step_function(score_identifier: str) -> StepFunction:
 def get_step_scores(
     score_identifier: str,
     step_fn_args: StepFunctionArgs,
-    step_fn_extra_args: Dict[str, Any] = {},
+    step_fn_extra_args: dict[str, Any] = {},
 ) -> SingleScorePerStepTensor:
     """Returns step scores for the target tokens in the batch."""
     return get_step_function(score_identifier)(step_fn_args, **step_fn_extra_args)
 
 
 def get_step_scores_args(
-    score_identifiers: List[str], kwargs: Dict[str, Any], default_args: Optional[Dict[str, Any]] = None
-) -> Dict[str, Any]:
+    score_identifiers: list[str], kwargs: dict[str, Any], default_args: Optional[dict[str, Any]] = None
+) -> dict[str, Any]:
     step_scores_args = {}
     for step_fn_id in score_identifiers:
         step_fn = get_step_function(step_fn_id)
@@ -442,7 +442,7 @@ def get_step_scores_args(
     return step_scores_args
 
 
-def list_step_functions() -> List[str]:
+def list_step_functions() -> list[str]:
     """Lists identifiers for all available step scores. One or more step scores identifiers can be passed to the
     :meth:`~inseq.models.AttributionModel.attribute` method either to compute scores while attributing (``step_scores``
     parameter), or as target function for the attribution, if supported by the attribution method (``attributed_fn``
@@ -454,7 +454,7 @@ def list_step_functions() -> List[str]:
 def register_step_function(
     fn: StepFunction,
     identifier: str,
-    aggregate_map: Optional[Dict[str, str]] = None,
+    aggregate_map: Optional[dict[str, str]] = None,
     overwrite: bool = False,
 ) -> None:
     """Registers a function to be used to compute step scores and store them in the

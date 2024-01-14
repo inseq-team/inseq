@@ -5,6 +5,7 @@ import logging
 import math
 from base64 import standard_b64decode, standard_b64encode
 from collections import OrderedDict
+from collections.abc import Sequence
 from contextlib import contextmanager
 from functools import wraps
 from importlib import import_module
@@ -12,7 +13,7 @@ from inspect import signature
 from itertools import dropwhile
 from numbers import Number
 from os import PathLike, fsync
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Optional, Union
 
 from numpy import asarray, frombuffer
 from torch import Tensor
@@ -85,7 +86,7 @@ def pretty_tensor(t: Optional[Tensor] = None, lpad: int = 8) -> str:
         return f"{t.dtype} tensor of shape {list(t.shape)} on {t.device}: {out_list}"
 
 
-def pretty_dict(d: Dict[str, Any], lpad: int = 4) -> str:
+def pretty_dict(d: dict[str, Any], lpad: int = 4) -> str:
     if not d:
         return "{}"
     out_txt = "{\n"
@@ -110,11 +111,11 @@ def pretty_dict(d: Dict[str, Any], lpad: int = 4) -> str:
 
 
 def extract_signature_args(
-    full_args: Dict[str, Any],
+    full_args: dict[str, Any],
     func: Callable[[Any], Any],
     exclude_args: Optional[Sequence[str]] = None,
     return_remaining: bool = False,
-) -> Union[Dict[str, Any], Tuple[Dict[str, Any], Dict[str, Any]]]:
+) -> Union[dict[str, Any], tuple[dict[str, Any], dict[str, Any]]]:
     extracted_args = {
         k: v
         for k, v in full_args.items()
@@ -202,7 +203,7 @@ def isnotebook():
 def format_input_texts(
     texts: TextInput,
     ref_texts: Optional[TextInput] = None,
-) -> Tuple[List[str], List[str]]:
+) -> tuple[list[str], list[str]]:
     texts = [texts] if isinstance(texts, str) else texts
     reference_texts = [ref_texts] if isinstance(ref_texts, str) else ref_texts
     if reference_texts and texts and len(texts) != len(reference_texts):
@@ -235,7 +236,7 @@ def aggregate_token_sequence(token_sequence, spans):
     return out_sequence
 
 
-def aggregate_token_pair(tokens: List[TokenWithId], other_tokens: List[TokenWithId]):
+def aggregate_token_pair(tokens: list[TokenWithId], other_tokens: list[TokenWithId]):
     if not other_tokens:
         return tokens
     out_tokens = []
@@ -424,7 +425,7 @@ def get_cls_from_instance_type(mod, name, cls_lookup_map):
     return curr_class
 
 
-def clean_tokens(tokens: List[str], remove_tokens: List[str]) -> Tuple[List[str], List[int]]:
+def clean_tokens(tokens: list[str], remove_tokens: list[str]) -> tuple[list[str], list[int]]:
     """Removes tokens from a list of tokens and returns the cleaned list and the removed token indexes."""
     clean_tokens = []
     removed_token_idxs = []

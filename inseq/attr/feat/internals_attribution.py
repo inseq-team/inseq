@@ -14,7 +14,7 @@
 """Attention-based feature attribution methods."""
 
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 from captum._utils.typing import TensorOrTupleOfTensorsGeneric
 from captum.attr._utils.attribution import Attribution
@@ -110,7 +110,7 @@ class AttentionWeightsAttribution(InternalsAttributionRegistry):
 
     def attribute_step(
         self,
-        attribute_fn_main_args: Dict[str, Any],
-        attribution_args: Dict[str, Any],
+        attribute_fn_main_args: dict[str, Any],
+        attribution_args: dict[str, Any],
     ) -> MultiDimensionalFeatureAttributionStepOutput:
         return self.method.attribute(**attribute_fn_main_args, **attribution_args)

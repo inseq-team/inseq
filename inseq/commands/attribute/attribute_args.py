@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import Optional
 
 from ... import (
     list_aggregation_functions,
@@ -38,7 +38,7 @@ class AttributeBaseArgs:
             " specified using the ``attribution_kwargs`` argument."
         ),
     )
-    attribution_selectors: Optional[List[int]] = cli_arg(
+    attribution_selectors: Optional[list[int]] = cli_arg(
         default=None,
         help=(
             "The indices of the attribution scores to be used for the attribution aggregation. If specified, the"
@@ -46,7 +46,7 @@ class AttributeBaseArgs:
             " If not specified, the aggregation function is applied to all the scores."
         ),
     )
-    attribution_aggregators: List[str] = cli_arg(
+    attribution_aggregators: list[str] = cli_arg(
         default=None,
         help=(
             "The aggregators used to aggregate the attribution scores for each context. The outcome should"
@@ -94,7 +94,7 @@ class AttributeExtendedArgs(AttributeBaseArgs):
             " since for decoder-only ones it is sufficient to add prefix to input string. Default: False."
         ),
     )
-    step_scores: List[str] = cli_arg(
+    step_scores: list[str] = cli_arg(
         default_factory=list,
         help="Adds the specified step scores to the attribution output.",
         choices=list_step_functions(),
@@ -143,8 +143,8 @@ class AttributeExtendedArgs(AttributeBaseArgs):
 @command_args_docstring
 @dataclass
 class AttributeWithInputsArgs(AttributeExtendedArgs):
-    input_texts: List[str] = cli_arg(default=None, aliases=["-i"], help="One or more input texts used for generation.")
-    generated_texts: Optional[List[str]] = cli_arg(
+    input_texts: list[str] = cli_arg(default=None, aliases=["-i"], help="One or more input texts used for generation.")
+    generated_texts: Optional[list[str]] = cli_arg(
         default=None, aliases=["-g"], help="If specified, constrains the decoding procedure to the specified outputs."
     )
 

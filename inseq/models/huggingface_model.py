@@ -1,7 +1,7 @@
 """HuggingFace Seq2seq model."""
 import logging
 from abc import abstractmethod
-from typing import Any, Dict, List, NoReturn, Optional, Tuple, Union
+from typing import Any, NoReturn, Optional, Union
 
 import torch
 from torch import long
@@ -69,8 +69,8 @@ class HuggingfaceModel(AttributionModel):
         attribution_method: Optional[str] = None,
         tokenizer: Union[str, PreTrainedTokenizerBase, None] = None,
         device: Optional[str] = None,
-        model_kwargs: Optional[Dict[str, Any]] = {},
-        tokenizer_kwargs: Optional[Dict[str, Any]] = {},
+        model_kwargs: Optional[dict[str, Any]] = {},
+        tokenizer_kwargs: Optional[dict[str, Any]] = {},
         **kwargs,
     ) -> None:
         """AttributionModel subclass for Huggingface-compatible models.
@@ -137,8 +137,8 @@ class HuggingfaceModel(AttributionModel):
         attribution_method: Optional[str] = None,
         tokenizer: Union[str, PreTrainedTokenizerBase, None] = None,
         device: str = None,
-        model_kwargs: Optional[Dict[str, Any]] = {},
-        tokenizer_kwargs: Optional[Dict[str, Any]] = {},
+        model_kwargs: Optional[dict[str, Any]] = {},
+        tokenizer_kwargs: Optional[dict[str, Any]] = {},
         **kwargs,
     ) -> "HuggingfaceModel":
         """Loads a HuggingFace model and tokenizer and wraps them in the appropriate AttributionModel."""
@@ -179,8 +179,8 @@ class HuggingfaceModel(AttributionModel):
         pass
 
     @property
-    def info(self) -> Dict[str, str]:
-        dic_info: Dict[str, str] = super().info
+    def info(self) -> dict[str, str]:
+        dic_info: dict[str, str] = super().info
         extra_info = {
             "tokenizer_name": self.tokenizer_name,
             "tokenizer_class": self.tokenizer.__class__.__name__,
@@ -196,7 +196,7 @@ class HuggingfaceModel(AttributionModel):
         return_generation_output: bool = False,
         skip_special_tokens: bool = True,
         **kwargs,
-    ) -> Union[List[str], Tuple[List[str], ModelOutput]]:
+    ) -> Union[list[str], tuple[list[str], ModelOutput]]:
         """Wrapper of model.generate to handle tokenization and decoding.
 
         Args:
@@ -284,9 +284,9 @@ class HuggingfaceModel(AttributionModel):
 
     def decode(
         self,
-        ids: Union[List[int], List[List[int]], IdsTensor],
+        ids: Union[list[int], list[list[int]], IdsTensor],
         skip_special_tokens: bool = True,
-    ) -> List[str]:
+    ) -> list[str]:
         return self.tokenizer.batch_decode(
             ids,
             skip_special_tokens=skip_special_tokens,
@@ -386,11 +386,11 @@ class HuggingfaceModel(AttributionModel):
         return [self.clean_tokens(token_seq, skip_special_tokens, as_targets) for token_seq in tokens]
 
     @property
-    def special_tokens(self) -> List[str]:
+    def special_tokens(self) -> list[str]:
         return self.tokenizer.all_special_tokens
 
     @property
-    def special_tokens_ids(self) -> List[int]:
+    def special_tokens_ids(self) -> list[int]:
         return self.tokenizer.all_special_ids
 
     @property
@@ -429,7 +429,7 @@ class HuggingfaceEncoderDecoderModel(HuggingfaceModel, EncoderDecoderAttribution
     @staticmethod
     def get_attentions_dict(
         output: Seq2SeqLMOutput,
-    ) -> Dict[str, MultiLayerMultiUnitScoreTensor]:
+    ) -> dict[str, MultiLayerMultiUnitScoreTensor]:
         if output.encoder_attentions is None or output.decoder_attentions is None:
             raise ValueError("Model does not support attribution relying on attention outputs.")
         return {
@@ -439,7 +439,7 @@ class HuggingfaceEncoderDecoderModel(HuggingfaceModel, EncoderDecoderAttribution
         }
 
     @staticmethod
-    def get_hidden_states_dict(output: Seq2SeqLMOutput) -> Dict[str, MultiLayerEmbeddingsTensor]:
+    def get_hidden_states_dict(output: Seq2SeqLMOutput) -> dict[str, MultiLayerEmbeddingsTensor]:
         return {
             "encoder_hidden_states": torch.stack(output.encoder_hidden_states, dim=1),
             "decoder_hidden_states": torch.stack(output.decoder_hidden_states, dim=1),
@@ -463,8 +463,8 @@ class HuggingfaceDecoderOnlyModel(HuggingfaceModel, DecoderOnlyAttributionModel)
         attribution_method: Optional[str] = None,
         tokenizer: Union[str, PreTrainedTokenizerBase, None] = None,
         device: str = None,
-        model_kwargs: Optional[Dict[str, Any]] = {},
-        tokenizer_kwargs: Optional[Dict[str, Any]] = {},
+        model_kwargs: Optional[dict[str, Any]] = {},
+        tokenizer_kwargs: Optional[dict[str, Any]] = {},
         **kwargs,
     ) -> NoReturn:
         super().__init__(model, attribution_method, tokenizer, device, model_kwargs, tokenizer_kwargs, **kwargs)
@@ -479,7 +479,7 @@ class HuggingfaceDecoderOnlyModel(HuggingfaceModel, DecoderOnlyAttributionModel)
             self.embed_scale = self.model.embed_scale
 
     @staticmethod
-    def get_attentions_dict(output: CausalLMOutput) -> Dict[str, MultiLayerMultiUnitScoreTensor]:
+    def get_attentions_dict(output: CausalLMOutput) -> dict[str, MultiLayerMultiUnitScoreTensor]:
         if output.attentions is None:
             raise ValueError("Model does not support attribution relying on attention outputs.")
         return {
@@ -487,7 +487,7 @@ class HuggingfaceDecoderOnlyModel(HuggingfaceModel, DecoderOnlyAttributionModel)
         }
 
     @staticmethod
-    def get_hidden_states_dict(output: CausalLMOutput) -> Dict[str, MultiLayerEmbeddingsTensor]:
+    def get_hidden_states_dict(output: CausalLMOutput) -> dict[str, MultiLayerEmbeddingsTensor]:
         return {
             "decoder_hidden_states": torch.stack(output.hidden_states, dim=1),
         }

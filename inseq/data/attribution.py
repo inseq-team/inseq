@@ -3,7 +3,7 @@ from copy import deepcopy
 from dataclasses import dataclass, field
 from os import PathLike
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Type, Union
+from typing import TYPE_CHECKING, Any, Callable, Optional, Union
 
 import torch
 
@@ -72,7 +72,7 @@ def get_batch_from_inputs(
     return batch
 
 
-def merge_attributions(attributions: List["FeatureAttributionOutput"]) -> "FeatureAttributionOutput":
+def merge_attributions(attributions: list["FeatureAttributionOutput"]) -> "FeatureAttributionOutput":
     """Merges multiple :class:`~inseq.data.FeatureAttributionOutput` objects into a single one.
 
     Merging is allowed only if the two outputs match on the fields specified in ``_merge_match_info_fields``.
@@ -136,16 +136,16 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
             scores produced alongside attributions (n per generation step, as for attributions).
     """
 
-    source: List[TokenWithId]
-    target: List[TokenWithId]
+    source: list[TokenWithId]
+    target: list[TokenWithId]
     source_attributions: Optional[SequenceAttributionTensor] = None
     target_attributions: Optional[SequenceAttributionTensor] = None
-    step_scores: Optional[Dict[str, SingleScoresPerSequenceTensor]] = None
-    sequence_scores: Optional[Dict[str, MultipleScoresPerSequenceTensor]] = None
+    step_scores: Optional[dict[str, SingleScoresPerSequenceTensor]] = None
+    sequence_scores: Optional[dict[str, MultipleScoresPerSequenceTensor]] = None
     attr_pos_start: int = 0
     attr_pos_end: Optional[int] = None
-    _aggregator: Union[str, List[str], None] = None
-    _dict_aggregate_fn: Optional[Dict[str, str]] = None
+    _aggregator: Union[str, list[str], None] = None
+    _dict_aggregate_fn: Optional[dict[str, str]] = None
 
     def __post_init__(self):
         if self._dict_aggregate_fn is None:
@@ -177,12 +177,12 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
     @classmethod
     def from_step_attributions(
         cls,
-        attributions: List["FeatureAttributionStepOutput"],
-        tokenized_target_sentences: Optional[List[List[TokenWithId]]] = None,
+        attributions: list["FeatureAttributionStepOutput"],
+        tokenized_target_sentences: Optional[list[list[TokenWithId]]] = None,
         pad_id: Optional[Any] = None,
         has_bos_token: bool = True,
         attr_pos_end: Optional[int] = None,
-    ) -> List["FeatureAttributionSequenceOutput"]:
+    ) -> list["FeatureAttributionSequenceOutput"]:
         """Converts a list of :class:`~inseq.data.attribution.FeatureAttributionStepOutput` objects containing multiple
         examples outputs per step into a list of :class:`~inseq.data.attribution.FeatureAttributionSequenceOutput` with
         every object containing all step outputs for an individual example.
@@ -288,7 +288,7 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
         max_val: Optional[int] = None,
         display: bool = True,
         return_html: Optional[bool] = False,
-        aggregator: Union[AggregatorPipeline, Type[Aggregator]] = None,
+        aggregator: Union[AggregatorPipeline, type[Aggregator]] = None,
         do_aggregation: bool = True,
         **kwargs,
     ) -> Optional[str]:
@@ -367,10 +367,10 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
 
     def get_scores_dicts(
         self,
-        aggregator: Union[AggregatorPipeline, Type[Aggregator]] = None,
+        aggregator: Union[AggregatorPipeline, type[Aggregator]] = None,
         do_aggregation: bool = True,
         **kwargs,
-    ) -> Dict[str, Dict[str, Dict[str, float]]]:
+    ) -> dict[str, dict[str, dict[str, float]]]:
         # If no aggregator is specified, the default aggregator for the class is used
         aggr = self.aggregate(aggregator, **kwargs) if do_aggregation else self
         return_dict = {"source_attributions": {}, "target_attributions": {}, "step_scores": {}}
@@ -403,13 +403,13 @@ class FeatureAttributionStepOutput(TensorWrapper):
     """Output of a single step of feature attribution, plus extra information related to what was attributed."""
 
     source_attributions: Optional[StepAttributionTensor] = None
-    step_scores: Optional[Dict[str, SingleScorePerStepTensor]] = None
+    step_scores: Optional[dict[str, SingleScorePerStepTensor]] = None
     target_attributions: Optional[StepAttributionTensor] = None
-    sequence_scores: Optional[Dict[str, MultipleScoresPerStepTensor]] = None
+    sequence_scores: Optional[dict[str, MultipleScoresPerStepTensor]] = None
     source: Optional[OneOrMoreTokenWithIdSequences] = None
     prefix: Optional[OneOrMoreTokenWithIdSequences] = None
     target: Optional[OneOrMoreTokenWithIdSequences] = None
-    _sequence_cls: Type["FeatureAttributionSequenceOutput"] = FeatureAttributionSequenceOutput
+    _sequence_cls: type["FeatureAttributionSequenceOutput"] = FeatureAttributionSequenceOutput
 
     def __post_init__(self):
         self.to(torch.float32)
@@ -501,9 +501,9 @@ class FeatureAttributionOutput:
         "tokenizer_name",
     ]
 
-    sequence_attributions: List[FeatureAttributionSequenceOutput]
-    step_attributions: Optional[List[FeatureAttributionStepOutput]] = None
-    info: Dict[str, Any] = field(default_factory=dict)
+    sequence_attributions: list[FeatureAttributionSequenceOutput]
+    step_attributions: Optional[list[FeatureAttributionStepOutput]] = None
+    info: dict[str, Any] = field(default_factory=dict)
 
     def __str__(self):
         return f"{self.__class__.__name__}({pretty_dict(self.__dict__)})"
@@ -622,7 +622,7 @@ class FeatureAttributionOutput:
 
     def aggregate(
         self,
-        aggregator: Union[AggregatorPipeline, Type[Aggregator]] = None,
+        aggregator: Union[AggregatorPipeline, type[Aggregator]] = None,
         **kwargs,
     ) -> "FeatureAttributionOutput":
         """Aggregate the sequence attributions using one or more aggregators.
@@ -646,7 +646,7 @@ class FeatureAttributionOutput:
         max_val: Optional[int] = None,
         display: bool = True,
         return_html: Optional[bool] = False,
-        aggregator: Union[AggregatorPipeline, Type[Aggregator]] = None,
+        aggregator: Union[AggregatorPipeline, type[Aggregator]] = None,
         do_aggregation: bool = True,
         **kwargs,
     ) -> Optional[str]:
@@ -681,8 +681,8 @@ class FeatureAttributionOutput:
             self.sequence_attributions[i] = attr.weight_attributions(step_score_id)
 
     def get_scores_dicts(
-        self, aggregator: Union[AggregatorPipeline, Type[Aggregator]] = None, do_aggregation: bool = True, **kwargs
-    ) -> List[Dict[str, Dict[str, Dict[str, float]]]]:
+        self, aggregator: Union[AggregatorPipeline, type[Aggregator]] = None, do_aggregation: bool = True, **kwargs
+    ) -> list[dict[str, dict[str, dict[str, float]]]]:
         """Get all computed scores (attributions and step scores) for all sequences as a list of dictionaries.
 
         Returns:
@@ -726,7 +726,7 @@ class GranularFeatureAttributionSequenceOutput(FeatureAttributionSequenceOutput)
 class GranularFeatureAttributionStepOutput(FeatureAttributionStepOutput):
     """Raw output of a single step of gradient feature attribution."""
 
-    _sequence_cls: Type["FeatureAttributionSequenceOutput"] = GranularFeatureAttributionSequenceOutput
+    _sequence_cls: type["FeatureAttributionSequenceOutput"] = GranularFeatureAttributionSequenceOutput
 
 
 @dataclass(eq=False, repr=False)
@@ -746,7 +746,7 @@ class CoarseFeatureAttributionSequenceOutput(FeatureAttributionSequenceOutput):
 class CoarseFeatureAttributionStepOutput(FeatureAttributionStepOutput):
     """Raw output of a single step of coarse-grained feature attribution."""
 
-    _sequence_cls: Type["FeatureAttributionSequenceOutput"] = CoarseFeatureAttributionSequenceOutput
+    _sequence_cls: type["FeatureAttributionSequenceOutput"] = CoarseFeatureAttributionSequenceOutput
 
 
 @dataclass(eq=False, repr=False)
@@ -770,7 +770,7 @@ class MultiDimensionalFeatureAttributionStepOutput(FeatureAttributionStepOutput)
     """Raw output of a single step of multi-dimensional feature attribution."""
 
     _num_dimensions: int = 2
-    _sequence_cls: Type["FeatureAttributionSequenceOutput"] = MultiDimensionalFeatureAttributionSequenceOutput
+    _sequence_cls: type["FeatureAttributionSequenceOutput"] = MultiDimensionalFeatureAttributionSequenceOutput
 
     def get_sequence_cls(self, **kwargs):
         return MultiDimensionalFeatureAttributionSequenceOutput(_num_dimensions=self._num_dimensions, **kwargs)

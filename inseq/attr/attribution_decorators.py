@@ -14,8 +14,9 @@
 """Decorators for attribution methods."""
 
 import logging
+from collections.abc import Sequence
 from functools import wraps
-from typing import Any, Callable, List, Optional, Sequence
+from typing import Any, Callable, Optional
 
 from ..data.data_utils import TensorWrapper
 
@@ -55,7 +56,7 @@ def batched(f: Callable[..., Any]) -> Callable[..., Any]:
 
     @wraps(f)
     def batched_wrapper(self, *args, batch_size: Optional[int] = None, **kwargs):
-        def get_batched(bs: Optional[int], seq: Sequence[Any]) -> List[List[Any]]:
+        def get_batched(bs: Optional[int], seq: Sequence[Any]) -> list[list[Any]]:
             if isinstance(seq, str):
                 seq = [seq]
             if isinstance(seq, list):

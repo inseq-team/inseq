@@ -1,4 +1,4 @@
-from typing import List, Literal, Optional
+from typing import Literal, Optional
 
 from rich.console import Console
 
@@ -45,10 +45,10 @@ def get_formatted_attribute_context_results(
     def format_context_comment(
         model: HuggingfaceModel,
         has_other_context: bool,
-        special_tokens_to_keep: List[str],
+        special_tokens_to_keep: list[str],
         context: str,
-        context_scores: List[float],
-        other_context_scores: Optional[List[float]] = None,
+        context_scores: list[float],
+        other_context_scores: Optional[list[float]] = None,
         is_target: bool = False,
         context_type: Literal["Input", "Output"] = "Input",
     ) -> str:

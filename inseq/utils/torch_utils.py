@@ -1,5 +1,6 @@
 import logging
-from typing import TYPE_CHECKING, Callable, List, Literal, Optional, Sequence, Tuple, Union
+from collections.abc import Sequence
+from typing import TYPE_CHECKING, Callable, Literal, Optional, Union
 
 import torch
 import torch.nn.functional as F
@@ -22,7 +23,7 @@ TORCH_BACKEND_DEVICE_MAP = {
 
 @torch.no_grad()
 def remap_from_filtered(
-    original_shape: Tuple[int, ...],
+    original_shape: tuple[int, ...],
     mask: Int[torch.Tensor, "batch_size 1"],
     filtered: Num[torch.Tensor, "filtered_batch_size"],
 ) -> Num[torch.Tensor, "batch_size"]:
@@ -35,10 +36,10 @@ def remap_from_filtered(
 
 
 def normalize(
-    attributions: Union[torch.Tensor, Tuple[torch.Tensor, ...]],
+    attributions: Union[torch.Tensor, tuple[torch.Tensor, ...]],
     norm_dim: int = 0,
     norm_ord: int = 1,
-) -> Union[torch.Tensor, Tuple[torch.Tensor, ...]]:
+) -> Union[torch.Tensor, tuple[torch.Tensor, ...]]:
     multi_input = False
     if isinstance(attributions, tuple):
         orig_sizes = [a.shape[norm_dim] for a in attributions]
@@ -100,7 +101,7 @@ def filter_logits(
     top_k: int = 0,
     min_tokens_to_keep: int = 1,
     filter_strategy: Union[Literal["original"], Literal["contrast"], Literal["merged"], None] = None,
-) -> Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
+) -> Union[torch.Tensor, tuple[torch.Tensor, torch.Tensor]]:
     """Applies top-k and top-p filtering to logits, and optionally to an additional set of contrastive logits."""
     if top_k > original_logits.size(-1) or top_k < 0:
         raise ValueError(f"`top_k` has to be a positive integer < {original_logits.size(-1)}, but is {top_k}")
@@ -141,7 +142,7 @@ def euclidean_distance(vec_a: torch.Tensor, vec_b: torch.Tensor) -> torch.Tensor
 
 def aggregate_contiguous(
     t: torch.Tensor,
-    spans: Sequence[Tuple[int, int]],
+    spans: Sequence[tuple[int, int]],
     aggregate_fn: Optional[Callable] = None,
     aggregate_dim: int = 0,
 ):
@@ -177,7 +178,7 @@ def aggregate_contiguous(
     return out_cat
 
 
-def get_front_padding(t: torch.Tensor, pad: int = 0, dim: int = 1) -> List[int]:
+def get_front_padding(t: torch.Tensor, pad: int = 0, dim: int = 1) -> list[int]:
     """Given a tensor of shape (batch, seq_len) of ids, return a list of length batch containing
     the number of padding tokens at the beginning of each sequence.
     """
@@ -185,8 +186,8 @@ def get_front_padding(t: torch.Tensor, pad: int = 0, dim: int = 1) -> List[int]:
 
 
 def get_sequences_from_batched_steps(
-    bsteps: List[torch.Tensor], padding_dims: Sequence[int] = [], stack_dim: int = 2
-) -> List[torch.Tensor]:
+    bsteps: list[torch.Tensor], padding_dims: Sequence[int] = [], stack_dim: int = 2
+) -> list[torch.Tensor]:
     """Given a sequence of batched step tensors of shape (batch_size, seq_len, ...) builds a sequence
     of tensors of shape (seq_len, ...) where each resulting tensor is the aggregation
     across batch steps for every batch element.

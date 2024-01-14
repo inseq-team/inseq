@@ -1,7 +1,7 @@
 import logging
 import re
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 from rich import print as rprint
 from rich.prompt import Confirm, Prompt
@@ -25,13 +25,13 @@ class CCIOutput:
     cti_score: float
     contextual_prefix: str
     contextless_prefix: str
-    input_context_scores: Optional[List[float]] = None
-    output_context_scores: Optional[List[float]] = None
+    input_context_scores: Optional[list[float]] = None
+    output_context_scores: Optional[list[float]] = None
 
     def __repr__(self):
         return f"{self.__class__.__name__}({pretty_dict(self.__dict__)})"
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return dict(self.__dict__.items())
 
 
@@ -40,19 +40,19 @@ class AttributeContextOutput:
     """Output of the overall context attribution process."""
 
     input_context: Optional[str] = None
-    input_context_tokens: Optional[List[str]] = None
+    input_context_tokens: Optional[list[str]] = None
     output_context: Optional[str] = None
-    output_context_tokens: Optional[List[str]] = None
+    output_context_tokens: Optional[list[str]] = None
     output_current: Optional[str] = None
-    output_current_tokens: Optional[List[str]] = None
-    cti_scores: Optional[List[float]] = None
-    cci_scores: List[CCIOutput] = field(default_factory=list)
+    output_current_tokens: Optional[list[str]] = None
+    cti_scores: Optional[list[float]] = None
+    cci_scores: list[CCIOutput] = field(default_factory=list)
     info: Optional[AttributeContextArgs] = None
 
     def __repr__(self):
         return f"{self.__class__.__name__}({pretty_dict(self.__dict__)})"
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         out_dict = {k: v for k, v in self.__dict__.items() if k not in ["cci_scores", "info"]}
         out_dict["cci_scores"] = [cci_out.to_dict() for cci_out in self.cci_scores]
         if self.info:
@@ -70,10 +70,10 @@ def format_template(template: str, current: str, context: Optional[str] = None) 
 def get_filtered_tokens(
     text: str,
     model: HuggingfaceModel,
-    special_tokens_to_keep: List[str],
+    special_tokens_to_keep: list[str],
     replace_special_characters: bool = False,
     is_target: bool = False,
-) -> List[str]:
+) -> list[str]:
     """Tokenize text and filter out special tokens, keeping only those in ``special_tokens_to_keep``."""
     as_targets = is_target and model.is_encoder_decoder
     return [
@@ -86,7 +86,7 @@ def get_filtered_tokens(
 def generate_with_special_tokens(
     model: HuggingfaceModel,
     model_input: str,
-    special_tokens_to_keep: List[str] = [],
+    special_tokens_to_keep: list[str] = [],
     **generation_kwargs,
 ) -> str:
     """Generate text preserving special tokens in ``special_tokens_to_keep``."""
@@ -99,8 +99,8 @@ def generate_with_special_tokens(
 def generate_model_output(
     model: HuggingfaceModel,
     model_input: str,
-    generation_kwargs: Dict[str, Any],
-    special_tokens_to_keep: List[str],
+    generation_kwargs: dict[str, Any],
+    special_tokens_to_keep: list[str],
     output_template: str,
     prefix: str,
     suffix: str,
@@ -177,9 +177,9 @@ def prepare_outputs(
     output_current_text: Optional[str],
     output_template: str,
     align_output_context_auto: bool = False,
-    generation_kwargs: Dict[str, Any] = {},
-    special_tokens_to_keep: List[str] = [],
-) -> Tuple[Optional[str], str]:
+    generation_kwargs: dict[str, Any] = {},
+    special_tokens_to_keep: list[str] = [],
+) -> tuple[Optional[str], str]:
     """Handle model outputs and prepare them for attribution.
     This procedure is valid both for encoder-decoder and decoder-only models.
 
@@ -282,11 +282,11 @@ def prepare_outputs(
 
 
 def filter_rank_tokens(
-    tokens: List[str],
-    scores: List[float],
+    tokens: list[str],
+    scores: list[float],
     std_threshold: Optional[float] = None,
     topk: Optional[int] = None,
-) -> Tuple[List[Tuple[int, float, str]], float]:
+) -> tuple[list[tuple[int, float, str]], float]:
     indices = list(range(0, len(scores)))
     token_score_tuples = sorted(zip(indices, scores, tokens), key=lambda x: abs(x[1]), reverse=True)
     if std_threshold:
@@ -300,11 +300,11 @@ def filter_rank_tokens(
 def get_contextless_prefix(
     model: HuggingfaceModel,
     input_current_text: str,
-    output_current_tokens: List[str],
+    output_current_tokens: list[str],
     cti_idx: int,
-    special_tokens_to_keep: List[str] = [],
-    generation_kwargs: Dict[str, Any] = {},
-) -> Tuple[str, str]:
+    special_tokens_to_keep: list[str] = [],
+    generation_kwargs: dict[str, Any] = {},
+) -> tuple[str, str]:
     """Generate the contextless prefix for the current token identified as context-sensitive."""
     output_current_prefix_tokens = output_current_tokens[:cti_idx]
     output_current_prefix = model.convert_tokens_to_string(output_current_prefix_tokens, skip_special_tokens=False)
@@ -333,15 +333,15 @@ def get_source_target_cci_scores(
     model: HuggingfaceModel,
     cci_attrib_out: FeatureAttributionSequenceOutput,
     input_template: str,
-    input_context_tokens: List[str],
-    input_full_tokens: List[str],
+    input_context_tokens: list[str],
+    input_full_tokens: list[str],
     output_template: str,
-    output_context_tokens: List[str],
+    output_context_tokens: list[str],
     has_input_context: bool,
     has_output_context: bool,
     model_has_lang_tag: bool,
-    special_tokens_to_keep: List[str] = [],
-) -> Tuple[Optional[List[float]], Optional[List[float]]]:
+    special_tokens_to_keep: list[str] = [],
+) -> tuple[Optional[list[float]], Optional[list[float]]]:
     """Extract attribution scores for the input and output contexts."""
     input_scores, output_scores = None, None
     if has_input_context:

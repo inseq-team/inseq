@@ -1,7 +1,7 @@
 import logging
 from abc import ABC, abstractmethod
 from functools import wraps
-from typing import Any, Callable, Dict, List, Optional, Protocol, Tuple, TypeVar, Union
+from typing import Any, Callable, Optional, Protocol, TypeVar, Union
 
 import torch
 
@@ -56,7 +56,7 @@ class ForwardMethod(Protocol):
         target_ids: ExpandedTargetIdsTensor,
         attributed_fn: Callable[..., SingleScorePerStepTensor],
         use_embeddings: bool,
-        attributed_fn_argnames: Optional[List[str]],
+        attributed_fn_argnames: Optional[list[str]],
         *args,
     ) -> CustomForwardOutput:
         ...
@@ -79,11 +79,11 @@ class InputFormatter:
         target_ids: TargetIdsTensor,
         attributed_fn: Callable[..., SingleScorePerStepTensor],
         attribute_target: bool = False,
-        attributed_fn_args: Dict[str, Any] = {},
+        attributed_fn_args: dict[str, Any] = {},
         attribute_batch_ids: bool = False,
         forward_batch_embeds: bool = True,
         use_baselines: bool = False,
-    ) -> Tuple[Dict[str, Any], Tuple[Union[IdsTensor, EmbeddingsTensor, None], ...]]:
+    ) -> tuple[dict[str, Any], tuple[Union[IdsTensor, EmbeddingsTensor, None], ...]]:
         raise NotImplementedError()
 
     @staticmethod
@@ -95,7 +95,7 @@ class InputFormatter:
         target_tokens: OneOrMoreTokenSequences,
         target_ids: TargetIdsTensor,
         contrast_batch: Optional[DecoderOnlyBatch] = None,
-        contrast_targets_alignments: Optional[List[List[Tuple[int, int]]]] = None,
+        contrast_targets_alignments: Optional[list[list[tuple[int, int]]]] = None,
     ) -> FeatureAttributionStepOutput:
         r"""Enriches the attribution output with token information, producing the finished
         :class:`~inseq.data.FeatureAttributionStepOutput` object.
@@ -146,20 +146,20 @@ class InputFormatter:
 
     @staticmethod
     @abstractmethod
-    def get_step_function_reserved_args() -> List[str]:
+    def get_step_function_reserved_args() -> list[str]:
         raise NotImplementedError()
 
     @staticmethod
     def format_contrast_targets_alignments(
-        contrast_targets_alignments: Union[List[Tuple[int, int]], List[List[Tuple[int, int]]], str],
-        target_sequences: List[str],
-        target_tokens: List[List[str]],
-        contrast_sequences: List[str],
-        contrast_tokens: List[List[str]],
-        special_tokens: List[str] = [],
+        contrast_targets_alignments: Union[list[tuple[int, int]], list[list[tuple[int, int]]], str],
+        target_sequences: list[str],
+        target_tokens: list[list[str]],
+        contrast_sequences: list[str],
+        contrast_tokens: list[list[str]],
+        special_tokens: list[str] = [],
         start_pos: int = 0,
         end_pos: Optional[int] = None,
-    ) -> Tuple[DecoderOnlyBatch, Optional[List[List[Tuple[int, int]]]]]:
+    ) -> tuple[DecoderOnlyBatch, Optional[list[list[tuple[int, int]]]]]:
         # Ensure that the contrast_targets_alignments are in the correct format (list of lists of idxs pairs)
         if contrast_targets_alignments:
             if isinstance(contrast_targets_alignments, list) and len(contrast_targets_alignments) > 0:
@@ -256,7 +256,7 @@ class AttributionModel(ABC, torch.nn.Module):
         self._default_attributed_fn_id = fn
 
     @property
-    def info(self) -> Dict[Optional[str], Optional[str]]:
+    def info(self) -> dict[Optional[str], Optional[str]]:
         return {
             "model_name": self.model_name,
             "model_class": self.model.__class__.__name__ if self.model is not None else None,
@@ -309,13 +309,13 @@ class AttributionModel(ABC, torch.nn.Module):
         pretty_progress: bool = True,
         output_step_attributions: bool = False,
         attribute_target: bool = False,
-        step_scores: List[str] = [],
+        step_scores: list[str] = [],
         include_eos_baseline: bool = False,
         attributed_fn: Union[str, Callable[..., SingleScorePerStepTensor], None] = None,
         device: Optional[str] = None,
         batch_size: Optional[int] = None,
         generate_from_target_prefix: bool = False,
-        generation_args: Dict[str, Any] = {},
+        generation_args: dict[str, Any] = {},
         **kwargs,
     ) -> FeatureAttributionOutput:
         """Perform sequential attribution of input texts for every token in generated texts using the specified method.
@@ -483,8 +483,8 @@ class AttributionModel(ABC, torch.nn.Module):
         self,
         batch: Union[EncoderDecoderBatch, DecoderOnlyBatch],
         contrast_target_tokens: Optional[OneOrMoreTokenSequences] = None,
-        contrast_targets_alignments: Optional[List[List[Tuple[int, int]]]] = None,
-    ) -> List[List[TokenWithId]]:
+        contrast_targets_alignments: Optional[list[list[tuple[int, int]]]] = None,
+    ) -> list[list[TokenWithId]]:
         if contrast_target_tokens is not None:
             return join_token_ids(
                 batch.target_tokens,
@@ -503,7 +503,7 @@ class AttributionModel(ABC, torch.nn.Module):
         encodings: Union[TextInput, BatchEncoding],
         return_generation_output: Optional[bool] = False,
         **kwargs,
-    ) -> Union[List[str], Tuple[List[str], Any]]:
+    ) -> Union[list[str], tuple[list[str], Any]]:
         pass
 
     @staticmethod
@@ -522,7 +522,7 @@ class AttributionModel(ABC, torch.nn.Module):
         pass
 
     @abstractmethod
-    def decode(self, ids: IdsTensor, skip_special_tokens: bool = True) -> List[str]:
+    def decode(self, ids: IdsTensor, skip_special_tokens: bool = True) -> list[str]:
         pass
 
     @abstractmethod
@@ -538,7 +538,7 @@ class AttributionModel(ABC, torch.nn.Module):
     @abstractmethod
     def convert_tokens_to_ids(
         self,
-        tokens: Union[List[str], List[List[str]]],
+        tokens: Union[list[str], list[list[str]]],
     ) -> OneOrMoreIdSequences:
         pass
 
@@ -571,12 +571,12 @@ class AttributionModel(ABC, torch.nn.Module):
 
     @property
     @abstractmethod
-    def special_tokens(self) -> List[str]:
+    def special_tokens(self) -> list[str]:
         pass
 
     @property
     @abstractmethod
-    def special_tokens_ids(self) -> List[int]:
+    def special_tokens_ids(self) -> list[int]:
         pass
 
     @property
@@ -626,12 +626,12 @@ class AttributionModel(ABC, torch.nn.Module):
 
     @staticmethod
     @abstractmethod
-    def get_attentions_dict(output: ModelOutput) -> Dict[str, torch.Tensor]:
+    def get_attentions_dict(output: ModelOutput) -> dict[str, torch.Tensor]:
         pass
 
     @staticmethod
     @abstractmethod
-    def get_hidden_states_dict(output: ModelOutput) -> Dict[str, torch.Tensor]:
+    def get_hidden_states_dict(output: ModelOutput) -> dict[str, torch.Tensor]:
         pass
 
     # Model forward
@@ -642,7 +642,7 @@ class AttributionModel(ABC, torch.nn.Module):
         target_ids: ExpandedTargetIdsTensor,
         attributed_fn: Callable[..., SingleScorePerStepTensor],
         use_embeddings: bool = True,
-        attributed_fn_argnames: Optional[List[str]] = None,
+        attributed_fn_argnames: Optional[list[str]] = None,
         *args,
         **kwargs,
     ) -> LogitsTensor:
