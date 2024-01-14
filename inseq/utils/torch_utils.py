@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Callable, List, Literal, Optional, Sequence, T
 import torch
 import torch.nn.functional as F
 from jaxtyping import Int, Num
+from torch import nn
 from torch.backends.cuda import is_built as is_cuda_built
 from torch.backends.mps import is_available as is_mps_available
 from torch.backends.mps import is_built as is_mps_built
@@ -234,3 +235,58 @@ def get_default_device() -> str:
         return "cpu"
     else:
         return "cpu"
+
+
+def find_block_stack(module: torch.nn.Module) -> Optional[torch.nn.ModuleList]:
+    """Recursively searches for the first instance of a `nn.ModuleList` submodule within a given `torch.nn.Module`.
+    Args:
+        module (:obj:`torch.nn.Module`): A Pytorch :obj:`nn.Module` object.
+    Returns:
+        :obj:`torch.nn.ModuleList`: The first instance of a :obj:`nn.Module` submodule found within the given object.
+        None: If no `nn.ModuleList` submodule is found within the given `nn.Module` object.
+    """
+    # Check if the current module is an instance of nn.ModuleList
+    if isinstance(module, nn.ModuleList):
+        return module
+
+    # Recursively search for nn.ModuleList in the submodules of the current module
+    for submodule in module.children():
+        module_list = find_block_stack(submodule)
+        if module_list is not None:
+            return module_list
+
+    # If nn.ModuleList is not found in any submodules, return None
+    return None
+
+
+def get_submodule(
+    root_module: torch.nn.Module, submodule_name: str, layer: Optional[int] = None
+) -> Optional[torch.nn.Module]:
+    """Recursively searches for a submodule within a given `torch.nn.Module`.
+
+    Args:
+        root_module (:obj:`torch.nn.Module`): A Pytorch :obj:`nn.Module` object to use as root for searching.
+        submodule_name (:obj:`str`): A dot-separated string representing the name of the submodule to find,
+            e.g. "encoder.layer.0.attention".
+        layer (:obj:`int`, `optional`): If specified, the i-th layer found in the :obj:`nn.ModuleList` of `root_module`
+            will be used as root for searching. If not specified, `root_module` will be used as root for searching.
+            E.g. If `root_module` contains a layer stack at `root_module.encoder.layer`, setting `layer=0` and
+            `submodule_name="attention"` will produce the same result as setting `layer=None` and
+            `submodule_name="encoder.layer.0.attention"`.
+    """
+    parsed_submodule_name = submodule_name.split(".")
+    curr_module = root_module
+    if layer is not None:
+        curr_module = find_block_stack(root_module)[layer]
+    for sub_module in parsed_submodule_name:
+        # If the current submodule is a digit, it is an index of a nn.ModuleList
+        if sub_module.isdigit():
+            layer_idx = int(sub_module)
+            if not isinstance(curr_module, nn.ModuleList) or layer_idx > len(curr_module):
+                return None
+            curr_module = curr_module[int(sub_module)]
+        else:
+            curr_module = getattr(curr_module, sub_module, None)
+        if curr_module is None:
+            return None
+    return curr_module

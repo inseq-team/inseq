@@ -23,6 +23,7 @@ from ...data import MultiDimensionalFeatureAttributionStepOutput
 from ...utils import Registry
 from ...utils.typing import MultiLayerMultiUnitScoreTensor
 from .feature_attribution import FeatureAttribution
+from .ops import Alti
 
 logger = logging.getLogger(__name__)
 
@@ -60,15 +61,15 @@ class AttentionWeightsAttribution(InternalsAttributionRegistry):
                 additional_forward_args (`TensorOrTupleOfTensorsGeneric`):
                     Tensor or tuple of tensors that are additional arguments to the model. Unused, but included to
                     match standard Captum API.
-                encoder_self_attentions (:obj:`tuple(torch.Tensor)`, *optional*, defaults to None): Tensor of encoder
+                encoder_self_attentions (:obj:`torch.Tensor`, *optional*, defaults to None): Tensor of encoder
                     self-attention weights of the forward pass with shape
                     :obj:`(batch_size, n_layers, n_heads, source_seq_len, source_seq_len)`.
-                decoder_self_attentions (:obj:`tuple(torch.Tensor)`, *optional*, defaults to None): Tensor of decoder
+                decoder_self_attentions (:obj:`torch.Tensor`, *optional*, defaults to None): Tensor of decoder
                     self-attention weights of the forward pass with shape
                     :obj:`(batch_size, n_layers, n_heads, target_seq_len, target_seq_len)`.
-                cross_attentions (:obj:`tuple(torch.Tensor)`, *optional*, defaults to None):
+                cross_attentions (:obj:`torch.Tensor`, *optional*, defaults to None):
                     Tensor of cross-attention weights computed during the forward pass with shape
-                    :obj:`(batch_size, n_layers, n_heads, source_seq_len, target_seq_len)`.
+                    :obj:`(batch_size, n_layers, n_heads, target_seq_len, source_seq_len)`.
 
             Returns:
                 :class:`~inseq.data.MultiDimensionalFeatureAttributionStepOutput`: A step output containing attention
@@ -105,6 +106,30 @@ class AttentionWeightsAttribution(InternalsAttributionRegistry):
         # Does not rely on predicted output (i.e. decoding strategy agnostic)
         self.use_predicted_target = False
         self.method = self.AttentionWeights(attribution_model)
+
+    def attribute_step(
+        self,
+        attribute_fn_main_args: Dict[str, Any],
+        attribution_args: Dict[str, Any],
+    ) -> MultiDimensionalFeatureAttributionStepOutput:
+        return self.method.attribute(**attribute_fn_main_args, **attribution_args)
+
+
+class AltiAttribution(InternalsAttributionRegistry):
+    """The ALTI attribution method (https://arxiv.org/abs/2203.04212)."""
+
+    method_name = "alti"
+
+    def __init__(self, attribution_model, **kwargs):
+        super().__init__(attribution_model, hook_to_model=False)
+        self.use_attention_weights = True
+        self.use_hidden_states = True
+        self.use_modules_inputs_outputs = True
+        self.use_model_config = True
+        # Does not rely on predicted output (i.e. decoding strategy agnostic)
+        self.use_predicted_target = False
+        self.method = Alti(attribution_model)
+        self.hook(**kwargs)
 
     def attribute_step(
         self,

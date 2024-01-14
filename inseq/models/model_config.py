@@ -18,6 +18,16 @@ class ModelConfig:
     """
 
     attention_module: str
+    layer: str
+    ln1: str
+    ln2: str
+    values: str
+    dense: str
+    lnf: str
+    fc1: str
+    fc2: str
+    unembed: str
+    layer_norm_type: str
 
 
 MODEL_CONFIGS = {
