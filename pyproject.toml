@@ -5,7 +5,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 name = "inseq"
-version = "0.5.0"
+version = "0.6.0.dev0"
 description = "Interpretability for Sequence Generation Models 🔍"
 readme = "README.md"
 authors = ["The Inseq Team"]
@@ -53,8 +53,7 @@ captum = ">=0.6.0"
 numpy = ">=1.21.6"
 jaxtyping = "^0.2.23"
 typeguard = "<=2.13.3"
-# Omitting future torch releases as they don't install nvidia dependencies: https://github.com/pytorch/pytorch/issues/100974
-torch = "2.0.0"
+torch = ">2.1.1"
 matplotlib = ">=3.5.3"
 tqdm = ">=4.64.0"
 poethepoet = ">=0.13.1"
@@ -121,7 +120,7 @@ torch-cuda = "python -m pip install torch"
 
 [tool.mypy]
 # https://mypy.readthedocs.io/en/latest/config_file.html#using-a-pyproject-toml-file
-python_version = 3.9
+python_version = "3.9"
 strict = true
 
 
