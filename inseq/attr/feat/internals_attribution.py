@@ -14,7 +14,7 @@
 """Attention-based feature attribution methods."""
 
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 from captum._utils.typing import TensorOrTupleOfTensorsGeneric
 from captum.attr._utils.attribution import Attribution
@@ -76,7 +76,7 @@ class AttentionWeightsAttribution(InternalsAttributionRegistry):
             """
             # We adopt the format [batch_size, sequence_length, num_layers, num_heads]
             # for consistency with other multi-unit methods (e.g. gradient attribution)
-            decoder_self_attentions = decoder_self_attentions[..., -1, :].clone().permute(0, 3, 1, 2)
+            decoder_self_attentions = decoder_self_attentions[..., -1, :].to("cpu").clone().permute(0, 3, 1, 2)
             if self.forward_func.is_encoder_decoder:
                 sequence_scores = {}
                 if len(inputs) > 1:
@@ -84,9 +84,11 @@ class AttentionWeightsAttribution(InternalsAttributionRegistry):
                 else:
                     target_attributions = None
                     sequence_scores["decoder_self_attentions"] = decoder_self_attentions
-                sequence_scores["encoder_self_attentions"] = encoder_self_attentions.clone().permute(0, 3, 4, 1, 2)
+                sequence_scores["encoder_self_attentions"] = (
+                    encoder_self_attentions.to("cpu").clone().permute(0, 3, 4, 1, 2)
+                )
                 return MultiDimensionalFeatureAttributionStepOutput(
-                    source_attributions=cross_attentions[..., -1, :].clone().permute(0, 3, 1, 2),
+                    source_attributions=cross_attentions[..., -1, :].to("cpu").clone().permute(0, 3, 1, 2),
                     target_attributions=target_attributions,
                     sequence_scores=sequence_scores,
                     _num_dimensions=2,  # num_layers, num_heads
@@ -108,7 +110,7 @@ class AttentionWeightsAttribution(InternalsAttributionRegistry):
 
     def attribute_step(
         self,
-        attribute_fn_main_args: Dict[str, Any],
-        attribution_args: Dict[str, Any],
+        attribute_fn_main_args: dict[str, Any],
+        attribution_args: dict[str, Any],
     ) -> MultiDimensionalFeatureAttributionStepOutput:
         return self.method.attribute(**attribute_fn_main_args, **attribution_args)

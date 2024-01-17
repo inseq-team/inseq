@@ -23,7 +23,7 @@ import os
 from enum import Enum
 from itertools import islice
 from pathlib import Path
-from typing import Any, List, Optional, Tuple, Union
+from typing import Any, Optional, Union
 
 import torch
 from jaxtyping import Float, Int
@@ -56,7 +56,7 @@ class UnknownPathBuildingStrategy(Exception):
     def __init__(
         self,
         strategy: str,
-        *args: Tuple[Any],
+        *args: tuple[Any],
     ) -> None:
         """Initialize the exception."""
         super().__init__(
@@ -75,7 +75,7 @@ class MonotonicPathBuilder:
         self,
         vocabulary_embeddings: VocabularyEmbeddingsTensor,
         knn_graph: "csr_matrix",
-        special_tokens: List[int] = [],
+        special_tokens: list[int] = [],
     ) -> None:
         """Initialize the monotonic path builder."""
         self.vocabulary_embeddings = vocabulary_embeddings
@@ -112,7 +112,7 @@ class MonotonicPathBuilder:
         overwrite_cache: bool = False,
         cache_dir: Path = INSEQ_ARTIFACTS_CACHE / "path_knn",
         vocabulary_embeddings: Optional[VocabularyEmbeddingsTensor] = None,
-        special_tokens: List[int] = [],
+        special_tokens: list[int] = [],
         embedding_scaling: int = 1,
     ) -> "MonotonicPathBuilder":
         """Load a cached monotonic path builder from a model name, or compute it if it does not exist."""
@@ -188,7 +188,7 @@ class MonotonicPathBuilder:
         baseline_idx: int,
         n_steps: Optional[int] = 30,
         strategy: Optional[str] = "greedy",
-    ) -> List[int]:
+    ) -> list[int]:
         """Find a monotonic path from a word to a baseline."""
         # if word_idx is a special token copy it and return
         if word_idx in self.special_tokens:
@@ -207,7 +207,7 @@ class MonotonicPathBuilder:
         return word_path
 
     def build_monotonic_path_embedding(
-        self, word_path: List[int], baseline_idx: int, n_steps: int = 30
+        self, word_path: list[int], baseline_idx: int, n_steps: int = 30
     ) -> Float[torch.Tensor, "n_steps embed_size"]:
         """Build a monotonic path embedding from a word path."""
         baseline_vec = self.vocabulary_embeddings[baseline_idx]
@@ -231,7 +231,7 @@ class MonotonicPathBuilder:
         self,
         word_idx: int,
         baseline_idx: int,
-        word_path: List[int],
+        word_path: list[int],
         strategy: str = "greedy",
         n_steps: int = 30,
     ) -> int:

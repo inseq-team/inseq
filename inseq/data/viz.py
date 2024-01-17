@@ -18,7 +18,7 @@
 
 import random
 import string
-from typing import Dict, List, Literal, Optional, Tuple, Union
+from typing import Literal, Optional, Union
 
 import numpy as np
 from matplotlib.colors import Colormap
@@ -128,13 +128,13 @@ def show_attributions(
 
 
 def get_attribution_colors(
-    attributions: List[FeatureAttributionSequenceOutput],
+    attributions: list[FeatureAttributionSequenceOutput],
     min_val: Optional[int] = None,
     max_val: Optional[int] = None,
     cmap: Union[str, Colormap, None] = None,
     return_alpha: bool = True,
     return_strings: bool = True,
-) -> List[List[List[Union[str, Tuple[float, float, float]]]]]:
+) -> list[list[list[Union[str, tuple[float, float, float]]]]]:
     """A list (one element = one sentence) of lists (one element = attributions for one token)
     of lists (one element = one attribution) of colors. Colors are either strings or RGB(A) tuples.
     """
@@ -197,12 +197,12 @@ def get_heatmap_type(
 
 def get_saliency_heatmap_html(
     scores: Union[np.ndarray, None],
-    column_labels: List[str],
-    row_labels: List[str],
-    input_colors: List[List[str]],
-    step_scores: Optional[Dict[str, np.ndarray]] = None,
+    column_labels: list[str],
+    row_labels: list[str],
+    input_colors: list[list[str]],
+    step_scores: Optional[dict[str, np.ndarray]] = None,
     label: str = "",
-    step_scores_threshold: Union[float, Dict[str, float]] = 0.5,
+    step_scores_threshold: Union[float, dict[str, float]] = 0.5,
 ):
     # unique ID added to HTML elements and function to avoid collision of differnent instances
     uuid = "".join(random.choices(string.ascii_lowercase, k=20))
@@ -246,12 +246,12 @@ def get_saliency_heatmap_html(
 
 def get_saliency_heatmap_rich(
     scores: Union[np.ndarray, None],
-    column_labels: List[str],
-    row_labels: List[str],
-    input_colors: List[List[str]],
-    step_scores: Optional[Dict[str, np.ndarray]] = None,
+    column_labels: list[str],
+    row_labels: list[str],
+    input_colors: list[list[str]],
+    step_scores: Optional[dict[str, np.ndarray]] = None,
     label: str = "",
-    step_scores_threshold: Union[float, Dict[str, float]] = 0.5,
+    step_scores_threshold: Union[float, dict[str, float]] = 0.5,
 ):
     columns = [Column(header="", justify="right", overflow="fold")]
     for column_label in column_labels:
@@ -294,13 +294,13 @@ def get_saliency_heatmap_rich(
 
 def get_progress_bar(
     sequences: TextSequences,
-    target_lengths: List[int],
+    target_lengths: list[int],
     method_name: str,
     show: bool,
     pretty: bool,
     attr_pos_start: int,
     attr_pos_end: int,
-) -> Union[tqdm, Tuple[Progress, Live], None]:
+) -> Union[tqdm, tuple[Progress, Live], None]:
     if not show:
         return None
     elif show and not pretty:
@@ -348,12 +348,12 @@ def get_progress_bar(
 
 
 def update_progress_bar(
-    pbar: Union[tqdm, Tuple[Progress, Live], None],
-    skipped_prefixes: Optional[List[str]] = None,
-    attributed_sentences: Optional[List[str]] = None,
-    unattributed_suffixes: Optional[List[str]] = None,
-    skipped_suffixes: Optional[List[str]] = None,
-    whitespace_indexes: List[List[int]] = None,
+    pbar: Union[tqdm, tuple[Progress, Live], None],
+    skipped_prefixes: Optional[list[str]] = None,
+    attributed_sentences: Optional[list[str]] = None,
+    unattributed_suffixes: Optional[list[str]] = None,
+    skipped_suffixes: Optional[list[str]] = None,
+    whitespace_indexes: list[list[int]] = None,
     show: bool = False,
     pretty: bool = False,
 ) -> None:
@@ -378,7 +378,7 @@ def update_progress_bar(
                 pbar[0].update(job.id, description=formatted_desc, refresh=True)
 
 
-def close_progress_bar(pbar: Union[tqdm, Tuple[Progress, Live], None], show: bool, pretty: bool) -> None:
+def close_progress_bar(pbar: Union[tqdm, tuple[Progress, Live], None], show: bool, pretty: bool) -> None:
     if not show:
         return
     elif show and not pretty:

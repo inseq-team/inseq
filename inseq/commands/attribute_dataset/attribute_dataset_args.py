@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import Optional
 
 from ...utils import cli_arg
 from ..commands_utils import command_args_docstring
@@ -26,7 +26,7 @@ class LoadDatasetArgs:
     dataset_dir: Optional[str] = cli_arg(
         default=None, aliases=["--dir"], help="Path to the directory containing the data files."
     )
-    dataset_files: Optional[List[str]] = cli_arg(default=None, aliases=["--files"], help="Path to the dataset files.")
+    dataset_files: Optional[list[str]] = cli_arg(default=None, aliases=["--files"], help="Path to the dataset files.")
     dataset_split: Optional[str] = cli_arg(default="train", aliases=["--split"], help="Dataset split.")
     dataset_revision: Optional[str] = cli_arg(
         default=None, aliases=["--revision"], help="The Huggingface dataset revision."

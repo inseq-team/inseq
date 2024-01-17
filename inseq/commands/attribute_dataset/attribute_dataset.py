@@ -1,4 +1,4 @@
-from typing import List, Optional, Tuple
+from typing import Optional
 
 from ...utils import is_datasets_available
 from ..attribute import AttributeExtendedArgs
@@ -10,7 +10,7 @@ if is_datasets_available():
     from datasets import load_dataset
 
 
-def load_fields_from_dataset(dataset_args: LoadDatasetArgs) -> Tuple[List[str], Optional[List[str]]]:
+def load_fields_from_dataset(dataset_args: LoadDatasetArgs) -> tuple[list[str], Optional[list[str]]]:
     if not is_datasets_available():
         raise ImportError("The datasets library needs to be installed to use the attribute-dataset client.")
     dataset = load_dataset(
@@ -40,7 +40,7 @@ class AttributeDatasetCommand(BaseCLICommand):
     _help = "Perform feature attribution on a full dataset and save the results to a file"
     _dataclasses = AttributeExtendedArgs, LoadDatasetArgs
 
-    def run(args: Tuple[AttributeExtendedArgs, LoadDatasetArgs]):
+    def run(args: tuple[AttributeExtendedArgs, LoadDatasetArgs]):
         attribute_args, dataset_args = args
         input_texts, generated_texts = load_fields_from_dataset(dataset_args)
         attribute(input_texts, generated_texts, attribute_args)

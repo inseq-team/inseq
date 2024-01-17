@@ -1,8 +1,6 @@
 import logging
 import math
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Union
-
-import torch
+from typing import TYPE_CHECKING, Any, Callable, Optional, Union
 
 from ...utils import extract_signature_args, get_aligned_idx
 from ...utils.typing import (
@@ -10,6 +8,7 @@ from ...utils.typing import (
     OneOrMoreIdSequences,
     OneOrMoreTokenSequences,
     SingleScorePerStepTensor,
+    StepAttributionTensor,
     TextInput,
     TokenWithId,
 )
@@ -51,7 +50,7 @@ def check_attribute_positions(
     max_length: int,
     attr_pos_start: Optional[int] = None,
     attr_pos_end: Optional[int] = None,
-) -> Tuple[int, int]:
+) -> tuple[int, int]:
     r"""Checks whether the combination of start/end positions for attribution is valid.
 
     Args:
@@ -90,8 +89,8 @@ def join_token_ids(
     tokens: OneOrMoreTokenSequences,
     ids: OneOrMoreIdSequences,
     contrast_tokens: Optional[OneOrMoreTokenSequences] = None,
-    contrast_targets_alignments: Optional[List[List[Tuple[int, int]]]] = None,
-) -> List[TokenWithId]:
+    contrast_targets_alignments: Optional[list[list[tuple[int, int]]]] = None,
+) -> list[TokenWithId]:
     """Joins tokens and ids into a list of TokenWithId objects."""
     if contrast_tokens is None:
         contrast_tokens = tokens
@@ -116,10 +115,10 @@ def join_token_ids(
 def extract_args(
     attribution_method: "FeatureAttribution",
     attributed_fn: Callable[..., SingleScorePerStepTensor],
-    step_scores: List[str],
-    default_args: List[str],
+    step_scores: list[str],
+    default_args: list[str],
     **kwargs,
-) -> Tuple[Dict[str, Any], Dict[str, Any], Dict[str, Any]]:
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
     attribution_args = kwargs.pop("attribution_args", {})
     attributed_fn_args = kwargs.pop("attributed_fn_args", {})
     step_scores_args = kwargs.pop("step_scores_args", {})
@@ -143,17 +142,13 @@ def extract_args(
 
 
 def get_source_target_attributions(
-    attr: Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]],
+    attr: Union[StepAttributionTensor, tuple[StepAttributionTensor, StepAttributionTensor]],
     is_encoder_decoder: bool,
-) -> Tuple[torch.Tensor, torch.Tensor]:
-    if is_encoder_decoder:
-        if isinstance(attr, tuple) and len(attr) > 1:
-            return attr[0], attr[1]
-        elif isinstance(attr, tuple) and len(attr) == 1:
-            return attr[0], None
+) -> tuple[Optional[StepAttributionTensor], Optional[StepAttributionTensor]]:
+    if isinstance(attr, tuple):
+        if is_encoder_decoder:
+            return (attr[0], attr[1]) if len(attr) > 1 else (attr[0], None)
         else:
-            return attr, None
-    elif isinstance(attr, tuple):
-        return None, attr[0]
+            return (None, attr[0])
     else:
-        return None, attr
+        return (attr, None) if is_encoder_decoder else (None, attr)

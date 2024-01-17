@@ -1,6 +1,6 @@
 import logging
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from ... import list_step_functions
 from ...attr.step_functions import is_contrastive_step_function
@@ -144,7 +144,7 @@ class AttributeContextMethodArgs(AttributeBaseArgs):
             " prompted to manually specify which part of the generated text corresponds to the output context."
         ),
     )
-    special_tokens_to_keep: List[str] = cli_arg(
+    special_tokens_to_keep: list[str] = cli_arg(
         default_factory=list,
         help="Special tokens to preserve in the generated string, e.g. ``<brk>`` separator between context and current.",
     )
@@ -217,5 +217,5 @@ class AttributeContextArgs(AttributeContextInputArgs, AttributeContextMethodArgs
     def __repr__(self):
         return f"{self.__class__.__name__}({pretty_dict(self.__dict__)})"
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return dict(self.__dict__.items())

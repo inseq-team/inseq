@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Dict
+from typing import Any
 
 from captum.attr import Occlusion
 
@@ -44,8 +44,8 @@ class OcclusionAttribution(PerturbationAttributionRegistry):
 
     def attribute_step(
         self,
-        attribute_fn_main_args: Dict[str, Any],
-        attribution_args: Dict[str, Any] = {},
+        attribute_fn_main_args: dict[str, Any],
+        attribution_args: dict[str, Any] = {},
     ) -> CoarseFeatureAttributionStepOutput:
         r"""Sliding window shapes is defined as a tuple.
         First entry is between 1 and length of input.
@@ -77,8 +77,8 @@ class OcclusionAttribution(PerturbationAttributionRegistry):
             target_attributions = target_attributions[:, :, 0].abs()
 
         return CoarseFeatureAttributionStepOutput(
-            source_attributions=source_attributions,
-            target_attributions=target_attributions,
+            source_attributions=source_attributions.to("cpu") if source_attributions is not None else None,
+            target_attributions=target_attributions.to("cpu") if target_attributions is not None else None,
         )
 
 
@@ -100,8 +100,8 @@ class LimeAttribution(PerturbationAttributionRegistry):
 
     def attribute_step(
         self,
-        attribute_fn_main_args: Dict[str, Any],
-        attribution_args: Dict[str, Any] = {},
+        attribute_fn_main_args: dict[str, Any],
+        attribution_args: dict[str, Any] = {},
     ) -> GranularFeatureAttributionStepOutput:
         if len(attribute_fn_main_args["inputs"]) > 1:
             # Captum's `_evaluate_batch` function for LIME does not account for multiple inputs when encoder-decoder

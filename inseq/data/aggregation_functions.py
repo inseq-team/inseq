@@ -14,7 +14,7 @@
 
 import logging
 from abc import abstractmethod
-from typing import List, Tuple, Union
+from typing import Union
 
 import torch
 from torch.linalg import vector_norm
@@ -37,7 +37,7 @@ class AggregationFunction(Registry):
     @abstractmethod
     def __call__(
         self,
-        scores: Union[torch.Tensor, Tuple[torch.Tensor, ...]],
+        scores: Union[torch.Tensor, tuple[torch.Tensor, ...]],
         dim: int,
         **kwargs,
     ) -> ScoreTensor:
@@ -112,6 +112,6 @@ DEFAULT_ATTRIBUTION_AGGREGATE_DICT = {
 }
 
 
-def list_aggregation_functions() -> List[str]:
+def list_aggregation_functions() -> list[str]:
     """Lists identifiers for all available aggregation functions."""
     return available_classes(AggregationFunction)

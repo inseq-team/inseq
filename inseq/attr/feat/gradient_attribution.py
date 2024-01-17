@@ -14,7 +14,7 @@
 """Gradient-based feature attribution methods."""
 
 import logging
-from typing import Any, Dict
+from typing import Any
 
 from captum.attr import (
     DeepLift,
@@ -65,8 +65,8 @@ class GradientAttributionRegistry(FeatureAttribution, Registry):
 
     def attribute_step(
         self,
-        attribute_fn_main_args: Dict[str, Any],
-        attribution_args: Dict[str, Any] = {},
+        attribute_fn_main_args: dict[str, Any],
+        attribution_args: dict[str, Any] = {},
     ) -> GranularFeatureAttributionStepOutput:
         r"""Performs a single attribution step for the specified attribution arguments.
 
@@ -95,9 +95,9 @@ class GradientAttributionRegistry(FeatureAttribution, Registry):
             attr, self.attribution_model.is_encoder_decoder
         )
         return GranularFeatureAttributionStepOutput(
-            source_attributions=source_attributions,
-            target_attributions=target_attributions,
-            step_scores={"deltas": deltas} if deltas is not None else None,
+            source_attributions=source_attributions.to("cpu") if source_attributions is not None else None,
+            target_attributions=target_attributions.to("cpu") if target_attributions is not None else None,
+            step_scores={"deltas": deltas.to("cpu")} if deltas is not None else None,
         )
 
 

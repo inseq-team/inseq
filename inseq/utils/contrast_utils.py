@@ -1,7 +1,7 @@
 import logging
 import warnings
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Callable, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Callable, Optional, Union
 
 import torch
 
@@ -61,7 +61,7 @@ def _get_contrast_inputs(
     args: "StepFunctionArgs",
     contrast_sources: Optional[FeatureAttributionInput] = None,
     contrast_targets: Optional[FeatureAttributionInput] = None,
-    contrast_targets_alignments: Optional[List[List[Tuple[int, int]]]] = None,
+    contrast_targets_alignments: Optional[list[list[tuple[int, int]]]] = None,
     return_contrastive_target_ids: bool = False,
     return_contrastive_batch: bool = False,
     **forward_kwargs,
@@ -126,7 +126,7 @@ def _setup_contrast_args(
     args: "StepFunctionArgs",
     contrast_sources: Optional[FeatureAttributionInput] = None,
     contrast_targets: Optional[FeatureAttributionInput] = None,
-    contrast_targets_alignments: Optional[List[List[Tuple[int, int]]]] = None,
+    contrast_targets_alignments: Optional[list[list[tuple[int, int]]]] = None,
     contrast_force_inputs: bool = False,
 ):
     c_inputs = _get_contrast_inputs(

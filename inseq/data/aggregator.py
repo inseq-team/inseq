@@ -1,6 +1,7 @@
 import logging
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Callable, List, Optional, Sequence, Tuple, Type, TypeVar, Union
+from collections.abc import Sequence
+from typing import TYPE_CHECKING, Callable, Optional, TypeVar, Union
 
 import torch
 
@@ -125,7 +126,7 @@ class Aggregator(Registry):
 def _get_aggregators_from_id(
     aggregator: str,
     aggregate_fn: Optional[str] = None,
-) -> Tuple[Type[Aggregator], Optional[AggregationFunction]]:
+) -> tuple[type[Aggregator], Optional[AggregationFunction]]:
     if aggregator in available_classes(Aggregator):
         aggregator = Aggregator.available_classes()[aggregator]
     elif aggregator in available_classes(AggregationFunction):
@@ -155,11 +156,11 @@ def _get_aggregators_from_id(
 class AggregatorPipeline:
     def __init__(
         self,
-        aggregators: List[Union[str, Type[Aggregator]]],
-        aggregate_fn: Optional[List[Union[str, Callable]]] = None,
+        aggregators: list[Union[str, type[Aggregator]]],
+        aggregate_fn: Optional[list[Union[str, Callable]]] = None,
     ):
-        self.aggregators: List[Type[Aggregator]] = []
-        self.aggregate_fn: List[Callable] = []
+        self.aggregators: list[type[Aggregator]] = []
+        self.aggregate_fn: list[Callable] = []
         if aggregate_fn is not None:
             if len(aggregate_fn) != len(aggregators):
                 raise ValueError(
@@ -196,16 +197,16 @@ class AggregatorPipeline:
         return tensors
 
 
-AggregatorInput = Union[AggregatorPipeline, Type[Aggregator], str, Sequence[Union[str, Type[Aggregator]]], None]
+AggregatorInput = Union[AggregatorPipeline, type[Aggregator], str, Sequence[Union[str, type[Aggregator]]], None]
 
 
-def list_aggregators() -> List[str]:
+def list_aggregators() -> list[str]:
     """Lists identifiers for all available aggregators."""
     return available_classes(Aggregator)
 
 
 class AggregableMixin(ABC):
-    _aggregator: Union[AggregatorPipeline, Type[Aggregator]]
+    _aggregator: Union[AggregatorPipeline, type[Aggregator]]
 
     def aggregate(
         self: AggregableMixinClass,
@@ -304,7 +305,7 @@ class SequenceAttributionAggregator(Aggregator):
         cls,
         attr: "FeatureAttributionSequenceOutput",
         aggregate_fn: AggregationFunction,
-        select_idx: Union[int, Tuple[int, int], List[int], None] = None,
+        select_idx: Union[int, tuple[int, int], list[int], None] = None,
         normalize: bool = True,
         **kwargs,
     ):
@@ -365,7 +366,7 @@ class SequenceAttributionAggregator(Aggregator):
         cls,
         attr: "FeatureAttributionSequenceOutput",
         aggregate_fn: AggregationFunction,
-        select_idx: Union[int, Tuple[int, int], List[int], None] = None,
+        select_idx: Union[int, tuple[int, int], list[int], None] = None,
         normalize: bool = True,
         **kwargs,
     ):
@@ -379,7 +380,7 @@ class SequenceAttributionAggregator(Aggregator):
         cls,
         attr: "FeatureAttributionSequenceOutput",
         aggregate_fn: AggregationFunction,
-        select_idx: Union[int, Tuple[int, int], List[int], None] = None,
+        select_idx: Union[int, tuple[int, int], list[int], None] = None,
         normalize: bool = True,
         **kwargs,
     ):
@@ -397,7 +398,7 @@ class SequenceAttributionAggregator(Aggregator):
         cls,
         attr: "FeatureAttributionSequenceOutput",
         aggregate_fn: AggregationFunction,
-        select_idx: Union[int, Tuple[int, int], List[int], None] = None,
+        select_idx: Union[int, tuple[int, int], list[int], None] = None,
         **kwargs,
     ):
         if aggregate_fn.takes_sequence_scores:
@@ -438,7 +439,7 @@ class SequenceAttributionAggregator(Aggregator):
     def _filter_scores(
         scores: torch.Tensor,
         dim: int = -1,
-        indices: Union[int, Tuple[int, int], List[int], None] = None,
+        indices: Union[int, tuple[int, int], list[int], None] = None,
     ) -> torch.Tensor:
         n_units = scores.shape[dim]
 
@@ -481,11 +482,11 @@ class SequenceAttributionAggregator(Aggregator):
 
     @staticmethod
     def _aggregate_scores(
-        scores: Union[torch.Tensor, Tuple[torch.Tensor, ...]],
+        scores: Union[torch.Tensor, tuple[torch.Tensor, ...]],
         aggregate_fn: AggregationFunction,
         dim: int = -1,
         **kwargs,
-    ) -> Union[torch.Tensor, Tuple[torch.Tensor, ...]]:
+    ) -> Union[torch.Tensor, tuple[torch.Tensor, ...]]:
         if isinstance(scores, tuple) and aggregate_fn.takes_single_tensor:
             return tuple(aggregate_fn(score, dim=dim, **kwargs) for score in scores)
         return aggregate_fn(scores, dim=dim, **kwargs)
@@ -546,7 +547,7 @@ class ContiguousSpanAggregator(SequenceAttributionAggregator):
         return super().aggregate(attr, source_spans=source_spans, target_spans=target_spans, **kwargs)
 
     @staticmethod
-    def format_spans(spans) -> List[Tuple[int, int]]:
+    def format_spans(spans) -> list[tuple[int, int]]:
         if not spans:
             return spans
         return [spans] if isinstance(spans[0], int) else spans
@@ -579,7 +580,7 @@ class ContiguousSpanAggregator(SequenceAttributionAggregator):
         return scores_aggregated_x
 
     @staticmethod
-    def _relativize_target_spans(spans: List[Tuple[int, int]], start: int):
+    def _relativize_target_spans(spans: list[tuple[int, int]], start: int):
         if start != 0 and spans:
             # Remove target spans referring to the unattributed prefix, rescale remaining spans to relative idxs
             # of the generated sequences and set 0 if the span starts before the generation begins.
@@ -707,7 +708,7 @@ class SubwordAggregator(ContiguousSpanAggregator):
         attr: "FeatureAttributionSequenceOutput",
         aggregate_source: bool = True,
         aggregate_target: bool = True,
-        special_chars: Union[str, Tuple[str, ...]] = "▁",
+        special_chars: Union[str, tuple[str, ...]] = "▁",
         is_suffix_symbol: bool = False,
         **kwargs,
     ):
@@ -720,7 +721,7 @@ class SubwordAggregator(ContiguousSpanAggregator):
         return super().aggregate(attr, source_spans=source_spans, target_spans=target_spans, **kwargs)
 
     @staticmethod
-    def get_spans(tokens: List[TokenWithId], special_chars: Union[str, Tuple[str, ...]], is_suffix_symbol: bool):
+    def get_spans(tokens: list[TokenWithId], special_chars: Union[str, tuple[str, ...]], is_suffix_symbol: bool):
         spans = []
         last_prefix_idx = 0
         has_special_chars = any(sym in token.token for token in tokens for sym in special_chars)

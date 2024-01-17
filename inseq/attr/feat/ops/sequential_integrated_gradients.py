@@ -17,7 +17,7 @@
 # OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 import typing
-from typing import Any, Callable, List, Tuple, Union
+from typing import Any, Callable, Union
 
 import torch
 from captum._utils.common import (
@@ -138,7 +138,7 @@ class SequentialIntegratedGradients(GradientAttribution):
         internal_batch_size: Union[None, int] = None,
         *,
         return_convergence_delta: Literal[True],
-    ) -> Tuple[TensorOrTupleOfTensorsGeneric, Tensor]:
+    ) -> tuple[TensorOrTupleOfTensorsGeneric, Tensor]:
         ...
 
     def attribute(  # type: ignore
@@ -153,7 +153,7 @@ class SequentialIntegratedGradients(GradientAttribution):
         return_convergence_delta: bool = False,
     ) -> Union[
         TensorOrTupleOfTensorsGeneric,
-        Tuple[TensorOrTupleOfTensorsGeneric, Tensor],
+        tuple[TensorOrTupleOfTensorsGeneric, Tensor],
     ]:
         r"""
         This method attributes the output of the model with given target index
@@ -367,15 +367,15 @@ class SequentialIntegratedGradients(GradientAttribution):
 
     def _attribute(
         self,
-        inputs: Tuple[Tensor, ...],
-        baselines: Tuple[Union[Tensor, int, float], ...],
+        inputs: tuple[Tensor, ...],
+        baselines: tuple[Union[Tensor, int, float], ...],
         target: TargetType = None,
         additional_forward_args: Any = None,
         n_steps: int = 50,
         method: str = "gausslegendre",
         idx: int = None,
-        step_sizes_and_alphas: Union[None, Tuple[List[float], List[float]]] = None,
-    ) -> Tuple[Tensor, ...]:
+        step_sizes_and_alphas: Union[None, tuple[list[float], list[float]]] = None,
+    ) -> tuple[Tensor, ...]:
         if step_sizes_and_alphas is None:
             # retrieve step size and scaling factor for specified
             # approximation method

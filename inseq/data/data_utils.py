@@ -1,6 +1,6 @@
 from copy import deepcopy
 from dataclasses import dataclass, fields
-from typing import Any, Dict, TypeVar
+from typing import Any, TypeVar
 
 import numpy as np
 import torch
@@ -175,7 +175,7 @@ class TensorWrapper:
                 out_params[field.name] = None
         return self.__class__(**out_params)
 
-    def to_dict(self: TensorClass) -> Dict[str, Any]:
+    def to_dict(self: TensorClass) -> dict[str, Any]:
         return {k: v for k, v in self.__dict__.items() if not k.startswith("_")}
 
     def __str__(self):

@@ -1,5 +1,6 @@
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Optional, Sequence, Tuple, Union
+from typing import Optional, Union
 
 import torch
 from jaxtyping import Float, Float32, Int64
@@ -38,7 +39,7 @@ OneOrMoreTokenSequences = Sequence[Sequence[str]]
 OneOrMoreTokenWithIdSequences = Sequence[Sequence[TokenWithId]]
 OneOrMoreAttributionSequences = Sequence[Sequence[float]]
 
-IndexSpan = Union[Tuple[int, int], Sequence[Tuple[int, int]]]
+IndexSpan = Union[tuple[int, int], Sequence[tuple[int, int]]]
 
 IdsTensor = Int64[torch.Tensor, "batch_size seq_len"]
 TargetIdsTensor = Int64[torch.Tensor, "batch_size"]
@@ -92,7 +93,7 @@ ModelClass = PreTrainedModel
 
 AttributionForwardInputs = Union[IdsTensor, EmbeddingsTensor]
 AttributionForwardInputsPair = Union[
-    Tuple[IdsTensor, IdsTensor],
-    Tuple[EmbeddingsTensor, EmbeddingsTensor],
+    tuple[IdsTensor, IdsTensor],
+    tuple[EmbeddingsTensor, EmbeddingsTensor],
 ]
 OneOrTwoAttributionForwardInputs = Union[AttributionForwardInputs, AttributionForwardInputsPair]

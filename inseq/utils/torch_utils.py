@@ -1,5 +1,6 @@
 import logging
-from typing import TYPE_CHECKING, Callable, List, Literal, Optional, Sequence, Tuple, Union
+from collections.abc import Sequence
+from typing import TYPE_CHECKING, Callable, Literal, Optional, Union
 
 import torch
 import torch.nn.functional as F
@@ -22,7 +23,7 @@ TORCH_BACKEND_DEVICE_MAP = {
 
 @torch.no_grad()
 def remap_from_filtered(
-    original_shape: Tuple[int, ...],
+    original_shape: tuple[int, ...],
     mask: Int[torch.Tensor, "batch_size 1"],
     filtered: Num[torch.Tensor, "filtered_batch_size"],
 ) -> Num[torch.Tensor, "batch_size"]:
@@ -35,10 +36,10 @@ def remap_from_filtered(
 
 
 def normalize(
-    attributions: Union[torch.Tensor, Tuple[torch.Tensor, ...]],
+    attributions: Union[torch.Tensor, tuple[torch.Tensor, ...]],
     norm_dim: int = 0,
     norm_ord: int = 1,
-) -> Union[torch.Tensor, Tuple[torch.Tensor, ...]]:
+) -> Union[torch.Tensor, tuple[torch.Tensor, ...]]:
     multi_input = False
     if isinstance(attributions, tuple):
         orig_sizes = [a.shape[norm_dim] for a in attributions]
@@ -100,7 +101,7 @@ def filter_logits(
     top_k: int = 0,
     min_tokens_to_keep: int = 1,
     filter_strategy: Union[Literal["original"], Literal["contrast"], Literal["merged"], None] = None,
-) -> Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
+) -> Union[torch.Tensor, tuple[torch.Tensor, torch.Tensor]]:
     """Applies top-k and top-p filtering to logits, and optionally to an additional set of contrastive logits."""
     if top_k > original_logits.size(-1) or top_k < 0:
         raise ValueError(f"`top_k` has to be a positive integer < {original_logits.size(-1)}, but is {top_k}")
@@ -141,7 +142,7 @@ def euclidean_distance(vec_a: torch.Tensor, vec_b: torch.Tensor) -> torch.Tensor
 
 def aggregate_contiguous(
     t: torch.Tensor,
-    spans: Sequence[Tuple[int, int]],
+    spans: Sequence[tuple[int, int]],
     aggregate_fn: Optional[Callable] = None,
     aggregate_dim: int = 0,
 ):
@@ -177,39 +178,48 @@ def aggregate_contiguous(
     return out_cat
 
 
-def get_front_padding(t: torch.Tensor, pad: int = 0, dim: int = 1) -> List[int]:
+def get_front_padding(t: torch.Tensor, pad: int = 0, dim: int = 1) -> list[int]:
     """Given a tensor of shape (batch, seq_len) of ids, return a list of length batch containing
     the number of padding tokens at the beginning of each sequence.
     """
     return (t != pad).int().argmax(dim).tolist()
 
 
-def get_sequences_from_batched_steps(bsteps: List[torch.Tensor]) -> List[torch.Tensor]:
+def get_sequences_from_batched_steps(
+    bsteps: list[torch.Tensor], padding_dims: Sequence[int] = [], stack_dim: int = 2
+) -> list[torch.Tensor]:
     """Given a sequence of batched step tensors of shape (batch_size, seq_len, ...) builds a sequence
     of tensors of shape (seq_len, ...) where each resulting tensor is the aggregation
     across batch steps for every batch element.
 
+    Source attribution shape: (batch_size, source_seq_len, ...)
+    Target attribution shape: (batch_size, target_seq_len, ...)
+    Step scores shape: (batch_size)
+    Sequence scores shape: (batch_size, source/target_seq_len, ...)
+
     Input tensors will be padded with nans up to max length in non-uniform dimensions to allow for stacking.
     """
-    dim_ranges = {dim: [bstep.shape[dim] for bstep in bsteps] for dim in range(bsteps[0].ndim)}
-    for dim, dim_range in dim_ranges.items():
-        # If dimension grows across batch steps, it will be padded
-        if max(dim_range) > min(dim_range):
-            for bstep_idx, bstep in enumerate(bsteps):
-                padded_bstep = torch.ones(
-                    *bstep.shape[:dim],
-                    max(dim_range) - bstep.shape[dim],
-                    *bstep.shape[dim + 1 :],  # noqa
-                    dtype=bstep.dtype,
-                    device=bstep.device,
-                )
-                padded_bstep = torch.cat([bstep, padded_bstep * float("nan")], dim=dim)
+    bsteps_num_dims = bsteps[0].ndim
+    if stack_dim > bsteps_num_dims:
+        raise ValueError(f"Stack dimension {stack_dim} is greater than tensor dimension {bsteps_num_dims}")
+    if not padding_dims:
+        sequences = torch.stack(bsteps, dim=stack_dim).split(1, dim=0)
+        return [seq.squeeze(0) for seq in sequences]
+    for dim in padding_dims:
+        if dim >= bsteps_num_dims:
+            raise ValueError(f"Padding dimension {dim} is greater than tensor dimension {bsteps_num_dims}")
+    padding_dims = set(padding_dims)
+    max_dims = tuple(max([bstep.shape[dim] for bstep in bsteps]) for dim in padding_dims)
+    for bstep_idx, bstep in enumerate(bsteps):
+        for curr_dim, max_dim in zip(padding_dims, max_dims):
+            bstep_dim = bstep.shape[curr_dim]
+            if bstep_dim < max_dim:
+                # Pad the end of curr_dim with nans
+                pad_shape = (0,) * ((bsteps_num_dims - curr_dim) * 2 - 1) + (max_dim - bstep_dim,)
+                padded_bstep = F.pad(bstep, pad=pad_shape, mode="constant", value=float("nan"))
                 bsteps[bstep_idx] = padded_bstep
-    dim = 2 if bsteps[0].ndim > 1 else 1
-    sequences = torch.stack(bsteps, dim=dim)
-    sequences = sequences.split(1, dim=0)
-    squeezed_sequences = [seq.squeeze(0) for seq in sequences]
-    return squeezed_sequences
+    sequences = torch.stack(bsteps, dim=stack_dim).split(1, dim=0)
+    return [seq.squeeze(0) for seq in sequences]
 
 
 def check_device(device_name: str) -> bool:

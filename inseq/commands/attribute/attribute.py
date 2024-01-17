@@ -1,5 +1,5 @@
 import logging
-from typing import List, Optional
+from typing import Optional
 
 from ... import FeatureAttributionOutput, load_model
 from ..base import BaseCLICommand
@@ -8,8 +8,8 @@ from .attribute_args import AttributeExtendedArgs, AttributeWithInputsArgs
 
 def aggregate_attribution_scores(
     out: FeatureAttributionOutput,
-    selectors: Optional[List[int]] = None,
-    aggregators: Optional[List[str]] = None,
+    selectors: Optional[list[int]] = None,
+    aggregators: Optional[list[str]] = None,
     normalize_attributions: bool = False,
 ) -> FeatureAttributionOutput:
     if selectors is not None and aggregators is not None:

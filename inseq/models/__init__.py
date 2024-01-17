@@ -1,5 +1,5 @@
 import logging
-from typing import List, Optional, Union
+from typing import Optional, Union
 
 from rich.status import Status
 
@@ -47,7 +47,7 @@ def load_model(
         return FRAMEWORKS_MAP[framework].load(model, attribution_method, **kwargs)
 
 
-def list_supported_frameworks() -> List[str]:
+def list_supported_frameworks() -> list[str]:
     """Lists identifiers for all available frameworks. These can be used to load models with the `framework` argument
     in the :meth:`~inseq.load_model` function.
     """

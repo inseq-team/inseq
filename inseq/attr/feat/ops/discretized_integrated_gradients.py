@@ -17,7 +17,7 @@
 # OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 from pathlib import Path
-from typing import Any, Callable, List, Tuple, Union
+from typing import Any, Callable, Union
 
 import torch
 from captum._utils.common import (
@@ -51,7 +51,7 @@ class DiscretetizedIntegratedGradients(IntegratedGradients):
         self,
         model_name: str,
         vocabulary_embeddings: VocabularyEmbeddingsTensor,
-        special_tokens: List[int],
+        special_tokens: list[int],
         cache_dir: Path = INSEQ_ARTIFACTS_CACHE / "dig_knn",
         embedding_scaling: int = 1,
         **kwargs,
@@ -67,7 +67,7 @@ class DiscretetizedIntegratedGradients(IntegratedGradients):
         )
 
     @staticmethod
-    def get_inputs_baselines(scaled_features_tpl: Tuple[Tensor, ...], n_steps: int) -> Tuple[Tensor, ...]:
+    def get_inputs_baselines(scaled_features_tpl: tuple[Tensor, ...], n_steps: int) -> tuple[Tensor, ...]:
         # Baseline and inputs are reversed in the path builder
         # For every element in the batch, the first embedding of the sub-tensor
         # of shape (n_steps x embedding_dim) is the baseline, the last is the input.
@@ -96,7 +96,7 @@ class DiscretetizedIntegratedGradients(IntegratedGradients):
         method: str = "greedy",
         internal_batch_size: Union[None, int] = None,
         return_convergence_delta: bool = False,
-    ) -> Union[TensorOrTupleOfTensorsGeneric, Tuple[TensorOrTupleOfTensorsGeneric, Tensor]]:
+    ) -> Union[TensorOrTupleOfTensorsGeneric, tuple[TensorOrTupleOfTensorsGeneric, Tensor]]:
         n_examples = inputs[0].shape[0]
         # Keeps track whether original input is a tuple or not before
         # converting it into a tuple.
@@ -146,11 +146,11 @@ class DiscretetizedIntegratedGradients(IntegratedGradients):
 
     def _attribute(
         self,
-        scaled_features_tpl: Tuple[Tensor, ...],
+        scaled_features_tpl: tuple[Tensor, ...],
         target: TargetType = None,
         additional_forward_args: Any = None,
         n_steps: int = 50,
-    ) -> Tuple[Tensor, ...]:
+    ) -> tuple[Tensor, ...]:
         additional_forward_args = _format_additional_forward_args(additional_forward_args)
         input_additional_args = (
             _expand_additional_forward_args(additional_forward_args, n_steps)

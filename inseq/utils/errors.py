@@ -1,4 +1,4 @@
-from typing import Any, Tuple
+from typing import Any
 
 from .registry import available_classes
 
@@ -21,7 +21,7 @@ class UnknownAttributionMethodError(Exception):
         self,
         method_name: str,
         msg: str = UNKNOWN_ATTRIBUTION_METHOD_MSG,
-        *args: Tuple[Any],
+        *args: tuple[Any],
     ) -> None:
         from inseq.attr import FeatureAttribution
 
@@ -41,7 +41,7 @@ class MissingAttributionMethodError(Exception):
         "or pass it to the attribute method.\nAvailable methods: {available_methods}"
     )
 
-    def __init__(self, msg: str = MISSING_ATTRIBUTION_METHOD_MSG, *args: Tuple[Any]) -> None:
+    def __init__(self, msg: str = MISSING_ATTRIBUTION_METHOD_MSG, *args: tuple[Any]) -> None:
         from inseq.attr import FeatureAttribution
 
         msg = msg.format(available_methods=", ".join(available_classes(FeatureAttribution)))

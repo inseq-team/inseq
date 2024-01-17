@@ -25,9 +25,9 @@ copyright = "2023, The Inseq Team, Licensed under the Apache License, Version 2.
 author = "The Inseq Team"
 
 # The short X.Y version
-version = "0.5"
+version = "0.6"
 # The full version, including alpha/beta/rc tags
-release = "0.5.0"
+release = "0.6.0.dev0"
 
 
 # Prefix link to point to master, comment this during version release and uncomment below line
