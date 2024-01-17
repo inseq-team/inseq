@@ -274,7 +274,7 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
                     out_seq_scores = [attr.sequence_scores[seq_score_name][i, ...] for i in range(num_sequences)]
                 else:
                     out_seq_scores = get_sequences_from_batched_steps(
-                        [att.sequence_scores[seq_score_name] for att in attributions], padding_dims=[2], stack_dim=3
+                        [att.sequence_scores[seq_score_name] for att in attributions], padding_dims=[1]
                     )
                 for seq_id in range(num_sequences):
                     seq_scores[seq_id][seq_score_name] = remove_pad_fn(out_seq_scores, sources, targets, seq_id)
