@@ -113,12 +113,12 @@ class HuggingfaceModel(AttributionModel):
         else:
             self.tokenizer = AutoTokenizer.from_pretrained(tokenizer, **tokenizer_kwargs)
         if self.model.config.pad_token_id is not None:
-            self.pad_token = self.tokenizer.convert_ids_to_tokens(self.model.config.pad_token_id)
+            self.pad_token = self._convert_ids_to_tokens(self.model.config.pad_token_id, skip_special_tokens=False)
             self.tokenizer.pad_token = self.pad_token
         self.bos_token_id = getattr(self.model.config, "decoder_start_token_id", None)
         if self.bos_token_id is None:
             self.bos_token_id = self.model.config.bos_token_id
-        self.bos_token = self.tokenizer.convert_ids_to_tokens(self.bos_token_id)
+        self.bos_token = self._convert_ids_to_tokens(self.bos_token_id, skip_special_tokens=False)
         self.eos_token_id = getattr(self.model.config, "eos_token_id", None)
         if self.eos_token_id is None:
             self.eos_token_id = self.tokenizer.pad_token_id
@@ -277,7 +277,7 @@ class HuggingfaceModel(AttributionModel):
                 baseline_ids = torch.cat((bos_ids, baseline_ids), dim=1)
         return BatchEncoding(
             input_ids=batch["input_ids"],
-            input_tokens=[self.tokenizer.convert_ids_to_tokens(x) for x in batch["input_ids"]],
+            input_tokens=[self._convert_ids_to_tokens(x, skip_special_tokens=False) for x in batch["input_ids"]],
             attention_mask=batch["attention_mask"],
             baseline_ids=baseline_ids,
         )
@@ -304,14 +304,20 @@ class HuggingfaceModel(AttributionModel):
             embeddings = self.get_embedding_layer()(ids)
         return embeddings * self.embed_scale
 
+    def _convert_ids_to_tokens(self, ids: IdsTensor, skip_special_tokens: bool = True) -> OneOrMoreTokenSequences:
+        tokens = self.tokenizer.convert_ids_to_tokens(ids, skip_special_tokens=skip_special_tokens)
+        if isinstance(tokens, bytes) and not isinstance(tokens, str):
+            return tokens.decode("utf-8")
+        elif isinstance(tokens, list):
+            return [t.decode("utf-8") if isinstance(t, bytes) else t for t in tokens]
+        return tokens
+
     def convert_ids_to_tokens(
         self, ids: IdsTensor, skip_special_tokens: Optional[bool] = True
     ) -> OneOrMoreTokenSequences:
         if ids.ndim < 2:
-            return self.tokenizer.convert_ids_to_tokens(ids, skip_special_tokens=skip_special_tokens)
-        return [
-            self.tokenizer.convert_ids_to_tokens(id_slice, skip_special_tokens=skip_special_tokens) for id_slice in ids
-        ]
+            return self._convert_ids_to_tokens(ids, skip_special_tokens)
+        return [self._convert_ids_to_tokens(id_slice, skip_special_tokens) for id_slice in ids]
 
     def convert_tokens_to_ids(self, tokens: TextInput) -> OneOrMoreIdSequences:
         if isinstance(tokens[0], str):
@@ -326,7 +332,7 @@ class HuggingfaceModel(AttributionModel):
     ) -> TextInput:
         if isinstance(tokens, list) and len(tokens) == 0:
             return ""
-        elif isinstance(tokens[0], str):
+        elif isinstance(tokens[0], (bytes, str)):
             tmp_decode_state = self.tokenizer._decode_use_source_tokenizer
             self.tokenizer._decode_use_source_tokenizer = not as_targets
             out_strings = self.tokenizer.convert_tokens_to_string(
@@ -348,7 +354,7 @@ class HuggingfaceModel(AttributionModel):
                 text_target=text if as_targets else None,
                 add_special_tokens=not skip_special_tokens,
             )["input_ids"]
-            return self.tokenizer.convert_ids_to_tokens(ids, skip_special_tokens)
+            return self._convert_ids_to_tokens(ids, skip_special_tokens)
         return [self.convert_string_to_tokens(t, skip_special_tokens, as_targets) for t in text]
 
     def clean_tokens(
@@ -372,7 +378,7 @@ class HuggingfaceModel(AttributionModel):
         """
         if isinstance(tokens, list) and len(tokens) == 0:
             return []
-        elif isinstance(tokens[0], str):
+        elif isinstance(tokens[0], (bytes, str)):
             clean_tokens = []
             for tok in tokens:
                 clean_tok = self.convert_tokens_to_string(

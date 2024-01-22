@@ -289,6 +289,7 @@ def filter_rank_tokens(
 ) -> tuple[list[tuple[int, float, str]], float]:
     indices = list(range(0, len(scores)))
     token_score_tuples = sorted(zip(indices, scores, tokens), key=lambda x: abs(x[1]), reverse=True)
+    threshold = None
     if std_threshold:
         threshold = tensor(scores).mean() + std_threshold * tensor(scores).std()
         token_score_tuples = [(i, s, t) for i, s, t in token_score_tuples if abs(s) > threshold]

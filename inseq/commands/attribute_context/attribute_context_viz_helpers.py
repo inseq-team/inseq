@@ -66,14 +66,14 @@ def get_formatted_attribute_context_results(
         )
         for idx, score, tok in context_ranked_tokens:
             context_tokens[idx] = f"[bold green]{tok}({score:.3f})[/bold green]"
-        cci_threshold_comment = f"(CCI > {threshold:.3f})"
+        cci_threshold_comment = f"(CCI > {threshold:.3f})" if threshold is not None else ""
         return f"\n[bold]{context_type} context {cci_threshold_comment}:[/bold]\t{''.join(context_tokens)}"
 
     out_string = ""
     output_current_tokens = get_filtered_tokens(
         output.output_current, model, args.special_tokens_to_keep, replace_special_characters=True, is_target=True
     )
-    cti_theshold_comment = f"(CTI > {cti_threshold:.3f})"
+    cti_theshold_comment = f"(CTI > {cti_threshold:.3f})" if cti_threshold is not None else ""
     for example_idx, cci_out in enumerate(output.cci_scores, start=1):
         curr_output_tokens = output_current_tokens.copy()
         cti_idx = cci_out.cti_idx
