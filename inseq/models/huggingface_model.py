@@ -143,7 +143,7 @@ class HuggingfaceModel(AttributionModel):
     ) -> "HuggingfaceModel":
         """Loads a HuggingFace model and tokenizer and wraps them in the appropriate AttributionModel."""
         if isinstance(model, str):
-            is_encoder_decoder = AutoConfig.from_pretrained(model).is_encoder_decoder
+            is_encoder_decoder = AutoConfig.from_pretrained(model, **model_kwargs).is_encoder_decoder
         else:
             is_encoder_decoder = model.config.is_encoder_decoder
         if is_encoder_decoder:
