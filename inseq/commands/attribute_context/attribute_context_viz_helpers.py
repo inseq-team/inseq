@@ -134,7 +134,7 @@ def visualize_attribute_context(
         )
     elif not isinstance(model, HuggingfaceModel):
         raise TypeError(f"Unsupported model type {type(model)} for visualization.")
-    if cti_threshold is None:
+    if cti_threshold is None and len(output.cti_scores) > 1:
         cti_threshold = (
             tensor(output.cti_scores).mean()
             + output.info.context_sensitivity_std_threshold * tensor(output.cti_scores).std()
