@@ -292,7 +292,7 @@ def filter_rank_tokens(
     threshold = None
     if std_threshold:
         threshold = tensor(scores).mean() + std_threshold * tensor(scores).std()
-        token_score_tuples = [(i, s, t) for i, s, t in token_score_tuples if abs(s) > threshold]
+        token_score_tuples = [(i, s, t) for i, s, t in token_score_tuples if abs(s) >= threshold]
     if topk:
         token_score_tuples = token_score_tuples[:topk]
     return token_score_tuples, threshold

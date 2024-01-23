@@ -108,10 +108,6 @@ class AttributeContextInputArgs:
             raise ValueError(f"{{current}} format placeholder is missing from output_template {self.output_template}.")
         if not self.input_current_text:
             raise ValueError("--input_current_text must be a non-empty string.")
-        if self.has_input_context and self.input_template.find("{context}") > self.input_template.find("{current}"):
-            raise ValueError(
-                f"{{context}} placeholder must appear before {{current}} in input_template '{self.input_template}'."
-            )
         if self.has_output_context and self.output_template.find("{context}") > self.output_template.find("{current}"):
             raise ValueError(
                 f"{{context}} placeholder must appear before {{current}} in output_template '{self.output_template}'."

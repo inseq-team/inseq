@@ -121,8 +121,8 @@ def handle_visualization(
     viz += "\n\n" + get_formatted_attribute_context_results(model, args, output, cti_threshold)
     if args.viz_path:
         with console.capture() as _:
-            console.print(viz, soft_wrap=True)
+            console.print(viz, soft_wrap=False)
         with open(args.viz_path, "w") as f:
             f.write(console.export_html())
     if args.show_viz:
-        console.print(viz, soft_wrap=True)
+        console.print(viz, soft_wrap=False)
