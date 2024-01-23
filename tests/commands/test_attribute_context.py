@@ -1,3 +1,5 @@
+import json
+
 import pytest
 from pytest import fixture
 from transformers import AutoModelForCausalLM, AutoModelForSeq2SeqLM, GPT2LMHeadModel, MarianMTModel
@@ -335,3 +337,18 @@ def test_in_out_ctx_encdec_langtag_whitespace_sep():
     )
     cli_out = attribute_context(in_out_ctx_encdec_langtag_whitespace_sep)
     assert round_scores(cli_out) == expected_output
+
+
+def test_save_reload_attribute_context_outputs(tmp_path):
+    args = AttributeContextArgs(
+        model_name_or_path="gpt2",
+        input_context_text="George was sick yesterday.",
+        input_current_text="His colleagues asked him to come",
+        attributed_fn="contrast_prob_diff",
+        show_viz=False,
+        save_path=str(tmp_path) + "/test.json",
+    )
+    out_pre_save = attribute_context(args)
+    with open(tmp_path / "test.json") as f:
+        out_post_save = AttributeContextOutput.from_dict(json.load(f))
+    assert out_pre_save == out_post_save

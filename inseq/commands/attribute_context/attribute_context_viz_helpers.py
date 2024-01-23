@@ -1,7 +1,10 @@
-from typing import Literal, Optional
+from copy import deepcopy
+from typing import Literal, Optional, Union
 
 from rich.console import Console
+from torch import tensor
 
+from ... import load_model
 from ...models import HuggingfaceModel
 from .attribute_context_args import AttributeContextArgs
 from .attribute_context_helpers import AttributeContextOutput, filter_rank_tokens, get_filtered_tokens
@@ -110,19 +113,41 @@ def get_formatted_attribute_context_results(
     return out_string
 
 
-def handle_visualization(
-    args: AttributeContextArgs,
-    model: HuggingfaceModel,
+def visualize_attribute_context(
     output: AttributeContextOutput,
-    cti_threshold: float,
-) -> None:
+    model: Union[HuggingfaceModel, str, None] = None,
+    cti_threshold: Optional[float] = None,
+    return_html: bool = False,
+) -> Optional[str]:
+    if output.info is None:
+        raise ValueError("Cannot visualize attribution results without args. Set add_output_info = True.")
     console = Console(record=True)
-    viz = get_formatted_procedure_details(args)
-    viz += "\n\n" + get_formatted_attribute_context_results(model, args, output, cti_threshold)
-    if args.viz_path:
+    viz = get_formatted_procedure_details(output.info)
+    if model is None:
+        model = output.info.model_name_or_path
+    if isinstance(model, str):
+        model = load_model(
+            output.info.model_name_or_path,
+            output.info.attribution_method,
+            model_kwargs=deepcopy(output.info.model_kwargs),
+            tokenizer_kwargs=deepcopy(output.info.tokenizer_kwargs),
+        )
+    elif not isinstance(model, HuggingfaceModel):
+        raise TypeError(f"Unsupported model type {type(model)} for visualization.")
+    if cti_threshold is None:
+        cti_threshold = (
+            tensor(output.cti_scores).mean()
+            + output.info.context_sensitivity_std_threshold * tensor(output.cti_scores).std()
+        )
+    viz += "\n\n" + get_formatted_attribute_context_results(model, output.info, output, cti_threshold)
+    html = console.export_html()
+    if output.info.viz_path:
         with console.capture() as _:
             console.print(viz, soft_wrap=False)
-        with open(args.viz_path, "w") as f:
-            f.write(console.export_html())
-    if args.show_viz:
+        with open(output.info.viz_path, "w") as f:
+            f.write(html)
+    if output.info.show_viz:
         console.print(viz, soft_wrap=False)
+    if return_html:
+        return html
+    return None

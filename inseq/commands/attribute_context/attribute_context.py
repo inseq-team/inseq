@@ -40,7 +40,7 @@ from .attribute_context_helpers import (
     get_source_target_cci_scores,
     prepare_outputs,
 )
-from .attribute_context_viz_helpers import handle_visualization
+from .attribute_context_viz_helpers import visualize_attribute_context
 
 warnings.filterwarnings("ignore")
 transformers.logging.set_verbosity_error()
@@ -134,7 +134,7 @@ def attribute_context(args: AttributeContextArgs):
         output_current=args.output_current_text,
         output_current_tokens=output_current_tokens,
         cti_scores=cti_scores,
-        info=args if args.add_output_info else None,
+        info=args,
     )
     # Part 2: Contextual Cues Imputation (CCI)
     for cti_idx, cti_score, cti_tok in cti_ranked_tokens:
@@ -202,11 +202,13 @@ def attribute_context(args: AttributeContextArgs):
             output_context_scores=target_scores,
         )
         output.cci_scores.append(cci_out)
+    if args.show_viz or args.viz_path:
+        visualize_attribute_context(output, model, cti_threshold)
+    if not args.add_output_info:
+        output.info = None
     if args.save_path:
         with open(args.save_path, "w") as f:
             json.dump(output.to_dict(), f, indent=4)
-    if args.show_viz or args.viz_path:
-        handle_visualization(args, model, output, cti_threshold)
     return output
 
 

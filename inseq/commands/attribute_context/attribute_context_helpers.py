@@ -1,6 +1,6 @@
 import logging
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from typing import Any, Optional
 
 from rich import print as rprint
@@ -58,6 +58,18 @@ class AttributeContextOutput:
         if self.info:
             out_dict["info"] = self.info.to_dict()
         return out_dict
+
+    @classmethod
+    def from_dict(cls, out_dict: dict[str, Any]) -> "AttributeContextOutput":
+        out = cls()
+        for k, v in out_dict.items():
+            if k not in ["cci_scores", "info"]:
+                setattr(out, k, v)
+        out.cci_scores = [CCIOutput(**cci_out) for cci_out in out_dict["cci_scores"]]
+        if "info" in out_dict:
+            not_init_fields = [f.name for f in fields(AttributeContextArgs) if not f.init]
+            out.info = AttributeContextArgs(**{k: v for k, v in out_dict["info"].items() if k not in not_init_fields})
+        return out
 
 
 def format_template(template: str, current: str, context: Optional[str] = None) -> str:
@@ -290,7 +302,7 @@ def filter_rank_tokens(
     indices = list(range(0, len(scores)))
     token_score_tuples = sorted(zip(indices, scores, tokens), key=lambda x: abs(x[1]), reverse=True)
     threshold = None
-    if std_threshold:
+    if std_threshold is not None:
         threshold = tensor(scores).mean() + std_threshold * tensor(scores).std()
         token_score_tuples = [(i, s, t) for i, s, t in token_score_tuples if abs(s) >= threshold]
     if topk:
