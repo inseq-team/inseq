@@ -140,10 +140,10 @@ def visualize_attribute_context(
             + output.info.context_sensitivity_std_threshold * tensor(output.cti_scores).std()
         )
     viz += "\n\n" + get_formatted_attribute_context_results(model, output.info, output, cti_threshold)
+    with console.capture() as _:
+        console.print(viz, soft_wrap=False)
     html = console.export_html()
     if output.info.viz_path:
-        with console.capture() as _:
-            console.print(viz, soft_wrap=False)
         with open(output.info.viz_path, "w") as f:
             f.write(html)
     if output.info.show_viz:

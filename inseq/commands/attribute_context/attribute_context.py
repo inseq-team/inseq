@@ -19,6 +19,7 @@ inseq attribute-context \
 """
 
 import json
+import logging
 import warnings
 from copy import deepcopy
 
@@ -44,6 +45,8 @@ from .attribute_context_viz_helpers import visualize_attribute_context
 
 warnings.filterwarnings("ignore")
 transformers.logging.set_verbosity_error()
+
+logger = logging.getLogger(__name__)
 
 
 def attribute_context(args: AttributeContextArgs):
@@ -115,17 +118,17 @@ def attribute_context(args: AttributeContextArgs):
         cti_out.show(do_aggregation=False)
 
     start_pos = 1 if has_lang_tag else 0
+    cti_scores = cti_out.step_scores[args.context_sensitivity_metric][start_pos:].tolist()
+    cti_tokens = [t.token for t in cti_out.target][start_pos + cti_out.attr_pos_start :]
+    if model.is_encoder_decoder:
+        cti_scores = cti_scores[:-1]
+        cti_tokens = cti_tokens[:-1]
     cti_ranked_tokens, cti_threshold = filter_rank_tokens(
-        tokens=[t.token for t in cti_out.target][start_pos + cti_out.attr_pos_start :],
-        scores=cti_out.step_scores[args.context_sensitivity_metric][start_pos:].tolist(),
+        tokens=cti_tokens,
+        scores=cti_scores,
         std_threshold=args.context_sensitivity_std_threshold,
         topk=args.context_sensitivity_topk,
     )
-    cti_scores = cti_out.step_scores[args.context_sensitivity_metric].tolist()
-    if model.is_encoder_decoder:
-        cti_scores = cti_scores[:-1]
-        if has_lang_tag:
-            cti_scores = cti_scores[1:]
     output = AttributeContextOutput(
         input_context=args.input_context_text,
         input_context_tokens=input_context_tokens,
@@ -141,6 +144,11 @@ def attribute_context(args: AttributeContextArgs):
         contextual_prefix = model.convert_tokens_to_string(
             output_full_tokens[: output_current_text_offset + cti_idx + 1], skip_special_tokens=False
         )
+        if not contextual_prefix:
+            logger.warning(
+                f"Empty contextual prefix for token {cti_tok} at position {cti_idx} - skipping CCI for this token."
+            )
+            continue
         cci_kwargs = {}
         contextless_prefix = None
         if args.attributed_fn is not None and is_contrastive_step_function(args.attributed_fn):
@@ -154,8 +162,12 @@ def attribute_context(args: AttributeContextArgs):
             )
             cci_kwargs["contrast_sources"] = args.input_current_text if model.is_encoder_decoder else None
             cci_kwargs["contrast_targets"] = contextless_prefix
-            output_ctx_tokens = model.convert_string_to_tokens(contextual_prefix, skip_special_tokens=False)
-            output_ctxless_tokens = model.convert_string_to_tokens(contextless_prefix, skip_special_tokens=False)
+            output_ctx_tokens = model.convert_string_to_tokens(
+                contextual_prefix, skip_special_tokens=False, as_targets=model.is_encoder_decoder
+            )
+            output_ctxless_tokens = model.convert_string_to_tokens(
+                contextless_prefix, skip_special_tokens=False, as_targets=model.is_encoder_decoder
+            )
             tok_pos = -2 if model.is_encoder_decoder else -1
             if args.attributed_fn == "kl_divergence" or output_ctx_tokens[tok_pos] == output_ctxless_tokens[tok_pos]:
                 cci_kwargs["contrast_force_inputs"] = True

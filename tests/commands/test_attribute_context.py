@@ -63,16 +63,7 @@ def test_in_out_ctx_encdec_whitespace_sep(encdec_model: MarianMTModel):
                 contextless_prefix="Où",
                 input_context_scores=[0.01, 0.01, 0.01, 0.01, 0.01],
                 output_context_scores=[],
-            ),
-            CCIOutput(
-                cti_idx=3,
-                cti_token="elles",
-                cti_score=1.23,
-                contextual_prefix="Où sont-elles",
-                contextless_prefix="Où sont-ils",
-                input_context_scores=[0.03, 0.12, 0.03, 0.03, 0.02],
-                output_context_scores=[],
-            ),
+            )
         ],
         info=None,
     )
