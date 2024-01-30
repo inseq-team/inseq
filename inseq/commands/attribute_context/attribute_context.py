@@ -36,10 +36,11 @@ from .attribute_context_helpers import (
     CCIOutput,
     filter_rank_tokens,
     format_template,
-    get_contextless_prefix,
+    get_contextless_output,
     get_filtered_tokens,
     get_source_target_cci_scores,
     prepare_outputs,
+    prompt_user_for_contextless_output_next_tokens,
 )
 from .attribute_context_viz_helpers import visualize_attribute_context
 
@@ -140,33 +141,55 @@ def attribute_context(args: AttributeContextArgs):
         info=args,
     )
     # Part 2: Contextual Cues Imputation (CCI)
-    for cti_idx, cti_score, cti_tok in cti_ranked_tokens:
-        contextual_prefix = model.convert_tokens_to_string(
+    for cci_step_idx, (cti_idx, cti_score, cti_tok) in enumerate(cti_ranked_tokens):
+        contextual_output = model.convert_tokens_to_string(
             output_full_tokens[: output_current_text_offset + cti_idx + 1], skip_special_tokens=False
         )
-        if not contextual_prefix:
+        if not contextual_output:
             logger.warning(
-                f"Empty contextual prefix for token {cti_tok} at position {cti_idx} - skipping CCI for this token."
+                f"Empty contextual output for token {cti_tok} at position {cti_idx} - skipping CCI for this token."
             )
             continue
         cci_kwargs = {}
-        contextless_prefix = None
+        contextless_output = None
         if args.attributed_fn is not None and is_contrastive_step_function(args.attributed_fn):
-            contextless_prefix = get_contextless_prefix(
-                model,
-                args.input_current_text,
-                output_current_tokens,
-                cti_idx,
-                args.special_tokens_to_keep,
-                deepcopy(args.generation_kwargs),
-            )
+            n_ctxless_next_tokens = len(args.contextless_output_next_tokens)
+            next_ctxless_token = None
+            if n_ctxless_next_tokens > 0:
+                if n_ctxless_next_tokens != len(cti_ranked_tokens):
+                    raise ValueError(
+                        "The number of manually specified contextless output next tokens must be equal to the number "
+                        "of context-sensitive tokens identified by CTI."
+                    )
+                next_ctxless_token = args.contextless_output_next_tokens[cci_step_idx]
+            if args.prompt_user_for_contextless_output_next_tokens:
+                next_ctxless_token = prompt_user_for_contextless_output_next_tokens(
+                    output_current_tokens, cti_idx, model
+                )
+            if isinstance(next_ctxless_token, str):
+                next_ctxless_token = model.convert_string_to_tokens(
+                    next_ctxless_token, skip_special_tokens=False, as_targets=model.is_encoder_decoder
+                )[0]
+                contextless_output_tokens = output_current_tokens[:cti_idx] + [next_ctxless_token]
+                contextless_output = model.convert_tokens_to_string(
+                    contextless_output_tokens, skip_special_tokens=False
+                )
+            else:
+                contextless_output = get_contextless_output(
+                    model,
+                    args.input_current_text,
+                    output_current_tokens,
+                    cti_idx,
+                    args.special_tokens_to_keep,
+                    deepcopy(args.generation_kwargs),
+                )
             cci_kwargs["contrast_sources"] = args.input_current_text if model.is_encoder_decoder else None
-            cci_kwargs["contrast_targets"] = contextless_prefix
+            cci_kwargs["contrast_targets"] = contextless_output
             output_ctx_tokens = model.convert_string_to_tokens(
-                contextual_prefix, skip_special_tokens=False, as_targets=model.is_encoder_decoder
+                contextual_output, skip_special_tokens=False, as_targets=model.is_encoder_decoder
             )
             output_ctxless_tokens = model.convert_string_to_tokens(
-                contextless_prefix, skip_special_tokens=False, as_targets=model.is_encoder_decoder
+                contextless_output, skip_special_tokens=False, as_targets=model.is_encoder_decoder
             )
             tok_pos = -2 if model.is_encoder_decoder else -1
             if args.attributed_fn == "kl_divergence" or output_ctx_tokens[tok_pos] == output_ctxless_tokens[tok_pos]:
@@ -174,7 +197,7 @@ def attribute_context(args: AttributeContextArgs):
         pos_start = output_current_text_offset + cti_idx + int(model.is_encoder_decoder) + int(has_lang_tag)
         cci_attrib_out = model.attribute(
             input_full_text,
-            contextual_prefix,
+            contextual_output,
             attribute_target=model.is_encoder_decoder and args.has_output_context,
             show_progress=False,
             attr_pos_start=pos_start,
@@ -208,8 +231,8 @@ def attribute_context(args: AttributeContextArgs):
             cti_idx=cti_idx,
             cti_token=cti_tok,
             cti_score=cti_score,
-            contextual_prefix=contextual_prefix,
-            contextless_prefix=contextless_prefix,
+            contextual_output=contextual_output,
+            contextless_output=contextless_output,
             input_context_scores=source_scores,
             output_context_scores=target_scores,
         )

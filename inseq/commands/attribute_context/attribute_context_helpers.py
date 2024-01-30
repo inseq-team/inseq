@@ -23,8 +23,8 @@ class CCIOutput:
     cti_idx: int
     cti_token: str
     cti_score: float
-    contextual_prefix: str
-    contextless_prefix: str
+    contextual_output: str
+    contextless_output: str
     input_context_scores: Optional[list[float]] = None
     output_context_scores: Optional[list[float]] = None
 
@@ -293,6 +293,15 @@ def prepare_outputs(
     return final_context, final_current.strip()
 
 
+def get_scores_threshold(scores: list[float], std_weight: float) -> float:
+    """Compute the threshold for a given weight."""
+    if std_weight is None or len(scores) == 0:
+        return 0
+    if std_weight == 0 or len(scores) == 1:
+        return tensor(scores).mean()
+    return tensor(scores).mean() + std_weight * tensor(scores).std()
+
+
 def filter_rank_tokens(
     tokens: list[str],
     scores: list[float],
@@ -301,16 +310,14 @@ def filter_rank_tokens(
 ) -> tuple[list[tuple[int, float, str]], float]:
     indices = list(range(0, len(scores)))
     token_score_tuples = sorted(zip(indices, scores, tokens), key=lambda x: abs(x[1]), reverse=True)
-    threshold = None
-    if std_threshold is not None:
-        threshold = tensor(scores).mean() + std_threshold * tensor(scores).std()
-        token_score_tuples = [(i, s, t) for i, s, t in token_score_tuples if abs(s) >= threshold]
+    threshold = get_scores_threshold(scores, std_threshold)
+    token_score_tuples = [(i, s, t) for i, s, t in token_score_tuples if abs(s) >= threshold]
     if topk:
         token_score_tuples = token_score_tuples[:topk]
     return token_score_tuples, threshold
 
 
-def get_contextless_prefix(
+def get_contextless_output(
     model: HuggingfaceModel,
     input_current_text: str,
     output_current_tokens: list[str],
@@ -318,28 +325,28 @@ def get_contextless_prefix(
     special_tokens_to_keep: list[str] = [],
     generation_kwargs: dict[str, Any] = {},
 ) -> tuple[str, str]:
-    """Generate the contextless prefix for the current token identified as context-sensitive."""
-    output_current_prefix_tokens = output_current_tokens[:cti_idx]
-    output_current_prefix = model.convert_tokens_to_string(output_current_prefix_tokens, skip_special_tokens=False)
+    """Generate the contextless output for the current token identified as context-sensitive."""
+    contextual_prefix_tokens = output_current_tokens[:cti_idx]
+    contextual_prefix = model.convert_tokens_to_string(contextual_prefix_tokens, skip_special_tokens=False)
     if model.is_encoder_decoder:
         # One extra token for the EOS which is always forced at the end for encoder-decoders
         generation_kwargs["max_new_tokens"] = 2
-        decoder_input_ids = model.encode(output_current_prefix, as_targets=True).input_ids
+        decoder_input_ids = model.encode(contextual_prefix, as_targets=True).input_ids
         if int(decoder_input_ids[0, -1]) == model.eos_token_id:
             decoder_input_ids = decoder_input_ids[0, :-1][None, ...]
         generation_kwargs["decoder_input_ids"] = decoder_input_ids
         generation_input = input_current_text
     else:
         generation_kwargs["max_new_tokens"] = 1
-        space = " " if output_current_prefix and not output_current_prefix.startswith((" ", "\n")) else ""
-        generation_input = input_current_text + space + output_current_prefix
-    output_contextless = generate_with_special_tokens(
+        space = " " if contextual_prefix and not contextual_prefix.startswith((" ", "\n")) else ""
+        generation_input = input_current_text + space + contextual_prefix
+    contextless_output = generate_with_special_tokens(
         model,
         generation_input,
         special_tokens_to_keep,
         **generation_kwargs,
     )
-    return output_contextless
+    return contextless_output
 
 
 def get_source_target_cci_scores(
@@ -377,3 +384,45 @@ def get_source_target_cci_scores(
         prefix_len = len(output_prefix_tokens) + int(not model.is_encoder_decoder) * len(input_full_tokens)
         output_scores = output_scores[prefix_len : len(output_context_tokens) + prefix_len]
     return input_scores, output_scores
+
+
+def prompt_user_for_contextless_output_next_tokens(
+    output_current_tokens: list[str],
+    cti_idx: int,
+    model: HuggingfaceModel,
+    special_tokens_to_keep: list[str] = [],
+) -> Optional[str]:
+    """Prompt the user to provide the next tokens of the contextless output.
+
+    Args:
+        output_current_tokens (str): list of tokens of the current output
+        cti_idx (int): index of the current token identified as context-sensitive
+
+    Returns:
+        str: next tokens of the contextless output specified by the user. If None, the user does not want to specify
+            the contextless output.
+    """
+    contextual_prefix_tokens = output_current_tokens[:cti_idx]
+    contextual_prefix = model.convert_tokens_to_string(contextual_prefix_tokens, skip_special_tokens=False)
+    contextual_output_token = get_filtered_tokens(
+        output_current_tokens[cti_idx],
+        model,
+        special_tokens_to_keep=special_tokens_to_keep,
+        is_target=True,
+        replace_special_characters=True,
+    )[0]
+    while True:
+        force_contextless_output = Confirm.ask(
+            f'\n:arrow_right: Contextual prefix: "[bold]{contextual_prefix}[/bold]"'
+            f'\n:question: The token [bold]"{contextual_output_token}"[/bold] is produced in the contextual setting.'
+            " Do you want to specify a word for comparison?"
+        )
+        if not force_contextless_output:
+            return None
+        provided_contextless_output = Prompt.ask(
+            ":writing_hand: Please enter the word to use for comparison with the contextual output:"
+        )
+        if provided_contextless_output.strip():
+            break
+        rprint("[prompt.invalid]The provided word is empty. Please provide a non-empty word.")
+    return provided_contextless_output

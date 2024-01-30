@@ -140,6 +140,22 @@ class AttributeContextMethodArgs(AttributeBaseArgs):
             " prompted to manually specify which part of the generated text corresponds to the output context."
         ),
     )
+    contextless_output_next_tokens: list[str] = cli_arg(
+        default_factory=list,
+        help=(
+            "If specified, it should provide a list of one token per CCI output indicating the next token that should"
+            " be force-decoded as contextless output instead of the natural output produced by"
+            " ``get_contextless_output``. This is ignored if the ``attributed_fn`` used is not contrastive."
+        ),
+    )
+    prompt_user_for_contextless_output_next_tokens: bool = cli_arg(
+        default=False,
+        help=(
+            "If specified, the user is prompted to provide the next token that should be force-decoded as contextless"
+            " output instead of the natural output produced by ``get_contextless_output``. This is ignored if the"
+            " ``attributed_fn`` used is not contrastive."
+        ),
+    )
     special_tokens_to_keep: list[str] = cli_arg(
         default_factory=list,
         help="Special tokens to preserve in the generated string, e.g. ``<brk>`` separator between context and current.",
@@ -176,6 +192,13 @@ class AttributeContextMethodArgs(AttributeBaseArgs):
             "only the top-K remaining tokens are used. By default no top-k selection is performed."
         ),
     )
+
+    def __post_init__(self):
+        if len(self.contextless_output_next_tokens) > 0 and self.prompt_user_for_contextless_output_next_tokens:
+            raise ValueError(
+                "Only one of contextless_output_next_tokens and prompt_user_for_contextless_output_next_tokens can be"
+                " specified."
+            )
 
 
 @command_args_docstring

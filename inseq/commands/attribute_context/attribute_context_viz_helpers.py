@@ -2,12 +2,16 @@ from copy import deepcopy
 from typing import Literal, Optional, Union
 
 from rich.console import Console
-from torch import tensor
 
 from ... import load_model
 from ...models import HuggingfaceModel
 from .attribute_context_args import AttributeContextArgs
-from .attribute_context_helpers import AttributeContextOutput, filter_rank_tokens, get_filtered_tokens
+from .attribute_context_helpers import (
+    AttributeContextOutput,
+    filter_rank_tokens,
+    get_filtered_tokens,
+    get_scores_threshold,
+)
 
 
 def get_formatted_procedure_details(args: AttributeContextArgs) -> str:
@@ -135,10 +139,7 @@ def visualize_attribute_context(
     elif not isinstance(model, HuggingfaceModel):
         raise TypeError(f"Unsupported model type {type(model)} for visualization.")
     if cti_threshold is None and len(output.cti_scores) > 1:
-        cti_threshold = (
-            tensor(output.cti_scores).mean()
-            + output.info.context_sensitivity_std_threshold * tensor(output.cti_scores).std()
-        )
+        cti_threshold = get_scores_threshold(output.cti_scores, output.info.context_sensitivity_std_threshold)
     viz += "\n\n" + get_formatted_attribute_context_results(model, output.info, output, cti_threshold)
     with console.capture() as _:
         console.print(viz, soft_wrap=False)
