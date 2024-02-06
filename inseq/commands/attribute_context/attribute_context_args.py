@@ -1,5 +1,6 @@
 import logging
 from dataclasses import dataclass
+from enum import Enum
 from typing import Any, Optional
 
 from ... import list_step_functions
@@ -9,6 +10,12 @@ from ..attribute import AttributeBaseArgs
 from ..commands_utils import command_args_docstring
 
 logger = logging.getLogger(__name__)
+
+
+class HandleOutputContextSetting(Enum):
+    MANUAL = "manual"
+    AUTO = "auto"
+    PRE = "pre"
 
 
 @command_args_docstring
@@ -73,52 +80,17 @@ class AttributeContextInputArgs:
             " Defaults to '{context} {current}' if ``output_context_text`` is provided, '{current}' otherwise."
         ),
     )
-    has_input_context: bool = cli_arg(init=False)
-    has_output_context: bool = cli_arg(init=False)
-
-    def __post_init__(self):
-        if self.input_template is None:
-            self.input_template = "{current}" if self.input_context_text is None else "{context} {current}"
-        if self.output_template is None:
-            self.output_template = "{current}" if self.output_context_text is None else "{context} {current}"
-        self.has_input_context = "{context}" in self.input_template
-        self.has_output_context = "{context}" in self.output_template
-        if not self.input_current_text:
-            raise ValueError("--input_current_text must be a non-empty string.")
-        if self.input_context_text and not self.has_input_context:
-            logger.warning(
-                f"input_template has format {self.input_template} (no {{context}}), but --input_context_text is"
-                " specified. Ignoring provided --input_context_text."
-            )
-            self.input_context_text = None
-        if self.output_context_text and not self.has_output_context:
-            logger.warning(
-                f"output_template has format {self.output_template} (no {{context}}), but --output_context_text is"
-                " specified. Ignoring provided --output_context_text."
-            )
-            self.output_context_text = None
-        if not self.input_context_text and self.has_input_context:
-            raise ValueError(
-                f"{{context}} format placeholder is present in input_template {self.input_template},"
-                " but --input_context_text is not specified."
-            )
-        if "{current}" not in self.input_template:
-            raise ValueError(f"{{current}} format placeholder is missing from input_template {self.input_template}.")
-        if "{current}" not in self.output_template:
-            raise ValueError(f"{{current}} format placeholder is missing from output_template {self.output_template}.")
-        if not self.input_current_text:
-            raise ValueError("--input_current_text must be a non-empty string.")
-        if self.has_output_context and self.output_template.find("{context}") > self.output_template.find("{current}"):
-            raise ValueError(
-                f"{{context}} placeholder must appear before {{current}} in output_template '{self.output_template}'."
-            )
-        if not self.output_template.endswith("{current}"):
-            *_, suffix = self.output_template.partition("{current}")
-            logger.warning(
-                f"Suffix '{suffix}' was specified in output_template and will be used to ignore the specified suffix"
-                " tokens during context sensitivity detection. Make sure that the suffix corresponds to the end of the"
-                " output_current_text by forcing --output_current_text if necessary."
-            )
+    contextless_input_current_text: Optional[str] = cli_arg(
+        default=None,
+        help=(
+            "The input current text or template to use in the contrastive comparison with contextual input. By default"
+            " it is the same as ``input_current_text``, but it can be useful in cases where the context is nested "
+            "inside the current text (e.g. for an ``input_template`` like <user>\n{context}\n{current}\n<assistant> we "
+            "can use this parameter to format the contextless version as <user>\n{current}\n<assistant>)."
+            "If it contains the tag {current}, it will be infilled with the ``input_current_text``. Otherwise, it will"
+            " be used as-is for the contrastive comparison, enabling contrastive comparison with different inputs."
+        ),
+    )
 
 
 @command_args_docstring
@@ -129,15 +101,19 @@ class AttributeContextMethodArgs(AttributeBaseArgs):
         help="The contrastive metric used to detect context-sensitive tokens in ``output_current_text``.",
         choices=[fn for fn in list_step_functions() if is_contrastive_step_function(fn)],
     )
-    align_output_context_auto: bool = cli_arg(
-        default=False,
+    handle_output_context_strategy: str = cli_arg(
+        default=HandleOutputContextSetting.MANUAL.value,
+        choices=[e.value for e in HandleOutputContextSetting],
         help=(
-            "Argument used for encoder-decoder model when generating text with an output template including both"
-            " {context} and {current}, to attempt an automatic detection of which parts of the output belong to"
-            " context vs. current in absence of other explicit cues. If set to True, the input and output context"
-            " and current texts are aligned automatically (assuming an MT-like task), and the alignments are "
-            " assumed to be valid to separate the two without further user validation. Otherwise, the user is "
-            " prompted to manually specify which part of the generated text corresponds to the output context."
+            "Specifies how output context should be handled when it is produced together with the output current text,"
+            " and the two need to be separated for context sensitivity detection.\n"
+            "Options:\n"
+            "- `manual`: The user is prompted to verify an automatic context detection attempt, and optionally to"
+            "  provide a correct context separation manually.\n"
+            "- `auto`: Attempts an automatic detection of context using an automatic alignment with source context"
+            " (assuming an MT-like task).\n"
+            "- `pre`: If context is required but not pre-defined by the user via the ``output_context_text`` argument,"
+            "  the execution will fail instead of attempting to prompt the user for the output context."
         ),
     )
     contextless_output_next_tokens: list[str] = cli_arg(
@@ -159,6 +135,13 @@ class AttributeContextMethodArgs(AttributeBaseArgs):
     special_tokens_to_keep: list[str] = cli_arg(
         default_factory=list,
         help="Special tokens to preserve in the generated string, e.g. ``<brk>`` separator between context and current.",
+    )
+    decoder_input_output_separator: str = cli_arg(
+        default=" ",
+        help=(
+            "If specified, the separator used to split the input and output of the decoder. If not specified, the"
+            " separator is a whitespace character."
+        ),
     )
     context_sensitivity_std_threshold: float = cli_arg(
         default=1.0,
@@ -192,13 +175,6 @@ class AttributeContextMethodArgs(AttributeBaseArgs):
             "only the top-K remaining tokens are used. By default no top-k selection is performed."
         ),
     )
-
-    def __post_init__(self):
-        if len(self.contextless_output_next_tokens) > 0 and self.prompt_user_for_contextless_output_next_tokens:
-            raise ValueError(
-                "Only one of contextless_output_next_tokens and prompt_user_for_contextless_output_next_tokens can be"
-                " specified."
-            )
 
 
 @command_args_docstring
@@ -238,3 +214,62 @@ class AttributeContextArgs(AttributeContextInputArgs, AttributeContextMethodArgs
 
     def to_dict(self) -> dict[str, Any]:
         return dict(self.__dict__.items())
+
+    def __post_init__(self):
+        if (
+            self.handle_output_context_strategy == HandleOutputContextSetting.PRE.value
+            and not self.output_context_text
+        ):
+            raise ValueError(
+                "If --handle_output_context_strategy='pre' and {context} is used in --output_template, --output_context_text"
+                " must be specified to avoid user prompt for output context."
+            )
+        if len(self.contextless_output_next_tokens) > 0 and self.prompt_user_for_contextless_output_next_tokens:
+            raise ValueError(
+                "Only one of contextless_output_next_tokens and prompt_user_for_contextless_output_next_tokens can be"
+                " specified."
+            )
+        if self.input_template is None:
+            self.input_template = "{current}" if self.input_context_text is None else "{context} {current}"
+        if self.output_template is None:
+            self.output_template = "{current}" if self.output_context_text is None else "{context} {current}"
+        if self.contextless_input_current_text is None:
+            self.contextless_input_current_text = "{current}"
+        self.has_input_context = "{context}" in self.input_template
+        self.has_output_context = "{context}" in self.output_template
+        if not self.input_current_text:
+            raise ValueError("--input_current_text must be a non-empty string.")
+        if self.input_context_text and not self.has_input_context:
+            logger.warning(
+                f"input_template has format {self.input_template} (no {{context}}), but --input_context_text is"
+                " specified. Ignoring provided --input_context_text."
+            )
+            self.input_context_text = None
+        if self.output_context_text and not self.has_output_context:
+            logger.warning(
+                f"output_template has format {self.output_template} (no {{context}}), but --output_context_text is"
+                " specified. Ignoring provided --output_context_text."
+            )
+            self.output_context_text = None
+        if not self.input_context_text and self.has_input_context:
+            raise ValueError(
+                f"{{context}} format placeholder is present in input_template {self.input_template},"
+                " but --input_context_text is not specified."
+            )
+        if "{current}" not in self.input_template:
+            raise ValueError(f"{{current}} format placeholder is missing from input_template {self.input_template}.")
+        if "{current}" not in self.output_template:
+            raise ValueError(f"{{current}} format placeholder is missing from output_template {self.output_template}.")
+        if not self.input_current_text:
+            raise ValueError("--input_current_text must be a non-empty string.")
+        if self.has_output_context and self.output_template.find("{context}") > self.output_template.find("{current}"):
+            raise ValueError(
+                f"{{context}} placeholder must appear before {{current}} in output_template '{self.output_template}'."
+            )
+        if not self.output_template.endswith("{current}"):
+            *_, suffix = self.output_template.partition("{current}")
+            logger.warning(
+                f"Suffix '{suffix}' was specified in output_template and will be used to ignore the specified suffix"
+                " tokens during context sensitivity detection. Make sure that the suffix corresponds to the end of the"
+                " output_current_text by forcing --output_current_text if necessary."
+            )

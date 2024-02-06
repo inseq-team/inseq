@@ -40,7 +40,6 @@ from .attribute_context_helpers import (
     get_filtered_tokens,
     get_source_target_cci_scores,
     prepare_outputs,
-    prompt_user_for_contextless_output_next_tokens,
 )
 from .attribute_context_viz_helpers import visualize_attribute_context
 
@@ -50,7 +49,7 @@ transformers.logging.set_verbosity_error()
 logger = logging.getLogger(__name__)
 
 
-def attribute_context(args: AttributeContextArgs):
+def attribute_context(args: AttributeContextArgs) -> AttributeContextOutput:
     """Attribute the generation of context-sensitive tokens in ``output_current_text`` to input/output contexts."""
     model: HuggingfaceModel = load_model(
         args.model_name_or_path,
@@ -58,7 +57,10 @@ def attribute_context(args: AttributeContextArgs):
         model_kwargs=deepcopy(args.model_kwargs),
         tokenizer_kwargs=deepcopy(args.tokenizer_kwargs),
     )
+    return attribute_context_with_model(args, model)
 
+
+def attribute_context_with_model(args: AttributeContextArgs, model: HuggingfaceModel) -> AttributeContextOutput:
     # Handle language tag for multilingual models - no need to specify it in generation kwargs
     has_lang_tag = "tgt_lang" in args.tokenizer_kwargs
     if has_lang_tag and "forced_bos_token_id" not in args.generation_kwargs:
@@ -67,6 +69,10 @@ def attribute_context(args: AttributeContextArgs):
 
     # Prepare input/outputs (generate if necessary)
     input_full_text = format_template(args.input_template, args.input_current_text, args.input_context_text)
+    if "{current}" in args.contextless_input_current_text:
+        args.input_current_text = args.contextless_input_current_text.format(current=args.input_current_text)
+    else:
+        args.input_current_text = args.contextless_input_current_text
     args.output_context_text, args.output_current_text = prepare_outputs(
         model=model,
         input_context_text=args.input_context_text,
@@ -74,9 +80,10 @@ def attribute_context(args: AttributeContextArgs):
         output_context_text=args.output_context_text,
         output_current_text=args.output_current_text,
         output_template=args.output_template,
-        align_output_context_auto=args.align_output_context_auto,
+        handle_output_context_strategy=args.handle_output_context_strategy,
         generation_kwargs=deepcopy(args.generation_kwargs),
         special_tokens_to_keep=args.special_tokens_to_keep,
+        decoder_input_output_separator=args.decoder_input_output_separator,
     )
     output_full_text = format_template(args.output_template, args.output_current_text, args.output_context_text)
 
@@ -85,8 +92,8 @@ def attribute_context(args: AttributeContextArgs):
     if args.input_context_text is not None:
         input_context_tokens = get_filtered_tokens(args.input_context_text, model, args.special_tokens_to_keep)
     if not model.is_encoder_decoder:
-        space = " " if not output_full_text.startswith((" ", "\n")) else ""
-        output_full_text = input_full_text + space + output_full_text
+        sep = args.decoder_input_output_separator if not output_full_text.startswith((" ", "\n")) else ""
+        output_full_text = input_full_text + sep + output_full_text
     output_current_tokens = get_filtered_tokens(
         args.output_current_text, model, args.special_tokens_to_keep, is_target=True
     )
@@ -101,8 +108,8 @@ def attribute_context(args: AttributeContextArgs):
     if model.is_encoder_decoder:
         prefixed_output_current_text = args.output_current_text
     else:
-        space = " " if not args.output_current_text.startswith((" ", "\n")) else ""
-        prefixed_output_current_text = args.input_current_text + space + args.output_current_text
+        sep = args.decoder_input_output_separator if not args.output_current_text.startswith((" ", "\n")) else ""
+        prefixed_output_current_text = args.input_current_text + sep + args.output_current_text
 
     # Part 1: Context-sensitive Token Identification (CTI)
     cti_out = model.attribute(
@@ -146,43 +153,24 @@ def attribute_context(args: AttributeContextArgs):
             output_full_tokens[: output_current_text_offset + cti_idx + 1], skip_special_tokens=False
         )
         if not contextual_output:
-            logger.warning(
-                f"Empty contextual output for token {cti_tok} at position {cti_idx} - skipping CCI for this token."
-            )
-            continue
+            contextual_output = output_full_tokens[output_current_text_offset + cti_idx]
+
         cci_kwargs = {}
         contextless_output = None
         if args.attributed_fn is not None and is_contrastive_step_function(args.attributed_fn):
-            n_ctxless_next_tokens = len(args.contextless_output_next_tokens)
-            next_ctxless_token = None
-            if n_ctxless_next_tokens > 0:
-                if n_ctxless_next_tokens != len(cti_ranked_tokens):
-                    raise ValueError(
-                        "The number of manually specified contextless output next tokens must be equal to the number "
-                        "of context-sensitive tokens identified by CTI."
-                    )
-                next_ctxless_token = args.contextless_output_next_tokens[cci_step_idx]
-            if args.prompt_user_for_contextless_output_next_tokens:
-                next_ctxless_token = prompt_user_for_contextless_output_next_tokens(
-                    output_current_tokens, cti_idx, model
-                )
-            if isinstance(next_ctxless_token, str):
-                next_ctxless_token = model.convert_string_to_tokens(
-                    next_ctxless_token, skip_special_tokens=False, as_targets=model.is_encoder_decoder
-                )[0]
-                contextless_output_tokens = output_current_tokens[:cti_idx] + [next_ctxless_token]
-                contextless_output = model.convert_tokens_to_string(
-                    contextless_output_tokens, skip_special_tokens=False
-                )
-            else:
-                contextless_output = get_contextless_output(
-                    model,
-                    args.input_current_text,
-                    output_current_tokens,
-                    cti_idx,
-                    args.special_tokens_to_keep,
-                    deepcopy(args.generation_kwargs),
-                )
+            contextless_output = get_contextless_output(
+                model,
+                args.input_current_text,
+                output_current_tokens,
+                cti_idx,
+                cti_ranked_tokens,
+                args.contextless_output_next_tokens,
+                args.prompt_user_for_contextless_output_next_tokens,
+                cci_step_idx,
+                args.decoder_input_output_separator,
+                args.special_tokens_to_keep,
+                deepcopy(args.generation_kwargs),
+            )
             cci_kwargs["contrast_sources"] = args.input_current_text if model.is_encoder_decoder else None
             cci_kwargs["contrast_targets"] = contextless_output
             output_ctx_tokens = model.convert_string_to_tokens(

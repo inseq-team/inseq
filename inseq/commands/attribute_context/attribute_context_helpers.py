@@ -11,7 +11,7 @@ from ...data import FeatureAttributionSequenceOutput
 from ...models import HuggingfaceModel
 from ...utils import pretty_dict
 from ...utils.alignment_utils import compute_word_aligns
-from .attribute_context_args import AttributeContextArgs
+from .attribute_context_args import AttributeContextArgs, HandleOutputContextSetting
 
 logger = logging.getLogger(__name__)
 
@@ -63,12 +63,12 @@ class AttributeContextOutput:
     def from_dict(cls, out_dict: dict[str, Any]) -> "AttributeContextOutput":
         out = cls()
         for k, v in out_dict.items():
-            if k not in ["cci_scores", "info"]:
+            if k not in ["cci_scores", "info", "has_input_context", "has_output_context"]:
                 setattr(out, k, v)
         out.cci_scores = [CCIOutput(**cci_out) for cci_out in out_dict["cci_scores"]]
         if "info" in out_dict:
-            not_init_fields = [f.name for f in fields(AttributeContextArgs) if not f.init]
-            out.info = AttributeContextArgs(**{k: v for k, v in out_dict["info"].items() if k not in not_init_fields})
+            field_names = [f.name for f in fields(AttributeContextArgs)]
+            out.info = AttributeContextArgs(**{k: v for k, v in out_dict["info"].items() if k in field_names})
         return out
 
 
@@ -188,9 +188,10 @@ def prepare_outputs(
     output_context_text: Optional[str],
     output_current_text: Optional[str],
     output_template: str,
-    align_output_context_auto: bool = False,
+    handle_output_context_strategy: str,
     generation_kwargs: dict[str, Any] = {},
     special_tokens_to_keep: list[str] = [],
+    decoder_input_output_separator: str = " ",
 ) -> tuple[Optional[str], str]:
     """Handle model outputs and prepare them for attribution.
     This procedure is valid both for encoder-decoder and decoder-only models.
@@ -235,8 +236,10 @@ def prepare_outputs(
             if "forced_bos_token_id" in generation_kwargs:
                 generation_kwargs["decoder_input_ids"][0, 0] = generation_kwargs["forced_bos_token_id"]
         else:
-            space = " " if output_current_prefix and not output_current_prefix.startswith((" ", "\n")) else ""
-            model_input = input_full_text + space + output_current_prefix
+            sep = ""
+            if output_current_prefix and not output_current_prefix.startswith((" ", "\n")):
+                sep = decoder_input_output_separator
+            model_input = input_full_text + sep + output_current_prefix
             output_current_prefix = model_input
 
     output_gen = generate_model_output(
@@ -265,12 +268,12 @@ def prepare_outputs(
     # Final resort: if the model is an encoder-decoder model, we align the full input and full output, identifying
     # which tokens correspond to context and which to current. This assumes that input and output texts are alignable
     # (e.g. translations of each other). We prompt the user a yes/no question asking whether the context identified is
-    # correct. If not, the user is asked to provide the correct context. If align_output_context_auto = True, aligned
+    # correct. If not, the user is asked to provide the correct context. If handle_output_context_strategy = "auto", aligned
     # texts are assumed to be correct (no user input required, to automate the procedure)
     if not output_context_candidate and model.is_encoder_decoder and input_context_text is not None:
         output_context_candidate = get_output_context_from_aligned_inputs(input_context_text, output_gen)
 
-    if output_context_candidate and align_output_context_auto:
+    if output_context_candidate and handle_output_context_strategy == HandleOutputContextSetting.AUTO.value:
         final_context = output_context_candidate
     else:
         final_context = prompt_user_for_context(output_gen, output_context_candidate)
@@ -322,8 +325,52 @@ def get_contextless_output(
     input_current_text: str,
     output_current_tokens: list[str],
     cti_idx: int,
+    cti_ranked_tokens: tuple[int, float, str],
+    contextless_output_next_tokens: Optional[list[str]],
+    prompt_user_for_contextless_output_next_tokens: bool,
+    cci_step_idx: int,
+    decoder_input_output_separator: str = " ",
     special_tokens_to_keep: list[str] = [],
     generation_kwargs: dict[str, Any] = {},
+) -> tuple[str, str]:
+    n_ctxless_next_tokens = len(contextless_output_next_tokens)
+    next_ctxless_token = None
+    if n_ctxless_next_tokens > 0:
+        if n_ctxless_next_tokens != len(cti_ranked_tokens):
+            raise ValueError(
+                "The number of manually specified contextless output next tokens must be equal to the number "
+                "of context-sensitive tokens identified by CTI."
+            )
+        next_ctxless_token = contextless_output_next_tokens[cci_step_idx]
+    if prompt_user_for_contextless_output_next_tokens:
+        next_ctxless_token = prompt_user_for_contextless_output_next_tokens(output_current_tokens, cti_idx, model)
+    if isinstance(next_ctxless_token, str):
+        next_ctxless_token = model.convert_string_to_tokens(
+            next_ctxless_token, skip_special_tokens=False, as_targets=model.is_encoder_decoder
+        )[0]
+        contextless_output_tokens = output_current_tokens[:cti_idx] + [next_ctxless_token]
+        contextless_output = model.convert_tokens_to_string(contextless_output_tokens, skip_special_tokens=False)
+    else:
+        contextless_output = generate_contextless_output(
+            model,
+            input_current_text,
+            output_current_tokens,
+            cti_idx,
+            special_tokens_to_keep,
+            generation_kwargs,
+            decoder_input_output_separator,
+        )
+    return contextless_output
+
+
+def generate_contextless_output(
+    model: HuggingfaceModel,
+    input_current_text: str,
+    output_current_tokens: list[str],
+    cti_idx: int,
+    special_tokens_to_keep: list[str] = [],
+    generation_kwargs: dict[str, Any] = {},
+    decoder_input_output_separator: str = " ",
 ) -> tuple[str, str]:
     """Generate the contextless output for the current token identified as context-sensitive."""
     contextual_prefix_tokens = output_current_tokens[:cti_idx]
@@ -338,8 +385,10 @@ def get_contextless_output(
         generation_input = input_current_text
     else:
         generation_kwargs["max_new_tokens"] = 1
-        space = " " if contextual_prefix and not contextual_prefix.startswith((" ", "\n")) else ""
-        generation_input = input_current_text + space + contextual_prefix
+        sep = ""
+        if contextual_prefix and not contextual_prefix.startswith((" ", "\n")):
+            sep = decoder_input_output_separator
+        generation_input = input_current_text + sep + contextual_prefix
     contextless_output = generate_with_special_tokens(
         model,
         generation_input,
