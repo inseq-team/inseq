@@ -219,6 +219,7 @@ class AttributeContextArgs(AttributeContextInputArgs, AttributeContextMethodArgs
         if (
             self.handle_output_context_strategy == HandleOutputContextSetting.PRE.value
             and not self.output_context_text
+            and "{context}" in self.output_template
         ):
             raise ValueError(
                 "If --handle_output_context_strategy='pre' and {context} is used in --output_template, --output_context_text"
