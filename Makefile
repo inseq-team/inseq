@@ -58,6 +58,7 @@ install-dev:
 #	-poetry run mypy --install-types --non-interactive ./
 	poetry run pre-commit install
 	poetry run pre-commit autoupdate
+	poetry self add poetry-plugin-export
 
 .PHONY: install-gpu
 install-gpu: install add-torch-gpu
