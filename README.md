@@ -327,7 +327,7 @@ Inseq has been used in various research projects. A list of known publications t
 </details>
 
 <details>
-  <summary><b>2023</b></summary>
+  <summary><b>2024</b></summary>
   <ol>
     <li><a href="https://arxiv.org/abs/2401.12576">LLMCheckup: Conversational Examination of Large Language Models via Interpretability Tools</a> (Wang et al., 2024)</li>
     <li><a href="https://arxiv.org/abs/2402.00794">ReAGent: A Model-agnostic Feature Attribution Method for Generative Language Models</a> (Zhao et al., 2024)</li>
