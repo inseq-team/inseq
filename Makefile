@@ -1,6 +1,5 @@
 #* Variables
-SHELL := /usr/bin/env bash
-PYTHON := python3
+PYTHON := .venv/bin/python
 
 #* Docker variables
 IMAGE := inseq
@@ -42,7 +41,7 @@ uv-download:
 .PHONY: uv-activate
 uv-activate:
 	@if [[ "$(OS)" == "Windows_NT" ]]; then \
-		./uv/Scripts/activate.ps1 \
+		./uv/Scripts/activate.ps1; \
 	else \
 		source .venv/bin/activate; \
 	fi
@@ -70,19 +69,19 @@ update-deps:
 #* Linting
 .PHONY: check-style
 check-style:
-	ruff format --check --config pyproject.toml ./
-	ruff check --no-fix --config pyproject.toml ./
-#   pydoclint --config pyproject.toml inseq/
-#	mypy --config-file pyproject.toml ./
+	$(PYTHON) -m ruff format --check --config pyproject.toml ./
+	$(PYTHON) -m ruff check --no-fix --config pyproject.toml ./
+#   $(PYTHON) -m pydoclint --config pyproject.toml inseq/
+#	$(PYTHON) -m mypy --config-file pyproject.toml ./
 
 .PHONY: fix-style
 fix-style:
-	ruff format --config pyproject.toml ./
-	ruff check --config pyproject.toml ./
+	$(PYTHON) -m ruff format --config pyproject.toml ./
+	$(PYTHON) -m ruff check --config pyproject.toml ./
 
 .PHONY: check-safety
 check-safety:
-	safety check --full-report
+	$(PYTHON) -m safety check --full-report
 
 .PHONY: lint
 lint: fix-style check-safety
@@ -90,19 +89,19 @@ lint: fix-style check-safety
 #* Linting
 .PHONY: test
 test:
-	pytest -c pyproject.toml -v
+	$(PYTHON) -m pytest -c pyproject.toml -v
 
 .PHONY: test-cpu
 test-cpu:
-	pytest -c pyproject.toml -v -m "not require_cuda_gpu"
+	$(PYTHON) -m pytest -c pyproject.toml -v -m "not require_cuda_gpu"
 
 .PHONY: fast-test
 fast-test:
-	pytest -c pyproject.toml -v -m "not slow"
+	$(PYTHON) -m pytest -c pyproject.toml -v -m "not slow"
 
 .PHONY: codecov
 codecov:
-	pytest --cov inseq --cov-report html
+	$(PYTHON) -m pytest --cov inseq --cov-report html
 
 #* Docs
 .PHONY: build-docs
