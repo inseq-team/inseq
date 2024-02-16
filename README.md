@@ -12,22 +12,17 @@
 [![Python Version](https://img.shields.io/pypi/pyversions/inseq.svg?color=blue)](https://pypi.org/project/inseq/)
 [![Downloads](https://static.pepy.tech/badge/inseq)](https://pepy.tech/project/inseq)
 [![License](https://img.shields.io/github/license/inseq-team/inseq)](https://github.com/inseq-team/inseq/blob/main/LICENSE)
-[![Demo Paper](https://img.shields.io/badge/arXiv-2302.13942-red)](http://arxiv.org/abs/2302.13942)
+[![Demo Paper](https://img.shields.io/badge/ACL%20Anthology%20-%20?logo=data%3Aimage%2Fx-icon%3Bbase64%2CAAABAAEAIBIAAAEAIABwCQAAFgAAACgAAAAgAAAAJAAAAAEAIAAAAAAAAAkAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACEa7k0mH%2B%2F5JBzt%2FyQc7f8kHO3%2FJBzt%2FyQc7f8kHO3%2FJBzt%2FyQc7f8kHO3%2FJB3t%2FyQd7f8kHe3%2FJBzt%2FyQc7f8kHO3%2FJBzt%2FyQd7f8kHO3%2FJB3t%2FyQd7f8kHO3%2FJB3t%2FyQd7f8kHe3%2FJB3t%2FyMc79EkGP8VAAAAAAAAAAAAAAAAIRruTSYf7%2FkkHO3%2FJBzt%2FyQd7f8kHe3%2FJB3t%2FyQd7f8kHO3%2FJB3t%2FyQc7f8kHe3%2FJBzt%2FyQc7f8kHO3%2FJB3t%2FyQc7f8kHO3%2FJBzt%2FyQc7f8kHO3%2FJB3t%2FyQc7f8kHO3%2FJB3t%2FyQd7f8kHe3%2FIxzv0SQY%2FxUAAAAAAAAAAAAAAAAhIe5NJh%2Fv%2BSQd7f8kHe3%2FJB3t%2FyQd7f8kHO3%2FJBzt%2FyQc7f8kHe3%2FJBzt%2FyQd7f8kHe3%2FJBzt%2FyQc7f8kHe3%2FJB3t%2FyQd7f8kHe3%2FJB3t%2FyQc7f8kHe3%2FJB3t%2FyQd7f8kHe3%2FJBzt%2FyQd7f8jHO%2FRJBj%2FFQAAAAAAAAAAAAAAACEa7k0mH%2B%2F5JB3t%2FyQc7f8kHO3%2FJBzt%2FyQc7f8kHe3%2FJBzt%2FyQd7f8kHe3%2FJBzt%2FyQc7f8kHO3%2FJBzt%2FyQc7f8kHe3%2FJBzt%2FyQd7f8kHe3%2FJB3t%2FyQc7f8kHe3%2FJB3t%2FyQc7f8kHO3%2FJBzt%2FyMc79EkGP8VAAAAAAAAAAAAAAAAIRruTSYf7%2FkkHO3%2FJBzt%2FyQc7f8kHe3%2FJB3t%2FyQd7f8kHO3%2FJB3t%2FyQd7f8kHO3%2FJB3t%2FyQc7f8kHe3%2FJBzt%2FyQc7f8kHe3%2FJB3t%2FyQd7f8kHe3%2FJBzt%2FyQd7f8kHO3%2FJB3t%2FyQc7f8kHO3%2FIxzv0SQY%2FxUAAAAAAAAAAAAAAAAhGu5NJh%2Fv%2BSQd7f8kHO3%2FJBzt%2FyQd7f8jIOzYIxvtgiQc8X8kHPF%2FJBzxfyQc8X8kHPF%2FJBzxfyQc8X8kHPF%2FIx%2FuiiMf7OgkHe3%2FJBzt%2FyQc7f8kHO3%2FJhzs9CUg7JYkHPF%2FJBzxfyQc8X8iHfBoMzP%2FCgAAAAAAAAAAAAAAACEa7k0mHu%2F5JBzt%2FyQc7f8kHO3%2FJBzt%2FyQb7LEAAP8FAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAkGP8VIxzv0SQc7f8kHe3%2FJB3t%2FyQc7f8jHOzpIhzuLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIRruTSYf7%2FkkHe3%2FJB3t%2FyQd7f8kHO3%2FJBvssQAA%2FwUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACQY%2FxUjHO%2FRJB3t%2FyQc7f8kHO3%2FJBzt%2FyMb7OkiHO4tAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAhGu5NJh%2Fv%2BSQd7f8kHe3%2FJBzt%2FyQc7f8kHuyxAAD%2FBQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJBj%2FFSMc79EkHe3%2FJBzt%2FyQc7f8kHO3%2FIxvs6SIc7i0AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACEa7k0mH%2B%2F5JBzt%2FyQc7f8kHO3%2FJBzt%2FyQb7LEAAP8FAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAkGP8VIx3v0SQd7f8kHe3%2FJBzt%2FyQc7f8jHOzpIhzuLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIRruTSYf7%2FkkHO3%2FJBzt%2FyQc7f8kHe3%2FJBzuxSgi81MhGu5NIRruTSEa7k0hGu5NISHuTSEh7k0hGu5NIRruTSIa72EjHe3aJBzt%2FyQd7f8kHO3%2FJBzt%2FyMc7OkiHO4tAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAhGu5NJh7v%2BSQc7f8kHe3%2FJBzt%2FyQc7f8kHO3%2FJh%2Fv%2BSYf7%2FkmHu%2F5Jh%2Fv%2BSYf7%2FkmH%2B%2F5Jh%2Fv%2BSYf7%2FkmH%2B%2F5Jh7v%2BSQc7f8kHO3%2FJBzt%2FyQc7f8kHO3%2FIxzs6SIc7i0AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACEa7k0mHu%2F5JBzt%2FyQd7f8kHO3%2FJBzt%2FyQc7f8kHe3%2FJB3t%2FyQd7f8kHO3%2FJBzt%2FyQc7f8kHe3%2FJB3t%2FyQc7f8kHO3%2FJBzt%2FyQc7f8kHe3%2FJBzt%2FyQd7f8jHOzpIhzuLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIRruTSYe7%2FkkHO3%2FJB3t%2FyQc7f8kHO3%2FJBzt%2FyQd7f8kHe3%2FJB3t%2FyQc7f8kHe3%2FJB3t%2FyQd7f8kHO3%2FJBzt%2FyQc7f8kHO3%2FJB3t%2FyQc7f8kHO3%2FJBzt%2FyMc7OkiHO4tAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAhGu5NJh%2Fv%2BSQc7f8kHO3%2FJB3t%2FyQc7f8kHO3%2FJBzt%2FyQc7f8kHO3%2FJBzt%2FyQc7f8kHO3%2FJBzt%2FyQc7f8kHO3%2FJBzt%2FyQc7f8kHO3%2FJBzt%2FyQc7f8kHO3%2FIxzs6SIc7i0AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACEa7k0mH%2B%2F5JB3t%2FyQc7f8kHe3%2FJBzt%2FyQc7f8kHO3%2FJB3t%2FyQc7f8kHO3%2FJBzt%2FyQd7f8kHO3%2FJBzt%2FyQc7f8kHO3%2FJB3t%2FyQc7f8kHO3%2FJBzt%2FyQc7f8jHOzpIhzuLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAKB%2FtOSUc7askHuyxJBvssSQe7LEkHuyxJB7ssSQe7LEkHuyxJBvssSQb7LEkHuyxJB7ssSQe7LEkHuyxJB7ssSUc7LMjHe31JB3t%2FyQd7f8kHe3%2FJBzt%2FyMc7OkiHO4tAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD%2FBQAA%2FwUAAP8FAAD%2FBQAA%2FwUAAP8FAAD%2FBQAA%2FwUAAP8FAAD%2FBQAA%2FwUAAP8FAAD%2FBQAA%2FwUAAP8FHBzsGyMd7qYjHO%2FRIxzv0SMd79EjHO%2FRIx7tux4Y%2BSoAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADAAAABwAAAAcAAAAHAAAABwAAAAcAAAAHAP8A%2FwD%2FAP8A%2FwD%2FAP8A%2FwAAAP8AAAD%2FAAAA%2FwAAAP8AAAD%2FAAAA%2FwAAAP%2BAAAD8%3D&labelColor=white&color=red&link=https%3A%2F%2Faclanthology.org%2F2023.acl-demo.40%2F
+)](http://arxiv.org/abs/2302.13942)
 
 </div>
 <div align="center">
 
   [![Follow Inseq on Twitter]( 	https://img.shields.io/badge/Twitter-1DA1F2?style=for-the-badge&logo=twitter&logoColor=white)](https://twitter.com/InseqLib)
   [![Join the Inseq Discord server](https://img.shields.io/badge/Discord-7289DA?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/V5VgwwFPbu)
-  <!--[![Follow Inseq on Mastodon](https://img.shields.io/mastodon/follow/109308976376923913?domain=https%3A%2F%2Fsigmoid.social&label=Inseq&style=social)](https://sigmoid.social/@inseq)-->
+  [![Read the Docs](https://img.shields.io/badge/-Docs-blue?style=for-the-badge&logo=Read-the-Docs&logoColor=white&link=https://inseq.org)](https://inseq.org)
+  [![Tutorial](https://img.shields.io/badge/-Tutorial-orange?style=for-the-badge&logo=Jupyter&logoColor=white&link=https://github.com/inseq-team/inseq/blob/main/examples/inseq_tutorial.ipynb)](https://github.com/inseq-team/inseq/blob/main/examples/inseq_tutorial.ipynb)
 
-</div>
-<div align="center">
-
-  <a href="http://arxiv.org/abs/2302.13942"><b>Paper</b></a> |
-  <a href="https://inseq.readthedocs.io"><b>Documentation</b></a> |
-  <a href="https://github.com/inseq-team/inseq/blob/main/examples/inseq_tutorial.ipynb"><b>Tutorial</b></a> |
-  <a href="https://pypi.org/project/inseq"><b>PyPI Package</b></a>
 
 </div>
 
@@ -53,13 +48,11 @@ To install the package, clone the repository and run the following commands:
 
 ```bash
 cd inseq
-make poetry-download # Download and install the Poetry package manager
+make uv-download # Download and install the UV package manager
 make install # Installs the package and all dependencies
 ```
 
-If you have a GPU available, use `make install-gpu` to install the latest `torch` version with GPU support.
-
-For library developers, you can use the `make install-dev` command to install and its GPU-friendly counterpart `make install-dev-gpu` to install all development dependencies (quality, docs, extras).
+For library developers, you can use the `make install-dev` command to install all development dependencies (quality, docs, extras).
 
 After installation, you should be able to run `make fast-test` and `make lint` without errors.
 </details>
@@ -71,8 +64,6 @@ After installation, you should be able to run `make fast-test` and `make lint` w
 
 - Installing `sentencepiece` requires various packages, install with `sudo apt-get install cmake build-essential pkg-config` or `brew install cmake gperftools pkg-config`.
 
-- Inseq does not work with older versions of `jaxlib`.
-Install a compatible version with ```poetry install --with jax```.
 </details>
 
 ## Example usage in Python

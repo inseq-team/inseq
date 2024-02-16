@@ -22,19 +22,17 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
 
-    - name: Install poetry
+    - name: Install uv
       run: |
-        make poetry-download
-        export PATH="$HOME/.poetry/env:$PATH"
+        make uv-download
 
     - name: Set up cache
       uses: actions/cache@v3.0.11
       with:
         path: .venv
-        key: venv-${{ matrix.python-version }}-${{ hashFiles('pyproject.toml') }}-${{ hashFiles('poetry.lock') }}
+        key: venv-${{ matrix.python-version }}-${{ hashFiles('pyproject.toml') }}
     - name: Install dependencies
       run: |
-        poetry config virtualenvs.in-project true
         make install-ci
 
     - name: Run style checks
