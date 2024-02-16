@@ -51,21 +51,16 @@ uv-activate:
 
 .PHONY: install
 install:
-	make uv-activate
-	uv pip install -r requirements.txt
-	uv pip install -e .
+	make uv-activate && uv pip install -r requirements.txt && uv pip install -e .
 
 .PHONY: install-dev
 install-dev:
-	make uv-activate
-	pre-commit install
-	pre-commit autoupdate
-	uv pip install -r requirements-dev.txt
+	make uv-activate && uv pip install -r requirements-dev.txt && pre-commit install && pre-commit autoupdate
+	
 
 .PHONY: install-ci
 install-ci:
-	make uv-activate
-	uv pip install -e .[lint]
+	make uv-activate && uv pip install -e .[lint]
 
 .PHONY: update-deps
 update-deps:
