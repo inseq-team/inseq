@@ -16,10 +16,7 @@ def command_args_docstring(cls):
         for field in fields:
             field_type = resolved_field_types[field.name]
             field_help = field.metadata.get("help", "")
-            docstring += textwrap.dedent(
-                f"""
-            **{field.name}** (``{field_type}``): {field_help}
-            """
-            )
+            docstring += textwrap.dedent(f"\n**{field.name}** (``{field_type}``): {field_help}\n")
     cls.__doc__ = docstring
+    print(docstring)
     return cls

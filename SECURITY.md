@@ -7,7 +7,7 @@
 
 Vulnerabilities can be reported by emailing core members:
 
-- [`gsarti`](https://github.com/gsarti) <[gabriele.sarti996@gmail.com](mailto:gabriele.sarti996@gmail.com)>
+- [Gabriele Sarti](https://github.com/gsarti) <[gabriele.sarti996@gmail.com](mailto:gabriele.sarti996@gmail.com)>
 
 Please include the requested information listed below (as much as you can provide) to help us better understand the nature and scope of the possible issue:
 

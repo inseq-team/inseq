@@ -2,17 +2,20 @@
 
 ## Dependencies
 
-We use `poetry` to manage the [dependencies](https://github.com/python-poetry/poetry).
-If you dont have `poetry`, you should install with `make poetry-download`.
+We use [`uv`](https://github.com/astral-sh/uv) to manage Inseq dependencies.
+If you dont have `uv`, you should install with `make uv-download`.
 
 To install dependencies and prepare [`pre-commit`](https://pre-commit.com/) hooks you would need to run `install` command:
 
 ```bash
 make install
+
+or
+
 make install-dev
 ```
 
-To activate your `virtualenv` run `poetry shell`.
+To activate your `virtualenv` run `make uv-activate`.
 
 ## Codestyle
 
