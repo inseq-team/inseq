@@ -1,4 +1,5 @@
 #* Variables
+SHELL := /bin/bash
 PYTHON := .venv/bin/python
 
 #* Docker variables
@@ -41,7 +42,7 @@ uv-download:
 .PHONY: uv-activate
 uv-activate:
 	@if [[ "$(OS)" == "Windows_NT" ]]; then \
-		./uv/Scripts/activate.ps1; \
+		./uv/Scripts/activate.ps1 \
 	else \
 		source .venv/bin/activate; \
 	fi
