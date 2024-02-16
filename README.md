@@ -301,7 +301,7 @@ If you use Inseq in your research we suggest to include a mention to the specifi
 
 ## Research using Inseq
 
-Inseq has been used in various research projects. A list of known publications that use Inseq to conduct interpretability analyses of generative models is shown below. If you know more, please let us know or submit a pull request (*last updated: December 2023*).
+Inseq has been used in various research projects. A list of known publications that use Inseq to conduct interpretability analyses of generative models is shown below. If you know more, please let us know or submit a pull request (*last updated: February 2024*).
 
 <details>
   <summary><b>2023</b></summary>
