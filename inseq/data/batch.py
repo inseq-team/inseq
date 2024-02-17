@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import List, Optional, Tuple, Union
+from typing import Optional, Union
 
 from ..utils import get_aligned_idx
 from ..utils.typing import EmbeddingsTensor, ExpandedTargetIdsTensor, IdsTensor, OneOrMoreTokenSequences
@@ -95,7 +95,7 @@ class Batch(TensorWrapper):
         self.encoding.input_ids = value
 
     @input_tokens.setter
-    def input_tokens(self, value: List[List[str]]):
+    def input_tokens(self, value: list[list[str]]):
         self.encoding.input_tokens = value
 
     @attention_mask.setter
@@ -169,7 +169,7 @@ class EncoderDecoderBatch(TensorWrapper):
 
     def get_step_target(
         self, step: int, with_attention: bool = False
-    ) -> Union[ExpandedTargetIdsTensor, Tuple[ExpandedTargetIdsTensor, ExpandedTargetIdsTensor]]:
+    ) -> Union[ExpandedTargetIdsTensor, tuple[ExpandedTargetIdsTensor, ExpandedTargetIdsTensor]]:
         tgt = self.targets.input_ids[:, step]
         if with_attention:
             return tgt, self.targets.attention_mask[:, step]
@@ -218,7 +218,7 @@ class DecoderOnlyBatch(Batch):
 
     def get_step_target(
         self, step: int, with_attention: bool = False
-    ) -> Union[ExpandedTargetIdsTensor, Tuple[ExpandedTargetIdsTensor, ExpandedTargetIdsTensor]]:
+    ) -> Union[ExpandedTargetIdsTensor, tuple[ExpandedTargetIdsTensor, ExpandedTargetIdsTensor]]:
         tgt = self.input_ids[:, step]
         if with_attention:
             return tgt, self.attention_mask[:, step]
@@ -233,8 +233,8 @@ class DecoderOnlyBatch(Batch):
 
 
 def slice_batch_from_position(
-    batch: DecoderOnlyBatch, curr_idx: int, alignments: Optional[List[Tuple[int, int]]] = None
-) -> Tuple[DecoderOnlyBatch, IdsTensor]:
+    batch: DecoderOnlyBatch, curr_idx: int, alignments: Optional[list[tuple[int, int]]] = None
+) -> tuple[DecoderOnlyBatch, IdsTensor]:
     if len(alignments) > 0 and isinstance(alignments[0], list):
         alignments = alignments[0]
     truncate_idx = get_aligned_idx(curr_idx, alignments)

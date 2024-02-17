@@ -1,7 +1,7 @@
 """HuggingFace Seq2seq model."""
 import logging
 from abc import abstractmethod
-from typing import Dict, List, NoReturn, Optional, Tuple, Union
+from typing import Any, NoReturn, Optional, Union
 
 import torch
 from torch import long
@@ -69,6 +69,8 @@ class HuggingfaceModel(AttributionModel):
         attribution_method: Optional[str] = None,
         tokenizer: Union[str, PreTrainedTokenizerBase, None] = None,
         device: Optional[str] = None,
+        model_kwargs: Optional[dict[str, Any]] = {},
+        tokenizer_kwargs: Optional[dict[str, Any]] = {},
         **kwargs,
     ) -> None:
         """AttributionModel subclass for Huggingface-compatible models.
@@ -90,15 +92,13 @@ class HuggingfaceModel(AttributionModel):
             raise ValueError(
                 f"Invalid autoclass {self._autoclass}. Must be one of {[x.__name__ for x in SUPPORTED_AUTOCLASSES]}."
             )
-        model_args = kwargs.pop("model_args", {})
-        model_kwargs = kwargs.pop("model_kwargs", {})
         if isinstance(model, PreTrainedModel):
             self.model = model
         else:
             if "output_attentions" not in model_kwargs:
                 model_kwargs["output_attentions"] = True
 
-            self.model = self._autoclass.from_pretrained(model, *model_args, **model_kwargs)
+            self.model = self._autoclass.from_pretrained(model, **model_kwargs)
         self.model_name = self.model.config.name_or_path
         self.tokenizer_name = tokenizer if isinstance(tokenizer, str) else None
         if tokenizer is None:
@@ -108,20 +108,17 @@ class HuggingfaceModel(AttributionModel):
                     "Unspecified tokenizer for model loaded from scratch. Use explicit identifier as tokenizer=<ID>"
                     "during model loading."
                 )
-        tokenizer_inputs = kwargs.pop("tokenizer_inputs", {})
-        tokenizer_kwargs = kwargs.pop("tokenizer_kwargs", {})
-
         if isinstance(tokenizer, PreTrainedTokenizerBase):
             self.tokenizer = tokenizer
         else:
-            self.tokenizer = AutoTokenizer.from_pretrained(tokenizer, *tokenizer_inputs, **tokenizer_kwargs)
+            self.tokenizer = AutoTokenizer.from_pretrained(tokenizer, **tokenizer_kwargs)
         if self.model.config.pad_token_id is not None:
-            self.pad_token = self.tokenizer.convert_ids_to_tokens(self.model.config.pad_token_id)
+            self.pad_token = self._convert_ids_to_tokens(self.model.config.pad_token_id, skip_special_tokens=False)
             self.tokenizer.pad_token = self.pad_token
         self.bos_token_id = getattr(self.model.config, "decoder_start_token_id", None)
         if self.bos_token_id is None:
             self.bos_token_id = self.model.config.bos_token_id
-        self.bos_token = self.tokenizer.convert_ids_to_tokens(self.bos_token_id)
+        self.bos_token = self._convert_ids_to_tokens(self.bos_token_id, skip_special_tokens=False)
         self.eos_token_id = getattr(self.model.config, "eos_token_id", None)
         if self.eos_token_id is None:
             self.eos_token_id = self.tokenizer.pad_token_id
@@ -140,17 +137,23 @@ class HuggingfaceModel(AttributionModel):
         attribution_method: Optional[str] = None,
         tokenizer: Union[str, PreTrainedTokenizerBase, None] = None,
         device: str = None,
+        model_kwargs: Optional[dict[str, Any]] = {},
+        tokenizer_kwargs: Optional[dict[str, Any]] = {},
         **kwargs,
     ) -> "HuggingfaceModel":
         """Loads a HuggingFace model and tokenizer and wraps them in the appropriate AttributionModel."""
         if isinstance(model, str):
-            is_encoder_decoder = AutoConfig.from_pretrained(model).is_encoder_decoder
+            is_encoder_decoder = AutoConfig.from_pretrained(model, **model_kwargs).is_encoder_decoder
         else:
             is_encoder_decoder = model.config.is_encoder_decoder
         if is_encoder_decoder:
-            return HuggingfaceEncoderDecoderModel(model, attribution_method, tokenizer, device, **kwargs)
+            return HuggingfaceEncoderDecoderModel(
+                model, attribution_method, tokenizer, device, model_kwargs, tokenizer_kwargs, **kwargs
+            )
         else:
-            return HuggingfaceDecoderOnlyModel(model, attribution_method, tokenizer, device, **kwargs)
+            return HuggingfaceDecoderOnlyModel(
+                model, attribution_method, tokenizer, device, model_kwargs, tokenizer_kwargs, **kwargs
+            )
 
     @AttributionModel.device.setter
     def device(self, new_device: str) -> None:
@@ -176,8 +179,8 @@ class HuggingfaceModel(AttributionModel):
         pass
 
     @property
-    def info(self) -> Dict[str, str]:
-        dic_info: Dict[str, str] = super().info
+    def info(self) -> dict[str, str]:
+        dic_info: dict[str, str] = super().info
         extra_info = {
             "tokenizer_name": self.tokenizer_name,
             "tokenizer_class": self.tokenizer.__class__.__name__,
@@ -193,7 +196,7 @@ class HuggingfaceModel(AttributionModel):
         return_generation_output: bool = False,
         skip_special_tokens: bool = True,
         **kwargs,
-    ) -> Union[List[str], Tuple[List[str], ModelOutput]]:
+    ) -> Union[list[str], tuple[list[str], ModelOutput]]:
         """Wrapper of model.generate to handle tokenization and decoding.
 
         Args:
@@ -274,16 +277,16 @@ class HuggingfaceModel(AttributionModel):
                 baseline_ids = torch.cat((bos_ids, baseline_ids), dim=1)
         return BatchEncoding(
             input_ids=batch["input_ids"],
-            input_tokens=[self.tokenizer.convert_ids_to_tokens(x) for x in batch["input_ids"]],
+            input_tokens=[self._convert_ids_to_tokens(x, skip_special_tokens=False) for x in batch["input_ids"]],
             attention_mask=batch["attention_mask"],
             baseline_ids=baseline_ids,
         )
 
     def decode(
         self,
-        ids: Union[List[int], List[List[int]], IdsTensor],
+        ids: Union[list[int], list[list[int]], IdsTensor],
         skip_special_tokens: bool = True,
-    ) -> List[str]:
+    ) -> list[str]:
         return self.tokenizer.batch_decode(
             ids,
             skip_special_tokens=skip_special_tokens,
@@ -301,14 +304,20 @@ class HuggingfaceModel(AttributionModel):
             embeddings = self.get_embedding_layer()(ids)
         return embeddings * self.embed_scale
 
+    def _convert_ids_to_tokens(self, ids: IdsTensor, skip_special_tokens: bool = True) -> OneOrMoreTokenSequences:
+        tokens = self.tokenizer.convert_ids_to_tokens(ids, skip_special_tokens=skip_special_tokens)
+        if isinstance(tokens, bytes) and not isinstance(tokens, str):
+            return tokens.decode("utf-8")
+        elif isinstance(tokens, list):
+            return [t.decode("utf-8") if isinstance(t, bytes) else t for t in tokens]
+        return tokens
+
     def convert_ids_to_tokens(
         self, ids: IdsTensor, skip_special_tokens: Optional[bool] = True
     ) -> OneOrMoreTokenSequences:
         if ids.ndim < 2:
-            return self.tokenizer.convert_ids_to_tokens(ids, skip_special_tokens=skip_special_tokens)
-        return [
-            self.tokenizer.convert_ids_to_tokens(id_slice, skip_special_tokens=skip_special_tokens) for id_slice in ids
-        ]
+            return self._convert_ids_to_tokens(ids, skip_special_tokens)
+        return [self._convert_ids_to_tokens(id_slice, skip_special_tokens) for id_slice in ids]
 
     def convert_tokens_to_ids(self, tokens: TextInput) -> OneOrMoreIdSequences:
         if isinstance(tokens[0], str):
@@ -323,7 +332,7 @@ class HuggingfaceModel(AttributionModel):
     ) -> TextInput:
         if isinstance(tokens, list) and len(tokens) == 0:
             return ""
-        elif isinstance(tokens[0], str):
+        elif isinstance(tokens[0], (bytes, str)):
             tmp_decode_state = self.tokenizer._decode_use_source_tokenizer
             self.tokenizer._decode_use_source_tokenizer = not as_targets
             out_strings = self.tokenizer.convert_tokens_to_string(
@@ -345,7 +354,7 @@ class HuggingfaceModel(AttributionModel):
                 text_target=text if as_targets else None,
                 add_special_tokens=not skip_special_tokens,
             )["input_ids"]
-            return self.tokenizer.convert_ids_to_tokens(ids, skip_special_tokens)
+            return self._convert_ids_to_tokens(ids, skip_special_tokens)
         return [self.convert_string_to_tokens(t, skip_special_tokens, as_targets) for t in text]
 
     def clean_tokens(
@@ -369,7 +378,7 @@ class HuggingfaceModel(AttributionModel):
         """
         if isinstance(tokens, list) and len(tokens) == 0:
             return []
-        elif isinstance(tokens[0], str):
+        elif isinstance(tokens[0], (bytes, str)):
             clean_tokens = []
             for tok in tokens:
                 clean_tok = self.convert_tokens_to_string(
@@ -383,11 +392,11 @@ class HuggingfaceModel(AttributionModel):
         return [self.clean_tokens(token_seq, skip_special_tokens, as_targets) for token_seq in tokens]
 
     @property
-    def special_tokens(self) -> List[str]:
+    def special_tokens(self) -> list[str]:
         return self.tokenizer.all_special_tokens
 
     @property
-    def special_tokens_ids(self) -> List[int]:
+    def special_tokens_ids(self) -> list[int]:
         return self.tokenizer.all_special_ids
 
     @property
@@ -409,16 +418,6 @@ class HuggingfaceEncoderDecoderModel(HuggingfaceModel, EncoderDecoderAttribution
 
     _autoclass = AutoModelForSeq2SeqLM
 
-    def __init__(
-        self,
-        model: Union[str, PreTrainedModel],
-        attribution_method: Optional[str] = None,
-        tokenizer: Union[str, PreTrainedTokenizerBase, None] = None,
-        device: str = None,
-        **kwargs,
-    ) -> NoReturn:
-        super().__init__(model, attribution_method, tokenizer, device, **kwargs)
-
     def configure_embeddings_scale(self):
         encoder = self.model.get_encoder()
         decoder = self.model.get_decoder()
@@ -436,7 +435,7 @@ class HuggingfaceEncoderDecoderModel(HuggingfaceModel, EncoderDecoderAttribution
     @staticmethod
     def get_attentions_dict(
         output: Seq2SeqLMOutput,
-    ) -> Dict[str, MultiLayerMultiUnitScoreTensor]:
+    ) -> dict[str, MultiLayerMultiUnitScoreTensor]:
         if output.encoder_attentions is None or output.decoder_attentions is None:
             raise ValueError("Model does not support attribution relying on attention outputs.")
         return {
@@ -446,7 +445,7 @@ class HuggingfaceEncoderDecoderModel(HuggingfaceModel, EncoderDecoderAttribution
         }
 
     @staticmethod
-    def get_hidden_states_dict(output: Seq2SeqLMOutput) -> Dict[str, MultiLayerEmbeddingsTensor]:
+    def get_hidden_states_dict(output: Seq2SeqLMOutput) -> dict[str, MultiLayerEmbeddingsTensor]:
         return {
             "encoder_hidden_states": torch.stack(output.encoder_hidden_states, dim=1),
             "decoder_hidden_states": torch.stack(output.decoder_hidden_states, dim=1),
@@ -470,9 +469,11 @@ class HuggingfaceDecoderOnlyModel(HuggingfaceModel, DecoderOnlyAttributionModel)
         attribution_method: Optional[str] = None,
         tokenizer: Union[str, PreTrainedTokenizerBase, None] = None,
         device: str = None,
+        model_kwargs: Optional[dict[str, Any]] = {},
+        tokenizer_kwargs: Optional[dict[str, Any]] = {},
         **kwargs,
     ) -> NoReturn:
-        super().__init__(model, attribution_method, tokenizer, device, **kwargs)
+        super().__init__(model, attribution_method, tokenizer, device, model_kwargs, tokenizer_kwargs, **kwargs)
         self.tokenizer.padding_side = "left"
         self.tokenizer.truncation_side = "left"
         if self.pad_token is None:
@@ -484,7 +485,7 @@ class HuggingfaceDecoderOnlyModel(HuggingfaceModel, DecoderOnlyAttributionModel)
             self.embed_scale = self.model.embed_scale
 
     @staticmethod
-    def get_attentions_dict(output: CausalLMOutput) -> Dict[str, MultiLayerMultiUnitScoreTensor]:
+    def get_attentions_dict(output: CausalLMOutput) -> dict[str, MultiLayerMultiUnitScoreTensor]:
         if output.attentions is None:
             raise ValueError("Model does not support attribution relying on attention outputs.")
         return {
@@ -492,7 +493,7 @@ class HuggingfaceDecoderOnlyModel(HuggingfaceModel, DecoderOnlyAttributionModel)
         }
 
     @staticmethod
-    def get_hidden_states_dict(output: CausalLMOutput) -> Dict[str, MultiLayerEmbeddingsTensor]:
+    def get_hidden_states_dict(output: CausalLMOutput) -> dict[str, MultiLayerEmbeddingsTensor]:
         return {
             "decoder_hidden_states": torch.stack(output.hidden_states, dim=1),
         }

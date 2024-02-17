@@ -3,9 +3,11 @@ import sys
 
 from ..utils import InseqArgumentParser
 from .attribute import AttributeCommand
+from .attribute_context import AttributeContextCommand
 from .attribute_dataset import AttributeDatasetCommand
+from .base import BaseCLICommand
 
-COMMANDS = [AttributeCommand, AttributeDatasetCommand]
+COMMANDS: list[BaseCLICommand] = [AttributeCommand, AttributeDatasetCommand, AttributeContextCommand]
 
 
 def main():

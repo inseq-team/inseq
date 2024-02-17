@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from enum import Enum
 from functools import lru_cache
 from itertools import chain
-from typing import List, Optional, Tuple, Union
+from typing import Optional, Union
 
 import torch
 from transformers import AutoModel, AutoTokenizer, PreTrainedModel, PreTrainedTokenizerBase
@@ -18,12 +18,12 @@ ALIGN_MODEL_ID = "sentence-transformers/LaBSE"
 
 @dataclass
 class AlignedSequences:
-    source_tokens: List[str]
-    target_tokens: List[str]
-    alignments: List[Tuple[int, int]]
+    source_tokens: list[str]
+    target_tokens: list[str]
+    alignments: list[tuple[int, int]]
 
     @property
-    def aligned_tokens(self) -> List[Tuple[str, str]]:
+    def aligned_tokens(self) -> list[tuple[str, str]]:
         return [(self.source_tokens[a_idx], self.target_tokens[b_idx]) for a_idx, b_idx in self.alignments]
 
     def reverse(self) -> "AlignedSequences":
@@ -51,7 +51,7 @@ def get_aligner_tokenizer() -> PreTrainedTokenizerBase:
     return AutoTokenizer.from_pretrained(ALIGN_MODEL_ID)
 
 
-def _preprocess_sequence_for_alignment(tokenized_seq: List[str]) -> Tuple[torch.Tensor, List[List[int]]]:
+def _preprocess_sequence_for_alignment(tokenized_seq: list[str]) -> tuple[torch.Tensor, list[list[int]]]:
     aligner_tokenizer = get_aligner_tokenizer()
     idxs = [aligner_tokenizer.convert_tokens_to_ids(x) for x in tokenized_seq]
     idxs = aligner_tokenizer.prepare_for_model(
@@ -67,8 +67,8 @@ def _preprocess_sequence_for_alignment(tokenized_seq: List[str]) -> Tuple[torch.
 
 
 def _get_aligner_subword_aligns(
-    src: List[str],
-    tgt: List[str],
+    src: list[str],
+    tgt: list[str],
     align_layer: int,
     score_threshold: float,
 ) -> torch.Tensor:
@@ -91,8 +91,8 @@ def _get_aligner_subword_aligns(
 
 
 def compute_word_aligns(
-    src: Union[str, List[str]],
-    tgt: Union[str, List[str]],
+    src: Union[str, list[str]],
+    tgt: Union[str, list[str]],
     split_pattern: str = r"\s+|\b",
     align_layer: int = 8,
     score_threshold: float = 1e-3,
@@ -116,8 +116,8 @@ def compute_word_aligns(
 
 
 def align_tokenizations(
-    tok_a: List[str],
-    tok_b: List[str],
+    tok_a: list[str],
+    tok_b: list[str],
 ) -> AlignedSequences:
     """Align tokens from a sentence tokenized by different tokenizers.
 
@@ -193,8 +193,8 @@ def propagate_alignments(aligns_a_b: AlignedSequences, aligns_b_c: AlignedSequen
 
 
 def add_alignment_extra_positions(
-    alignments: List[Tuple[int, int]], extra_positions: List[Tuple[int, int]]
-) -> List[Tuple[int, int]]:
+    alignments: list[tuple[int, int]], extra_positions: list[tuple[int, int]]
+) -> list[tuple[int, int]]:
     for x_idx_a, x_idx_b in extra_positions:
         for pos, (idx_a, idx_b) in enumerate(alignments):
             a_val, b_val = idx_a, idx_b
@@ -208,10 +208,10 @@ def add_alignment_extra_positions(
 
 def auto_align_sequences(
     a_sequence: Optional[str] = None,
-    a_tokens: Optional[List[str]] = None,
+    a_tokens: Optional[list[str]] = None,
     b_sequence: Optional[str] = None,
-    b_tokens: Optional[List[str]] = None,
-    filter_special_tokens: List[str] = [],
+    b_tokens: Optional[list[str]] = None,
+    filter_special_tokens: list[str] = [],
     split_pattern: str = r"\s+|\b",
 ) -> AlignedSequences:
     if not a_sequence or not b_sequence or not a_tokens or not b_tokens:
@@ -231,7 +231,7 @@ def auto_align_sequences(
         clean_a_tokens, removed_a_token_idxs = clean_tokens(a_tokens, filter_special_tokens)
         clean_b_tokens, removed_b_token_idxs = clean_tokens(b_tokens, filter_special_tokens)
         if len(removed_a_token_idxs) != len(removed_b_token_idxs):
-            logger.warning(
+            logger.debug(
                 "The number of special tokens in the target and contrast sequences do not match. "
                 "Trying to match special tokens based on their identity."
             )
@@ -266,7 +266,7 @@ def auto_align_sequences(
             alignments=a_to_b_aligns_with_special_tokens,
         )
     except Exception as e:
-        logger.warning(
+        logger.error(
             "Failed to compute alignments using the aligner. "
             f"Please check the following error and provide custom alignments if needed.\n{e}"
         )
@@ -274,16 +274,16 @@ def auto_align_sequences(
 
 
 def get_adjusted_alignments(
-    alignments: Union[List[Tuple[int, int]], str],
+    alignments: Union[list[tuple[int, int]], str],
     target_sequence: Optional[str] = None,
-    target_tokens: Optional[List[str]] = None,
+    target_tokens: Optional[list[str]] = None,
     contrast_sequence: Optional[str] = None,
-    contrast_tokens: Optional[List[str]] = None,
+    contrast_tokens: Optional[list[str]] = None,
     fill_missing: bool = False,
-    special_tokens: List[str] = [],
+    special_tokens: list[str] = [],
     start_pos: int = 0,
     end_pos: Optional[int] = None,
-) -> List[Tuple[int, int]]:
+) -> list[tuple[int, int]]:
     is_auto_aligned = False
     if fill_missing and not target_tokens:
         raise ValueError("Missing target tokens. Please provide target tokens to fill missing alignments.")
@@ -302,7 +302,7 @@ def get_adjusted_alignments(
             ).alignments
             alignments = [(a_idx, b_idx) for a_idx, b_idx in alignments if start_pos <= a_idx < end_pos]
             is_auto_aligned = True
-            logger.warning(
+            logger.debug(
                 f"Using {ALIGN_MODEL_ID} for automatic alignments. Provide custom alignments for non-linguistic "
                 f"sequences, or for languages not covered by the aligner."
             )
@@ -316,13 +316,14 @@ def get_adjusted_alignments(
 
     # Filter alignments (restrict to one per token)
     filter_aligns = []
-    for pair_idx in range(start_pos, end_pos):
-        match_pairs = [(p0, p1) for p0, p1 in alignments if p0 == pair_idx and 0 <= p1 < len(contrast_tokens)]
-        if match_pairs:
-            # If found, use the first match that containing an unaligned target token, first match otherwise
-            match_pairs_unaligned = [p for p in match_pairs if p[1] not in [f[1] for f in filter_aligns]]
-            valid_match = match_pairs_unaligned[0] if match_pairs_unaligned else match_pairs[0]
-            filter_aligns.append(valid_match)
+    if len(alignments) > 0:
+        for pair_idx in range(start_pos, end_pos):
+            match_pairs = [(p0, p1) for p0, p1 in alignments if p0 == pair_idx and 0 <= p1 < len(contrast_tokens)]
+            if match_pairs:
+                # If found, use the first match that containing an unaligned target token, first match otherwise
+                match_pairs_unaligned = [p for p in match_pairs if p[1] not in [f[1] for f in filter_aligns]]
+                valid_match = match_pairs_unaligned[0] if match_pairs_unaligned else match_pairs[0]
+                filter_aligns.append(valid_match)
 
     # Filling alignments with missing tokens
     if fill_missing:
@@ -333,10 +334,10 @@ def get_adjusted_alignments(
             # Default behavior: fill missing alignments with 1:1 position alignments starting from the bottom of the
             # two sequences
             if not match_pairs:
-                if (len(contrast_tokens) - step_idx) < start_pos:
-                    filled_alignments.append((pair_idx, len(contrast_tokens) - 1))
-                else:
+                if (len(contrast_tokens) - step_idx) > 0:
                     filled_alignments.append((pair_idx, len(contrast_tokens) - step_idx))
+                else:
+                    filled_alignments.append((pair_idx, len(contrast_tokens) - 1))
 
         if filter_aligns != filled_alignments:
             existing_aligns_message = (
@@ -346,17 +347,17 @@ def get_adjusted_alignments(
                 "No target alignments were provided for the contrastive target. "
                 "Use e.g. 'contrast_targets_alignments=[(0,1), ...] to provide them in model.attribute"
             )
-            logger.warning(
+            logger.debug(
                 f"{existing_aligns_message if filter_aligns else no_aligns_message}\n"
                 "Filling missing position with right-aligned 1:1 position alignments."
             )
             filter_aligns = sorted(set(filled_alignments), key=lambda x: (x[0], x[1]))
     if is_auto_aligned or (fill_missing and filter_aligns != filled_alignments):
-        logger.warning(f"Generated alignments: {filter_aligns}")
+        logger.debug(f"Generated alignments: {filter_aligns}")
     return filter_aligns
 
 
-def get_aligned_idx(a_idx: int, alignments: List[Tuple[int, int]]) -> int:
+def get_aligned_idx(a_idx: int, alignments: list[tuple[int, int]]) -> int:
     if alignments:
         # Find all alignment pairs for the current original target
         aligned_idxs = [t_idx for s_idx, t_idx in alignments if s_idx == a_idx]

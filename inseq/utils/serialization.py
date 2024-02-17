@@ -33,7 +33,7 @@ import json
 from collections import OrderedDict
 from json import JSONEncoder
 from os import PathLike
-from typing import Any, Callable, Dict, List, Optional, TypeVar, Union
+from typing import Any, Callable, Optional, TypeVar, Union
 
 from numpy import generic, ndarray
 
@@ -96,7 +96,7 @@ def ndarray_encode(
     ndarray_compact: Optional[bool] = None,
     compression: bool = False,
     **kwargs,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Encodes numpy ``ndarray`` as lists with meta data.
     Encodes numpy scalar types as Python equivalents. Special encoding is not possible,
     because float64 is a subclass of primitives, which never reach the encoder.
@@ -135,7 +135,7 @@ ENCODE_HOOKS = [class_instance_encode, ndarray_encode]
 class AttributionSerializer(JSONEncoder):
     def __init__(
         self,
-        encoders: Optional[List[Callable]] = None,
+        encoders: Optional[list[Callable]] = None,
         use_primitives: bool = True,
         ndarray_compact: Optional[bool] = None,
         compression: bool = False,
@@ -174,7 +174,7 @@ class AttributionSerializer(JSONEncoder):
 def json_advanced_dumps(
     obj: EncodableObject,
     sort_keys: bool = True,
-    encoders: List[Callable] = ENCODE_HOOKS,
+    encoders: list[Callable] = ENCODE_HOOKS,
     use_primitives: bool = True,
     allow_nan: bool = True,
     ndarray_compact: Optional[bool] = None,
@@ -221,7 +221,7 @@ def json_advanced_dumps(
 def json_advanced_dump(
     obj: EncodableObject,
     sort_keys: bool = True,
-    encoders: List[Callable] = ENCODE_HOOKS,
+    encoders: list[Callable] = ENCODE_HOOKS,
     use_primitives: bool = False,
     allow_nan: bool = True,
     ndarray_compact: Optional[bool] = None,
@@ -301,7 +301,7 @@ def ndarray_hook(dct: Any, **kwargs) -> DecodableObject:
         return scalar_to_numpy(data_json, nptype)
 
 
-def class_instance_hook(dct: Any, cls_lookup_map: Optional[Dict[str, type]] = None, **kwargs) -> DecodableObject:
+def class_instance_hook(dct: Any, cls_lookup_map: Optional[dict[str, type]] = None, **kwargs) -> DecodableObject:
     """This hook tries to convert json encoded by class_instance_encoder back to it's original instance.
     It only works if the environment is the same, e.g. the class is similarly importable and hasn't changed.
 
@@ -343,8 +343,8 @@ class AttributionDeserializer:
     def __init__(
         self,
         ordered: bool = False,
-        hooks: Optional[List[Callable]] = None,
-        cls_lookup_map: Optional[Dict[str, type]] = None,
+        hooks: Optional[list[Callable]] = None,
+        cls_lookup_map: Optional[dict[str, type]] = None,
     ):
         self.map_type = OrderedDict if ordered else dict
         self.hooks = hooks if hooks else []
@@ -365,8 +365,8 @@ def json_advanced_loads(
     string: str,
     ordered: bool = False,
     decompression: bool = False,
-    hooks: List[Callable] = DECODE_HOOKS,
-    cls_lookup_map: Optional[Dict[str, type]] = None,
+    hooks: list[Callable] = DECODE_HOOKS,
+    cls_lookup_map: Optional[dict[str, type]] = None,
     **jsonkwargs,
 ) -> Any:
     """Load a complex object containing classes and arrays object from a string.
@@ -405,8 +405,8 @@ def json_advanced_load(
     fp: Union[str, bytes, PathLike],
     ordered: bool = True,
     decompression: bool = False,
-    hooks: List[Callable] = DECODE_HOOKS,
-    cls_lookup_map: Optional[Dict[str, type]] = None,
+    hooks: list[Callable] = DECODE_HOOKS,
+    cls_lookup_map: Optional[dict[str, type]] = None,
     **jsonkwargs,
 ) -> Any:
     """Load a complex object containing classes and arrays from a JSON file.

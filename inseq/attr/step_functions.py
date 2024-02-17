@@ -1,6 +1,7 @@
 import logging
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Protocol, Tuple, Union
+from inspect import signature
+from typing import TYPE_CHECKING, Any, Optional, Protocol, Union
 
 import torch
 import torch.nn.functional as F
@@ -84,14 +85,14 @@ class StepFunction(Protocol):
 def logit_fn(args: StepFunctionArgs) -> SingleScorePerStepTensor:
     """Compute the logit of the target_ids from the model's output logits."""
     logits = args.attribution_model.output2logits(args.forward_output)
-    target_ids = args.target_ids.reshape(logits.shape[0], 1)
+    target_ids = args.target_ids.reshape(logits.shape[0], 1).to(logits.device)
     return logits.gather(-1, target_ids).squeeze(-1)
 
 
 def probability_fn(args: StepFunctionArgs, logprob: bool = False) -> SingleScorePerStepTensor:
     """Compute the probabilty of target_ids from the model's output logits."""
     logits = args.attribution_model.output2logits(args.forward_output)
-    target_ids = args.target_ids.reshape(logits.shape[0], 1)
+    target_ids = args.target_ids.reshape(logits.shape[0], 1).to(logits.device)
     logits = logits.softmax(dim=-1) if not logprob else logits.log_softmax(dim=-1)
     # Extracts the ith score from the softmax output over the vocabulary (dim -1 of the logits)
     # where i is the value of the corresponding index in target_ids.
@@ -101,7 +102,7 @@ def probability_fn(args: StepFunctionArgs, logprob: bool = False) -> SingleScore
 def entropy_fn(args: StepFunctionArgs) -> SingleScorePerStepTensor:
     """Compute the entropy of the model's output distribution."""
     logits = args.attribution_model.output2logits(args.forward_output)
-    entropy = torch.zeros(logits.size(0))
+    entropy = torch.zeros(logits.size(0)).to(logits.device)
     for i in range(logits.size(0)):
         entropy[i] = torch.distributions.Categorical(logits=logits[i]).entropy()
     return entropy
@@ -112,7 +113,7 @@ def crossentropy_fn(args: StepFunctionArgs) -> SingleScorePerStepTensor:
     See: https://github.com/ZurichNLP/nmtscore/blob/master/src/nmtscore/models/m2m100.py#L99.
     """
     logits = args.attribution_model.output2logits(args.forward_output)
-    return F.cross_entropy(logits, args.target_ids, reduction="none").squeeze(-1)
+    return F.cross_entropy(logits, args.target_ids.to(logits.device), reduction="none").squeeze(-1)
 
 
 def perplexity_fn(args: StepFunctionArgs) -> SingleScorePerStepTensor:
@@ -129,7 +130,7 @@ def contrast_logits_fn(
     args: StepFunctionArgs,
     contrast_sources: Optional[FeatureAttributionInput] = None,
     contrast_targets: Optional[FeatureAttributionInput] = None,
-    contrast_targets_alignments: Optional[List[List[Tuple[int, int]]]] = None,
+    contrast_targets_alignments: Optional[list[list[tuple[int, int]]]] = None,
     contrast_force_inputs: bool = False,
 ):
     """Returns the logit of a generation target given contrastive context or target prediction alternative.
@@ -152,7 +153,7 @@ def contrast_prob_fn(
     args: StepFunctionArgs,
     contrast_sources: Optional[FeatureAttributionInput] = None,
     contrast_targets: Optional[FeatureAttributionInput] = None,
-    contrast_targets_alignments: Optional[List[List[Tuple[int, int]]]] = None,
+    contrast_targets_alignments: Optional[list[list[tuple[int, int]]]] = None,
     logprob: bool = False,
     contrast_force_inputs: bool = False,
 ):
@@ -176,7 +177,7 @@ def pcxmi_fn(
     args: StepFunctionArgs,
     contrast_sources: Optional[FeatureAttributionInput] = None,
     contrast_targets: Optional[FeatureAttributionInput] = None,
-    contrast_targets_alignments: Optional[List[List[Tuple[int, int]]]] = None,
+    contrast_targets_alignments: Optional[list[list[tuple[int, int]]]] = None,
     contrast_force_inputs: bool = False,
 ) -> SingleScorePerStepTensor:
     """Compute the pointwise conditional cross-mutual information (P-CXMI) of target ids given original and contrastive
@@ -191,7 +192,7 @@ def pcxmi_fn(
         contrast_targets=contrast_targets,
         contrast_targets_alignments=contrast_targets_alignments,
         contrast_force_inputs=contrast_force_inputs,
-    )
+    ).to(original_probs.device)
     return -torch.log2(torch.div(original_probs, contrast_probs))
 
 
@@ -200,7 +201,7 @@ def kl_divergence_fn(
     args: StepFunctionArgs,
     contrast_sources: Optional[FeatureAttributionInput] = None,
     contrast_targets: Optional[FeatureAttributionInput] = None,
-    contrast_targets_alignments: Optional[List[List[Tuple[int, int]]]] = None,
+    contrast_targets_alignments: Optional[list[list[tuple[int, int]]]] = None,
     top_k: int = 0,
     top_p: float = 1.0,
     min_tokens_to_keep: int = 1,
@@ -236,7 +237,7 @@ def kl_divergence_fn(
     c_forward_output = args.attribution_model.get_forward_output(
         contrast_inputs.batch, use_embeddings=args.attribution_model.is_encoder_decoder
     )
-    contrast_logits: torch.Tensor = args.attribution_model.output2logits(c_forward_output)
+    contrast_logits: torch.Tensor = args.attribution_model.output2logits(c_forward_output).to(original_logits.device)
     filtered_original_logits, filtered_contrast_logits = filter_logits(
         original_logits=original_logits,
         contrast_logits=contrast_logits,
@@ -259,7 +260,7 @@ def contrast_prob_diff_fn(
     args: StepFunctionArgs,
     contrast_sources: Optional[FeatureAttributionInput] = None,
     contrast_targets: Optional[FeatureAttributionInput] = None,
-    contrast_targets_alignments: Optional[List[List[Tuple[int, int]]]] = None,
+    contrast_targets_alignments: Optional[list[list[tuple[int, int]]]] = None,
     logprob: bool = False,
     contrast_force_inputs: bool = False,
 ):
@@ -278,7 +279,7 @@ def contrast_prob_diff_fn(
         contrast_targets_alignments=contrast_targets_alignments,
         logprob=logprob,
         contrast_force_inputs=contrast_force_inputs,
-    )
+    ).to(model_probs.device)
     return model_probs - contrast_probs
 
 
@@ -287,7 +288,7 @@ def contrast_logits_diff_fn(
     args: StepFunctionArgs,
     contrast_sources: Optional[FeatureAttributionInput] = None,
     contrast_targets: Optional[FeatureAttributionInput] = None,
-    contrast_targets_alignments: Optional[List[List[Tuple[int, int]]]] = None,
+    contrast_targets_alignments: Optional[list[list[tuple[int, int]]]] = None,
     contrast_force_inputs: bool = False,
 ):
     """Equivalent to ``contrast_prob_diff_fn`` but for logits. The original target function used in
@@ -300,7 +301,7 @@ def contrast_logits_diff_fn(
         contrast_targets=contrast_targets,
         contrast_targets_alignments=contrast_targets_alignments,
         contrast_force_inputs=contrast_force_inputs,
-    )
+    ).to(model_logits.device)
     return model_logits - contrast_logits
 
 
@@ -309,7 +310,7 @@ def in_context_pvi_fn(
     args: StepFunctionArgs,
     contrast_sources: Optional[FeatureAttributionInput] = None,
     contrast_targets: Optional[FeatureAttributionInput] = None,
-    contrast_targets_alignments: Optional[List[List[Tuple[int, int]]]] = None,
+    contrast_targets_alignments: Optional[list[list[tuple[int, int]]]] = None,
     contrast_force_inputs: bool = False,
 ):
     """Returns the in-context pointwise V-usable information as defined by `Lu et al. (2023)
@@ -329,7 +330,7 @@ def in_context_pvi_fn(
         contrast_targets_alignments=contrast_targets_alignments,
         logprob=True,
         contrast_force_inputs=contrast_force_inputs,
-    )
+    ).to(orig_logprob.device)
     return -orig_logprob + contrast_logprob
 
 
@@ -361,7 +362,7 @@ def mc_dropout_prob_avg_fn(
             aux_batch, use_embeddings=args.attribution_model.is_encoder_decoder
         )
         args.forward_output = aux_output
-        noisy_prob = probability_fn(args, logprob=logprob)
+        noisy_prob = probability_fn(args, logprob=logprob).to(orig_prob.device)
         noisy_probs.append(noisy_prob)
     # Z-score the original based on the mean and standard deviation of MC dropout predictions
     return (orig_prob - torch.stack(noisy_probs).mean(0)).div(torch.stack(noisy_probs).std(0))
@@ -377,7 +378,7 @@ def top_p_size_fn(
         top_p (:obj:`float`): The cumulative probability threshold to use for filtering the logits.
     """
     logits: torch.Tensor = args.attribution_model.output2logits(args.forward_output)
-    indices_to_remove = top_p_logits_mask(logits, top_p, 1)
+    indices_to_remove = top_p_logits_mask(logits, top_p, 1).to(logits.device)
     logits = logits.masked_select(~indices_to_remove)[None, ...]
     return torch.tensor(logits.size(-1))[None, ...]
 
@@ -418,15 +419,15 @@ def get_step_function(score_identifier: str) -> StepFunction:
 def get_step_scores(
     score_identifier: str,
     step_fn_args: StepFunctionArgs,
-    step_fn_extra_args: Dict[str, Any] = {},
+    step_fn_extra_args: dict[str, Any] = {},
 ) -> SingleScorePerStepTensor:
     """Returns step scores for the target tokens in the batch."""
     return get_step_function(score_identifier)(step_fn_args, **step_fn_extra_args)
 
 
 def get_step_scores_args(
-    score_identifiers: List[str], kwargs: Dict[str, Any], default_args: Optional[Dict[str, Any]] = None
-) -> Dict[str, Any]:
+    score_identifiers: list[str], kwargs: dict[str, Any], default_args: Optional[dict[str, Any]] = None
+) -> dict[str, Any]:
     step_scores_args = {}
     for step_fn_id in score_identifiers:
         step_fn = get_step_function(step_fn_id)
@@ -441,7 +442,7 @@ def get_step_scores_args(
     return step_scores_args
 
 
-def list_step_functions() -> List[str]:
+def list_step_functions() -> list[str]:
     """Lists identifiers for all available step scores. One or more step scores identifiers can be passed to the
     :meth:`~inseq.models.AttributionModel.attribute` method either to compute scores while attributing (``step_scores``
     parameter), or as target function for the attribution, if supported by the attribution method (``attributed_fn``
@@ -453,7 +454,7 @@ def list_step_functions() -> List[str]:
 def register_step_function(
     fn: StepFunction,
     identifier: str,
-    aggregate_map: Optional[Dict[str, str]] = None,
+    aggregate_map: Optional[dict[str, str]] = None,
     overwrite: bool = False,
 ) -> None:
     """Registers a function to be used to compute step scores and store them in the
@@ -500,3 +501,7 @@ def register_step_function(
             if agg_name not in DEFAULT_ATTRIBUTION_AGGREGATE_DICT["step_scores"]:
                 DEFAULT_ATTRIBUTION_AGGREGATE_DICT["step_scores"][agg_name] = {}
             DEFAULT_ATTRIBUTION_AGGREGATE_DICT["step_scores"][agg_name][identifier] = aggregation_fn_identifier
+
+
+def is_contrastive_step_function(step_fn_id: str) -> bool:
+    return "contrast_targets" in signature(get_step_function(step_fn_id)).parameters

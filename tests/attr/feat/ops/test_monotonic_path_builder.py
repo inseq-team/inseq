@@ -1,5 +1,4 @@
 from itertools import islice
-from typing import List, Tuple
 
 from inseq.utils import is_joblib_available
 
@@ -65,7 +64,7 @@ def walrus_operator_find_word_path(wrd_idx: int, n_steps: int):
         ((512, 12, 3)),
     ],
 )
-def test_equivalent_monotonic_method(input_dims: Tuple[int, ...]) -> None:
+def test_equivalent_monotonic_method(input_dims: tuple[int, ...]) -> None:
     torch.manual_seed(42)
     baseline_embeds = torch.randn(input_dims)
     input_embeds = torch.randn(input_dims)
@@ -130,7 +129,7 @@ def test_scaled_monotonic_path_embeddings(word_idx: int, dig_model) -> None:
         )
     ],
 )
-def test_parallel_find_word(ids: List[List[int]], dig_model) -> None:
+def test_parallel_find_word(ids: list[list[int]], dig_model) -> None:
     pathsa = []
     for seq in ids:
         tok_paths = []

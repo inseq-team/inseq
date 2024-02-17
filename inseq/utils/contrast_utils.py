@@ -1,7 +1,7 @@
 import logging
 import warnings
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Callable, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Callable, Optional, Union
 
 import torch
 
@@ -61,7 +61,7 @@ def _get_contrast_inputs(
     args: "StepFunctionArgs",
     contrast_sources: Optional[FeatureAttributionInput] = None,
     contrast_targets: Optional[FeatureAttributionInput] = None,
-    contrast_targets_alignments: Optional[List[List[Tuple[int, int]]]] = None,
+    contrast_targets_alignments: Optional[list[list[tuple[int, int]]]] = None,
     return_contrastive_target_ids: bool = False,
     return_contrastive_batch: bool = False,
     **forward_kwargs,
@@ -82,7 +82,7 @@ def _get_contrast_inputs(
                 inputs=contrast_targets,
                 as_targets=is_enc_dec,
             )
-        )
+        ).to(args.decoder_input_ids.device)
         curr_prefix_len = args.decoder_input_ids.size(1)
         c_batch, c_tgt_ids = slice_batch_from_position(c_batch, curr_prefix_len, contrast_targets_alignments)
 
@@ -107,7 +107,7 @@ def _get_contrast_inputs(
                 "Contrastive source inputs can only be used with encoder-decoder models. "
                 "Use `contrast_targets` to set a contrastive target containing a prefix for decoder-only models."
             )
-        c_enc_in = args.attribution_model.encode(contrast_sources)
+        c_enc_in = args.attribution_model.encode(contrast_sources).to(args.encoder_input_ids.device)
         if (
             args.encoder_input_ids.shape != c_enc_in.input_ids.shape
             or torch.ne(args.encoder_input_ids, c_enc_in.input_ids).any()
@@ -126,7 +126,7 @@ def _setup_contrast_args(
     args: "StepFunctionArgs",
     contrast_sources: Optional[FeatureAttributionInput] = None,
     contrast_targets: Optional[FeatureAttributionInput] = None,
-    contrast_targets_alignments: Optional[List[List[Tuple[int, int]]]] = None,
+    contrast_targets_alignments: Optional[list[list[tuple[int, int]]]] = None,
     contrast_force_inputs: bool = False,
 ):
     c_inputs = _get_contrast_inputs(
