@@ -102,7 +102,7 @@ fast-test:
 
 # Limits the number of threads to 4 to avoid overloading the CI
 .PHONY: fast-test-ci
-fast-test:
+fast-test-ci:
 	$(PYTHON) -m pytest -n 4 -c pyproject.toml -v -m "not slow"
 
 .PHONY: codecov
