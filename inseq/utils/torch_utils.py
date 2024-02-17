@@ -269,3 +269,60 @@ def find_block_stack(module):
 
     # If nn.ModuleList is not found in any submodules, return None
     return None
+
+
+def validate_indices(
+    scores: torch.Tensor,
+    dim: int = -1,
+    indices: Union[int, tuple[int, int], list[int], None] = None,
+) -> Union[int, tuple[int, int], list[int]]:
+    """Validates a set of indices for a given dimension of a tensor of scores. Supports single indices, spans and lists
+    of indices, including negative indices to specify positions relative to the end of the tensor.
+
+    Args:
+        scores (torch.Tensor): The tensor of scores.
+        dim (int, optional): The dimension of the tensor that will be indexed. Defaults to -1.
+        indices (Union[int, tuple[int, int], list[int], None], optional): 
+            - If an integer, it is interpreted as a single index for the dimension.
+            - If a tuple of two integers, it is interpreted as a span of indices for the dimension.
+            - If a list of integers, it is interpreted as a list of individual indices for the dimension.
+
+    Returns:
+        ``Union[int, tuple[int, int], list[int]]``: The validated list of positive indices for indexing the dimension.
+    """
+    n_units = scores.shape[dim]
+    if hasattr(indices, "__iter__"):
+        if len(indices) == 0:
+            raise RuntimeError("At least two indices must be specified. Found an empty list.")
+        if len(indices) == 1:
+            indices = indices[0]
+
+    if isinstance(indices, int):
+        if indices not in range(-n_units, n_units):
+            raise IndexError(f"Index out of range. Scores only have {n_units} units.")
+        indices = indices if indices >= 0 else n_units + indices
+        return torch.tensor(indices)
+    else:
+        if indices is None:
+            indices = (0, n_units)
+            logger.info("No indices specified. Using all indices by default.")
+
+        # Convert negative indices to positive indices
+        if hasattr(indices, "__iter__"):
+            indices = type(indices)([h_idx if h_idx >= 0 else n_units + h_idx for h_idx in indices])
+        if not hasattr(indices, "__iter__") or (
+            len(indices) == 2 and isinstance(indices, tuple) and indices[0] >= indices[1]
+        ):
+            raise RuntimeError(
+                "A (start, end) tuple of indices representing a span, a list of individual indices"
+                " or a single index must be specified."
+            )
+        max_idx_val = n_units if isinstance(indices, list) else n_units + 1
+        if not all(h in range(-n_units, max_idx_val) for h in indices):
+            raise IndexError(f"One or more index out of range. Scores only have {n_units} units.")
+        if len(set(indices)) != len(indices):
+            raise IndexError("Duplicate indices are not allowed.")
+        if isinstance(indices, tuple):
+            return torch.arange(indices[0], indices[1])
+        else:
+            return torch.tensor(indices)

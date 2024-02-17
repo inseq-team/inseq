@@ -147,7 +147,7 @@ Use the `inseq.list_feature_attribution_methods` function to list all available 
 
 - `lime`: ["Why Should I Trust You?": Explaining the Predictions of Any Classifier](https://arxiv.org/abs/1602.04938) (Ribeiro et al., 2016)
 
-- `value_zeroing`: [Value Zeroing](https://aclanthology.org/2023.eacl-main.245/) (Mohebbi et al. 2023)
+- `value_zeroing`: [Quantifying Context Mixing in Transformers](https://aclanthology.org/2023.eacl-main.245/) (Mohebbi et al. 2023)
 
 #### Step functions
 

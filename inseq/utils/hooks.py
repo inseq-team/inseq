@@ -5,7 +5,7 @@ from typing import Callable, Optional, TypeVar
 
 from torch import nn
 
-FrameType = TypeVar("FrameType")
+StackFrame = TypeVar("StackFrame")
 
 
 def get_last_variable_assignment_position(
@@ -41,7 +41,7 @@ def get_post_variable_assignment_hook(
     module: nn.Module,
     varname: str,
     fname: str = "forward",
-    hook_fn: Callable[[FrameType], None] = lambda **kwargs: None,
+    hook_fn: Callable[[StackFrame], None] = lambda **kwargs: None,
     **kwargs,
 ) -> Callable[[], None]:
     """Creates a hook that is called after the last variable assignment in the specified method of a `nn.Module`.

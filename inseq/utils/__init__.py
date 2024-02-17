@@ -8,7 +8,7 @@ from .errors import (
     MissingAttributionMethodError,
     UnknownAttributionMethodError,
 )
-from .hooks import get_post_variable_assignment_hook
+from .hooks import get_post_variable_assignment_hook, StackFrame
 from .import_utils import (
     is_captum_available,
     is_datasets_available,
@@ -57,6 +57,7 @@ from .torch_utils import (
     normalize,
     remap_from_filtered,
     top_p_logits_mask,
+    validate_indices,
 )
 
 __all__ = [
@@ -120,4 +121,7 @@ __all__ = [
     "top_p_logits_mask",
     "filter_logits",
     "cli_arg",
+    "get_post_variable_assignment_hook",
+    "StackFrame",
+    "validate_indices",
 ]
