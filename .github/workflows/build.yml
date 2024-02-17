@@ -42,7 +42,7 @@ jobs:
 
     - name: Run fast tests
       run: |
-        make fast-test
+        make fast-test-ci
 
     - name: Run safety checks
       run: |

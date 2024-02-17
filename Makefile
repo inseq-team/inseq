@@ -90,19 +90,24 @@ lint: fix-style check-safety
 #* Linting
 .PHONY: test
 test:
-	$(PYTHON) -m pytest -c pyproject.toml -v
+	$(PYTHON) -m pytest -n auto -c pyproject.toml -v
 
 .PHONY: test-cpu
 test-cpu:
-	$(PYTHON) -m pytest -c pyproject.toml -v -m "not require_cuda_gpu"
+	$(PYTHON) -m pytest -n auto -c pyproject.toml -v -m "not require_cuda_gpu"
 
 .PHONY: fast-test
 fast-test:
-	$(PYTHON) -m pytest -c pyproject.toml -v -m "not slow"
+	$(PYTHON) -m pytest -n auto -c pyproject.toml -v -m "not slow"
+
+# Limits the number of threads to 4 to avoid overloading the CI
+.PHONY: fast-test-ci
+fast-test:
+	$(PYTHON) -m pytest -n 4 -c pyproject.toml -v -m "not slow"
 
 .PHONY: codecov
 codecov:
-	$(PYTHON) -m pytest --cov inseq --cov-report html
+	$(PYTHON) -m pytest -n auto --cov inseq --cov-report html
 
 #* Docs
 .PHONY: build-docs

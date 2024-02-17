@@ -18,6 +18,7 @@
 - Drop `darglint` in favor of `pydoclint`. ([#249](https://github.com/inseq-team/inseq/pull/249))
 - Replace Arxiv with ACL Anthology badge in `README`. ([#249](https://github.com/inseq-team/inseq/pull/249))
 - Add first version of `CHANGELOG.md` ([#249](https://github.com/inseq-team/inseq/pull/249))
+- Added multithread support for running tests using `pytest-xdist`
 
 ## 📝 Documentation and Tutorials
 

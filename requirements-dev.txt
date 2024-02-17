@@ -66,6 +66,8 @@ dparse==0.6.4b0
     # via
     #   safety
     #   safety-schemas
+execnet==2.0.2
+    # via pytest-xdist
 executing==2.0.1
     # via stack-data
 filelock==3.13.1
@@ -232,8 +234,11 @@ pygments==2.17.2
 pyparsing==3.1.1
     # via matplotlib
 pytest==8.0.0
-    # via pytest-cov
+    # via
+    #   pytest-cov
+    #   pytest-xdist
 pytest-cov==4.1.0
+pytest-xdist==3.5.0
 python-dateutil==2.8.2
     # via
     #   jupyter-client
