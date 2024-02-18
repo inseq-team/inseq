@@ -120,6 +120,9 @@ class LimeAttribution(PerturbationAttributionRegistry):
         )
 
 class ReAGentAttribution(PerturbationAttributionRegistry):
+    """ReAGent-based attribution method.
+    The main part of the code is in ops/reagent.py.
+    """
 
     method_name = "ReAGent"
 
@@ -133,12 +136,8 @@ class ReAGentAttribution(PerturbationAttributionRegistry):
         attribution_args: dict[str, Any] = {},
     ) -> GranularFeatureAttributionStepOutput:
         if len(attribute_fn_main_args["inputs"]) > 1:
-            # Captum's `_evaluate_batch` function for LIME does not account for multiple inputs when encoder-decoder
-            # models and attribute_target=True are used. The model output is of length two and if the inputs are either
-            # of length one (list containing a tuple) or of length two (tuple unpacked from the list), an error is
-            # raised. A workaround will be added soon.
             raise NotImplementedError(
-                "ReAgent attribution with attribute_target=True currently not supported for encoder-decoder models."
+                "ReAgent attribution not supported for encoder-decoder models."
             )
         out = super().attribute_step(attribute_fn_main_args, attribution_args)
         return GranularFeatureAttributionStepOutput(
