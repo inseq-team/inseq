@@ -11,6 +11,7 @@ from ...utils import Registry
 from .attribution_utils import get_source_target_attributions
 from .gradient_attribution import FeatureAttribution
 from .ops import Lime
+from .ops import ReAGent
 
 logger = logging.getLogger(__name__)
 
@@ -110,6 +111,34 @@ class LimeAttribution(PerturbationAttributionRegistry):
             # raised. A workaround will be added soon.
             raise NotImplementedError(
                 "LIME attribution with attribute_target=True currently not supported for encoder-decoder models."
+            )
+        out = super().attribute_step(attribute_fn_main_args, attribution_args)
+        return GranularFeatureAttributionStepOutput(
+            source_attributions=out.source_attributions,
+            target_attributions=out.target_attributions,
+            sequence_scores=out.sequence_scores,
+        )
+
+class ReAGentAttribution(PerturbationAttributionRegistry):
+
+    method_name = "ReAGent"
+
+    def __init__(self, attribution_model, **kwargs):
+        super().__init__(attribution_model)
+        self.method = ReAGent(attribution_model=self.attribution_model, **kwargs)
+
+    def attribute_step(
+        self,
+        attribute_fn_main_args: dict[str, Any],
+        attribution_args: dict[str, Any] = {},
+    ) -> GranularFeatureAttributionStepOutput:
+        if len(attribute_fn_main_args["inputs"]) > 1:
+            # Captum's `_evaluate_batch` function for LIME does not account for multiple inputs when encoder-decoder
+            # models and attribute_target=True are used. The model output is of length two and if the inputs are either
+            # of length one (list containing a tuple) or of length two (tuple unpacked from the list), an error is
+            # raised. A workaround will be added soon.
+            raise NotImplementedError(
+                "ReAgent attribution with attribute_target=True currently not supported for encoder-decoder models."
             )
         out = super().attribute_step(attribute_fn_main_args, attribution_args)
         return GranularFeatureAttributionStepOutput(
