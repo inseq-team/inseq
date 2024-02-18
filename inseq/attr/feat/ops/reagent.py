@@ -1,17 +1,14 @@
-
-from typing import Any, Callable, Union, cast
+from typing import Any, Callable, Union
+from typing_extensions import override
 from captum.attr._utils.attribution import PerturbationAttribution
 from captum._utils.typing import TargetType, TensorOrTupleOfTensorsGeneric
 from torch import Tensor
 import torch
-from ReAGent.src.rationalization.rationalizer.aggregate_rationalizer import AggregateRationalizer
-from ReAGent.src.rationalization.rationalizer.importance_score_evaluator.delta_prob import DeltaProbImportanceScoreEvaluator
-from ReAGent.src.rationalization.rationalizer.stopping_condition_evaluator.top_k import TopKStoppingConditionEvaluator
-from ReAGent.src.rationalization.rationalizer.stopping_condition_evaluator.dummy import DummyStoppingConditionEvaluator
-from ReAGent.src.rationalization.rationalizer.token_replacement.token_replacer.uniform import UniformTokenReplacer
-
-from ReAGent.src.rationalization.rationalizer.token_replacement.token_sampler.postag import POSTagTokenSampler
-from ReAGent.src.rationalization.rationalizer.token_replacement.token_sampler.uniform import UniformTokenSampler
+from .reagent_core.aggregate_rationalizer import AggregateRationalizer
+from .reagent_core.importance_score_evaluator.delta_prob import DeltaProbImportanceScoreEvaluator
+from .reagent_core.stopping_condition_evaluator.top_k import TopKStoppingConditionEvaluator
+from .reagent_core.token_replacement.token_replacer.uniform import UniformTokenReplacer
+from .reagent_core.token_replacement.token_sampler.postag import POSTagTokenSampler
 
 class ReAGent(PerturbationAttribution):
     r"""
@@ -75,7 +72,6 @@ class ReAGent(PerturbationAttribution):
             top_n_ratio=rational_size_ratio,
             tokenizer=tokenizer
         )
-        # stopping_condition_evaluator = DummyStoppingConditionEvaluator()
 
         importance_score_evaluator = DeltaProbImportanceScoreEvaluator(
             model=model,
