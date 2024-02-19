@@ -2,8 +2,6 @@ import torch
 from transformers import AutoModelWithLMHead, AutoTokenizer
 from typing_extensions import override
 
-from .base import TokenSampler
-
 
 class InferentialMTokenSampler(TokenSampler):
     """Sample tokens from a seq-2-seq model"""
@@ -37,8 +35,6 @@ class InferentialMTokenSampler(TokenSampler):
             token_inferences: sampled (placement) tokens by inference
 
         """
-        super().sample(inputs)
-
         batch_li = []
         for seq_i in torch.arange(inputs.shape[0]):
             seq_li = []

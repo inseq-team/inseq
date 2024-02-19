@@ -63,7 +63,7 @@ class RankingTokenReplacer(TokenReplacer):
         """
         super().sample(input)
 
-        token_sampled = self.token_sampler.sample(input)
+        token_sampled = self.token_sampler(input)
 
         input_replaced = input * ~self.mask_replacing + token_sampled * self.mask_replacing
 

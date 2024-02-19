@@ -10,7 +10,7 @@ from ...data import (
 from ...utils import Registry
 from .attribution_utils import get_source_target_attributions
 from .gradient_attribution import FeatureAttribution
-from .ops import Lime, ReAGent
+from .ops import Lime, Reagent
 
 logger = logging.getLogger(__name__)
 
@@ -119,16 +119,22 @@ class LimeAttribution(PerturbationAttributionRegistry):
         )
 
 
-class ReAGentAttribution(PerturbationAttributionRegistry):
-    """ReAGent-based attribution method.
-    The main part of the code is in ops/reagent.py.
+class ReagentAttribution(PerturbationAttributionRegistry):
+    """Recursive attribution generator (ReAGent) method.
+
+    Measures importance as the drop in prediction probability produced by replacing a token with a plausible
+    alternative predicted by a LM.
+
+    Reference implementation:
+    `ReAGent: A Model-agnostic Feature Attribution Method for Generative Language Models
+        <https://arxiv.org/abs/2402.00794>`__
     """
 
-    method_name = "ReAGent"
+    method_name = "reagent"
 
     def __init__(self, attribution_model, **kwargs):
         super().__init__(attribution_model)
-        self.method = ReAGent(attribution_model=self.attribution_model, **kwargs)
+        self.method = Reagent(attribution_model=self.attribution_model, **kwargs)
 
     def attribute_step(
         self,

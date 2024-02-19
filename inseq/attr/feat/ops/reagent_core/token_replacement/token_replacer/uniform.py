@@ -40,7 +40,7 @@ class UniformTokenReplacer(TokenReplacer):
         sample_uniform = torch.rand(input.shape, device=input.device)
         mask_replacing = sample_uniform < self.ratio
 
-        token_sampled = self.token_sampler.sample(input)
+        token_sampled = self.token_sampler(input)
 
         input_replaced = input * ~mask_replacing + token_sampled * mask_replacing
 

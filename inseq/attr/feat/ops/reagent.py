@@ -1,4 +1,4 @@
-from typing import Any, Callable, Union
+from typing import TYPE_CHECKING, Any, Union
 
 import torch
 from captum._utils.typing import TargetType, TensorOrTupleOfTensorsGeneric
@@ -10,12 +10,21 @@ from .reagent_core.aggregate_rationalizer import AggregateRationalizer
 from .reagent_core.importance_score_evaluator.delta_prob import DeltaProbImportanceScoreEvaluator
 from .reagent_core.stopping_condition_evaluator.top_k import TopKStoppingConditionEvaluator
 from .reagent_core.token_replacement.token_replacer.uniform import UniformTokenReplacer
-from .reagent_core.token_replacement.token_sampler.postag import POSTagTokenSampler
+from .reagent_core.token_sampler import POSTagTokenSampler
+
+if TYPE_CHECKING:
+    from ....models import HuggingfaceModel
 
 
-class ReAGent(PerturbationAttribution):
-    r"""
-    ReAGent
+class Reagent(PerturbationAttribution):
+    r"""Recursive attribution generator (ReAGent) method.
+
+    Measures importance as the drop in prediction probability produced by replacing a token with a plausible
+    alternative predicted by a LM.
+
+    Reference implementation:
+    `ReAGent: A Model-agnostic Feature Attribution Method for Generative Language Models
+        <https://arxiv.org/abs/2402.00794>`__
 
     Args:
         forward_func (callable): The forward function of the model or any
@@ -27,10 +36,6 @@ class ReAGent(PerturbationAttribution):
         replacing_ratio (float): replacing ratio of tokens for probing
         max_probe_steps (int): max_probe_steps
         num_probes (int): number of probes in parallel
-
-    References:
-        `ReAGent: A Model-agnostic Feature Attribution Method for Generative Language Models
-        <https://arxiv.org/abs/2402.00794>`_
 
     Examples:
         ```
@@ -52,7 +57,7 @@ class ReAGent(PerturbationAttribution):
 
     def __init__(
         self,
-        attribution_model: Callable,
+        attribution_model: "HuggingfaceModel",
         rational_size: int = 5,
         rational_size_ratio: float = None,
         stopping_condition_top_k: int = 3,
@@ -65,7 +70,9 @@ class ReAGent(PerturbationAttribution):
         model = attribution_model.model
         tokenizer = attribution_model.tokenizer
 
-        token_sampler = POSTagTokenSampler(tokenizer=tokenizer, device=model.device)
+        token_sampler = POSTagTokenSampler(
+            tokenizer=tokenizer, identifier=attribution_model.model_name, device=attribution_model.device
+        )
 
         stopping_condition_evaluator = TopKStoppingConditionEvaluator(
             model=model,
