@@ -1,4 +1,3 @@
-
 from typing import Union
 
 import torch
@@ -9,9 +8,7 @@ from .base import TokenReplacer
 
 
 class UniformTokenReplacer(TokenReplacer):
-    """Replace tokens in a sequence where selecting is base on uniform distribution
-
-    """
+    """Replace tokens in a sequence where selecting is base on uniform distribution"""
 
     @override
     def __init__(self, token_sampler: TokenSampler, ratio: float) -> None:
@@ -32,7 +29,7 @@ class UniformTokenReplacer(TokenReplacer):
 
         Args:
             input: input sequence [batch, sequence]
-        
+
         Returns:
             input_replaced: A replaced sequence [batch, sequence]
             mask_replacing: Identify which token has been replaced [batch, sequence]
@@ -48,4 +45,3 @@ class UniformTokenReplacer(TokenReplacer):
         input_replaced = input * ~mask_replacing + token_sampled * mask_replacing
 
         return input_replaced, mask_replacing
-    

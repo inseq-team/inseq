@@ -9,12 +9,12 @@ from .base import TokenReplacer
 
 
 class RankingTokenReplacer(TokenReplacer):
-    """Replace tokens in a sequence based on top-N ranking
-
-    """
+    """Replace tokens in a sequence based on top-N ranking"""
 
     @override
-    def __init__(self, token_sampler: TokenSampler, top_n: int = 0, top_n_ratio: float = 0, replace_greater: bool = False) -> None:
+    def __init__(
+        self, token_sampler: TokenSampler, top_n: int = 0, top_n_ratio: float = 0, replace_greater: bool = False
+    ) -> None:
         """Constructor
 
         Args:
@@ -31,11 +31,9 @@ class RankingTokenReplacer(TokenReplacer):
         self.replace_greater = replace_greater
 
     def set_score(self, value: torch.Tensor) -> None:
-        
         pos_sorted = torch.argsort(value, descending=True)
 
         top_n = self.top_n
-        
 
         if top_n == 0:
             top_n = int(math.ceil(self.top_n_ratio * value.shape[-1]))
@@ -43,9 +41,13 @@ class RankingTokenReplacer(TokenReplacer):
         pos_top_n = pos_sorted[..., :top_n]
 
         if not self.replace_greater:
-            self.mask_replacing = torch.ones(value.shape, device=value.device, dtype=torch.bool).scatter(-1, pos_top_n, 0)
+            self.mask_replacing = torch.ones(value.shape, device=value.device, dtype=torch.bool).scatter(
+                -1, pos_top_n, 0
+            )
         else:
-            self.mask_replacing = torch.zeros(value.shape, device=value.device, dtype=torch.bool).scatter(-1, pos_top_n, 1)
+            self.mask_replacing = torch.zeros(value.shape, device=value.device, dtype=torch.bool).scatter(
+                -1, pos_top_n, 1
+            )
 
     @override
     def sample(self, input: torch.Tensor) -> Union[torch.Tensor, torch.Tensor]:
@@ -53,7 +55,7 @@ class RankingTokenReplacer(TokenReplacer):
 
         Args:
             input: input sequence [batch, sequence]
-        
+
         Returns:
             input_replaced: A replaced sequence [batch, sequence]
             mask_replacing: Identify which token has been replaced [batch, sequence]

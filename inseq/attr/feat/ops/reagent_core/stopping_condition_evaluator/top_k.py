@@ -11,14 +11,22 @@ from .base import StoppingConditionEvaluator
 
 class TopKStoppingConditionEvaluator(StoppingConditionEvaluator):
     """
-    Stopping Condition Evaluator which stop when target exist in top k predictions, 
+    Stopping Condition Evaluator which stop when target exist in top k predictions,
     while top n tokens based on importance_score are not been replaced.
     """
 
     @override
-    def __init__(self, model: AutoModelWithLMHead, token_sampler: TokenSampler, top_k: int, top_n: int = 0, top_n_ratio: float = 0, tokenizer: AutoTokenizer = None) -> None:
+    def __init__(
+        self,
+        model: AutoModelWithLMHead,
+        token_sampler: TokenSampler,
+        top_k: int,
+        top_n: int = 0,
+        top_n_ratio: float = 0,
+        tokenizer: AutoTokenizer = None,
+    ) -> None:
         """Constructor
-        
+
         Args:
             model: A Huggingface AutoModelWithLMHead.
             token_sampler: A TokenSampler to sample replacement tokens
@@ -38,7 +46,9 @@ class TopKStoppingConditionEvaluator(StoppingConditionEvaluator):
         self.tokenizer = tokenizer
 
     @override
-    def evaluate(self, input_ids: torch.Tensor, target_id: torch.Tensor, importance_score: torch.Tensor) -> torch.Tensor:
+    def evaluate(
+        self, input_ids: torch.Tensor, target_id: torch.Tensor, importance_score: torch.Tensor
+    ) -> torch.Tensor:
         """Evaluate stop condition
 
         Args:
@@ -53,7 +63,7 @@ class TopKStoppingConditionEvaluator(StoppingConditionEvaluator):
         super().evaluate(input_ids, target_id, importance_score)
 
         # Replace tokens with low importance score and then inference \hat{y^{(e)}_{t+1}}
-        
+
         self.token_replacer.set_score(importance_score)
         input_ids_replaced, mask_replacing = self.token_replacer.sample(input_ids)
 
@@ -61,18 +71,18 @@ class TopKStoppingConditionEvaluator(StoppingConditionEvaluator):
 
         # Whether the result \hat{y^{(e)}_{t+1}} consistent with y_{t+1}
 
-        assert input_ids_replaced.requires_grad == False, "Error: auto-diff engine not disabled"
+        assert not input_ids_replaced.requires_grad, "Error: auto-diff engine not disabled"
         with torch.no_grad():
-            logits_replaced = self.model(input_ids_replaced)['logits']
+            logits_replaced = self.model(input_ids_replaced)["logits"]
 
-        if self.trace_target_likelihood != None:
+        if self.trace_target_likelihood is not None:
             self.trace_target_likelihood.append(torch.softmax(logits_replaced, dim=-1)[:, -1, target_id])
 
-        ids_prediction_sorted = torch.argsort(logits_replaced[:, -1 ,:], descending=True)
-        ids_prediction_top_k = ids_prediction_sorted[:, :self.top_k]
+        ids_prediction_sorted = torch.argsort(logits_replaced[:, -1, :], descending=True)
+        ids_prediction_top_k = ids_prediction_sorted[:, : self.top_k]
 
         if self.tokenizer:
-            top_k_words = [ [ self.tokenizer.decode([token_id]) for token_id in seq] for seq in ids_prediction_top_k ]
+            top_k_words = [[self.tokenizer.decode([token_id]) for token_id in seq] for seq in ids_prediction_top_k]
             logging.debug(f"Top K words -> {top_k_words}")
 
         match_mask = ids_prediction_top_k == target_id
@@ -83,9 +93,7 @@ class TopKStoppingConditionEvaluator(StoppingConditionEvaluator):
 
     @override
     def trace_start(self) -> None:
-        """Start tracing
-
-        """
+        """Start tracing"""
         super().trace_start()
 
         self.token_sampler.trace_start()
@@ -93,9 +101,7 @@ class TopKStoppingConditionEvaluator(StoppingConditionEvaluator):
 
     @override
     def trace_stop(self) -> None:
-        """Stop tracing
-        
-        """
+        """Stop tracing"""
         super().trace_stop()
 
         self.token_sampler.trace_stop()

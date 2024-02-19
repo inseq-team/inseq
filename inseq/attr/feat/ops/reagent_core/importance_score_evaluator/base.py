@@ -2,15 +2,11 @@ import torch
 from transformers import AutoModelWithLMHead, AutoTokenizer
 from typing_extensions import override
 
-from ..stopping_condition_evaluator.base import StoppingConditionEvaluator
-from ..token_replacement.token_replacer.base import TokenReplacer
 from ..utils.traceable import Traceable
 
 
 class BaseImportanceScoreEvaluator(Traceable):
-    """Importance Score Evaluator
-    
-    """
+    """Importance Score Evaluator"""
 
     def __init__(self, model: AutoModelWithLMHead, tokenizer: AutoTokenizer) -> None:
         """Base Constructor
@@ -23,7 +19,7 @@ class BaseImportanceScoreEvaluator(Traceable):
 
         self.model = model
         self.tokenizer = tokenizer
-        
+
         self.important_score = None
 
         self.trace_importance_score = None
@@ -42,12 +38,10 @@ class BaseImportanceScoreEvaluator(Traceable):
         """
 
         raise NotImplementedError()
-    
+
     @override
     def trace_start(self):
-        """Start tracing
-        
-        """
+        """Start tracing"""
         super().trace_start()
 
         self.trace_importance_score = []
@@ -56,9 +50,7 @@ class BaseImportanceScoreEvaluator(Traceable):
 
     @override
     def trace_stop(self):
-        """Stop tracing
-        
-        """
+        """Stop tracing"""
         super().trace_stop()
 
         self.trace_importance_score = None

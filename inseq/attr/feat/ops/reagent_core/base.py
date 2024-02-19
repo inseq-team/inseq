@@ -3,7 +3,6 @@ from .utils.traceable import Traceable
 
 
 class BaseRationalizer(Traceable):
-
     def __init__(self, importance_score_evaluator: BaseImportanceScoreEvaluator) -> None:
         super().__init__()
 

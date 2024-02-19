@@ -1,14 +1,17 @@
 from typing import Any, Callable, Union
-from typing_extensions import override
-from captum.attr._utils.attribution import PerturbationAttribution
-from captum._utils.typing import TargetType, TensorOrTupleOfTensorsGeneric
-from torch import Tensor
+
 import torch
+from captum._utils.typing import TargetType, TensorOrTupleOfTensorsGeneric
+from captum.attr._utils.attribution import PerturbationAttribution
+from torch import Tensor
+from typing_extensions import override
+
 from .reagent_core.aggregate_rationalizer import AggregateRationalizer
 from .reagent_core.importance_score_evaluator.delta_prob import DeltaProbImportanceScoreEvaluator
 from .reagent_core.stopping_condition_evaluator.top_k import TopKStoppingConditionEvaluator
 from .reagent_core.token_replacement.token_replacer.uniform import UniformTokenReplacer
 from .reagent_core.token_replacement.token_sampler.postag import POSTagTokenSampler
+
 
 class ReAGent(PerturbationAttribution):
     r"""
@@ -33,8 +36,8 @@ class ReAGent(PerturbationAttribution):
         ```
         import inseq
 
-        model = inseq.load_model("gpt2-medium", "ReAGent", 
-                                rational_size=5, 
+        model = inseq.load_model("gpt2-medium", "ReAGent",
+                                rational_size=5,
                                 rational_size_ratio=None,
                                 stopping_condition_top_k=3,
                                 replacing_ratio=0.3,
@@ -50,12 +53,12 @@ class ReAGent(PerturbationAttribution):
     def __init__(
         self,
         attribution_model: Callable,
-        rational_size: int=5,
-        rational_size_ratio: float=None,
-        stopping_condition_top_k: int=3,
-        replacing_ratio: float=0.3,
-        max_probe_steps: int=3000,
-        num_probes: int=8,
+        rational_size: int = 5,
+        rational_size_ratio: float = None,
+        stopping_condition_top_k: int = 3,
+        replacing_ratio: float = 0.3,
+        max_probe_steps: int = 3000,
+        num_probes: int = 8,
     ) -> None:
         PerturbationAttribution.__init__(self, forward_func=attribution_model)
 
@@ -70,18 +73,15 @@ class ReAGent(PerturbationAttribution):
             top_k=stopping_condition_top_k,
             top_n=rational_size,
             top_n_ratio=rational_size_ratio,
-            tokenizer=tokenizer
+            tokenizer=tokenizer,
         )
 
         importance_score_evaluator = DeltaProbImportanceScoreEvaluator(
             model=model,
             tokenizer=tokenizer,
-            token_replacer=UniformTokenReplacer(
-                token_sampler=token_sampler,
-                ratio=replacing_ratio
-            ),
+            token_replacer=UniformTokenReplacer(token_sampler=token_sampler, ratio=replacing_ratio),
             stopping_condition_evaluator=stopping_condition_evaluator,
-            max_steps=max_probe_steps
+            max_steps=max_probe_steps,
         )
 
         self.rationalizer = AggregateRationalizer(
@@ -90,7 +90,7 @@ class ReAGent(PerturbationAttribution):
             overlap_threshold=0,
             overlap_strict_pos=True,
             top_n=rational_size,
-            top_n_ratio=rational_size_ratio
+            top_n_ratio=rational_size_ratio,
         )
 
     @override
@@ -103,8 +103,7 @@ class ReAGent(PerturbationAttribution):
         TensorOrTupleOfTensorsGeneric,
         tuple[TensorOrTupleOfTensorsGeneric, Tensor],
     ]:
-        """Implement attribute
-        """
+        """Implement attribute"""
         self.rationalizer.rationalize(additional_forward_args[0], additional_forward_args[1])
         mean_important_score = torch.unsqueeze(self.rationalizer.mean_important_score, 0)
         res = torch.unsqueeze(mean_important_score, 2).repeat(1, 1, inputs[0].shape[2])

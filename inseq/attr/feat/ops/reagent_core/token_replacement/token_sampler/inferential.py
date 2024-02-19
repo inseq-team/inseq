@@ -6,9 +6,7 @@ from .base import TokenSampler
 
 
 class InferentialTokenSampler(TokenSampler):
-    """Sample tokens from a seq-2-seq model
-
-    """
+    """Sample tokens from a seq-2-seq model"""
 
     @override
     def __init__(self, tokenizer: AutoTokenizer, model: AutoModelWithLMHead) -> None:
@@ -30,16 +28,16 @@ class InferentialTokenSampler(TokenSampler):
 
         Args:
             input: input tensor [batch, sequence]
-        
+
         Returns:
             token_inferences: sampled (placement) tokens by inference
 
         """
         super().sample(input)
 
-        logits_replacing = self.model(input)['logits']
+        logits_replacing = self.model(input)["logits"]
         ids_infer = torch.argmax(logits_replacing, dim=-1)
 
-        token_inferences = torch.cat([ input[:, 0:1], ids_infer[:, :-1] ], dim=1)
+        token_inferences = torch.cat([input[:, 0:1], ids_infer[:, :-1]], dim=1)
 
         return token_inferences

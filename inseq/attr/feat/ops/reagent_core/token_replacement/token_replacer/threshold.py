@@ -1,4 +1,3 @@
-
 from typing import Union
 
 import torch
@@ -9,9 +8,7 @@ from .base import TokenReplacer
 
 
 class ThresholdTokenReplacer(TokenReplacer):
-    """Replace tokens in a sequence based on a threshold
-
-    """
+    """Replace tokens in a sequence based on a threshold"""
 
     @override
     def __init__(self, token_sampler: TokenSampler, threshold: float, replace_greater: bool = False) -> None:
@@ -30,7 +27,7 @@ class ThresholdTokenReplacer(TokenReplacer):
 
     def set_value(self, value: torch.Tensor) -> None:
         """Set the value for threshold control
-        
+
         Args:
             value: value [batch, sequence]
 
@@ -46,7 +43,7 @@ class ThresholdTokenReplacer(TokenReplacer):
 
         Args:
             input: input sequence [batch, sequence]
-        
+
         Returns:
             input_replaced: A replaced sequence [batch, sequence]
             mask_replacing: Identify which token has been replaced [batch, sequence]
@@ -59,5 +56,3 @@ class ThresholdTokenReplacer(TokenReplacer):
         input_replaced = input * ~self.mask_replacing + token_sampled * self.mask_replacing
 
         return input_replaced, self.mask_replacing
-
-    

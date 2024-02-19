@@ -6,9 +6,7 @@ from .base import TokenSampler
 
 
 class UniformTokenSampler(TokenSampler):
-    """Sample tokens from Uniform distribution
-
-    """
+    """Sample tokens from Uniform distribution"""
 
     @override
     def __init__(self, tokenizer: AutoTokenizer) -> None:
@@ -32,14 +30,14 @@ class UniformTokenSampler(TokenSampler):
 
         # collect available tokens
         self.avail_tokens = torch.arange(tokenizer.vocab_size)[avail_mask != 0]
-    
+
     @override
     def sample(self, input: torch.Tensor) -> torch.Tensor:
         """Sample a tensor
 
         Args:
             input: input tensor [batch, sequence]
-        
+
         Returns:
             token_uniform: A sampled tensor where its shape is the same with the input
 

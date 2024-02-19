@@ -5,18 +5,12 @@ from ...utils.traceable import Traceable
 
 
 class TokenSampler(Traceable):
-    """Base class for token samplers
+    """Base class for token samplers"""
 
-    """
-    
     @override
     def __init__(self) -> None:
-        """Base Constructor
-        
-        """
+        """Base Constructor"""
         super().__init__()
 
     def sample(self, input: torch.Tensor) -> torch.Tensor:
-        """Base sample
-
-        """
+        """Base sample"""

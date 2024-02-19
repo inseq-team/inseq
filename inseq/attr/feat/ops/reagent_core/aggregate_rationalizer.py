@@ -1,20 +1,25 @@
-
 import math
 from typing import Union
 
 import torch
+from typing_extensions import override
+
 from .base import BaseRationalizer
 from .importance_score_evaluator.base import BaseImportanceScoreEvaluator
 
-from typing_extensions import override
-
 
 class AggregateRationalizer(BaseRationalizer):
-    """AggregateRationalizer
-    
-    """
+    """AggregateRationalizer"""
 
-    def __init__(self, importance_score_evaluator: BaseImportanceScoreEvaluator, batch_size: int, overlap_threshold: int, overlap_strict_pos: bool = True, top_n: float = 0, top_n_ratio: float = 0) -> None:
+    def __init__(
+        self,
+        importance_score_evaluator: BaseImportanceScoreEvaluator,
+        batch_size: int,
+        overlap_threshold: int,
+        overlap_strict_pos: bool = True,
+        top_n: float = 0,
+        top_n_ratio: float = 0,
+    ) -> None:
         """Constructor
 
         Args:
@@ -34,11 +39,10 @@ class AggregateRationalizer(BaseRationalizer):
         self.top_n = top_n
         self.top_n_ratio = top_n_ratio
 
-        assert overlap_strict_pos == True, "overlap_strict_pos = False not been supported yet"
+        assert overlap_strict_pos, "overlap_strict_pos = False not been supported yet"
 
     def get_separate_rational(self, input_ids, tokenizer) -> Union[torch.Tensor, list[list[str]]]:
-
-        tokens = [ [ tokenizer.decode([input_ids[0, i]]) for i in s] for s in self.pos_top_n ]
+        tokens = [[tokenizer.decode([input_ids[0, i]]) for i in s] for s in self.pos_top_n]
 
         return self.pos_top_n, tokens
 
@@ -59,9 +63,13 @@ class AggregateRationalizer(BaseRationalizer):
         batch_input_ids = input_ids.repeat(self.batch_size, 1)
 
         batch_importance_score = self.importance_score_evaluator.evaluate(batch_input_ids, target_id)
-        
-        important_score_masked = batch_importance_score * torch.unsqueeze(self.importance_score_evaluator.stop_mask, -1)
-        self.mean_important_score = torch.sum(important_score_masked, dim=0) / torch.sum(self.importance_score_evaluator.stop_mask)
+
+        important_score_masked = batch_importance_score * torch.unsqueeze(
+            self.importance_score_evaluator.stop_mask, -1
+        )
+        self.mean_important_score = torch.sum(important_score_masked, dim=0) / torch.sum(
+            self.importance_score_evaluator.stop_mask
+        )
 
         pos_sorted = torch.argsort(batch_importance_score, dim=-1, descending=True)
 
@@ -75,30 +83,29 @@ class AggregateRationalizer(BaseRationalizer):
 
         if self.overlap_strict_pos:
             count_overlap = torch.bincount(pos_top_n.flatten(), minlength=input_ids.shape[1])
-            pos_top_n_overlap = torch.unsqueeze(torch.nonzero(count_overlap >= self.overlap_threshold, as_tuple=True)[0], 0)
+            pos_top_n_overlap = torch.unsqueeze(
+                torch.nonzero(count_overlap >= self.overlap_threshold, as_tuple=True)[0], 0
+            )
             return pos_top_n_overlap
         else:
             token_id_top_n = input_ids[0, pos_top_n]
             count_overlap = torch.bincount(token_id_top_n.flatten(), minlength=input_ids.shape[1])
-            token_id_top_n_overlap = torch.unsqueeze(torch.nonzero(count_overlap >= self.overlap_threshold, as_tuple=True)[0], 0)
+            _token_id_top_n_overlap = torch.unsqueeze(
+                torch.nonzero(count_overlap >= self.overlap_threshold, as_tuple=True)[0], 0
+            )
             # TODO: Convert back to pos
             raise NotImplementedError("TODO")
-            
 
     @override
     def trace_start(self) -> None:
-        """Start tracing
-        
-        """
+        """Start tracing"""
         super().trace_start()
 
         self.importance_score_evaluator.trace_start()
 
     @override
     def trace_stop(self) -> None:
-        """Stop tracing
-        
-        """
+        """Stop tracing"""
         super().trace_stop()
 
         self.importance_score_evaluator.trace_stop()
@@ -106,18 +113,14 @@ class AggregateRationalizer(BaseRationalizer):
 
 @torch.no_grad()
 def main():
-
-    from stopping_condition_evaluator.top_k import \
-        TopKStoppingConditionEvaluator
+    from rationalization.rationalizer.importance_score_evaluator.delta_prob import DeltaProbImportanceScoreEvaluator
+    from stopping_condition_evaluator.top_k import TopKStoppingConditionEvaluator
     from token_replacement.token_replacer.uniform import UniformTokenReplacer
-    from token_replacement.token_sampler.inferential import \
-        InferentialTokenSampler
+    from token_replacement.token_sampler.inferential import InferentialTokenSampler
     from token_replacement.token_sampler.postag import POSTagTokenSampler
     from token_replacement.token_sampler.uniform import UniformTokenSampler
     from transformers import AutoModelWithLMHead, AutoTokenizer
 
-    from rationalization.rationalizer.importance_score_evaluator.delta_prob import \
-        DeltaProbImportanceScoreEvaluator
     from utils.serializing import serialize_rational
 
     # ======== model loading ========
@@ -127,7 +130,7 @@ def main():
 
     model.cuda()
     model.eval()
-    
+
     # ======== prepare data ========
 
     # batch with size 1
@@ -138,14 +141,14 @@ def main():
         # "When my flight landed in Thailand, I converted my currency and slowly fell asleep. (I had a terrifying dream about my grandmother, but that's a story for another time). I was staying in the capital city of"
     ]
 
-    # generate prediction 
-    input_ids = tokenizer(input_string, return_tensors='pt')['input_ids'].to(model.device)
-    generated_input = model.generate(input_ids=input_ids, max_length=80, do_sample=False) 
-    print(' generated input -->', [ [ tokenizer.decode(token) for token in seq] for seq in generated_input ])
+    # generate prediction
+    input_ids = tokenizer(input_string, return_tensors="pt")["input_ids"].to(model.device)
+    generated_input = model.generate(input_ids=input_ids, max_length=80, do_sample=False)
+    print(" generated input -->", [[tokenizer.decode(token) for token in seq] for seq in generated_input])
 
     # extract target from prediction
     target_id = generated_input[:, input_ids.shape[1]]
-    print(' target -->', [ tokenizer.decode(token) for token in target_id ])
+    print(" target -->", [tokenizer.decode(token) for token in target_id])
 
     # ======== hyper-parameters ========
 
@@ -165,7 +168,7 @@ def main():
     overlap_strict_pos = True
 
     # ======== rationalization ========
-    
+
     approach_sample_replacing_token = "uniform"
     # approach_sample_replacing_token = "inference"
     # approach_sample_replacing_token = "postag"
@@ -175,81 +178,79 @@ def main():
         # Approach 1: sample replacing token from uniform distribution
         rationalizer = AggregateRationalizer(
             importance_score_evaluator=DeltaProbImportanceScoreEvaluator(
-                model=model, 
-                tokenizer=tokenizer, 
+                model=model,
+                tokenizer=tokenizer,
                 token_replacer=UniformTokenReplacer(
-                    token_sampler=UniformTokenSampler(tokenizer), 
-                    ratio=updating_replacing_ratio
+                    token_sampler=UniformTokenSampler(tokenizer), ratio=updating_replacing_ratio
                 ),
                 stopping_condition_evaluator=TopKStoppingConditionEvaluator(
-                    model=model, 
-                    token_sampler=UniformTokenSampler(tokenizer), 
-                    top_k=stop_condition_tolerance, 
-                    top_n=rational_size, 
-                    top_n_ratio=rationale_size_ratio, 
-                    tokenizer=tokenizer
-                )
-            ), 
+                    model=model,
+                    token_sampler=UniformTokenSampler(tokenizer),
+                    top_k=stop_condition_tolerance,
+                    top_n=rational_size,
+                    top_n_ratio=rationale_size_ratio,
+                    tokenizer=tokenizer,
+                ),
+            ),
             batch_size=aggregate_batch_size,
             overlap_threshold=overlap_threshold,
             overlap_strict_pos=overlap_strict_pos,
-            top_n=rational_size, 
-            top_n_ratio=rationale_size_ratio
+            top_n=rational_size,
+            top_n_ratio=rationale_size_ratio,
         )
     elif approach_sample_replacing_token == "inference":
         # Approach 2: sample replacing token from model inference
         rationalizer = AggregateRationalizer(
             importance_score_evaluator=DeltaProbImportanceScoreEvaluator(
-                model=model, 
-                tokenizer=tokenizer, 
+                model=model,
+                tokenizer=tokenizer,
                 token_replacer=UniformTokenReplacer(
-                    token_sampler=InferentialTokenSampler(tokenizer=tokenizer, model=model), 
-                    ratio=updating_replacing_ratio
+                    token_sampler=InferentialTokenSampler(tokenizer=tokenizer, model=model),
+                    ratio=updating_replacing_ratio,
                 ),
                 stopping_condition_evaluator=TopKStoppingConditionEvaluator(
-                    model=model, 
-                    token_sampler=InferentialTokenSampler(tokenizer=tokenizer, model=model), 
-                    top_k=stop_condition_tolerance, 
-                    top_n=rational_size, 
-                    top_n_ratio=rationale_size_ratio, 
-                    tokenizer=tokenizer
-                )
-            ), 
+                    model=model,
+                    token_sampler=InferentialTokenSampler(tokenizer=tokenizer, model=model),
+                    top_k=stop_condition_tolerance,
+                    top_n=rational_size,
+                    top_n_ratio=rationale_size_ratio,
+                    tokenizer=tokenizer,
+                ),
+            ),
             batch_size=aggregate_batch_size,
             overlap_threshold=overlap_threshold,
             overlap_strict_pos=overlap_strict_pos,
-            top_n=rational_size, 
-            top_n_ratio=rationale_size_ratio
+            top_n=rational_size,
+            top_n_ratio=rationale_size_ratio,
         )
     elif approach_sample_replacing_token == "postag":
         # Approach 3: sample replacing token from uniform distribution on a set of words with the same POS tag
-        ts = POSTagTokenSampler(tokenizer=tokenizer, device=input_ids.device) # Initialize POSTagTokenSampler takes time so share it
+        ts = POSTagTokenSampler(
+            tokenizer=tokenizer, device=input_ids.device
+        )  # Initialize POSTagTokenSampler takes time so share it
         rationalizer = AggregateRationalizer(
             importance_score_evaluator=DeltaProbImportanceScoreEvaluator(
-                model=model, 
-                tokenizer=tokenizer, 
-                token_replacer=UniformTokenReplacer(
-                    token_sampler=ts, 
-                    ratio=updating_replacing_ratio
-                ),
+                model=model,
+                tokenizer=tokenizer,
+                token_replacer=UniformTokenReplacer(token_sampler=ts, ratio=updating_replacing_ratio),
                 stopping_condition_evaluator=TopKStoppingConditionEvaluator(
-                    model=model, 
-                    token_sampler=ts, 
-                    top_k=stop_condition_tolerance, 
-                    top_n=rational_size, 
-                    top_n_ratio=rationale_size_ratio, 
-                    tokenizer=tokenizer
-                )
-            ), 
+                    model=model,
+                    token_sampler=ts,
+                    top_k=stop_condition_tolerance,
+                    top_n=rational_size,
+                    top_n_ratio=rationale_size_ratio,
+                    tokenizer=tokenizer,
+                ),
+            ),
             batch_size=aggregate_batch_size,
             overlap_threshold=overlap_threshold,
             overlap_strict_pos=overlap_strict_pos,
-            top_n=rational_size, 
-            top_n_ratio=rationale_size_ratio
+            top_n=rational_size,
+            top_n_ratio=rationale_size_ratio,
         )
     else:
         raise ValueError("Invalid approach_sample_replacing_token")
-    
+
     rationalizer.trace_start()
 
     # rationalization
@@ -258,37 +259,38 @@ def main():
     # convert results
 
     print()
-    print(f"========================")
+    print("========================")
     print()
-    print(f'Input --> {input_string[0]}')
-    print(f'Target --> {tokenizer.decode(target_id[0])}')
+    print(f"Input --> {input_string[0]}")
+    print(f"Target --> {tokenizer.decode(target_id[0])}")
     print(f"Rational positions --> {pos_rational}")
-    print(f"Rational words -->")
+    print("Rational words -->")
     for i in range(pos_rational.shape[0]):
         ids_rational = input_ids[0, pos_rational[i]]
-        text_rational = [ tokenizer.decode([id_rational]) for id_rational in ids_rational ]
+        text_rational = [tokenizer.decode([id_rational]) for id_rational in ids_rational]
         print(f"{text_rational}")
 
     # output
 
     serialize_rational(
-        "rationalization_results/demo.json", 
-        -1, 
-        input_ids[0], 
-        target_id[0], 
-        pos_rational[0], 
-        tokenizer, 
+        "rationalization_results/demo.json",
+        -1,
+        input_ids[0],
+        target_id[0],
+        pos_rational[0],
+        tokenizer,
         rationalizer.importance_score_evaluator.important_score[0],
         compact=False,
-        comments= {
+        comments={
             "message": "This is a demo output. [comments] is an optional field",
             "model": "gpt2-medium",
-            "approach_type": approach_sample_replacing_token
+            "approach_type": approach_sample_replacing_token,
         },
-        trace_rationalizer=rationalizer
+        trace_rationalizer=rationalizer,
     )
 
     rationalizer.trace_stop()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

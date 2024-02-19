@@ -9,11 +9,16 @@ from .base import BaseImportanceScoreEvaluator
 
 
 class DeltaProbImportanceScoreEvaluator(BaseImportanceScoreEvaluator):
-    """Importance Score Evaluator
-    
-    """
+    """Importance Score Evaluator"""
 
-    def __init__(self, model: AutoModelWithLMHead, tokenizer: AutoTokenizer, token_replacer: TokenReplacer, stopping_condition_evaluator: StoppingConditionEvaluator, max_steps: float) -> None:
+    def __init__(
+        self,
+        model: AutoModelWithLMHead,
+        tokenizer: AutoTokenizer,
+        token_replacer: TokenReplacer,
+        stopping_condition_evaluator: StoppingConditionEvaluator,
+        max_steps: float,
+    ) -> None:
         """Constructor
 
         Args:
@@ -35,7 +40,13 @@ class DeltaProbImportanceScoreEvaluator(BaseImportanceScoreEvaluator):
         self.trace_target_likelihood_original = None
         self.num_steps = 0
 
-    def update_importance_score(self, logit_importance_score: torch.Tensor, input_ids: torch.Tensor, target_id: torch.Tensor, prob_original_target: torch.Tensor) -> torch.Tensor:
+    def update_importance_score(
+        self,
+        logit_importance_score: torch.Tensor,
+        input_ids: torch.Tensor,
+        target_id: torch.Tensor,
+        prob_original_target: torch.Tensor,
+    ) -> torch.Tensor:
         """Update importance score by one step
 
         Args:
@@ -53,11 +64,13 @@ class DeltaProbImportanceScoreEvaluator(BaseImportanceScoreEvaluator):
         input_ids_replaced, mask_replacing = self.token_replacer.sample(input_ids)
 
         logging.debug(f"Replacing mask:     { mask_replacing }")
-        logging.debug(f"Replaced sequence:  { [[ self.tokenizer.decode(seq[i]) for i in range(input_ids_replaced.shape[1]) ] for seq in input_ids_replaced ] }")
-        
+        logging.debug(
+            f"Replaced sequence:  { [[ self.tokenizer.decode(seq[i]) for i in range(input_ids_replaced.shape[1]) ] for seq in input_ids_replaced ] }"
+        )
+
         # Inference \hat{p^{(y)}} = p(y_{t+1}|\hat{y_{1...t}})
 
-        logits_replaced = self.model(input_ids_replaced)['logits']
+        logits_replaced = self.model(input_ids_replaced)["logits"]
         prob_replaced_target = torch.softmax(logits_replaced[:, input_ids_replaced.shape[1] - 1, :], -1)[:, target_id]
         self.trace_prob_original_target = prob_replaced_target
 
@@ -93,10 +106,10 @@ class DeltaProbImportanceScoreEvaluator(BaseImportanceScoreEvaluator):
 
         # Inference p^{(y)} = p(y_{t+1}|y_{1...t})
 
-        logits_original = self.model(input_ids)['logits']
+        logits_original = self.model(input_ids)["logits"]
         prob_original_target = torch.softmax(logits_original[:, input_ids.shape[1] - 1, :], -1)[:, target_id]
 
-        if self.trace_target_likelihood_original != None:
+        if self.trace_target_likelihood_original is not None:
             self.trace_target_likelihood_original = prob_original_target
 
         # Initialize importance score s for each token in the sequence y_{1...t}
@@ -108,34 +121,42 @@ class DeltaProbImportanceScoreEvaluator(BaseImportanceScoreEvaluator):
         self.num_steps = 0
         while self.num_steps < self.max_steps:
             self.num_steps += 1
-            
+
             # Update importance score
-            logit_importance_score_update = self.update_importance_score(logit_importance_score, input_ids, target_id, prob_original_target)
-            logit_importance_score = ~torch.unsqueeze(self.stop_mask, 1) * logit_importance_score_update + torch.unsqueeze(self.stop_mask, 1) * logit_importance_score
+            logit_importance_score_update = self.update_importance_score(
+                logit_importance_score, input_ids, target_id, prob_original_target
+            )
+            logit_importance_score = (
+                ~torch.unsqueeze(self.stop_mask, 1) * logit_importance_score_update
+                + torch.unsqueeze(self.stop_mask, 1) * logit_importance_score
+            )
 
             self.important_score = torch.softmax(logit_importance_score, -1)
-            if self.trace_importance_score != None:
+            if self.trace_importance_score is not None:
                 self.trace_importance_score.append(self.important_score)
 
             # Evaluate stop condition
-            self.stop_mask = self.stop_mask | self.stopping_condition_evaluator.evaluate(input_ids, target_id, self.important_score)
+            self.stop_mask = self.stop_mask | self.stopping_condition_evaluator.evaluate(
+                input_ids, target_id, self.important_score
+            )
             if torch.prod(self.stop_mask) > 0:
                 break
-        
+
         logging.info(f"Importance score evaluated in {self.num_steps} steps.")
 
         return torch.softmax(logit_importance_score, -1)
 
 
-
-
-
 class DeltaProbImportanceScoreEvaluator_imp(BaseImportanceScoreEvaluator):
-    """Importance Score Evaluator
-    
-    """
+    """Importance Score Evaluator"""
 
-    def __init__(self, model: AutoModelWithLMHead, tokenizer: AutoTokenizer, token_replacer: TokenReplacer, stopping_condition_evaluator: StoppingConditionEvaluator) -> None:
+    def __init__(
+        self,
+        model: AutoModelWithLMHead,
+        tokenizer: AutoTokenizer,
+        token_replacer: TokenReplacer,
+        stopping_condition_evaluator: StoppingConditionEvaluator,
+    ) -> None:
         """Constructor
 
         Args:
@@ -156,7 +177,13 @@ class DeltaProbImportanceScoreEvaluator_imp(BaseImportanceScoreEvaluator):
         self.trace_target_likelihood_original = None
         self.num_steps = 0
 
-    def update_importance_score(self, logit_importance_score: torch.Tensor, input_ids: torch.Tensor, target_id: torch.Tensor, prob_original_target: torch.Tensor) -> torch.Tensor:
+    def update_importance_score(
+        self,
+        logit_importance_score: torch.Tensor,
+        input_ids: torch.Tensor,
+        target_id: torch.Tensor,
+        prob_original_target: torch.Tensor,
+    ) -> torch.Tensor:
         """Update importance score by one step
 
         Args:
@@ -174,11 +201,13 @@ class DeltaProbImportanceScoreEvaluator_imp(BaseImportanceScoreEvaluator):
         input_ids_replaced, mask_replacing = self.token_replacer.sample(input_ids)
 
         logging.debug(f"Replacing mask:     { mask_replacing }")
-        logging.debug(f"Replaced sequence:  { [[ self.tokenizer.decode(seq[i]) for i in range(input_ids_replaced.shape[1]) ] for seq in input_ids_replaced ] }")
-        
+        logging.debug(
+            f"Replaced sequence:  { [[ self.tokenizer.decode(seq[i]) for i in range(input_ids_replaced.shape[1]) ] for seq in input_ids_replaced ] }"
+        )
+
         # Inference \hat{p^{(y)}} = p(y_{t+1}|\hat{y_{1...t}})
 
-        logits_replaced = self.model(input_ids_replaced)['logits']
+        logits_replaced = self.model(input_ids_replaced)["logits"]
         prob_replaced_target = torch.softmax(logits_replaced[:, input_ids_replaced.shape[1] - 1, :], -1)[:, target_id]
         self.trace_prob_original_target = prob_replaced_target
 
@@ -211,10 +240,10 @@ class DeltaProbImportanceScoreEvaluator_imp(BaseImportanceScoreEvaluator):
 
         # Inference p^{(y)} = p(y_{t+1}|y_{1...t})
 
-        logits_original = self.model(input_ids)['logits']
+        logits_original = self.model(input_ids)["logits"]
         prob_original_target = torch.softmax(logits_original[:, input_ids.shape[1] - 1, :], -1)[:, target_id]
 
-        if self.trace_target_likelihood_original != None:
+        if self.trace_target_likelihood_original is not None:
             self.trace_target_likelihood_original = prob_original_target
 
         # Initialize importance score s for each token in the sequence y_{1...t}
@@ -226,20 +255,27 @@ class DeltaProbImportanceScoreEvaluator_imp(BaseImportanceScoreEvaluator):
         self.num_steps = 0
         while True:
             self.num_steps += 1
-            
+
             # Update importance score
-            logit_importance_score_update = self.update_importance_score(logit_importance_score, input_ids, target_id, prob_original_target)
-            logit_importance_score = ~torch.unsqueeze(self.stop_mask, 1) * logit_importance_score_update + torch.unsqueeze(self.stop_mask, 1) * logit_importance_score
+            logit_importance_score_update = self.update_importance_score(
+                logit_importance_score, input_ids, target_id, prob_original_target
+            )
+            logit_importance_score = (
+                ~torch.unsqueeze(self.stop_mask, 1) * logit_importance_score_update
+                + torch.unsqueeze(self.stop_mask, 1) * logit_importance_score
+            )
 
             self.important_score = torch.softmax(logit_importance_score, -1)
-            if self.trace_importance_score != None:
+            if self.trace_importance_score is not None:
                 self.trace_importance_score.append(self.important_score)
 
             # Evaluate stop condition
-            self.stop_mask = self.stop_mask | self.stopping_condition_evaluator.evaluate(input_ids, target_id, self.important_score)
+            self.stop_mask = self.stop_mask | self.stopping_condition_evaluator.evaluate(
+                input_ids, target_id, self.important_score
+            )
             if torch.prod(self.stop_mask) > 0:
                 break
-        
+
         logging.info(f"Importance score evaluated in {self.num_steps} steps.")
 
         return torch.softmax(logit_importance_score, -1)

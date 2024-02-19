@@ -14,30 +14,22 @@ class TokenReplacer(Traceable):
     """
 
     def __init__(self, token_sampler: TokenSampler) -> None:
-        """Base Constructor
-        
-        """
+        """Base Constructor"""
         self.token_sampler = token_sampler
 
     def sample(self, input: torch.Tensor) -> Union[torch.Tensor, torch.Tensor]:
-        """Base sample
+        """Base sample"""
 
-        """
-    
     @override
     def trace_start(self):
-        """Start tracing
-        
-        """
+        """Start tracing"""
         super().trace_start()
 
         self.token_sampler.trace_start()
 
     @override
     def trace_stop(self):
-        """Stop tracing
-        
-        """
+        """Stop tracing"""
         super().trace_stop()
-        
+
         self.token_sampler.trace_stop()

@@ -10,8 +10,7 @@ from ...data import (
 from ...utils import Registry
 from .attribution_utils import get_source_target_attributions
 from .gradient_attribution import FeatureAttribution
-from .ops import Lime
-from .ops import ReAGent
+from .ops import Lime, ReAGent
 
 logger = logging.getLogger(__name__)
 
@@ -119,6 +118,7 @@ class LimeAttribution(PerturbationAttributionRegistry):
             sequence_scores=out.sequence_scores,
         )
 
+
 class ReAGentAttribution(PerturbationAttributionRegistry):
     """ReAGent-based attribution method.
     The main part of the code is in ops/reagent.py.
@@ -136,9 +136,7 @@ class ReAGentAttribution(PerturbationAttributionRegistry):
         attribution_args: dict[str, Any] = {},
     ) -> GranularFeatureAttributionStepOutput:
         if len(attribute_fn_main_args["inputs"]) > 1:
-            raise NotImplementedError(
-                "ReAgent attribution not supported for encoder-decoder models."
-            )
+            raise NotImplementedError("ReAgent attribution not supported for encoder-decoder models.")
         out = super().attribute_step(attribute_fn_main_args, attribution_args)
         return GranularFeatureAttributionStepOutput(
             source_attributions=out.source_attributions,

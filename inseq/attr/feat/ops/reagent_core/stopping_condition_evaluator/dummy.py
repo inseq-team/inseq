@@ -6,19 +6,19 @@ from .base import StoppingConditionEvaluator
 
 class DummyStoppingConditionEvaluator(StoppingConditionEvaluator):
     """
-    Stopping Condition Evaluator which stop when target exist in top k predictions, 
+    Stopping Condition Evaluator which stop when target exist in top k predictions,
     while top n tokens based on importance_score are not been replaced.
     """
 
     @override
     def __init__(self) -> None:
-        """Constructor
-
-        """
+        """Constructor"""
         super().__init__()
 
     @override
-    def evaluate(self, input_ids: torch.Tensor, target_id: torch.Tensor, importance_score: torch.Tensor) -> torch.Tensor:
+    def evaluate(
+        self, input_ids: torch.Tensor, target_id: torch.Tensor, importance_score: torch.Tensor
+    ) -> torch.Tensor:
         """Evaluate stop condition
 
         Args:

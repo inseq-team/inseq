@@ -18,10 +18,10 @@ def serialize_rational(
     compact: bool = False,
     trace_rationalizer: BaseRationalizer = None,
     trace_batch_idx: int = 0,
-    schema_file: str = "../docs/rationalization.schema.json"
+    schema_file: str = "../docs/rationalization.schema.json",
 ) -> None:
     """Serialize rationalization result to a json file
-    
+
     Args:
         filename: Filename to store json file
         id: id of the record
@@ -50,7 +50,7 @@ def serialize_rational(
         "rational-tokens": [i.item() for i in token_inputs[position_rational]],
     }
 
-    if important_score != None:
+    if important_score is not None:
         data["importance-scores"] = [i.item() for i in important_score]
 
     if comments:
@@ -58,14 +58,22 @@ def serialize_rational(
 
     if trace_rationalizer:
         trace = {
-            "importance-scores": [ [ v.item() for v in i[trace_batch_idx] ] for i in trace_rationalizer.importance_score_evaluator.trace_importance_score ],
-            "target-likelihood-original": trace_rationalizer.importance_score_evaluator.trace_target_likelihood_original[trace_batch_idx].item(),
-            "target-likelihood": [ i[trace_batch_idx].item() for i in trace_rationalizer.importance_score_evaluator.stopping_condition_evaluator.trace_target_likelihood ]
+            "importance-scores": [
+                [v.item() for v in i[trace_batch_idx]]
+                for i in trace_rationalizer.importance_score_evaluator.trace_importance_score
+            ],
+            "target-likelihood-original": trace_rationalizer.importance_score_evaluator.trace_target_likelihood_original[
+                trace_batch_idx
+            ].item(),
+            "target-likelihood": [
+                i[trace_batch_idx].item()
+                for i in trace_rationalizer.importance_score_evaluator.stopping_condition_evaluator.trace_target_likelihood
+            ],
         }
         data["trace"] = trace
 
     indent = None if compact else 4
     json_str = json.dumps(data, indent=indent)
 
-    with open(filename, 'w') as f_output:
+    with open(filename, "w") as f_output:
         f_output.write(json_str)
