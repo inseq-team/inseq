@@ -1,6 +1,6 @@
 #* Variables
-SHELL := /usr/bin/env bash
-PYTHON := python3
+SHELL := /bin/bash
+PYTHON := .venv/bin/python
 
 #* Docker variables
 IMAGE := inseq
@@ -9,12 +9,9 @@ VERSION := latest
 .PHONY: help
 help:
 	@echo "Commands:"
-	@echo "poetry-download : downloads and installs the poetry package manager"
-	@echo "poetry-remove   : removes the poetry package manager"
+	@echo "uv-download     : downloads and installs the uv package manager"
 	@echo "install         : installs required dependencies"
-	@echo "install-gpu    : installs required dependencies, plus Torch GPU support"
 	@echo "install-dev     : installs the dev dependencies for the project"
-	@echo "install-dev-gpu : installs the dev dependencies for the project, plus Torch GPU support"
 	@echo "update-deps     : updates the dependencies and writes them to requirements.txt"
 	@echo "check-style     : run checks on all files without fixing them."
 	@echo "fix-style       : run checks on files and potentially modifies them."
@@ -28,71 +25,64 @@ help:
 	@echo "serve-docs      : serve documentation locally."
 	@echo "docs            : build and serve generated documentation locally."
 	@echo "docker-build    : builds docker image for the package."
-	@echo "docker-remove   : removes built docker image."
+#	@echo "docker-remove   : removes built docker image."
 	@echo "clean           : cleans all unecessary files."
 
-#* Poetry
-.PHONY: poetry-download
-poetry-download:
-	curl -sSL https://install.python-poetry.org | $(PYTHON) -
+#* UV
+uv-download:
+	@echo "Downloading uv package manager..."
+	@if [[ $OS == "Windows_NT" ]]; then \
+		irm https://astral.sh/uv/install.ps1 | iex; \
+	else \
+		curl -LsSf https://astral.sh/uv/install.sh | sh; \
+	fi
+	uv venv
 
-.PHONY: poetry-remove
-poetry-remove:
-	curl -sSL https://install.python-poetry.org | $(PYTHON) - --uninstall
+
+.PHONY: uv-activate
+uv-activate:
+	@if [[ "$(OS)" == "Windows_NT" ]]; then \
+		./uv/Scripts/activate.ps1 \
+	else \
+		source .venv/bin/activate; \
+	fi
 
 #* Installation
 
-.PHONY: add-torch-gpu
-add-torch-gpu:
-	poetry run poe upgrade-pip
-	poetry run pip uninstall torch -y
-	poetry run poe torch-cuda
-
 .PHONY: install
 install:
-	poetry install
+	make uv-activate && uv pip install -r requirements.txt && uv pip install -e .
 
 .PHONY: install-dev
 install-dev:
-	poetry install --all-extras --with lint,docs --sync
-#	-poetry run mypy --install-types --non-interactive ./
-	poetry run pre-commit install
-	poetry run pre-commit autoupdate
-	poetry self add poetry-plugin-export
-
-.PHONY: install-gpu
-install-gpu: install add-torch-gpu
-
-.PHONY: install-dev-gpu
-install-dev-gpu: install-dev add-torch-gpu
+	make uv-activate && uv pip install -r requirements-dev.txt && pre-commit install && pre-commit autoupdate
+	
 
 .PHONY: install-ci
 install-ci:
-	poetry install --with lint
+	make uv-activate && uv pip install -e .[lint]
 
 .PHONY: update-deps
 update-deps:
-	poetry lock
-	poetry export --without-hashes > requirements.txt
-	poetry export --without-hashes -E sklearn -E datasets -E notebook --with lint,docs > requirements-dev.txt
+	uv pip compile pyproject.toml -o requirements.txt
+	uv pip compile --all-extras pyproject.toml -o requirements-dev.txt
 
 #* Linting
 .PHONY: check-style
 check-style:
-	poetry run ruff format --check --config pyproject.toml ./
-	poetry run ruff check --no-fix --config pyproject.toml ./
-#   poetry run darglint --verbosity 2 inseq tests
-#	poetry run mypy --config-file pyproject.toml ./
+	$(PYTHON) -m ruff format --check --config pyproject.toml ./
+	$(PYTHON) -m ruff check --no-fix --config pyproject.toml ./
+#   $(PYTHON) -m pydoclint --config pyproject.toml inseq/
+#	$(PYTHON) -m mypy --config-file pyproject.toml ./
 
 .PHONY: fix-style
 fix-style:
-	poetry run ruff format --config pyproject.toml ./
-	poetry run ruff check --config pyproject.toml ./
+	$(PYTHON) -m ruff format --config pyproject.toml ./
+	$(PYTHON) -m ruff check --config pyproject.toml ./
 
 .PHONY: check-safety
 check-safety:
-	poetry check
-	poetry run safety check --full-report -i 53048
+	$(PYTHON) -m safety check --full-report
 
 .PHONY: lint
 lint: fix-style check-safety
@@ -100,19 +90,24 @@ lint: fix-style check-safety
 #* Linting
 .PHONY: test
 test:
-	poetry run pytest -c pyproject.toml -v
+	$(PYTHON) -m pytest -n auto -c pyproject.toml -v
 
 .PHONY: test-cpu
 test-cpu:
-	poetry run pytest -c pyproject.toml -v -m "not require_cuda_gpu"
+	$(PYTHON) -m pytest -n auto -c pyproject.toml -v -m "not require_cuda_gpu"
 
 .PHONY: fast-test
 fast-test:
-	poetry run pytest -c pyproject.toml -v -m "not slow"
+	$(PYTHON) -m pytest -n auto -c pyproject.toml -v -m "not slow"
+
+# Limits the number of threads to 4 to avoid overloading the CI
+.PHONY: fast-test-ci
+fast-test-ci:
+	$(PYTHON) -m pytest -n 4 -c pyproject.toml -v -m "not slow"
 
 .PHONY: codecov
 codecov:
-	poetry run pytest --cov inseq --cov-report html
+	$(PYTHON) -m pytest -n auto --cov inseq --cov-report html
 
 #* Docs
 .PHONY: build-docs
@@ -131,17 +126,17 @@ docs: build-docs serve-docs
 # Example: make docker IMAGE=some_name VERSION=0.1.0
 .PHONY: docker-build
 docker-build:
-	@echo Building docker $(IMAGE):$(VERSION) ...
+	@echo "Building docker $(IMAGE):$(VERSION) ..."
 	docker build \
 		-t $(IMAGE):$(VERSION) . \
 		-f ./docker/Dockerfile --no-cache
 
 # Example: make clean_docker VERSION=latest
 # Example: make clean_docker IMAGE=some_name VERSION=0.1.0
-.PHONY: docker-remove
-docker-remove:
-	@echo Removing docker $(IMAGE):$(VERSION) ...
-#	docker rmi -f $(IMAGE):$(VERSION)
+#.PHONY: docker-remove
+#docker-remove:
+#	@echo "Removing docker $(IMAGE):$(VERSION) ..."
+# docker rmi -f $(IMAGE):$(VERSION)
 
 #* Cleaning
 .PHONY: pycache-remove
@@ -153,4 +148,4 @@ build-remove:
 	rm -rf build/
 
 .PHONY: clean
-clean: pycache-remove build-remove docker-remove
+clean: pycache-remove build-remove # docker-remove
