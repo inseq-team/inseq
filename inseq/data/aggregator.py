@@ -475,7 +475,7 @@ class SequenceAttributionAggregator(Aggregator):
             if len(set(indices)) != len(indices):
                 raise IndexError("Duplicate indices are not allowed.")
             if isinstance(indices, tuple):
-                scores = scores.index_select(dim, torch.arange(indices[0], indices[1]))
+                scores = scores.index_select(dim, torch.arange(indices[0], indices[1], device=scores.device))
             else:
                 scores = scores.index_select(dim, torch.tensor(indices, device=scores.device))
             return scores

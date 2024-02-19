@@ -249,7 +249,9 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
                     start_idx:end_idx, : len(targets[seq_id]), ...  # noqa: E203
                 ]
                 if target_attributions[seq_id].shape[0] != len(tokenized_target_sentences[seq_id]):
-                    empty_final_row = torch.ones(1, *target_attributions[seq_id].shape[1:]) * float("nan")
+                    empty_final_row = torch.ones(
+                        1, *target_attributions[seq_id].shape[1:], device=target_attributions[seq_id].device
+                    ) * float("nan")
                     target_attributions[seq_id] = torch.cat([target_attributions[seq_id], empty_final_row], dim=0)
                 seq_attributions[seq_id].target_attributions = target_attributions[seq_id]
         if attr.step_scores is not None:
