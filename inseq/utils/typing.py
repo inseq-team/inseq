@@ -40,6 +40,8 @@ OneOrMoreTokenWithIdSequences = Sequence[Sequence[TokenWithId]]
 OneOrMoreAttributionSequences = Sequence[Sequence[float]]
 
 IndexSpan = Union[tuple[int, int], Sequence[tuple[int, int]]]
+OneOrMoreIndices = Union[int, list[int], tuple[int, int]]
+OneOrMoreIndicesDict = dict[int, OneOrMoreIndices]
 
 IdsTensor = Int64[torch.Tensor, "batch_size seq_len"]
 TargetIdsTensor = Int64[torch.Tensor, "batch_size"]

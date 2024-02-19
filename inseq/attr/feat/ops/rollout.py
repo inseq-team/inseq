@@ -1,4 +1,4 @@
-from typing import Tuple, Union
+from typing import Union
 
 import torch
 import torch.nn.functional as F
@@ -11,7 +11,7 @@ from ....utils.typing import (
 
 
 def _check_matrix_shape(
-    scores: Union[MultiUnitScoreTensor, Tuple[MultiUnitScoreTensor, MultiUnitScoreTensor, MultiUnitScoreTensor]]
+    scores: Union[MultiUnitScoreTensor, tuple[MultiUnitScoreTensor, MultiUnitScoreTensor, MultiUnitScoreTensor]],
 ) -> None:
     """Checks that the shape of the provided scores is compatible with the rollout aggregation method."""
 
@@ -77,7 +77,7 @@ def _rollout_joint(
     final_source_scores: ScoreTensor,
     cross_scores: MultiUnitScoreTensor,
     target_scores: MultiUnitScoreTensor,
-) -> Tuple[ScoreTensor, ScoreTensor]:
+) -> tuple[ScoreTensor, ScoreTensor]:
     """Performs the rollout aggregation adapted for an encoder-decoder architecture with cross-importance scores."""
     target_scores = (target_scores.mT * cross_scores[..., -1, :]).mT
     joint_source_cross_scores = torch.einsum("bl...ij, b...jk -> bl...ik", cross_scores, final_source_scores)
@@ -100,9 +100,9 @@ def _rollout_joint(
 
 
 def rollout_fn(
-    scores: Union[MultiUnitScoreTensor, Tuple[MultiUnitScoreTensor, MultiUnitScoreTensor, MultiUnitScoreTensor]],
+    scores: Union[MultiUnitScoreTensor, tuple[MultiUnitScoreTensor, MultiUnitScoreTensor, MultiUnitScoreTensor]],
     dim: int = 1,
-) -> Union[ScoreTensor, Tuple[ScoreTensor, ScoreTensor]]:
+) -> Union[ScoreTensor, tuple[ScoreTensor, ScoreTensor]]:
     """Reference implementations:
     * `samiraabnar/attention-flow
         <https://github.com/samiraabnar/attention_flow/blob/master/attention_graph_util.py#L104>`__

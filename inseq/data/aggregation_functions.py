@@ -14,7 +14,7 @@
 
 import logging
 from abc import abstractmethod
-from typing import Dict, Tuple, Union
+from typing import Union
 
 import torch
 from torch.linalg import vector_norm
@@ -104,9 +104,9 @@ class RolloutAggregationFunction(AggregationFunction):
 
     def __call__(
         self,
-        scores: Union[torch.Tensor, Tuple[torch.Tensor, ...]],
+        scores: Union[torch.Tensor, tuple[torch.Tensor, ...]],
         dim: int,
-        sequence_scores: Dict[str, torch.Tensor] = {},
+        sequence_scores: dict[str, torch.Tensor] = {},
     ) -> ScoreTensor:
         dec_self_prefix = "decoder_self"
         enc_self_prefix = "encoder_self"

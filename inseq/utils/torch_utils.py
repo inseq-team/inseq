@@ -11,6 +11,8 @@ from torch.backends.mps import is_available as is_mps_available
 from torch.backends.mps import is_built as is_mps_built
 from torch.cuda import is_available as is_cuda_available
 
+from .typing import OneOrMoreIndices
+
 if TYPE_CHECKING:
     pass
 
@@ -274,15 +276,15 @@ def find_block_stack(module):
 def validate_indices(
     scores: torch.Tensor,
     dim: int = -1,
-    indices: Union[int, tuple[int, int], list[int], None] = None,
-) -> Union[int, tuple[int, int], list[int]]:
+    indices: Optional[OneOrMoreIndices] = None,
+) -> OneOrMoreIndices:
     """Validates a set of indices for a given dimension of a tensor of scores. Supports single indices, spans and lists
     of indices, including negative indices to specify positions relative to the end of the tensor.
 
     Args:
         scores (torch.Tensor): The tensor of scores.
         dim (int, optional): The dimension of the tensor that will be indexed. Defaults to -1.
-        indices (Union[int, tuple[int, int], list[int], None], optional): 
+        indices (Union[int, tuple[int, int], list[int], None], optional):
             - If an integer, it is interpreted as a single index for the dimension.
             - If a tuple of two integers, it is interpreted as a span of indices for the dimension.
             - If a list of integers, it is interpreted as a list of individual indices for the dimension.
@@ -290,10 +292,17 @@ def validate_indices(
     Returns:
         ``Union[int, tuple[int, int], list[int]]``: The validated list of positive indices for indexing the dimension.
     """
+    if dim >= scores.ndim:
+        raise IndexError(f"Dimension {dim} is greater than tensor dimension {scores.ndim}")
     n_units = scores.shape[dim]
+    if not isinstance(indices, (int, tuple, list)) and indices is not None:
+        raise TypeError(
+            "Indices must be an integer, a (start, end) tuple of indices representing a span, a list of individual"
+            " indices or a single index."
+        )
     if hasattr(indices, "__iter__"):
         if len(indices) == 0:
-            raise RuntimeError("At least two indices must be specified. Found an empty list.")
+            raise RuntimeError("An empty sequence of indices is not allowed.")
         if len(indices) == 1:
             indices = indices[0]
 

@@ -8,7 +8,7 @@ from .errors import (
     MissingAttributionMethodError,
     UnknownAttributionMethodError,
 )
-from .hooks import get_post_variable_assignment_hook, StackFrame
+from .hooks import StackFrame, get_post_variable_assignment_hook
 from .import_utils import (
     is_captum_available,
     is_datasets_available,

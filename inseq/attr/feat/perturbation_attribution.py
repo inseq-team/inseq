@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Dict
+from typing import Any
 
 from captum.attr import Occlusion
 
@@ -138,8 +138,8 @@ class ValueZeroingAttribution(PerturbationAttributionRegistry):
 
     def attribute_step(
         self,
-        attribute_fn_main_args: Dict[str, Any],
-        attribution_args: Dict[str, Any] = {},
+        attribute_fn_main_args: dict[str, Any],
+        attribution_args: dict[str, Any] = {},
     ) -> MultiDimensionalFeatureAttributionStepOutput:
         attr = self.method.attribute(**attribute_fn_main_args, **attribution_args)
         source_attributions, target_attributions = get_source_target_attributions(

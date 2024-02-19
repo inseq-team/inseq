@@ -12,10 +12,10 @@ from ..utils import (
     aggregate_token_sequence,
     available_classes,
     extract_signature_args,
+    validate_indices,
 )
 from ..utils import normalize as normalize_fn
-from ..utils.typing import IndexSpan, TokenWithId
-from ..utils import validate_indices
+from ..utils.typing import IndexSpan, OneOrMoreIndices, TokenWithId
 from .aggregation_functions import AggregationFunction
 from .data_utils import TensorWrapper
 
@@ -306,7 +306,7 @@ class SequenceAttributionAggregator(Aggregator):
         cls,
         attr: "FeatureAttributionSequenceOutput",
         aggregate_fn: AggregationFunction,
-        select_idx: Union[int, tuple[int, int], list[int], None] = None,
+        select_idx: Optional[OneOrMoreIndices] = None,
         normalize: bool = True,
         **kwargs,
     ):
@@ -367,7 +367,7 @@ class SequenceAttributionAggregator(Aggregator):
         cls,
         attr: "FeatureAttributionSequenceOutput",
         aggregate_fn: AggregationFunction,
-        select_idx: Union[int, tuple[int, int], list[int], None] = None,
+        select_idx: Optional[OneOrMoreIndices] = None,
         normalize: bool = True,
         **kwargs,
     ):
@@ -381,7 +381,7 @@ class SequenceAttributionAggregator(Aggregator):
         cls,
         attr: "FeatureAttributionSequenceOutput",
         aggregate_fn: AggregationFunction,
-        select_idx: Union[int, tuple[int, int], list[int], None] = None,
+        select_idx: Optional[OneOrMoreIndices] = None,
         normalize: bool = True,
         **kwargs,
     ):
@@ -399,7 +399,7 @@ class SequenceAttributionAggregator(Aggregator):
         cls,
         attr: "FeatureAttributionSequenceOutput",
         aggregate_fn: AggregationFunction,
-        select_idx: Union[int, tuple[int, int], list[int], None] = None,
+        select_idx: Optional[OneOrMoreIndices] = None,
         **kwargs,
     ):
         if aggregate_fn.takes_sequence_scores:
@@ -440,7 +440,7 @@ class SequenceAttributionAggregator(Aggregator):
     def _filter_scores(
         scores: torch.Tensor,
         dim: int = -1,
-        indices: Union[int, tuple[int, int], list[int], None] = None,
+        indices: Optional[OneOrMoreIndices] = None,
     ) -> torch.Tensor:
         indexed = scores.index_select(dim, validate_indices(scores, dim, indices).to(scores.device))
         if isinstance(indices, int):
