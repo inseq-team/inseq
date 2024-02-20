@@ -590,11 +590,11 @@ class FeatureAttribution(Registry):
                 batch=batch,
             )
             step_fn_extra_args = get_step_scores_args([score], step_scores_args)
-            step_output.step_scores[score] = get_step_scores(score, step_fn_args, step_fn_extra_args).to("cpu")
+            step_output.step_scores[score] = get_step_scores(score, step_fn_args, step_fn_extra_args)
         # Reinsert finished sentences
         if target_attention_mask is not None and is_filtered:
             step_output.remap_from_filtered(target_attention_mask, orig_batch)
-        step_output = step_output.detach().to("cpu")
+        step_output = step_output.detach()
         return step_output
 
     def get_attribution_args(self, **kwargs) -> tuple[dict[str, Any], dict[str, Any]]:
