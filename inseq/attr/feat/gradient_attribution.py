@@ -95,9 +95,9 @@ class GradientAttributionRegistry(FeatureAttribution, Registry):
             attr, self.attribution_model.is_encoder_decoder
         )
         return GranularFeatureAttributionStepOutput(
-            source_attributions=source_attributions.to("cpu") if source_attributions is not None else None,
-            target_attributions=target_attributions.to("cpu") if target_attributions is not None else None,
-            step_scores={"deltas": deltas.to("cpu")} if deltas is not None else None,
+            source_attributions=source_attributions if source_attributions is not None else None,
+            target_attributions=target_attributions if target_attributions is not None else None,
+            step_scores={"deltas": deltas} if deltas is not None else None,
         )
 
 
