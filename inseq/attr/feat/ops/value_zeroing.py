@@ -18,13 +18,13 @@ from typing import TYPE_CHECKING, Callable, Optional
 
 import torch
 from captum._utils.typing import TensorOrTupleOfTensorsGeneric
-from captum.attr._utils.attribution import Attribution
-from captum.log import log_usage
 from torch import nn
+from torch.utils.hooks import RemovableHandle
 
 from ....utils import StackFrame, find_block_stack, get_post_variable_assignment_hook, validate_indices
 from ....utils.typing import (
     EmbeddingsTensor,
+    InseqAttribution,
     MultiLayerEmbeddingsTensor,
     MultiLayerScoreTensor,
     OneOrMoreIndices,
@@ -32,7 +32,7 @@ from ....utils.typing import (
 )
 
 if TYPE_CHECKING:
-    from ....models import AttributionModel
+    from ....models import HuggingfaceModel
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +48,7 @@ class ValueZeroingModule(Enum):
     CROSS = "cross"
 
 
-class ValueZeroing(Attribution):
+class ValueZeroing(InseqAttribution):
     """Value Zeroing method for feature attribution.
 
     Introduced by `Mohebbi et al. (2023) <https://aclanthology.org/2023.eacl-main.245/>`__ to quantify context mixing inside
@@ -79,7 +79,7 @@ class ValueZeroing(Attribution):
         "euclidean": lambda x, y: torch.cdist(x, y, p=2),
     }
 
-    def __init__(self, forward_func: "AttributionModel") -> None:
+    def __init__(self, forward_func: "HuggingfaceModel") -> None:
         super().__init__(forward_func)
         self.clean_block_output_states: dict[int, EmbeddingsTensor] = {}
         self.corrupted_block_output_states: dict[int, EmbeddingsTensor] = {}
@@ -104,24 +104,23 @@ class ValueZeroing(Attribution):
             if zeroed_token_index is not None:
                 values_size = frame.f_locals[varname].size()
                 if len(values_size) == 3:  # Assume merged shape (bsz * num_heads, seq_len, hidden_size) e.g. Whisper
-                    per_head_values = frame.f_locals[varname].view(batch_size, -1, *values_size[1:])
+                    values = frame.f_locals[varname].view(batch_size, -1, *values_size[1:])
                 elif len(values_size) == 4:  # Assume per-head shape (bsz, num_heads, seq_len, hidden_size) e.g. GPT-2
-                    per_head_values = frame.f_locals[varname]
+                    values = frame.f_locals[varname].clone()
                 else:
                     raise ValueError(
                         f"Value vector shape {frame.f_locals[varname].size()} not supported. "
                         "Supported shapes: (batch_size, num_heads, seq_len, hidden_size) or "
                         "(batch_size * num_heads, seq_len, hidden_size)"
                     )
-                zeroed_units_indices = validate_indices(per_head_values, 1, zeroed_units_indices)
-                # Mask heads corresponding to zeroed units
-                per_head_values.index_fill_(1, zeroed_units_indices.to(per_head_values.device), 0)
-                # Mask tokens corresponding to zeroed tokens
-                per_head_values.index_fill_(2, torch.tensor(zeroed_token_index), 0)
+                zeroed_units_indices = validate_indices(values, 1, zeroed_units_indices).to(values.device)
+                zeroed_token_index = torch.tensor(zeroed_token_index, device=values.device)
+                # Mask heads corresponding to zeroed units and tokens corresponding to zeroed tokens
+                values[:, zeroed_units_indices, zeroed_token_index] = 0
                 if len(values_size) == 3:
-                    frame.f_locals[varname] = per_head_values.view(-1, *values_size[1:])
+                    frame.f_locals[varname] = values.view(-1, *values_size[1:])
                 elif len(values_size) == 4:
-                    frame.f_locals[varname] = per_head_values
+                    frame.f_locals[varname] = values
 
         return value_zeroing_forward_mid_hook
 
@@ -155,12 +154,11 @@ class ValueZeroing(Attribution):
         self,
         inputs: TensorOrTupleOfTensorsGeneric,
         additional_forward_args: TensorOrTupleOfTensorsGeneric,
-        modules: nn.ModuleList,
         hidden_states: MultiLayerEmbeddingsTensor,
-        similarity_scores_shape: torch.Size,
         similarity_metric: str = ValueZeroingSimilarityMetric.COSINE.value,
         mode: str = ValueZeroingModule.DECODER.value,
         zeroed_units_indices: Optional[OneOrMoreIndicesDict] = None,
+        threshold: float = 1e-5,
     ) -> MultiLayerScoreTensor:
         """Given a ``nn.ModuleList``, computes the similarity between the clean and corrupted states for each block.
 
@@ -186,13 +184,24 @@ class ValueZeroing(Attribution):
             :obj:`MultiLayerScoreTensor`: A tensor of shape ``[batch_size, seq_len, num_layer]`` containing distances
                 (1 - similarity score) between original and corrupted states for each layer.
         """
+        if mode == ValueZeroingModule.DECODER.value:
+            modules: nn.ModuleList = find_block_stack(self.forward_func.get_decoder())
+            batch_size = hidden_states.size(0)
+            num_layers = len(modules)
+            sequence_length = hidden_states.size(2)
+        else:
+            raise NotImplementedError(f"Mode {mode} not implemented for value zeroing.")
+
         # Store clean hidden states for later use. Starts at 1 since the first element of the modules stack is the
         # embedding layer, and we are only interested in the transformer blocks outputs.
         self.clean_block_output_states = {
             block_idx: hidden_states[:, block_idx + 1, ...].clone().detach().cpu() for block_idx in range(len(modules))
         }
         # Scores for every layer of the model
-        all_scores = torch.zeros(*similarity_scores_shape)
+        all_scores = torch.ones(
+            batch_size, num_layers, sequence_length, sequence_length, device=hidden_states.device
+        ) * float("nan")
+
         # Hooks:
         #   1. states_extract_and_patch_hook on the transformer block stores corrupted states and force clean states
         #      as the output of the block forward pass, i.e. the zeroing is done independently across layers.
@@ -202,15 +211,15 @@ class ValueZeroing(Attribution):
         # State extraction hooks can be registered only once since they are token-independent
         # Skip last block since its states are not used raw, but may have further transformations applied to them
         # (e.g. LayerNorm, Dropout). These are extracted separately from the model outputs.
-        states_extraction_hook_handles = []
+        states_extraction_hook_handles: list[RemovableHandle] = []
         for block_idx in range(len(modules) - 1):
             states_extract_and_patch_hook = self.get_states_extract_and_patch_hook(block_idx, hidden_state_idx=0)
             states_extraction_hook_handles.append(
                 modules[block_idx].register_forward_hook(states_extract_and_patch_hook)
             )
         # Zeroing is done for every token in the sequence separately (O(n) complexity)
-        for token_idx in range(similarity_scores_shape[-1]):
-            value_zeroing_hook_handles = []
+        for token_idx in range(sequence_length):
+            value_zeroing_hook_handles: list[RemovableHandle] = []
             # Value zeroing hooks are registered for every token separately since they are token-dependent
             for block_idx, block in enumerate(modules):
                 attention_module = block.get_submodule(self.forward_func.config.attention_module)
@@ -221,12 +230,12 @@ class ValueZeroing(Attribution):
                 else:
                     zeroed_units_indices_block = zeroed_units_indices
                 value_zeroing_hook = get_post_variable_assignment_hook(
-                    attention_module,
-                    hook_fn=self.get_value_zeroing_hook(self.forward_func.config.value_vector),
+                    module=attention_module,
                     varname=self.forward_func.config.value_vector,
+                    hook_fn=self.get_value_zeroing_hook(self.forward_func.config.value_vector),
                     zeroed_token_index=token_idx,
                     zeroed_units_indices=zeroed_units_indices_block,
-                    batch_size=similarity_scores_shape[0],
+                    batch_size=batch_size,
                 )
                 value_zeroing_hook_handle = attention_module.register_forward_pre_hook(value_zeroing_hook)
                 value_zeroing_hook_handles.append(value_zeroing_hook_handle)
@@ -250,23 +259,21 @@ class ValueZeroing(Attribution):
             for block_idx in range(len(modules)):
                 similarity_scores = self.SIMILARITY_METRICS[similarity_metric](
                     self.clean_block_output_states[block_idx].float(), self.corrupted_block_output_states[block_idx]
-                )
-                all_scores[:, block_idx, :, token_idx] = 1 - similarity_scores
+                )[:, token_idx:]
+                all_scores[:, block_idx, token_idx:, token_idx] = 1 - similarity_scores
+            self.corrupted_block_output_states = {}
         for handle in states_extraction_hook_handles:
             handle.remove()
+        self.clean_block_output_states = {}
+        all_scores = torch.where(all_scores < threshold, torch.zeros_like(all_scores), all_scores)
         # Normalize scores to sum to 1
         per_token_sum_score = all_scores.sum(dim=-1, keepdim=True)
         per_token_sum_score[per_token_sum_score == 0] = 1
         all_scores = all_scores / per_token_sum_score
-        # Since presently Inseq attribution is constrained by the attribution loop over the full generation, the
-        # extraction of value zeroing scores is done inefficiently by picking only the last token scores at every step.
-        # This makes the complexity of calling this method O(n^2), when it could be O(n) if the scores were extracted
-        # only at the final step. Since other methods (e.g. attention) face the same issue, this will be addressed in
-        # future releases.
-        # Final shape: [batch_size, seq_len, num_layers]
-        return all_scores[..., -1, :].mT.clone()
 
-    @log_usage()
+        # Final shape: [batch_size, seq_len, seq_len, num_layers]
+        return all_scores.permute(0, 3, 2, 1)
+
     def attribute(
         self,
         inputs: TensorOrTupleOfTensorsGeneric,
@@ -305,16 +312,10 @@ class ValueZeroing(Attribution):
                 f"Similarity metric {similarity_metric} not available."
                 f"Available metrics: {','.join(self.SIMILARITY_METRICS.keys())}"
             )
-        batch_size = decoder_hidden_states.size(0)
-        tgt_seq_len = decoder_hidden_states.size(2)
-        decoder_stack: nn.ModuleList = find_block_stack(self.forward_func.get_decoder())
-        decoder_scores_size = (batch_size, len(decoder_stack), tgt_seq_len, tgt_seq_len)
         decoder_scores = self.compute_modules_post_zeroing_similarity(
             inputs=inputs,
             additional_forward_args=additional_forward_args,
-            modules=decoder_stack,
             hidden_states=decoder_hidden_states,
-            similarity_scores_shape=decoder_scores_size,
             similarity_metric=similarity_metric,
             mode=ValueZeroingModule.DECODER.value,
             zeroed_units_indices=zeroed_units_indices,

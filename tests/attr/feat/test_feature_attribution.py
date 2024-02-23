@@ -1,8 +1,14 @@
+from typing import Any, Optional
+
 import torch
+from captum._utils.typing import TensorOrTupleOfTensorsGeneric
 from pytest import fixture
 
 import inseq
+from inseq.attr.feat.internals_attribution import InternalsAttributionRegistry
+from inseq.data import MultiDimensionalFeatureAttributionStepOutput
 from inseq.models import HuggingfaceDecoderOnlyModel, HuggingfaceEncoderDecoderModel
+from inseq.utils.typing import InseqAttribution, MultiLayerMultiUnitScoreTensor
 
 
 @fixture(scope="session")
@@ -129,3 +135,188 @@ def test_mcd_weighted_attribution_gpt(saliency_gpt_model):
     )
     attribution_scores = out.sequence_attributions[0].target_attributions
     assert isinstance(attribution_scores, torch.Tensor)
+
+
+class MultiStepAttentionWeights(InseqAttribution):
+    """Variant of the AttentionWeights class with is_final_step_method = False.
+    As a result, the attention matrix is computed and sliced at every generation step.
+    We define it here to test consistency with the final step method.
+    """
+
+    def attribute(
+        self,
+        inputs: TensorOrTupleOfTensorsGeneric,
+        additional_forward_args: TensorOrTupleOfTensorsGeneric,
+        encoder_self_attentions: Optional[MultiLayerMultiUnitScoreTensor] = None,
+        decoder_self_attentions: Optional[MultiLayerMultiUnitScoreTensor] = None,
+        cross_attentions: Optional[MultiLayerMultiUnitScoreTensor] = None,
+    ) -> MultiDimensionalFeatureAttributionStepOutput:
+        # We adopt the format [batch_size, sequence_length, num_layers, num_heads]
+        # for consistency with other multi-unit methods (e.g. gradient attribution)
+        decoder_self_attentions = decoder_self_attentions[..., -1, :].to("cpu").clone().permute(0, 3, 1, 2)
+        if self.forward_func.is_encoder_decoder:
+            sequence_scores = {}
+            if len(inputs) > 1:
+                target_attributions = decoder_self_attentions
+            else:
+                target_attributions = None
+                sequence_scores["decoder_self_attentions"] = decoder_self_attentions
+            sequence_scores["encoder_self_attentions"] = (
+                encoder_self_attentions.to("cpu").clone().permute(0, 4, 3, 1, 2)
+            )
+            return MultiDimensionalFeatureAttributionStepOutput(
+                source_attributions=cross_attentions[..., -1, :].to("cpu").clone().permute(0, 3, 1, 2),
+                target_attributions=target_attributions,
+                sequence_scores=sequence_scores,
+                _num_dimensions=2,  # num_layers, num_heads
+            )
+        else:
+            return MultiDimensionalFeatureAttributionStepOutput(
+                source_attributions=None,
+                target_attributions=decoder_self_attentions,
+                _num_dimensions=2,  # num_layers, num_heads
+            )
+
+
+class MultiStepAttentionWeightsAttribution(InternalsAttributionRegistry):
+    """Variant of the basic attention attribution method computing attention weights at every generation step."""
+
+    method_name = "per_step_attention"
+
+    def __init__(self, attribution_model, **kwargs):
+        super().__init__(attribution_model)
+        # Attention weights will be passed to the attribute_step method
+        self.use_attention_weights = True
+        # Does not rely on predicted output (i.e. decoding strategy agnostic)
+        self.use_predicted_target = False
+        self.method = MultiStepAttentionWeights(attribution_model)
+
+    def attribute_step(
+        self,
+        attribute_fn_main_args: dict[str, Any],
+        attribution_args: dict[str, Any],
+    ) -> MultiDimensionalFeatureAttributionStepOutput:
+        return self.method.attribute(**attribute_fn_main_args, **attribution_args)
+
+
+def test_seq2seq_final_step_per_step_conformity(saliency_mt_model: HuggingfaceEncoderDecoderModel):
+    out_per_step = saliency_mt_model.attribute(
+        "Hello ladies and badgers!",
+        method="per_step_attention",
+        attribute_target=True,
+        show_progress=False,
+        output_step_attributions=True,
+    )
+    out_final_step = saliency_mt_model.attribute(
+        "Hello ladies and badgers!",
+        method="attention",
+        attribute_target=True,
+        show_progress=False,
+        output_step_attributions=True,
+    )
+    for step_idx in range(len(out_per_step.step_attributions)):
+        assert torch.allclose(
+            out_per_step.step_attributions[step_idx].source_attributions,
+            out_final_step.step_attributions[step_idx].source_attributions,
+        )
+        assert torch.allclose(
+            out_per_step.step_attributions[step_idx].target_attributions,
+            out_final_step.step_attributions[step_idx].target_attributions,
+            equal_nan=True,
+        )
+        assert torch.allclose(
+            out_per_step.step_attributions[step_idx].sequence_scores["encoder_self_attentions"],
+            out_final_step.step_attributions[step_idx].sequence_scores["encoder_self_attentions"],
+        )
+
+
+def test_gpt_final_step_per_step_conformity(saliency_gpt_model: HuggingfaceDecoderOnlyModel):
+    out_per_step = saliency_gpt_model.attribute(
+        "Hello ladies and badgers!",
+        method="per_step_attention",
+        show_progress=False,
+        output_step_attributions=True,
+    )
+    out_final_step = saliency_gpt_model.attribute(
+        "Hello ladies and badgers!",
+        method="attention",
+        show_progress=False,
+        output_step_attributions=True,
+    )
+    for step_idx in range(len(out_per_step.step_attributions)):
+        assert torch.allclose(
+            out_per_step.step_attributions[step_idx].target_attributions,
+            out_final_step.step_attributions[step_idx].target_attributions,
+            equal_nan=True,
+        )
+
+
+def test_seq2seq_multi_step_attention_weights_single_full_match(saliency_mt_model: HuggingfaceEncoderDecoderModel):
+    """Runs a multi-step attention weights feature attribution taking advantage of
+    the custom feature attribution target function module.
+    """
+    out_per_step = saliency_mt_model.attribute(
+        "Hello ladies and badgers!",
+        method="per_step_attention",
+        attribute_target=True,
+        show_progress=False,
+    )
+    out_final_step = saliency_mt_model.attribute(
+        "Hello ladies and badgers!",
+        method="attention",
+        attribute_target=True,
+        show_progress=False,
+    )
+    assert out_per_step[0].source_attributions.shape == out_final_step[0].source_attributions.shape
+    assert out_per_step[0].target_attributions.shape == out_final_step[0].target_attributions.shape
+    assert (
+        out_per_step[0].sequence_scores["encoder_self_attentions"].shape
+        == out_final_step[0].sequence_scores["encoder_self_attentions"].shape
+    )
+    assert torch.allclose(
+        out_per_step[0].source_attributions,
+        out_final_step[0].source_attributions,
+    )
+    assert torch.allclose(out_per_step[0].target_attributions, out_final_step[0].target_attributions, equal_nan=True)
+    assert torch.allclose(
+        out_per_step[0].sequence_scores["encoder_self_attentions"],
+        out_final_step[0].sequence_scores["encoder_self_attentions"],
+    )
+
+
+def test_gpt_multi_step_attention_weights_single_full_match(saliency_gpt_model: HuggingfaceDecoderOnlyModel):
+    out_per_step = saliency_gpt_model.attribute(
+        "Hello ladies and badgers!",
+        method="per_step_attention",
+        show_progress=False,
+    )
+    out_final_step = saliency_gpt_model.attribute(
+        "Hello ladies and badgers!",
+        method="attention",
+        show_progress=False,
+    )
+    assert out_per_step[0].target_attributions.shape == out_final_step[0].target_attributions.shape
+    assert torch.allclose(out_per_step[0].target_attributions, out_final_step[0].target_attributions, equal_nan=True)
+
+
+# Batching for Seq2Seq models is not supported when using is_final_step methods
+# Passing several sentences will attributed them one by one under the hood
+# def test_seq2seq_multi_step_attention_weights_batched_full_match(saliency_mt_model: HuggingfaceEncoderDecoderModel):
+
+
+def test_gpt_multi_step_attention_weights_batched_full_match(saliency_gpt_model_larger: HuggingfaceDecoderOnlyModel):
+    out_per_step = saliency_gpt_model_larger.attribute(
+        ["Hello world!", "Colorless green ideas sleep furiously."],
+        method="per_step_attention",
+        show_progress=False,
+    )
+    out_final_step = saliency_gpt_model_larger.attribute(
+        ["Hello world!", "Colorless green ideas sleep furiously."],
+        method="attention",
+        show_progress=False,
+    )
+    for i in range(2):
+        assert out_per_step[i].target_attributions.shape == out_final_step[i].target_attributions.shape
+        assert torch.allclose(
+            out_per_step[i].target_attributions, out_final_step[i].target_attributions, equal_nan=True, atol=1e-5
+        )

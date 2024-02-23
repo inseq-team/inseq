@@ -335,3 +335,16 @@ def validate_indices(
             return torch.arange(indices[0], indices[1])
         else:
             return torch.tensor(indices)
+
+
+def pad_with_nan(t: torch.Tensor, dim: int, pad_size: int, front: bool = False) -> torch.Tensor:
+    """Utility to pad a tensor with nan values along a given dimension."""
+    nan_tensor = torch.ones(
+        *t.shape[:dim],
+        pad_size,
+        *t.shape[dim + 1 :],
+        device=t.device,
+    ) * float("nan")
+    if front:
+        return torch.cat([nan_tensor, t], dim=dim)
+    return torch.cat([t, nan_tensor], dim=dim)

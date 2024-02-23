@@ -175,6 +175,10 @@ class TensorWrapper:
                 out_params[field.name] = None
         return self.__class__(**out_params)
 
+    def clone_empty(self: TensorClass) -> TensorClass:
+        out_params = {k: v for k, v in self.__dict__.items() if k.startswith("_") and v is not None}
+        return self.__class__(**out_params)
+
     def to_dict(self: TensorClass) -> dict[str, Any]:
         return {k: v for k, v in self.__dict__.items() if not k.startswith("_")}
 

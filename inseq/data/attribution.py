@@ -12,6 +12,7 @@ from ..utils import (
     get_sequences_from_batched_steps,
     json_advanced_dump,
     json_advanced_load,
+    pad_with_nan,
     pretty_dict,
     remap_from_filtered,
 )
@@ -178,8 +179,8 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
     def from_step_attributions(
         cls,
         attributions: list["FeatureAttributionStepOutput"],
-        tokenized_target_sentences: Optional[list[list[TokenWithId]]] = None,
-        pad_id: Optional[Any] = None,
+        tokenized_target_sentences: list[list[TokenWithId]],
+        pad_token: Optional[Any] = None,
         has_bos_token: bool = True,
         attr_pos_end: Optional[int] = None,
     ) -> list["FeatureAttributionSequenceOutput"]:
@@ -198,36 +199,32 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
         num_sequences = len(attr.prefix)
         if not all(len(attr.prefix) == num_sequences for attr in attributions):
             raise ValueError("All the attributions must include the same number of sequences.")
-        seq_attributions = []
-        sources = None
-        if attr.source_attributions is not None:
-            sources = [drop_padding(attr.source[seq_id], pad_id) for seq_id in range(num_sequences)]
-        targets = [
-            drop_padding([a.target[seq_id][0] for a in attributions], pad_id) for seq_id in range(num_sequences)
-        ]
-        if tokenized_target_sentences is None:
-            tokenized_target_sentences = targets
-        if has_bos_token:
-            tokenized_target_sentences = [tok_seq[1:] for tok_seq in tokenized_target_sentences]
-        tokenized_target_sentences = [
-            drop_padding(tokenized_target_sentences[seq_id], pad_id) for seq_id in range(num_sequences)
-        ]
+        seq_attributions: list[FeatureAttributionSequenceOutput] = []
+        sources = []
+        targets = []
+        pos_start = []
+        for seq_idx in range(num_sequences):
+            if attr.source_attributions is not None:
+                sources.append(drop_padding(attr.source[seq_idx], pad_token))
+            curr_target = [a.target[seq_idx][0] for a in attributions]
+            targets.append(drop_padding(curr_target, pad_token))
+            if has_bos_token:
+                tokenized_target_sentences[seq_idx] = tokenized_target_sentences[seq_idx][1:]
+            tokenized_target_sentences[seq_idx] = drop_padding(tokenized_target_sentences[seq_idx], pad_token)
         if attr_pos_end is None:
             attr_pos_end = max(len(t) for t in tokenized_target_sentences)
-        pos_start = [
-            min(len(tokenized_target_sentences[seq_id]), attr_pos_end) - len(targets[seq_id])
-            for seq_id in range(num_sequences)
-        ]
-        for seq_id in range(num_sequences):
-            source = tokenized_target_sentences[seq_id][: pos_start[seq_id]] if sources is None else sources[seq_id]
-            seq_attributions.append(
-                attr.get_sequence_cls(
-                    source=source,
-                    target=tokenized_target_sentences[seq_id],
-                    attr_pos_start=pos_start[seq_id],
-                    attr_pos_end=attr_pos_end,
-                )
+        for seq_idx in range(num_sequences):
+            # If the model is decoder-only, the source is the input prefix
+            curr_pos_start = min(len(tokenized_target_sentences[seq_idx]), attr_pos_end) - len(targets[seq_idx])
+            pos_start.append(curr_pos_start)
+            source = tokenized_target_sentences[seq_idx][:curr_pos_start] if not sources else sources[seq_idx]
+            curr_seq_attribution: FeatureAttributionSequenceOutput = attr.get_sequence_cls(
+                source=source,
+                target=tokenized_target_sentences[seq_idx],
+                attr_pos_start=pos_start[seq_idx],
+                attr_pos_end=attr_pos_end,
             )
+            seq_attributions.append(curr_seq_attribution)
         if attr.source_attributions is not None:
             source_attributions = get_sequences_from_batched_steps([att.source_attributions for att in attributions])
             for seq_id in range(num_sequences):
@@ -249,10 +246,7 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
                     start_idx:end_idx, : len(targets[seq_id]), ...  # noqa: E203
                 ]
                 if target_attributions[seq_id].shape[0] != len(tokenized_target_sentences[seq_id]):
-                    empty_final_row = torch.ones(
-                        1, *target_attributions[seq_id].shape[1:], device=target_attributions[seq_id].device
-                    ) * float("nan")
-                    target_attributions[seq_id] = torch.cat([target_attributions[seq_id], empty_final_row], dim=0)
+                    target_attributions[seq_id] = pad_with_nan(target_attributions[seq_id], dim=0, pad_size=1)
                 seq_attributions[seq_id].target_attributions = target_attributions[seq_id]
         if attr.step_scores is not None:
             step_scores = [{} for _ in range(num_sequences)]
@@ -427,47 +421,51 @@ class FeatureAttributionStepOutput(TensorWrapper):
         self,
         target_attention_mask: TargetIdsTensor,
         batch: Union[DecoderOnlyBatch, EncoderDecoderBatch],
+        is_final_step_method: bool = False,
     ) -> None:
         """Remaps the attributions to the original shape of the input sequence."""
+        batch_size = (
+            len(batch.sources.input_tokens) if self.source_attributions is not None else len(batch.target_tokens)
+        )
+        source_len = len(batch.sources.input_tokens[0])
+        target_len = len(batch.target_tokens[0])
+        # Normal per-step attribution outputs have shape (batch_size, seq_len, ...)
+        other_dims_start_idx = 2
+        # Final step attribution outputs have shape (batch_size, seq_len, seq_len, ...)
+        if is_final_step_method:
+            other_dims_start_idx += 1
+        other_dims = (
+            self.source_attributions.shape[other_dims_start_idx:]
+            if self.source_attributions is not None
+            else self.target_attributions.shape[other_dims_start_idx:]
+        )
         if self.source_attributions is not None:
             self.source_attributions = remap_from_filtered(
-                original_shape=(len(batch.sources.input_tokens), *self.source_attributions.shape[1:]),
+                original_shape=(batch_size, *self.source_attributions.shape[1:]),
                 mask=target_attention_mask,
                 filtered=self.source_attributions,
             )
         if self.target_attributions is not None:
             self.target_attributions = remap_from_filtered(
-                original_shape=(len(batch.target_tokens), *self.target_attributions.shape[1:]),
+                original_shape=(batch_size, *self.target_attributions.shape[1:]),
                 mask=target_attention_mask,
                 filtered=self.target_attributions,
             )
         if self.step_scores is not None:
             for score_name, score_tensor in self.step_scores.items():
                 self.step_scores[score_name] = remap_from_filtered(
-                    original_shape=(len(batch.target_tokens), 1),
+                    original_shape=(batch_size, 1),
                     mask=target_attention_mask,
                     filtered=score_tensor.unsqueeze(-1),
                 ).squeeze(-1)
         if self.sequence_scores is not None:
             for score_name, score_tensor in self.sequence_scores.items():
                 if score_name.startswith("decoder"):
-                    original_shape = (
-                        len(batch.target_tokens),
-                        self.target_attributions.shape[1],
-                        *self.target_attributions.shape[1:],
-                    )
+                    original_shape = (batch_size, target_len, target_len, *other_dims)
                 elif score_name.startswith("encoder"):
-                    original_shape = (
-                        len(batch.sources.input_tokens),
-                        self.source_attributions.shape[1],
-                        *self.source_attributions.shape[1:],
-                    )
+                    original_shape = (batch_size, source_len, source_len, *other_dims)
                 else:  # default case: cross-attention
-                    original_shape = (
-                        len(batch.sources.input_tokens),
-                        self.target_attributions.shape[1],
-                        *self.source_attributions.shape[1:],
-                    )
+                    original_shape = (batch_size, source_len, target_len, *other_dims)
                 self.sequence_scores[score_name] = remap_from_filtered(
                     original_shape=original_shape,
                     mask=target_attention_mask,

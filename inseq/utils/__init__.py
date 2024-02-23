@@ -55,6 +55,7 @@ from .torch_utils import (
     get_front_padding,
     get_sequences_from_batched_steps,
     normalize,
+    pad_with_nan,
     remap_from_filtered,
     top_p_logits_mask,
     validate_indices,
@@ -124,4 +125,5 @@ __all__ = [
     "get_post_variable_assignment_hook",
     "StackFrame",
     "validate_indices",
+    "pad_with_nan",
 ]

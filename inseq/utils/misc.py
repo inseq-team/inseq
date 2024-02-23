@@ -10,7 +10,6 @@ from contextlib import contextmanager
 from functools import wraps
 from importlib import import_module
 from inspect import signature
-from itertools import dropwhile
 from numbers import Number
 from os import PathLike, fsync
 from typing import Any, Callable, Optional, Union
@@ -171,10 +170,10 @@ def pad(seq: Sequence[Sequence[Any]], pad_id: Any):
     return seq
 
 
-def drop_padding(seq: Sequence[Any], pad_id: Any):
+def drop_padding(seq: Sequence[TokenWithId], pad_id: str):
     if pad_id is None:
         return seq
-    return list(reversed(list(dropwhile(lambda x: x == pad_id, reversed(seq)))))
+    return [x for x in seq if x.token != pad_id]
 
 
 def isnotebook():

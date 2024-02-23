@@ -133,6 +133,8 @@ class ValueZeroingAttribution(PerturbationAttributionRegistry):
         self.use_predicted_target = False
         # Uses model configuration to access attention module and value vector variable
         self.use_model_config = True
+        # Needs only the final generation step to extract scores
+        self.is_final_step_method = True
         self.method = ValueZeroing(attribution_model)
         self.hook(**kwargs)
 
