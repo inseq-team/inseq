@@ -199,15 +199,15 @@ class MultiStepAttentionWeightsAttribution(InternalsAttributionRegistry):
         return self.method.attribute(**attribute_fn_main_args, **attribution_args)
 
 
-def test_seq2seq_final_step_per_step_conformity(saliency_mt_model: HuggingfaceEncoderDecoderModel):
-    out_per_step = saliency_mt_model.attribute(
+def test_seq2seq_final_step_per_step_conformity(saliency_mt_model_larger: HuggingfaceEncoderDecoderModel):
+    out_per_step = saliency_mt_model_larger.attribute(
         "Hello ladies and badgers!",
         method="per_step_attention",
         attribute_target=True,
         show_progress=False,
         output_step_attributions=True,
     )
-    out_final_step = saliency_mt_model.attribute(
+    out_final_step = saliency_mt_model_larger.attribute(
         "Hello ladies and badgers!",
         method="attention",
         attribute_target=True,
