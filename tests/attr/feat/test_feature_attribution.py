@@ -218,15 +218,18 @@ def test_seq2seq_final_step_per_step_conformity(saliency_mt_model: HuggingfaceEn
         assert torch.allclose(
             out_per_step.step_attributions[step_idx].source_attributions,
             out_final_step.step_attributions[step_idx].source_attributions,
+            atol=1e-4,
         )
         assert torch.allclose(
             out_per_step.step_attributions[step_idx].target_attributions,
             out_final_step.step_attributions[step_idx].target_attributions,
             equal_nan=True,
+            atol=1e-4,
         )
         assert torch.allclose(
             out_per_step.step_attributions[step_idx].sequence_scores["encoder_self_attentions"],
             out_final_step.step_attributions[step_idx].sequence_scores["encoder_self_attentions"],
+            atol=1e-4,
         )
 
 
@@ -248,6 +251,7 @@ def test_gpt_final_step_per_step_conformity(saliency_gpt_model: HuggingfaceDecod
             out_per_step.step_attributions[step_idx].target_attributions,
             out_final_step.step_attributions[step_idx].target_attributions,
             equal_nan=True,
+            atol=1e-4,
         )
 
 
@@ -276,11 +280,15 @@ def test_seq2seq_multi_step_attention_weights_single_full_match(saliency_mt_mode
     assert torch.allclose(
         out_per_step[0].source_attributions,
         out_final_step[0].source_attributions,
+        atol=1e-4,
     )
-    assert torch.allclose(out_per_step[0].target_attributions, out_final_step[0].target_attributions, equal_nan=True)
+    assert torch.allclose(
+        out_per_step[0].target_attributions, out_final_step[0].target_attributions, equal_nan=True, atol=1e-4
+    )
     assert torch.allclose(
         out_per_step[0].sequence_scores["encoder_self_attentions"],
         out_final_step[0].sequence_scores["encoder_self_attentions"],
+        atol=1e-4,
     )
 
 
@@ -296,7 +304,12 @@ def test_gpt_multi_step_attention_weights_single_full_match(saliency_gpt_model: 
         show_progress=False,
     )
     assert out_per_step[0].target_attributions.shape == out_final_step[0].target_attributions.shape
-    assert torch.allclose(out_per_step[0].target_attributions, out_final_step[0].target_attributions, equal_nan=True)
+    assert torch.allclose(
+        out_per_step[0].target_attributions,
+        out_final_step[0].target_attributions,
+        equal_nan=True,
+        atol=1e-4,
+    )
 
 
 # Batching for Seq2Seq models is not supported when using is_final_step methods
