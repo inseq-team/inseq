@@ -217,14 +217,14 @@ def test_seq2seq_final_step_per_step_conformity(saliency_mt_model_larger: Huggin
     assert out_per_step[0] == out_final_step[0]
 
 
-def test_gpt_final_step_per_step_conformity(saliency_gpt_model: HuggingfaceDecoderOnlyModel):
-    out_per_step = saliency_gpt_model.attribute(
+def test_gpt_final_step_per_step_conformity(saliency_gpt_model_larger: HuggingfaceDecoderOnlyModel):
+    out_per_step = saliency_gpt_model_larger.attribute(
         "Hello ladies and badgers!",
         method="per_step_attention",
         show_progress=False,
         output_step_attributions=True,
     )
-    out_final_step = saliency_gpt_model.attribute(
+    out_final_step = saliency_gpt_model_larger.attribute(
         "Hello ladies and badgers!",
         method="attention",
         show_progress=False,
