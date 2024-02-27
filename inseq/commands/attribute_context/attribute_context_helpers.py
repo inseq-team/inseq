@@ -402,6 +402,7 @@ def get_source_target_cci_scores(
     model: HuggingfaceModel,
     cci_attrib_out: FeatureAttributionSequenceOutput,
     input_template: str,
+    input_current_text: str,
     input_context_tokens: list[str],
     input_full_tokens: list[str],
     output_template: str,
@@ -421,6 +422,8 @@ def get_source_target_cci_scores(
         else:
             input_scores = cci_attrib_out.target_attributions[:, 0].tolist()
         input_prefix, *_ = input_template.partition("{context}")
+        if "{current}" in input_prefix:
+            input_prefix = input_prefix.format(current=input_current_text)
         input_prefix_tokens = get_filtered_tokens(input_prefix, model, special_tokens_to_keep, is_target=False)
         input_prefix_len = len(input_prefix_tokens)
         input_scores = input_scores[input_prefix_len : len(input_context_tokens) + input_prefix_len]
