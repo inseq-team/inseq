@@ -75,7 +75,7 @@ def test_contrastive_attribution_seq2seq_alignments(saliency_mt_model_larger: Hu
         "orig_tgt": "I soldati della pace ONU",
         "contrast_tgt": "Le forze militari di pace delle Nazioni Unite",
         "alignments": [[(0, 0), (1, 1), (2, 2), (3, 4), (4, 5), (5, 7), (6, 9)]],
-        "aligned_tgts": ["▁Le → ▁I", "▁forze → ▁soldati", "▁di → ▁della", "▁pace", "▁Nazioni → ▁ONU", "</s>"],
+        "aligned_tgts": ["<pad>", "▁Le → ▁I", "▁forze → ▁soldati", "▁di → ▁della", "▁pace", "▁Nazioni → ▁ONU", "</s>"],
     }
     out = saliency_mt_model_larger.attribute(
         aligned["src"],

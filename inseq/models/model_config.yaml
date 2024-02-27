@@ -1,46 +1,53 @@
+# AutoModelForCausalLM
+BloomForCausalLM:
+    self_attention_module: "self_attention"
+    value_vector: "value_layer"
 GPT2LMHeadModel:
-    attention_module: "attn"
+    self_attention_module: "attn"
     value_vector: "value"
 OpenAIGPTLMHeadModel:
-    attention_module: "attn"
+    self_attention_module: "attn"
     value_vector: "value"
 GPTNeoXForCausalLM:
-    attention_module: "attention"
+    self_attention_module: "attention"
     value_vector: "value"
-BloomForCausalLM:
-    attention_module: "self_attention"
-    value_vector: "value_layer"
 LlamaForCausalLM:
-    attention_module: "self_attn"
+    self_attention_module: "self_attn"
     value_vector: "value_states"
 GPTBigCodeForCausalLM:
-    attention_module: "attn"
+    self_attention_module: "attn"
     value_vector: "value"
 CodeGenForCausalLM:
-    attention_module: "attn"
+    self_attention_module: "attn"
     value_vector: "value"
-
-# TODO ForCausalLM
+# TODO
+# BioGptForCausalLM
+# GemmaForCausalLM
 # GPTNeoForCausalLM
 # GPTJForCausalLM
+# MistralForCausalLM
+# MixtralForCausalLM
+# MptForCausalLM
+# OpenLlamaForCausalLM
 # OPTForCausalLM
+# PhiForCausalLM
+# StableLmForCausalLM
 # XGLMForCausalLM
-# BioGptForCausalLM
-# XLNetLMHeadModel
+
+# AutoModelForSeq2SeqLM
+MarianMTModel:
+    self_attention_module: "self_attn"
+    cross_attention_module: "encoder_attn"
+    value_vector: "value_states"
  
 # TODO ForConditionalGeneration
 # BartForConditionalGeneration
-# BlenderbotForConditionalGeneration
-# T5ForConditionalGeneration
-# MarianMTModel
-# LongT5ForConditionalGeneration
 # FSMTForConditionalGeneration
+# LongT5ForConditionalGeneration
 # M2M100ForConditionalGeneration
 # MBartForConditionalGeneration
-# PegasusForConditionalGeneration
-# ProphetNetForConditionalGeneration
-# LEDForConditionalGeneration
-# BigBirdPegasusForConditionalGeneration
-# PLBartForConditionalGeneration
-# SwitchTransformerForConditionalGeneration
+# MT5ForConditionalGeneration
 # NllbMoeForConditionalGeneration
+# SeamlessM4TForTextToText
+# SeamlessM4Tv2ForTextToText
+# T5ForConditionalGeneration

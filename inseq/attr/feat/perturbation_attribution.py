@@ -144,11 +144,25 @@ class ValueZeroingAttribution(PerturbationAttributionRegistry):
         attribution_args: dict[str, Any] = {},
     ) -> MultiDimensionalFeatureAttributionStepOutput:
         attr = self.method.attribute(**attribute_fn_main_args, **attribution_args)
-        source_attributions, target_attributions = get_source_target_attributions(
-            attr, self.attribution_model.is_encoder_decoder
+        encoder_self_scores, decoder_cross_scores, decoder_self_scores = get_source_target_attributions(
+            attr, self.attribution_model.is_encoder_decoder, has_sequence_scores=True
         )
+        sequence_scores = {}
+        if self.attribution_model.is_encoder_decoder:
+            if len(attribute_fn_main_args["inputs"]) > 1:
+                target_attributions = decoder_self_scores.to("cpu")
+            else:
+                target_attributions = None
+                sequence_scores["decoder_self_scores"] = decoder_self_scores.to("cpu")
+            sequence_scores["encoder_self_scores"] = encoder_self_scores.to("cpu")
+            return MultiDimensionalFeatureAttributionStepOutput(
+                source_attributions=decoder_cross_scores.to("cpu"),
+                target_attributions=target_attributions,
+                sequence_scores=sequence_scores,
+                _num_dimensions=1,  # num_layers
+            )
         return MultiDimensionalFeatureAttributionStepOutput(
-            source_attributions=source_attributions,
-            target_attributions=target_attributions,
+            source_attributions=None,
+            target_attributions=decoder_self_scores,
             _num_dimensions=1,  # num_layers
         )

@@ -274,8 +274,8 @@ def test_attribute_slice_seq2seq(saliency_mt_model):
     assert ex2.attr_pos_start == len(ex2.target)
     assert ex2.attr_pos_end == len(ex2.target)
     assert ex2.source_attributions.shape[1] == 0 and ex2.target_attributions.shape[1] == 0
-    assert ex3.attr_pos_start == 12
-    assert ex3.attr_pos_end == 15
+    assert ex3.attr_pos_start == 13
+    assert ex3.attr_pos_end == 16
     assert ex1.source_attributions.shape[1] == ex1.attr_pos_end - ex1.attr_pos_start
     assert ex1.target_attributions.shape[1] == ex1.attr_pos_end - ex1.attr_pos_start
     assert ex1.target_attributions.shape[0] == ex1.attr_pos_end

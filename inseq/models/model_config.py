@@ -1,6 +1,7 @@
 import logging
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Optional
 
 import yaml
 
@@ -12,18 +13,23 @@ class ModelConfig:
     """Configuration used by the methods for which the attribute ``use_model_config=True``.
 
     Args:
-        attention_module (:obj:`str`):
-            The name of the module performing the attention computation (e.g.``attn`` for the GPT-2 model in
-            transformers). Can be identified by looking at the name of the attribute instantiating the attention module
+        self_attention_module (:obj:`str`):
+            The name of the module performing the self-attention computation (e.g.``attn`` for the GPT-2 model in
+            transformers). Can be identified by looking at the name of the self-attention module attribute
             in the model's transformer block class (e.g. :obj:`transformers.models.gpt2.GPT2Block` for GPT-2).
+        cross_attention_module (:obj:`str`):
+            The name of the module performing the cross-attention computation (e.g.``encoder_attn`` for MarianMT models
+            in transformers). Can be identified by looking at the name of the cross-attention module attribute
+            in the model's transformer block class (e.g. :obj:`transformers.models.marian.MarianDecoderLayer`).
         value_vector (:obj:`str`):
             The name of the variable in the forward pass of the attention module containing the value vector
             (e.g. ``value`` for the GPT-2 model in transformers). Can be identified by looking at the forward pass of
             the attention module (e.g. :obj:`transformers.models.gpt2.modeling_gpt2.GPT2Attention.forward` for GPT-2).
     """
 
-    attention_module: str
+    self_attention_module: str
     value_vector: str
+    cross_attention_module: Optional[str] = None
 
 
 MODEL_CONFIGS = {

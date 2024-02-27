@@ -209,8 +209,11 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
             curr_target = [a.target[seq_idx][0] for a in attributions]
             targets.append(drop_padding(curr_target, pad_token))
             if has_bos_token:
-                tokenized_target_sentences[seq_idx] = tokenized_target_sentences[seq_idx][1:]
-            tokenized_target_sentences[seq_idx] = drop_padding(tokenized_target_sentences[seq_idx], pad_token)
+                tokenized_target_sentences[seq_idx] = tokenized_target_sentences[seq_idx][:1] + drop_padding(
+                    tokenized_target_sentences[seq_idx], pad_token
+                )
+            else:
+                tokenized_target_sentences[seq_idx] = drop_padding(tokenized_target_sentences[seq_idx], pad_token)
         if attr_pos_end is None:
             attr_pos_end = max(len(t) for t in tokenized_target_sentences)
         for seq_idx in range(num_sequences):
@@ -238,8 +241,6 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
                 [att.target_attributions for att in attributions], padding_dims=[1]
             )
             for seq_id in range(num_sequences):
-                if has_bos_token:
-                    target_attributions[seq_id] = target_attributions[seq_id][1:, ...]
                 start_idx = max(pos_start) - pos_start[seq_id]
                 end_idx = start_idx + len(tokenized_target_sentences[seq_id])
                 target_attributions[seq_id] = target_attributions[seq_id][

@@ -45,7 +45,6 @@ class ValueZeroingSimilarityMetric(Enum):
 class ValueZeroingModule(Enum):
     DECODER = "decoder"
     ENCODER = "encoder"
-    CROSS = "cross"
 
 
 class ValueZeroing(InseqAttribution):
@@ -155,10 +154,13 @@ class ValueZeroing(InseqAttribution):
         inputs: TensorOrTupleOfTensorsGeneric,
         additional_forward_args: TensorOrTupleOfTensorsGeneric,
         hidden_states: MultiLayerEmbeddingsTensor,
+        attention_module_name: str,
+        attributed_seq_len: Optional[int] = None,
         similarity_metric: str = ValueZeroingSimilarityMetric.COSINE.value,
         mode: str = ValueZeroingModule.DECODER.value,
         zeroed_units_indices: Optional[OneOrMoreIndicesDict] = None,
-        threshold: float = 1e-5,
+        min_score_threshold: float = 1e-5,
+        use_causal_mask: bool = False,
     ) -> MultiLayerScoreTensor:
         """Given a ``nn.ModuleList``, computes the similarity between the clean and corrupted states for each block.
 
@@ -166,9 +168,12 @@ class ValueZeroing(InseqAttribution):
             modules (:obj:`nn.ModuleList`): The list of modules to compute the similarity for.
             hidden_states (:obj:`MultiLayerEmbeddingsTensor`): The cached hidden states of the modules to use as clean
                 counterparts when computing the similarity.
-            similarity_scores_shape (:obj:`torch.Size`): The shape of the similarity scores tensor to be returned.
+            attention_module_name (:obj:`str`): The name of the attention module to zero the values for.
+            attributed_seq_len (:obj:`int`): The length of the sequence to attribute. If not specified, it is assumed
+                to be the same as the length of the hidden states.
             similarity_metric (:obj:`str`): The name of the similarity metric used. Default: "cosine".
             mode (:obj:`str`): The mode of the model to compute the similarity for. Default: "decoder".
+
             zeroed_units_indices (:obj:`Union[int, tuple[int, int], list[int]]` or :obj:`dict` with :obj:`int` keys and
                 `Union[int, tuple[int, int], list[int]]` values, optional): The indices of the attention heads
                 that should be zeroed to compute corrupted states.
@@ -179,6 +184,9 @@ class ValueZeroing(InseqAttribution):
                     - If a dictionary, the keys are the layer indices and the values are the zeroed attention heads for
                       the corresponding layer. Any missing layer will not be zeroed.
                 Default: None.
+            min_score_threshold (:obj:`float`, optional): The minimum score threshold to consider when computing the
+                similarity. Default: 1e-5.
+            use_causal_mask (:obj:`bool`, optional): Whether a causal mask is applied to zeroing scores Default: False.
 
         Returns:
             :obj:`MultiLayerScoreTensor`: A tensor of shape ``[batch_size, seq_len, num_layer]`` containing distances
@@ -186,11 +194,15 @@ class ValueZeroing(InseqAttribution):
         """
         if mode == ValueZeroingModule.DECODER.value:
             modules: nn.ModuleList = find_block_stack(self.forward_func.get_decoder())
-            batch_size = hidden_states.size(0)
-            num_layers = len(modules)
-            sequence_length = hidden_states.size(2)
+        elif mode == ValueZeroingModule.ENCODER.value:
+            modules: nn.ModuleList = find_block_stack(self.forward_func.get_encoder())
         else:
             raise NotImplementedError(f"Mode {mode} not implemented for value zeroing.")
+        if attributed_seq_len is None:
+            attributed_seq_len = hidden_states.size(2)
+        batch_size = hidden_states.size(0)
+        generated_seq_len = hidden_states.size(2)
+        num_layers = len(modules)
 
         # Store clean hidden states for later use. Starts at 1 since the first element of the modules stack is the
         # embedding layer, and we are only interested in the transformer blocks outputs.
@@ -199,7 +211,7 @@ class ValueZeroing(InseqAttribution):
         }
         # Scores for every layer of the model
         all_scores = torch.ones(
-            batch_size, num_layers, sequence_length, sequence_length, device=hidden_states.device
+            batch_size, num_layers, generated_seq_len, attributed_seq_len, device=hidden_states.device
         ) * float("nan")
 
         # Hooks:
@@ -218,11 +230,11 @@ class ValueZeroing(InseqAttribution):
                 modules[block_idx].register_forward_hook(states_extract_and_patch_hook)
             )
         # Zeroing is done for every token in the sequence separately (O(n) complexity)
-        for token_idx in range(sequence_length):
+        for token_idx in range(attributed_seq_len):
             value_zeroing_hook_handles: list[RemovableHandle] = []
             # Value zeroing hooks are registered for every token separately since they are token-dependent
             for block_idx, block in enumerate(modules):
-                attention_module = block.get_submodule(self.forward_func.config.attention_module)
+                attention_module = block.get_submodule(attention_module_name)
                 if isinstance(zeroed_units_indices, dict):
                     if block_idx not in zeroed_units_indices:
                         continue
@@ -259,19 +271,22 @@ class ValueZeroing(InseqAttribution):
             for block_idx in range(len(modules)):
                 similarity_scores = self.SIMILARITY_METRICS[similarity_metric](
                     self.clean_block_output_states[block_idx].float(), self.corrupted_block_output_states[block_idx]
-                )[:, token_idx:]
-                all_scores[:, block_idx, token_idx:, token_idx] = 1 - similarity_scores
+                )
+                if use_causal_mask:
+                    all_scores[:, block_idx, token_idx:, token_idx] = 1 - similarity_scores[:, token_idx:]
+                else:
+                    all_scores[:, block_idx, :, token_idx] = 1 - similarity_scores
             self.corrupted_block_output_states = {}
         for handle in states_extraction_hook_handles:
             handle.remove()
         self.clean_block_output_states = {}
-        all_scores = torch.where(all_scores < threshold, torch.zeros_like(all_scores), all_scores)
+        all_scores = torch.where(all_scores < min_score_threshold, torch.zeros_like(all_scores), all_scores)
         # Normalize scores to sum to 1
-        per_token_sum_score = all_scores.sum(dim=-1, keepdim=True)
+        per_token_sum_score = all_scores.nansum(dim=-1, keepdim=True)
         per_token_sum_score[per_token_sum_score == 0] = 1
         all_scores = all_scores / per_token_sum_score
 
-        # Final shape: [batch_size, seq_len, seq_len, num_layers]
+        # Final shape: [batch_size, attributed_seq_len, generated_seq_len, num_layers]
         return all_scores.permute(0, 3, 2, 1)
 
     def attribute(
@@ -312,18 +327,39 @@ class ValueZeroing(InseqAttribution):
                 f"Similarity metric {similarity_metric} not available."
                 f"Available metrics: {','.join(self.SIMILARITY_METRICS.keys())}"
             )
+
         decoder_scores = self.compute_modules_post_zeroing_similarity(
             inputs=inputs,
             additional_forward_args=additional_forward_args,
             hidden_states=decoder_hidden_states,
+            attention_module_name=self.forward_func.config.self_attention_module,
             similarity_metric=similarity_metric,
             mode=ValueZeroingModule.DECODER.value,
             zeroed_units_indices=zeroed_units_indices,
+            use_causal_mask=True,
         )
-        return decoder_scores
         # Encoder-decoder models also perform zeroing on the encoder self-attention and cross-attention values
         # Adapted from https://github.com/hmohebbi/ContextMixingASR/blob/master/scoring/valueZeroing.py
-        # if is_encoder_decoder:
-        #    encoder_hidden_states = torch.stack(outputs.encoder_hidden_states)
-        #    encoder = self.forward_func.get_encoder()
-        #    encoder_stack = find_block_stack(encoder)
+        if self.forward_func.is_encoder_decoder:
+            # TODO: Enable different encoder/decoder/cross zeroing indices
+            encoder_scores = self.compute_modules_post_zeroing_similarity(
+                inputs=inputs,
+                additional_forward_args=additional_forward_args,
+                hidden_states=encoder_hidden_states,
+                attention_module_name=self.forward_func.config.self_attention_module,
+                similarity_metric=similarity_metric,
+                mode=ValueZeroingModule.ENCODER.value,
+                zeroed_units_indices=zeroed_units_indices,
+            )
+            cross_scores = self.compute_modules_post_zeroing_similarity(
+                inputs=inputs,
+                additional_forward_args=additional_forward_args,
+                hidden_states=decoder_hidden_states,
+                attributed_seq_len=encoder_hidden_states.size(2),
+                attention_module_name=self.forward_func.config.cross_attention_module,
+                similarity_metric=similarity_metric,
+                mode=ValueZeroingModule.DECODER.value,
+                zeroed_units_indices=zeroed_units_indices,
+            )
+            return encoder_scores, cross_scores, decoder_scores
+        return (decoder_scores,)
