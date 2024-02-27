@@ -21,7 +21,13 @@ from captum._utils.typing import TensorOrTupleOfTensorsGeneric
 from torch import nn
 from torch.utils.hooks import RemovableHandle
 
-from ....utils import StackFrame, find_block_stack, get_post_variable_assignment_hook, validate_indices
+from ....utils import (
+    StackFrame,
+    find_block_stack,
+    get_post_variable_assignment_hook,
+    recursive_get_submodule,
+    validate_indices,
+)
 from ....utils.typing import (
     EmbeddingsTensor,
     InseqAttribution,
@@ -99,6 +105,11 @@ class ValueZeroing(InseqAttribution):
             zeroed_units_indices: Optional[OneOrMoreIndices] = None,
             batch_size: int = 1,
         ) -> None:
+            if varname not in frame.f_locals:
+                raise ValueError(
+                    f"Variable {varname} not found in the local frame."
+                    f"Other variable names: {', '.join(frame.f_locals.keys())}"
+                )
             # Zeroing value vectors corresponding to the given token index
             if zeroed_token_index is not None:
                 values_size = frame.f_locals[varname].size()
@@ -234,7 +245,9 @@ class ValueZeroing(InseqAttribution):
             value_zeroing_hook_handles: list[RemovableHandle] = []
             # Value zeroing hooks are registered for every token separately since they are token-dependent
             for block_idx, block in enumerate(modules):
-                attention_module = block.get_submodule(attention_module_name)
+                attention_module = recursive_get_submodule(block, attention_module_name)
+                if attention_module is None:
+                    raise ValueError(f"Attention module {attention_module_name} not found in block {block_idx}.")
                 if isinstance(zeroed_units_indices, dict):
                     if block_idx not in zeroed_units_indices:
                         continue

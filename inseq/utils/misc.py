@@ -434,3 +434,8 @@ def clean_tokens(tokens: list[str], remove_tokens: list[str]) -> tuple[list[str]
         else:
             removed_token_idxs += [idx]
     return clean_tokens, removed_token_idxs
+
+
+def get_left_padding(text: str):
+    """Returns the number of spaces at the beginning of a string."""
+    return len(text) - len(text.lstrip())

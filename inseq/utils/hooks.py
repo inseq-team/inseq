@@ -5,6 +5,8 @@ from typing import Callable, Optional, TypeVar
 
 from torch import nn
 
+from .misc import get_left_padding
+
 StackFrame = TypeVar("StackFrame")
 
 
@@ -31,7 +33,21 @@ def get_last_variable_assignment_position(
     # Matches any assignment of variable varname
     pattern = rf"^\s*(?:\w+\s*,\s*)*\b{varname}\b\s*(?:,.+\s*)*=\s*[^\W=]+.*$"
     code, startline = getsourcelines(getattr(module, fname))
-    line_numbers = [i for i, line in enumerate(code) if re.match(pattern, line)]
+    line_numbers = []
+    i = 0
+    while i < len(code):
+        line = code[i]
+        # Handles multi-line assignments
+        if re.match(pattern, line):
+            parentheses_count = line.count("(") - line.count(")")
+            ends_with_newline = lambda l: l.strip().endswith("\\")
+            follow_indent = lambda l, i: len(code) > i + 1 and get_left_padding(code[i + 1]) > get_left_padding(l)
+            while (ends_with_newline(line) or follow_indent(line, i) or parentheses_count > 0) and len(code) > i + 1:
+                i += 1
+                line = code[i]
+                parentheses_count += line.count("(") - line.count(")")
+            line_numbers.append(i)
+        i += 1
     if len(line_numbers) == 0:
         return None
     return line_numbers[-1] + startline + 1

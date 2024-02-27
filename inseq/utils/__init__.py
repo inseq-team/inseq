@@ -56,6 +56,7 @@ from .torch_utils import (
     get_sequences_from_batched_steps,
     normalize,
     pad_with_nan,
+    recursive_get_submodule,
     remap_from_filtered,
     top_p_logits_mask,
     validate_indices,
@@ -126,4 +127,5 @@ __all__ = [
     "StackFrame",
     "validate_indices",
     "pad_with_nan",
+    "recursive_get_submodule",
 ]

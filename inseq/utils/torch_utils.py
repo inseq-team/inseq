@@ -348,3 +348,17 @@ def pad_with_nan(t: torch.Tensor, dim: int, pad_size: int, front: bool = False) 
     if front:
         return torch.cat([nan_tensor, t], dim=dim)
     return torch.cat([t, nan_tensor], dim=dim)
+
+
+def recursive_get_submodule(parent: nn.Module, target: str) -> Optional[nn.Module]:
+    if target == "":
+        return parent
+    mod = None
+    if hasattr(parent, target):
+        mod = getattr(parent, target)
+    else:
+        for submodule in parent.children():
+            mod = recursive_get_submodule(submodule, target)
+            if mod is not None:
+                break
+    return mod
