@@ -206,6 +206,7 @@ def attribute_context_with_model(args: AttributeContextArgs, model: HuggingfaceM
             model,
             cci_attrib_out,
             args.input_template,
+            args.input_current_text,
             input_context_tokens,
             input_full_tokens,
             args.output_template,
