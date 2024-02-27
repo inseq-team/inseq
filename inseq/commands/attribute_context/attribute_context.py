@@ -68,11 +68,11 @@ def attribute_context_with_model(args: AttributeContextArgs, model: HuggingfaceM
         args.generation_kwargs["forced_bos_token_id"] = model.tokenizer.lang_code_to_id[tgt_lang]
 
     # Prepare input/outputs (generate if necessary)
-    input_full_text = format_template(args.input_template, args.input_current_text, args.input_context_text)
     if "{current}" in args.contextless_input_current_text:
         args.input_current_text = args.contextless_input_current_text.format(current=args.input_current_text)
     else:
         args.input_current_text = args.contextless_input_current_text
+    input_full_text = format_template(args.input_template, args.input_current_text, args.input_context_text)
     args.output_context_text, args.output_current_text = prepare_outputs(
         model=model,
         input_context_text=args.input_context_text,
