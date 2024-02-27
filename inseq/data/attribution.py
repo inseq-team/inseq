@@ -181,7 +181,6 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
         attributions: list["FeatureAttributionStepOutput"],
         tokenized_target_sentences: list[list[TokenWithId]],
         pad_token: Optional[Any] = None,
-        has_bos_token: bool = True,
         attr_pos_end: Optional[int] = None,
     ) -> list["FeatureAttributionSequenceOutput"]:
         """Converts a list of :class:`~inseq.data.attribution.FeatureAttributionStepOutput` objects containing multiple
@@ -208,9 +207,9 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
                 sources.append(drop_padding(attr.source[seq_idx], pad_token))
             curr_target = [a.target[seq_idx][0] for a in attributions]
             targets.append(drop_padding(curr_target, pad_token))
-            if has_bos_token:
+            if all(attr.prefix[seq_idx][0] == pad_token for seq_idx in range(num_sequences)):
                 tokenized_target_sentences[seq_idx] = tokenized_target_sentences[seq_idx][:1] + drop_padding(
-                    tokenized_target_sentences[seq_idx], pad_token
+                    tokenized_target_sentences[seq_idx][1:], pad_token
                 )
             else:
                 tokenized_target_sentences[seq_idx] = drop_padding(tokenized_target_sentences[seq_idx], pad_token)

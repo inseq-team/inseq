@@ -294,7 +294,9 @@ class ValueZeroing(InseqAttribution):
         inputs: TensorOrTupleOfTensorsGeneric,
         additional_forward_args: TensorOrTupleOfTensorsGeneric,
         similarity_metric: str = ValueZeroingSimilarityMetric.COSINE.value,
-        zeroed_units_indices: Optional[OneOrMoreIndicesDict] = None,
+        encoder_zeroed_units_indices: Optional[OneOrMoreIndicesDict] = None,
+        decoder_zeroed_units_indices: Optional[OneOrMoreIndicesDict] = None,
+        cross_zeroed_units_indices: Optional[OneOrMoreIndicesDict] = None,
         encoder_hidden_states: Optional[MultiLayerEmbeddingsTensor] = None,
         decoder_hidden_states: Optional[MultiLayerEmbeddingsTensor] = None,
     ) -> TensorOrTupleOfTensorsGeneric:
@@ -312,7 +314,8 @@ class ValueZeroing(InseqAttribution):
                     - If a list of integers, the attention heads in the list are zeroed across all layers.
                     - If a dictionary, the keys are the layer indices and the values are the zeroed attention heads for
                         the corresponding layer.
-                Default: None.
+
+                Default: None (all heads are zeroed for every layer).
             encoder_hidden_states (:obj:`torch.Tensor`, optional): A tensor of shape ``[batch_size, num_layers + 1,
                 source_seq_len, hidden_size]`` containing hidden states of the encoder. Available only for
                 encoder-decoders models. Default: None.
@@ -335,13 +338,12 @@ class ValueZeroing(InseqAttribution):
             attention_module_name=self.forward_func.config.self_attention_module,
             similarity_metric=similarity_metric,
             mode=ValueZeroingModule.DECODER.value,
-            zeroed_units_indices=zeroed_units_indices,
+            zeroed_units_indices=decoder_zeroed_units_indices,
             use_causal_mask=True,
         )
         # Encoder-decoder models also perform zeroing on the encoder self-attention and cross-attention values
         # Adapted from https://github.com/hmohebbi/ContextMixingASR/blob/master/scoring/valueZeroing.py
         if self.forward_func.is_encoder_decoder:
-            # TODO: Enable different encoder/decoder/cross zeroing indices
             encoder_scores = self.compute_modules_post_zeroing_similarity(
                 inputs=inputs,
                 additional_forward_args=additional_forward_args,
@@ -349,7 +351,7 @@ class ValueZeroing(InseqAttribution):
                 attention_module_name=self.forward_func.config.self_attention_module,
                 similarity_metric=similarity_metric,
                 mode=ValueZeroingModule.ENCODER.value,
-                zeroed_units_indices=zeroed_units_indices,
+                zeroed_units_indices=encoder_zeroed_units_indices,
             )
             cross_scores = self.compute_modules_post_zeroing_similarity(
                 inputs=inputs,
@@ -359,7 +361,12 @@ class ValueZeroing(InseqAttribution):
                 attention_module_name=self.forward_func.config.cross_attention_module,
                 similarity_metric=similarity_metric,
                 mode=ValueZeroingModule.DECODER.value,
-                zeroed_units_indices=zeroed_units_indices,
+                zeroed_units_indices=cross_zeroed_units_indices,
             )
             return encoder_scores, cross_scores, decoder_scores
+        elif encoder_zeroed_units_indices is not None or cross_zeroed_units_indices is not None:
+            logger.warning(
+                "Zeroing indices for encoder and cross-attentions were specified, but the model is not an "
+                "encoder-decoder. Use `decoder_zeroed_units_indices` to parametrize zeroing for the decoder module."
+            )
         return (decoder_scores,)

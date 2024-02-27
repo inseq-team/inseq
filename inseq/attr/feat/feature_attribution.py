@@ -514,7 +514,6 @@ class FeatureAttribution(Registry):
                 attributions=attribution_outputs,
                 tokenized_target_sentences=target_tokens_with_ids,
                 pad_token=self.attribution_model.pad_token,
-                has_bos_token=self.attribution_model.is_encoder_decoder,
                 attr_pos_end=attr_pos_end,
             ),
             step_attributions=attribution_outputs if output_step_attributions else None,
