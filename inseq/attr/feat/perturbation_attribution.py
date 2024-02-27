@@ -153,8 +153,10 @@ class ValueZeroingAttribution(PerturbationAttributionRegistry):
                 target_attributions = decoder_self_scores.to("cpu")
             else:
                 target_attributions = None
-                sequence_scores["decoder_self_scores"] = decoder_self_scores.to("cpu")
-            sequence_scores["encoder_self_scores"] = encoder_self_scores.to("cpu")
+                if decoder_self_scores is not None:
+                    sequence_scores["decoder_self_scores"] = decoder_self_scores.to("cpu")
+            if encoder_self_scores is not None:
+                sequence_scores["encoder_self_scores"] = encoder_self_scores.to("cpu")
             return MultiDimensionalFeatureAttributionStepOutput(
                 source_attributions=decoder_cross_scores.to("cpu"),
                 target_attributions=target_attributions,
