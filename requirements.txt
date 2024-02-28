@@ -93,7 +93,7 @@ tqdm==4.66.2
     #   captum
     #   huggingface-hub
     #   transformers
-transformers==4.37.2
+transformers==4.38.1
 typeguard==2.13.3
     # via jaxtyping
 typing-extensions==4.9.0

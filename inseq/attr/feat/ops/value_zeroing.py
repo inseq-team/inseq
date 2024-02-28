@@ -184,7 +184,6 @@ class ValueZeroing(InseqAttribution):
                 to be the same as the length of the hidden states.
             similarity_metric (:obj:`str`): The name of the similarity metric used. Default: "cosine".
             mode (:obj:`str`): The mode of the model to compute the similarity for. Default: "decoder".
-
             zeroed_units_indices (:obj:`Union[int, tuple[int, int], list[int]]` or :obj:`dict` with :obj:`int` keys and
                 `Union[int, tuple[int, int], list[int]]` values, optional): The indices of the attention heads
                 that should be zeroed to compute corrupted states.

@@ -121,7 +121,55 @@ class LimeAttribution(PerturbationAttributionRegistry):
 
 
 class ValueZeroingAttribution(PerturbationAttributionRegistry):
-    """Value Zeroing attribution method."""
+    """Value Zeroing method for feature attribution.
+
+    Introduced by `Mohebbi et al. (2023) <https://aclanthology.org/2023.eacl-main.245/>`__ to quantify context mixing
+    in Transformer models. The method is based on the observation that context mixing is regulated by the value vectors
+    of the attention mechanism. The method consists of two steps:
+
+    1. Zeroing the value vectors of the attention mechanism for a given token index at a given layer of the model.
+    2. Computing the similarity between hidden states produced with and without the zeroing operation, and using it
+       as a measure of context mixing for the given token at the given layer.
+
+    The method is converted into a feature attribution method by allowing for extraction of value zeroing scores at
+    specific layers, or by aggregating them across layers.
+
+    Reference implementations:
+    - Original implementation: `hmohebbi/ValueZeroing <https://github.com/hmohebbi/ValueZeroing>`__
+    - Encoder-decoder implementation: `hmohebbi/ContextMixingASR <https://github.com/hmohebbi/ContextMixingASR>`__
+
+    Args:
+        similarity_metric (:obj:`str`, optional): The similarity metric to use for computing the distance between
+            hidden states produced with and without the zeroing operation. Options: cosine, euclidean. Default: cosine.
+        encoder_zeroed_units_indices (:obj:`Union[int, tuple[int, int], list[int], dict]`, optional): The indices of
+            the attention heads that should be zeroed to compute corrupted states in the encoder self-attention module.
+            Not used for decoder-only models, or if ``output_encoder_self_scores`` is False. Format
+
+            - None: all attention heads across all layers are zeroed.
+            - int: the same attention head is zeroed across all layers.
+            - tuple of two integers: the attention heads in the range are zeroed across all layers.
+            - list of integers: the attention heads in the list are zeroed across all layers.
+            - dictionary: the keys are the layer indices and the values are the zeroed attention heads for the corresponding layer.
+
+            Default: None (all heads are zeroed for every encoder layer).
+        decoder_zeroed_units_indices (:obj:`Union[int, tuple[int, int], list[int], dict]`, optional): Same as
+            ``encoder_zeroed_units_indices`` but for the decoder self-attention module. Not used for encoder-decoder
+            models or if ``output_decoder_self_scores`` is False. Default: None (all heads are zeroed for every decoder layer).
+        cross_zeroed_units_indices (:obj:`Union[int, tuple[int, int], list[int], dict]`, optional): Same as
+            ``encoder_zeroed_units_indices`` but for the cross-attention module in encoder-decoder models. Not used
+            if the model is decoder-only. Default: None (all heads are zeroed for every layer).
+        output_decoder_self_scores (:obj:`bool`, optional): Whether to produce scores derived from zeroing the
+            decoder self-attention value vectors in encoder-decoder models. Cannot be false for decoder-only, or
+            if target-side attribution is requested using `attribute_target=True`. Default: True.
+        output_encoder_self_scores (:obj:`bool`, optional): Whether to produce scores derived from zeroing the
+            encoder self-attention value vectors in encoder-decoder models. Default: True.
+
+    Returns:
+        :class:`~inseq.data.MultiDimensionalFeatureAttributionStepOutput`: The final dimension returned by the method
+        is ``[attributed_seq_len, generated_seq_len, num_layers]``. If ``output_decoder_self_scores`` and
+        ``output_encoder_self_scores`` are True, the respective scores are returned in the ``sequence_scores``
+        output dictionary.
+    """
 
     method_name = "value_zeroing"
 
