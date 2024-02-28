@@ -145,7 +145,7 @@ def visualize_attribute_context(
         console.print(viz, soft_wrap=False)
     html = console.export_html()
     if output.info.viz_path:
-        with open(output.info.viz_path, "w") as f:
+        with open(output.info.viz_path, "w", encoding="utf-8") as f:
             f.write(html)
     if output.info.show_viz:
         console.print(viz, soft_wrap=False)
