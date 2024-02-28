@@ -2,8 +2,6 @@
 since it is bugged is not very elegant, this will need to be refactored.
 """
 
-import json
-import os
 
 import pytest
 import torch
@@ -15,8 +13,9 @@ from inseq import list_feature_attribution_methods
 from inseq.data import FeatureAttributionOutput, FeatureAttributionSequenceOutput
 from inseq.utils import get_default_device
 
-EXAMPLES_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../fixtures/huggingface_model.json")
-EXAMPLES = json.load(open(EXAMPLES_FILE))
+from ..inference_commons import load_examples
+
+EXAMPLES = load_examples()
 
 USE_REFERENCE_TEXT = [True, False]
 ATTRIBUTE_TARGET = [True, False]
@@ -275,8 +274,8 @@ def test_attribute_slice_seq2seq(saliency_mt_model):
     assert ex2.attr_pos_start == len(ex2.target)
     assert ex2.attr_pos_end == len(ex2.target)
     assert ex2.source_attributions.shape[1] == 0 and ex2.target_attributions.shape[1] == 0
-    assert ex3.attr_pos_start == 12
-    assert ex3.attr_pos_end == 15
+    assert ex3.attr_pos_start == 13
+    assert ex3.attr_pos_end == 16
     assert ex1.source_attributions.shape[1] == ex1.attr_pos_end - ex1.attr_pos_start
     assert ex1.target_attributions.shape[1] == ex1.attr_pos_end - ex1.attr_pos_start
     assert ex1.target_attributions.shape[0] == ex1.attr_pos_end
@@ -303,12 +302,12 @@ def test_attribute_decoder(saliency_gpt2_model):
     assert ex1.target_attributions.shape[1] == ex1.attr_pos_end - ex1.attr_pos_start
     assert ex1.target_attributions.shape[0] == ex1.attr_pos_end
     # Empty attributions outputs have start and end set to seq length
-    assert ex2.attr_pos_start == 17
-    assert ex2.attr_pos_end == 22
+    assert ex2.attr_pos_start == 9
+    assert ex2.attr_pos_end == 14
     assert ex2.target_attributions.shape[1] == ex2.attr_pos_end - ex2.attr_pos_start
     assert ex2.target_attributions.shape[0] == ex2.attr_pos_end
-    assert ex3.attr_pos_start == 17
-    assert ex3.attr_pos_end == 22
+    assert ex3.attr_pos_start == 12
+    assert ex3.attr_pos_end == 17
     assert ex3.target_attributions.shape[1] == ex3.attr_pos_end - ex3.attr_pos_start
     assert ex3.target_attributions.shape[0] == ex3.attr_pos_end
     assert out.info["attr_pos_start"] == 17

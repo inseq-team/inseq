@@ -17,7 +17,7 @@ Attribution Methods
 .. autoclass:: inseq.attr.FeatureAttribution
     :members:
 
-Gradient Attribution Methods
+Gradient-based Attribution Methods
 -----------------------------------------------------------------------------------------------------------------------
 
 .. autoclass:: inseq.attr.feat.GradientAttributionRegistry
@@ -67,7 +67,7 @@ Layer Attribution Methods
     :members:
 
 
-Attention Attribution Methods
+Internals-based Attribution Methods
 -----------------------------------------------------------------------------------------------------------------------
 
 .. autoclass:: inseq.attr.feat.InternalsAttributionRegistry
@@ -75,4 +75,19 @@ Attention Attribution Methods
 
 
 .. autoclass:: inseq.attr.feat.AttentionWeightsAttribution
+    :members:
+
+Perturbation-based Attribution Methods
+-----------------------------------------------------------------------------------------------------------------------
+
+.. autoclass:: inseq.attr.feat.PerturbationAttributionRegistry
+    :members:
+
+.. autoclass:: inseq.attr.feat.OcclusionAttribution
+    :members:
+
+.. autoclass:: inseq.attr.feat.LimeAttribution
+    :members:
+
+.. autoclass:: inseq.attr.feat.ValueZeroingAttribution
     :members:

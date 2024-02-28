@@ -114,6 +114,7 @@ class FeatureAttribution(Registry):
         self.use_hidden_states: bool = False
         self.use_predicted_target: bool = True
         self.use_model_config: bool = False
+        self.is_final_step_method: bool = False
         if hook_to_model:
             self.hook(**kwargs)
 
@@ -272,6 +273,35 @@ class FeatureAttribution(Registry):
                 " method."
             )
 
+    @staticmethod
+    def _build_multistep_output_from_single_step(
+        single_step_output: FeatureAttributionStepOutput,
+        attr_pos_start: int,
+        attr_pos_end: int,
+    ) -> list[FeatureAttributionStepOutput]:
+        if single_step_output.step_scores:
+            raise ValueError("step_scores are not supported for final step attribution methods.")
+        num_seq = len(single_step_output.prefix)
+        steps = []
+        for pos_idx in range(attr_pos_start, attr_pos_end):
+            step_output = single_step_output.clone_empty()
+            step_output.source = single_step_output.source
+            step_output.prefix = [single_step_output.prefix[seq_idx][:pos_idx] for seq_idx in range(num_seq)]
+            step_output.target = (
+                single_step_output.target
+                if pos_idx == attr_pos_end - 1
+                else [[single_step_output.prefix[seq_idx][pos_idx]] for seq_idx in range(num_seq)]
+            )
+            if single_step_output.source_attributions is not None:
+                step_output.source_attributions = single_step_output.source_attributions[:, :, pos_idx - 1]
+            if single_step_output.target_attributions is not None:
+                step_output.target_attributions = single_step_output.target_attributions[:, :pos_idx, pos_idx - 1]
+            single_step_output.step_scores = {}
+            if single_step_output.sequence_scores is not None:
+                step_output.sequence_scores = single_step_output.sequence_scores
+            steps.append(step_output)
+        return steps
+
     def format_contrastive_targets(
         self,
         target_sequences: TextSequences,
@@ -416,9 +446,9 @@ class FeatureAttribution(Registry):
             target_lengths=targets_lengths,
             method_name=self.method_name,
             show=show_progress,
-            pretty=pretty_progress,
+            pretty=False if self.is_final_step_method else pretty_progress,
             attr_pos_start=attr_pos_start,
-            attr_pos_end=attr_pos_end,
+            attr_pos_end=1 if self.is_final_step_method else attr_pos_end,
         )
         whitespace_indexes = find_char_indexes(sequences.targets, " ")
         attribution_outputs = []
@@ -427,6 +457,8 @@ class FeatureAttribution(Registry):
 
         # Attribution loop for generation
         for step in range(attr_pos_start, iter_pos_end):
+            if self.is_final_step_method and step != iter_pos_end - 1:
+                continue
             tgt_ids, tgt_mask = batch.get_step_target(step, with_attention=True)
             step_output = self.filtered_attribute_step(
                 batch[:step],
@@ -450,7 +482,7 @@ class FeatureAttribution(Registry):
                 contrast_targets_alignments=contrast_targets_alignments,
             )
             attribution_outputs.append(step_output)
-            if pretty_progress:
+            if pretty_progress and not self.is_final_step_method:
                 tgt_tokens = batch.target_tokens
                 skipped_prefixes = tok2string(self.attribution_model, tgt_tokens, end=attr_pos_start)
                 attributed_sentences = tok2string(self.attribution_model, tgt_tokens, attr_pos_start, step + 1)
@@ -471,12 +503,17 @@ class FeatureAttribution(Registry):
         end = datetime.now()
         close_progress_bar(pbar, show=show_progress, pretty=pretty_progress)
         batch.detach().to("cpu")
+        if self.is_final_step_method:
+            attribution_outputs = self._build_multistep_output_from_single_step(
+                attribution_outputs[0],
+                attr_pos_start=attr_pos_start,
+                attr_pos_end=iter_pos_end,
+            )
         out = FeatureAttributionOutput(
             sequence_attributions=FeatureAttributionSequenceOutput.from_step_attributions(
                 attributions=attribution_outputs,
                 tokenized_target_sentences=target_tokens_with_ids,
-                pad_id=self.attribution_model.pad_token,
-                has_bos_token=self.attribution_model.is_encoder_decoder,
+                pad_token=self.attribution_model.pad_token,
                 attr_pos_end=attr_pos_end,
             ),
             step_attributions=attribution_outputs if output_step_attributions else None,
@@ -593,7 +630,7 @@ class FeatureAttribution(Registry):
             step_output.step_scores[score] = get_step_scores(score, step_fn_args, step_fn_extra_args).to("cpu")
         # Reinsert finished sentences
         if target_attention_mask is not None and is_filtered:
-            step_output.remap_from_filtered(target_attention_mask, orig_batch)
+            step_output.remap_from_filtered(target_attention_mask, orig_batch, self.is_final_step_method)
         step_output = step_output.detach().to("cpu")
         return step_output
 
