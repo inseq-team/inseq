@@ -1,11 +1,36 @@
 import math
+from abc import ABC, abstractmethod
 from typing import Union
 
 import torch
 from typing_extensions import override
 
-from ..token_sampler.base import TokenSampler
-from .base import TokenReplacer
+from .token_sampler import TokenSampler
+
+
+class TokenReplacer(ABC):
+    """
+    Base class for token replacers
+
+    """
+
+    def __init__(self, token_sampler: TokenSampler) -> None:
+        """Base Constructor"""
+        self.token_sampler = token_sampler
+
+    @abstractmethod
+    def __call__(self, input: torch.Tensor) -> Union[torch.Tensor, torch.Tensor]:
+        """Replace tokens according to the specified strategy.
+
+        Args:
+            input: input sequence [batch, sequence]
+
+        Returns:
+            input_replaced: A replaced sequence [batch, sequence]
+            mask_replacing: Identify which token has been replaced [batch, sequence]
+
+        """
+        raise NotImplementedError()
 
 
 class RankingTokenReplacer(TokenReplacer):
@@ -50,7 +75,7 @@ class RankingTokenReplacer(TokenReplacer):
             )
 
     @override
-    def sample(self, input: torch.Tensor) -> Union[torch.Tensor, torch.Tensor]:
+    def __call__(self, input: torch.Tensor) -> Union[torch.Tensor, torch.Tensor]:
         """Sample a sequence
 
         Args:
@@ -61,10 +86,48 @@ class RankingTokenReplacer(TokenReplacer):
             mask_replacing: Identify which token has been replaced [batch, sequence]
 
         """
-        super().sample(input)
 
         token_sampled = self.token_sampler(input)
 
         input_replaced = input * ~self.mask_replacing + token_sampled * self.mask_replacing
 
         return input_replaced, self.mask_replacing
+
+
+class UniformTokenReplacer(TokenReplacer):
+    """Replace tokens in a sequence where selecting is base on uniform distribution"""
+
+    @override
+    def __init__(self, token_sampler: TokenSampler, ratio: float) -> None:
+        """Constructor
+
+        Args:
+            token_sampler: A TokenSampler for sampling replace token.
+            ratio: replacing ratio
+
+        """
+        super().__init__(token_sampler)
+
+        self.ratio = ratio
+
+    @override
+    def __call__(self, input: torch.Tensor) -> Union[torch.Tensor, torch.Tensor]:
+        """Sample a sequence
+
+        Args:
+            input: input sequence [batch, sequence]
+
+        Returns:
+            input_replaced: A replaced sequence [batch, sequence]
+            mask_replacing: Identify which token has been replaced [batch, sequence]
+
+        """
+
+        sample_uniform = torch.rand(input.shape, device=input.device)
+        mask_replacing = sample_uniform < self.ratio
+
+        token_sampled = self.token_sampler(input)
+
+        input_replaced = input * ~mask_replacing + token_sampled * mask_replacing
+
+        return input_replaced, mask_replacing

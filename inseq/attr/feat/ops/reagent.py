@@ -6,10 +6,10 @@ from captum.attr._utils.attribution import PerturbationAttribution
 from torch import Tensor
 from typing_extensions import override
 
-from .reagent_core.aggregate_rationalizer import AggregateRationalizer
-from .reagent_core.importance_score_evaluator.delta_prob import DeltaProbImportanceScoreEvaluator
-from .reagent_core.stopping_condition_evaluator.top_k import TopKStoppingConditionEvaluator
-from .reagent_core.token_replacement.token_replacer.uniform import UniformTokenReplacer
+from .reagent_core.importance_score_evaluator import DeltaProbImportanceScoreEvaluator
+from .reagent_core.rationalizer import AggregateRationalizer
+from .reagent_core.stopping_condition_evaluator import TopKStoppingConditionEvaluator
+from .reagent_core.token_replacer import UniformTokenReplacer
 from .reagent_core.token_sampler import POSTagTokenSampler
 
 if TYPE_CHECKING:
@@ -111,7 +111,7 @@ class Reagent(PerturbationAttribution):
         tuple[TensorOrTupleOfTensorsGeneric, Tensor],
     ]:
         """Implement attribute"""
-        self.rationalizer.rationalize(additional_forward_args[0], additional_forward_args[1])
+        self.rationalizer(additional_forward_args[0], additional_forward_args[1])
         mean_important_score = torch.unsqueeze(self.rationalizer.mean_important_score, 0)
         res = torch.unsqueeze(mean_important_score, 2).repeat(1, 1, inputs[0].shape[2])
         return (res,)

@@ -6,6 +6,7 @@ from typing import Any, Optional, Union
 
 import torch
 from transformers import AutoTokenizer, PreTrainedTokenizerBase
+from typing_extensions import override
 
 from .....utils import INSEQ_ARTIFACTS_CACHE, cache_results, is_nltk_available
 from .....utils.typing import IdsTensor
@@ -18,8 +19,16 @@ class TokenSampler(ABC):
 
     @abstractmethod
     def __call__(self, input: IdsTensor, **kwargs) -> IdsTensor:
-        """Sample tokens according to the specified strategy."""
-        pass
+        """Sample tokens according to the specified strategy.
+
+        Args:
+            input: input tensor [batch, sequence]
+
+        Returns:
+            token_uniform: A sampled tensor where its shape is the same with the input
+
+        """
+        raise NotImplementedError()
 
 
 class POSTagTokenSampler(TokenSampler):
@@ -83,7 +92,17 @@ class POSTagTokenSampler(TokenSampler):
                 logger.info(f"Loading vocab from tokenizer - {i / tokenizer.vocab_size * 100:.2f}%")
         return pos2ids
 
+    @override
     def __call__(self, input_ids: IdsTensor) -> IdsTensor:
+        """Sample a tensor
+
+        Args:
+            input: input tensor [batch, sequence]
+
+        Returns:
+            token_uniform: A sampled tensor where its shape is the same with the input
+
+        """
         input_ids_pos = self.id2pos[input_ids]
         sample_uniform = torch.rand(input_ids.shape, device=input_ids.device)
         compact_group_idx = (sample_uniform * self.num_ids_per_pos[input_ids_pos] + self.offsets[input_ids_pos]).long()
