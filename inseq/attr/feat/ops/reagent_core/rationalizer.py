@@ -1,9 +1,12 @@
 import math
 from abc import ABC, abstractmethod
+from typing import Optional
 
 import torch
+from jaxtyping import Int64
 from typing_extensions import override
 
+from .....utils.typing import IdsTensor, TargetIdsTensor
 from .importance_score_evaluator import BaseImportanceScoreEvaluator
 
 
@@ -16,8 +19,8 @@ class BaseRationalizer(ABC):
 
     @abstractmethod
     def __call__(
-        self, input_ids: torch.Tensor, target_id: torch.Tensor, decoder_input_ids: torch.Tensor = None
-    ) -> torch.Tensor:
+        self, input_ids: IdsTensor, target_id: TargetIdsTensor, decoder_input_ids: Optional[IdsTensor] = None
+    ) -> Int64[torch.Tensor, "batch_size other_dims"]:
         """Compute rational of a sequence on a target
 
         Args:
@@ -69,8 +72,8 @@ class AggregateRationalizer(BaseRationalizer):
     @override
     @torch.no_grad()
     def __call__(
-        self, input_ids: torch.Tensor, target_id: torch.Tensor, decoder_input_ids: torch.Tensor = None
-    ) -> torch.Tensor:
+        self, input_ids: IdsTensor, target_id: TargetIdsTensor, decoder_input_ids: Optional[IdsTensor] = None
+    ) -> Int64[torch.Tensor, "batch_size other_dims"]:
         """Compute rational of a sequence on a target
 
         Args:

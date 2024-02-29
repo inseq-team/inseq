@@ -3,8 +3,10 @@ from abc import ABC, abstractmethod
 from typing import Union
 
 import torch
+from jaxtyping import Int64
 from typing_extensions import override
 
+from .....utils.typing import IdsTensor
 from .token_sampler import TokenSampler
 
 
@@ -19,7 +21,7 @@ class TokenReplacer(ABC):
         self.token_sampler = token_sampler
 
     @abstractmethod
-    def __call__(self, input: torch.Tensor) -> Union[torch.Tensor, torch.Tensor]:
+    def __call__(self, input: IdsTensor) -> Union[IdsTensor, Int64[torch.Tensor, "batch_size seq_len"]]:
         """Replace tokens according to the specified strategy.
 
         Args:
@@ -75,7 +77,7 @@ class RankingTokenReplacer(TokenReplacer):
             )
 
     @override
-    def __call__(self, input: torch.Tensor) -> Union[torch.Tensor, torch.Tensor]:
+    def __call__(self, input: IdsTensor) -> Union[IdsTensor, Int64[torch.Tensor, "batch_size seq_len"]]:
         """Sample a sequence
 
         Args:
@@ -111,7 +113,7 @@ class UniformTokenReplacer(TokenReplacer):
         self.ratio = ratio
 
     @override
-    def __call__(self, input: torch.Tensor) -> Union[torch.Tensor, torch.Tensor]:
+    def __call__(self, input: IdsTensor) -> Union[IdsTensor, Int64[torch.Tensor, "batch_size seq_len"]]:
         """Sample a sequence
 
         Args:

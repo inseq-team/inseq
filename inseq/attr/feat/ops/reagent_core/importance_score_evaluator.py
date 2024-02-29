@@ -1,10 +1,13 @@
 import logging
 from abc import ABC, abstractmethod
+from typing import Optional
 
 import torch
+from jaxtyping import Float
 from transformers import AutoModelForCausalLM, AutoModelForSeq2SeqLM, AutoTokenizer
 from typing_extensions import override
 
+from .....utils.typing import IdsTensor, MultipleScoresPerStepTensor, TargetIdsTensor
 from .stopping_condition_evaluator import StoppingConditionEvaluator
 from .token_replacer import TokenReplacer
 
@@ -28,8 +31,8 @@ class BaseImportanceScoreEvaluator(ABC):
 
     @abstractmethod
     def __call__(
-        self, input_ids: torch.Tensor, target_id: torch.Tensor, decoder_input_ids: torch.Tensor = None
-    ) -> torch.Tensor:
+        self, input_ids: IdsTensor, target_id: TargetIdsTensor, decoder_input_ids: Optional[IdsTensor] = None
+    ) -> MultipleScoresPerStepTensor:
         """Evaluate importance score of input sequence
 
         Args:
@@ -77,23 +80,23 @@ class DeltaProbImportanceScoreEvaluator(BaseImportanceScoreEvaluator):
 
     def update_importance_score(
         self,
-        logit_importance_score: torch.Tensor,
-        input_ids: torch.Tensor,
-        target_id: torch.Tensor,
-        prob_original_target: torch.Tensor,
-        decoder_input_ids: torch.Tensor = None,
-    ) -> torch.Tensor:
+        logit_importance_score: MultipleScoresPerStepTensor,
+        input_ids: IdsTensor,
+        target_id: TargetIdsTensor,
+        prob_original_target: Float[torch.Tensor, "batch_size 1"],
+        decoder_input_ids: Optional[IdsTensor] = None,
+    ) -> MultipleScoresPerStepTensor:
         """Update importance score by one step
 
         Args:
-            logit_importance_score: Current importance score in logistic scale [batch]
+            logit_importance_score: Current importance score in logistic scale [batch, sequence]
             input_ids: input tensor [batch, sequence]
             target_id: target tensor [batch]
-            prob_original_target: predictive probability of the target on the original sequence [batch]
+            prob_original_target: predictive probability of the target on the original sequence [batch, 1]
             decoder_input_ids (optional): decoder input sequence for AutoModelForSeq2SeqLM [batch, sequence]
 
         Return:
-            logit_importance_score: updated importance score in logistic scale [batch]
+            logit_importance_score: updated importance score in logistic scale [batch, sequence]
 
         """
         # Randomly replace a set of tokens R to form a new sequence \hat{y_{1...t}}
@@ -132,8 +135,8 @@ class DeltaProbImportanceScoreEvaluator(BaseImportanceScoreEvaluator):
 
     @override
     def __call__(
-        self, input_ids: torch.Tensor, target_id: torch.Tensor, decoder_input_ids: torch.Tensor = None
-    ) -> torch.Tensor:
+        self, input_ids: IdsTensor, target_id: TargetIdsTensor, decoder_input_ids: Optional[IdsTensor] = None
+    ) -> MultipleScoresPerStepTensor:
         """Evaluate importance score of input sequence
 
         Args:

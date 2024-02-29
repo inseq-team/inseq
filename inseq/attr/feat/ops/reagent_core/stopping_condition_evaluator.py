@@ -1,10 +1,13 @@
 import logging
 from abc import ABC, abstractmethod
+from typing import Optional
 
 import torch
+from jaxtyping import Int64
 from transformers import AutoModelWithLMHead, AutoTokenizer
 from typing_extensions import override
 
+from .....utils.typing import IdsTensor, MultipleScoresPerStepTensor, TargetIdsTensor
 from .token_replacer import RankingTokenReplacer
 from .token_sampler import TokenSampler
 
@@ -15,11 +18,11 @@ class StoppingConditionEvaluator(ABC):
     @abstractmethod
     def __call__(
         self,
-        input_ids: torch.Tensor,
-        target_id: torch.Tensor,
-        importance_score: torch.Tensor,
-        decoder_input_ids: torch.Tensor = None,
-    ) -> torch.Tensor:
+        input_ids: IdsTensor,
+        target_id: TargetIdsTensor,
+        importance_score: MultipleScoresPerStepTensor,
+        decoder_input_ids: Optional[IdsTensor] = None,
+    ) -> Int64[torch.Tensor, "batch_size"]:
         """Evaluate stop condition according to the specified strategy.
 
         Args:
@@ -72,11 +75,11 @@ class TopKStoppingConditionEvaluator(StoppingConditionEvaluator):
     @override
     def __call__(
         self,
-        input_ids: torch.Tensor,
-        target_id: torch.Tensor,
-        importance_score: torch.Tensor,
-        decoder_input_ids: torch.Tensor = None,
-    ) -> torch.Tensor:
+        input_ids: IdsTensor,
+        target_id: TargetIdsTensor,
+        importance_score: MultipleScoresPerStepTensor,
+        decoder_input_ids: Optional[IdsTensor] = None,
+    ) -> Int64[torch.Tensor, "batch_size"]:
         """Evaluate stop condition
 
         Args:
@@ -134,11 +137,11 @@ class DummyStoppingConditionEvaluator(StoppingConditionEvaluator):
     @override
     def __call__(
         self,
-        input_ids: torch.Tensor,
-        target_id: torch.Tensor,
-        importance_score: torch.Tensor,
-        decoder_input_ids: torch.Tensor = None,
-    ) -> torch.Tensor:
+        input_ids: IdsTensor,
+        target_id: TargetIdsTensor,
+        importance_score: MultipleScoresPerStepTensor,
+        decoder_input_ids: Optional[IdsTensor] = None,
+    ) -> Int64[torch.Tensor, "batch_size"]:
         """Evaluate stop condition
 
         Args:
