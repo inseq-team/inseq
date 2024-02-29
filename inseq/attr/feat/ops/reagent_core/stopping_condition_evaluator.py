@@ -14,7 +14,11 @@ class StoppingConditionEvaluator(ABC):
 
     @abstractmethod
     def __call__(
-        self, input_ids: torch.Tensor, target_id: torch.Tensor, importance_score: torch.Tensor
+        self,
+        input_ids: torch.Tensor,
+        target_id: torch.Tensor,
+        importance_score: torch.Tensor,
+        decoder_input_ids: torch.Tensor = None,
     ) -> torch.Tensor:
         """Evaluate stop condition according to the specified strategy.
 
@@ -22,6 +26,7 @@ class StoppingConditionEvaluator(ABC):
             input_ids: Input sequence [batch, sequence]
             target_id: Target token [batch]
             importance_score: Importance score of the input [batch, sequence]
+            decoder_input_ids (optional): decoder input sequence for AutoModelForSeq2SeqLM [batch, sequence]
 
         Return:
             Whether the stop condition achieved [batch]
@@ -66,7 +71,11 @@ class TopKStoppingConditionEvaluator(StoppingConditionEvaluator):
 
     @override
     def __call__(
-        self, input_ids: torch.Tensor, target_id: torch.Tensor, importance_score: torch.Tensor
+        self,
+        input_ids: torch.Tensor,
+        target_id: torch.Tensor,
+        importance_score: torch.Tensor,
+        decoder_input_ids: torch.Tensor = None,
     ) -> torch.Tensor:
         """Evaluate stop condition
 
@@ -74,6 +83,7 @@ class TopKStoppingConditionEvaluator(StoppingConditionEvaluator):
             input_ids: Input sequence [batch, sequence]
             target_id: Target token [batch]
             importance_score: Importance score of the input [batch, sequence]
+            decoder_input_ids (optional): decoder input sequence for AutoModelForSeq2SeqLM [batch, sequence]
 
         Return:
             Whether the stop condition achieved [batch]
@@ -90,7 +100,12 @@ class TopKStoppingConditionEvaluator(StoppingConditionEvaluator):
 
         assert not input_ids_replaced.requires_grad, "Error: auto-diff engine not disabled"
         with torch.no_grad():
-            logits_replaced = self.model(input_ids_replaced)["logits"]
+            if decoder_input_ids is None:
+                logits_replaced = self.model(input_ids_replaced)["logits"]
+            else:
+                logits_replaced = self.model(input_ids=input_ids_replaced, decoder_input_ids=decoder_input_ids)[
+                    "logits"
+                ]
 
         ids_prediction_sorted = torch.argsort(logits_replaced[:, -1, :], descending=True)
         ids_prediction_top_k = ids_prediction_sorted[:, : self.top_k]
@@ -118,7 +133,11 @@ class DummyStoppingConditionEvaluator(StoppingConditionEvaluator):
 
     @override
     def __call__(
-        self, input_ids: torch.Tensor, target_id: torch.Tensor, importance_score: torch.Tensor
+        self,
+        input_ids: torch.Tensor,
+        target_id: torch.Tensor,
+        importance_score: torch.Tensor,
+        decoder_input_ids: torch.Tensor = None,
     ) -> torch.Tensor:
         """Evaluate stop condition
 

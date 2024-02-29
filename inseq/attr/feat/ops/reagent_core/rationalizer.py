@@ -15,12 +15,15 @@ class BaseRationalizer(ABC):
         self.mean_important_score = None
 
     @abstractmethod
-    def __call__(self, input_ids: torch.Tensor, target_id: torch.Tensor) -> torch.Tensor:
+    def __call__(
+        self, input_ids: torch.Tensor, target_id: torch.Tensor, decoder_input_ids: torch.Tensor = None
+    ) -> torch.Tensor:
         """Compute rational of a sequence on a target
 
         Args:
             input_ids: The sequence [batch, sequence] (first dimension need to be 1)
             target_id: The target [batch]
+            decoder_input_ids (optional): decoder input sequence for AutoModelForSeq2SeqLM [batch, sequence]
 
         Return:
             pos_top_n: rational position in the sequence [batch, rational_size]
@@ -65,12 +68,15 @@ class AggregateRationalizer(BaseRationalizer):
 
     @override
     @torch.no_grad()
-    def __call__(self, input_ids: torch.Tensor, target_id: torch.Tensor) -> torch.Tensor:
+    def __call__(
+        self, input_ids: torch.Tensor, target_id: torch.Tensor, decoder_input_ids: torch.Tensor = None
+    ) -> torch.Tensor:
         """Compute rational of a sequence on a target
 
         Args:
             input_ids: The sequence [batch, sequence] (first dimension need to be 1)
             target_id: The target [batch]
+            decoder_input_ids (optional): decoder input sequence for AutoModelForSeq2SeqLM [batch, sequence]
 
         Return:
             pos_top_n: rational position in the sequence [batch, rational_size]
@@ -80,7 +86,7 @@ class AggregateRationalizer(BaseRationalizer):
 
         batch_input_ids = input_ids.repeat(self.batch_size, 1)
 
-        batch_importance_score = self.importance_score_evaluator(batch_input_ids, target_id)
+        batch_importance_score = self.importance_score_evaluator(batch_input_ids, target_id, decoder_input_ids)
 
         important_score_masked = batch_importance_score * torch.unsqueeze(
             self.importance_score_evaluator.stop_mask, -1
