@@ -31,7 +31,11 @@ class BaseImportanceScoreEvaluator(ABC):
 
     @abstractmethod
     def __call__(
-        self, input_ids: IdsTensor, target_id: TargetIdsTensor, decoder_input_ids: Optional[IdsTensor] = None
+        self,
+        input_ids: IdsTensor,
+        target_id: TargetIdsTensor,
+        decoder_input_ids: Optional[IdsTensor] = None,
+        attribute_target: bool = False,
     ) -> MultipleScoresPerStepTensor:
         """Evaluate importance score of input sequence
 
@@ -39,6 +43,7 @@ class BaseImportanceScoreEvaluator(ABC):
             input_ids: input sequence [batch, sequence]
             target_id: target token [batch]
             decoder_input_ids (optional): decoder input sequence for AutoModelForSeq2SeqLM [batch, sequence]
+            attribute_target: whether attribute target for encoder-decoder models
 
         Return:
             importance_score: evaluated importance score for each token in the input [batch, sequence]
@@ -85,6 +90,7 @@ class DeltaProbImportanceScoreEvaluator(BaseImportanceScoreEvaluator):
         target_id: TargetIdsTensor,
         prob_original_target: Float[torch.Tensor, "batch_size 1"],
         decoder_input_ids: Optional[IdsTensor] = None,
+        attribute_target: bool = False,
     ) -> MultipleScoresPerStepTensor:
         """Update importance score by one step
 
@@ -94,6 +100,7 @@ class DeltaProbImportanceScoreEvaluator(BaseImportanceScoreEvaluator):
             target_id: target tensor [batch]
             prob_original_target: predictive probability of the target on the original sequence [batch, 1]
             decoder_input_ids (optional): decoder input sequence for AutoModelForSeq2SeqLM [batch, sequence]
+            attribute_target: whether attribute target for encoder-decoder models
 
         Return:
             logit_importance_score: updated importance score in logistic scale [batch, sequence]
@@ -101,7 +108,12 @@ class DeltaProbImportanceScoreEvaluator(BaseImportanceScoreEvaluator):
         """
         # Randomly replace a set of tokens R to form a new sequence \hat{y_{1...t}}
 
-        input_ids_replaced, mask_replacing = self.token_replacer(input_ids)
+        if not attribute_target:
+            input_ids_replaced, mask_replacing = self.token_replacer(input_ids)
+        else:
+            ids_replaced, mask_replacing = self.token_replacer(torch.cat((input_ids, decoder_input_ids), 1))
+            input_ids_replaced = ids_replaced[:, : input_ids.shape[1]]
+            decoder_input_ids_replaced = ids_replaced[:, input_ids.shape[1] :]
 
         logging.debug(f"Replacing mask:     { mask_replacing }")
         logging.debug(
@@ -112,8 +124,12 @@ class DeltaProbImportanceScoreEvaluator(BaseImportanceScoreEvaluator):
 
         if decoder_input_ids is None:
             logits_replaced = self.model(input_ids_replaced)["logits"]
-        else:
+        elif not attribute_target:
             logits_replaced = self.model(input_ids=input_ids_replaced, decoder_input_ids=decoder_input_ids)["logits"]
+        else:
+            logits_replaced = self.model(input_ids=input_ids_replaced, decoder_input_ids=decoder_input_ids_replaced)[
+                "logits"
+            ]
 
         prob_replaced_target = torch.softmax(logits_replaced[:, -1, :], -1)[:, target_id]
 
@@ -135,7 +151,11 @@ class DeltaProbImportanceScoreEvaluator(BaseImportanceScoreEvaluator):
 
     @override
     def __call__(
-        self, input_ids: IdsTensor, target_id: TargetIdsTensor, decoder_input_ids: Optional[IdsTensor] = None
+        self,
+        input_ids: IdsTensor,
+        target_id: TargetIdsTensor,
+        decoder_input_ids: Optional[IdsTensor] = None,
+        attribute_target: bool = False,
     ) -> MultipleScoresPerStepTensor:
         """Evaluate importance score of input sequence
 
@@ -143,6 +163,7 @@ class DeltaProbImportanceScoreEvaluator(BaseImportanceScoreEvaluator):
             input_ids: input sequence [batch, sequence]
             target_id: target token [batch]
             decoder_input_ids (optional): decoder input sequence for AutoModelForSeq2SeqLM [batch, sequence]
+            attribute_target: whether attribute target for encoder-decoder models
 
         Return:
             importance_score: evaluated importance score for each token in the input [batch, sequence]
@@ -161,7 +182,12 @@ class DeltaProbImportanceScoreEvaluator(BaseImportanceScoreEvaluator):
 
         # Initialize importance score s for each token in the sequence y_{1...t}
 
-        logit_importance_score = torch.rand(input_ids.shape, device=input_ids.device)
+        if not attribute_target:
+            logit_importance_score = torch.rand(input_ids.shape, device=input_ids.device)
+        else:
+            logit_importance_score = torch.rand(
+                (input_ids.shape[0], input_ids.shape[1] + decoder_input_ids.shape[1]), device=input_ids.device
+            )
         logging.debug(f"Initialize importance score -> { torch.softmax(logit_importance_score, -1) }")
 
         # TODO: limit max steps
@@ -171,7 +197,7 @@ class DeltaProbImportanceScoreEvaluator(BaseImportanceScoreEvaluator):
 
             # Update importance score
             logit_importance_score_update = self.update_importance_score(
-                logit_importance_score, input_ids, target_id, prob_original_target, decoder_input_ids
+                logit_importance_score, input_ids, target_id, prob_original_target, decoder_input_ids, attribute_target
             )
             logit_importance_score = (
                 ~torch.unsqueeze(self.stop_mask, 1) * logit_importance_score_update
@@ -182,7 +208,7 @@ class DeltaProbImportanceScoreEvaluator(BaseImportanceScoreEvaluator):
 
             # Evaluate stop condition
             self.stop_mask = self.stop_mask | self.stopping_condition_evaluator(
-                input_ids, target_id, self.important_score, decoder_input_ids
+                input_ids, target_id, self.important_score, decoder_input_ids, attribute_target
             )
             if torch.prod(self.stop_mask) > 0:
                 break

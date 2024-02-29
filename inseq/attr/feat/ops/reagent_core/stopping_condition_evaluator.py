@@ -22,6 +22,7 @@ class StoppingConditionEvaluator(ABC):
         target_id: TargetIdsTensor,
         importance_score: MultipleScoresPerStepTensor,
         decoder_input_ids: Optional[IdsTensor] = None,
+        attribute_target: bool = False,
     ) -> Int64[torch.Tensor, "batch_size"]:
         """Evaluate stop condition according to the specified strategy.
 
@@ -30,6 +31,7 @@ class StoppingConditionEvaluator(ABC):
             target_id: Target token [batch]
             importance_score: Importance score of the input [batch, sequence]
             decoder_input_ids (optional): decoder input sequence for AutoModelForSeq2SeqLM [batch, sequence]
+            attribute_target: whether attribute target for encoder-decoder models
 
         Return:
             Whether the stop condition achieved [batch]
@@ -79,6 +81,7 @@ class TopKStoppingConditionEvaluator(StoppingConditionEvaluator):
         target_id: TargetIdsTensor,
         importance_score: MultipleScoresPerStepTensor,
         decoder_input_ids: Optional[IdsTensor] = None,
+        attribute_target: bool = False,
     ) -> Int64[torch.Tensor, "batch_size"]:
         """Evaluate stop condition
 
@@ -87,6 +90,7 @@ class TopKStoppingConditionEvaluator(StoppingConditionEvaluator):
             target_id: Target token [batch]
             importance_score: Importance score of the input [batch, sequence]
             decoder_input_ids (optional): decoder input sequence for AutoModelForSeq2SeqLM [batch, sequence]
+            attribute_target: whether attribute target for encoder-decoder models
 
         Return:
             Whether the stop condition achieved [batch]
@@ -95,7 +99,12 @@ class TopKStoppingConditionEvaluator(StoppingConditionEvaluator):
         # Replace tokens with low importance score and then inference \hat{y^{(e)}_{t+1}}
 
         self.token_replacer.set_score(importance_score)
-        input_ids_replaced, mask_replacing = self.token_replacer(input_ids)
+        if not attribute_target:
+            input_ids_replaced, mask_replacing = self.token_replacer(input_ids)
+        else:
+            ids_replaced, mask_replacing = self.token_replacer(torch.cat((input_ids, decoder_input_ids), 1))
+            input_ids_replaced = ids_replaced[:, : input_ids.shape[1]]
+            decoder_input_ids_replaced = ids_replaced[:, input_ids.shape[1] :]
 
         logging.debug(f"Replacing mask based on importance score -> { mask_replacing }")
 
@@ -105,10 +114,14 @@ class TopKStoppingConditionEvaluator(StoppingConditionEvaluator):
         with torch.no_grad():
             if decoder_input_ids is None:
                 logits_replaced = self.model(input_ids_replaced)["logits"]
-            else:
+            elif not attribute_target:
                 logits_replaced = self.model(input_ids=input_ids_replaced, decoder_input_ids=decoder_input_ids)[
                     "logits"
                 ]
+            else:
+                logits_replaced = self.model(
+                    input_ids=input_ids_replaced, decoder_input_ids=decoder_input_ids_replaced
+                )["logits"]
 
         ids_prediction_sorted = torch.argsort(logits_replaced[:, -1, :], descending=True)
         ids_prediction_top_k = ids_prediction_sorted[:, : self.top_k]
@@ -141,6 +154,7 @@ class DummyStoppingConditionEvaluator(StoppingConditionEvaluator):
         target_id: TargetIdsTensor,
         importance_score: MultipleScoresPerStepTensor,
         decoder_input_ids: Optional[IdsTensor] = None,
+        attribute_target: bool = False,
     ) -> Int64[torch.Tensor, "batch_size"]:
         """Evaluate stop condition
 
@@ -148,6 +162,7 @@ class DummyStoppingConditionEvaluator(StoppingConditionEvaluator):
             input_ids: Input sequence [batch, sequence]
             target_id: Target token [batch]
             importance_score: Importance score of the input [batch, sequence]
+            attribute_target: whether attribute target for encoder-decoder models
 
         Return:
             Whether the stop condition achieved [batch]

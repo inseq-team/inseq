@@ -19,7 +19,11 @@ class BaseRationalizer(ABC):
 
     @abstractmethod
     def __call__(
-        self, input_ids: IdsTensor, target_id: TargetIdsTensor, decoder_input_ids: Optional[IdsTensor] = None
+        self,
+        input_ids: IdsTensor,
+        target_id: TargetIdsTensor,
+        decoder_input_ids: Optional[IdsTensor] = None,
+        attribute_target: bool = False,
     ) -> Int64[torch.Tensor, "batch_size other_dims"]:
         """Compute rational of a sequence on a target
 
@@ -27,6 +31,7 @@ class BaseRationalizer(ABC):
             input_ids: The sequence [batch, sequence] (first dimension need to be 1)
             target_id: The target [batch]
             decoder_input_ids (optional): decoder input sequence for AutoModelForSeq2SeqLM [batch, sequence]
+            attribute_target: whether attribute target for encoder-decoder models
 
         Return:
             pos_top_n: rational position in the sequence [batch, rational_size]
@@ -72,7 +77,11 @@ class AggregateRationalizer(BaseRationalizer):
     @override
     @torch.no_grad()
     def __call__(
-        self, input_ids: IdsTensor, target_id: TargetIdsTensor, decoder_input_ids: Optional[IdsTensor] = None
+        self,
+        input_ids: IdsTensor,
+        target_id: TargetIdsTensor,
+        decoder_input_ids: Optional[IdsTensor] = None,
+        attribute_target: bool = False,
     ) -> Int64[torch.Tensor, "batch_size other_dims"]:
         """Compute rational of a sequence on a target
 
@@ -80,6 +89,7 @@ class AggregateRationalizer(BaseRationalizer):
             input_ids: The sequence [batch, sequence] (first dimension need to be 1)
             target_id: The target [batch]
             decoder_input_ids (optional): decoder input sequence for AutoModelForSeq2SeqLM [batch, sequence]
+            attribute_target: whether attribute target for encoder-decoder models
 
         Return:
             pos_top_n: rational position in the sequence [batch, rational_size]
@@ -88,8 +98,13 @@ class AggregateRationalizer(BaseRationalizer):
         assert input_ids.shape[0] == 1, "the first dimension of input (batch_size) need to be 1"
 
         batch_input_ids = input_ids.repeat(self.batch_size, 1)
+        batch_decoder_input_ids = (
+            decoder_input_ids.repeat(self.batch_size, 1) if decoder_input_ids is not None else None
+        )
 
-        batch_importance_score = self.importance_score_evaluator(batch_input_ids, target_id, decoder_input_ids)
+        batch_importance_score = self.importance_score_evaluator(
+            batch_input_ids, target_id, batch_decoder_input_ids, attribute_target
+        )
 
         important_score_masked = batch_importance_score * torch.unsqueeze(
             self.importance_score_evaluator.stop_mask, -1

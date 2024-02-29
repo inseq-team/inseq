@@ -141,8 +141,6 @@ class ReagentAttribution(PerturbationAttributionRegistry):
         attribute_fn_main_args: dict[str, Any],
         attribution_args: dict[str, Any] = {},
     ) -> GranularFeatureAttributionStepOutput:
-        if len(attribute_fn_main_args["inputs"]) > 1:
-            raise NotImplementedError("ReAgent attribution not supported for encoder-decoder models.")
         out = super().attribute_step(attribute_fn_main_args, attribution_args)
         return GranularFeatureAttributionStepOutput(
             source_attributions=out.source_attributions,
