@@ -63,7 +63,7 @@ class Reagent(PerturbationAttribution):
         stopping_condition_top_k: int = 3,
         replacing_ratio: float = 0.3,
         max_probe_steps: int = 3000,
-        num_probes: int = 8,
+        num_probes: int = 16,
     ) -> None:
         PerturbationAttribution.__init__(self, forward_func=attribution_model)
 
