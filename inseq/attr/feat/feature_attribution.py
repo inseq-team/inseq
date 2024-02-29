@@ -496,12 +496,12 @@ class FeatureAttribution(Registry):
                     skipped_suffixes,
                     whitespace_indexes,
                     show=show_progress,
-                    pretty=pretty_progress,
+                    pretty=True,
                 )
             else:
-                update_progress_bar(pbar, show=show_progress, pretty=pretty_progress)
+                update_progress_bar(pbar, show=show_progress, pretty=False)
         end = datetime.now()
-        close_progress_bar(pbar, show=show_progress, pretty=pretty_progress)
+        close_progress_bar(pbar, show=show_progress, pretty=False if self.is_final_step_method else pretty_progress)
         batch.detach().to("cpu")
         if self.is_final_step_method:
             attribution_outputs = self._build_multistep_output_from_single_step(
