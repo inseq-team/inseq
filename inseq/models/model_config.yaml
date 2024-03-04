@@ -1,2 +1,111 @@
+# Decoder-only models
+BioGptForCausalLM:
+    self_attention_module: "self_attn"
+    value_vector: "value_states"
+BloomForCausalLM:
+    self_attention_module: "self_attention"
+    value_vector: "value_layer"
+CodeGenForCausalLM:
+    self_attention_module: "attn"
+    value_vector: "value"
+FalconForCausalLM:
+    self_attention_module: "self_attention"
+    value_vector: "value_layer"
+GemmaForCausalLM:
+    self_attention_module: "self_attn"
+    value_vector: "value_states"
+GPTBigCodeForCausalLM:
+    self_attention_module: "attn"
+    value_vector: "value"
+GPTJForCausalLM:
+    self_attention_module: "attn"
+    value_vector: "value"
 GPT2LMHeadModel:
-    attention_module: "attn"
+    self_attention_module: "attn"
+    value_vector: "value"
+GPTNeoForCausalLM:
+    self_attention_module: "attn"
+    value_vector: "value"
+GPTNeoXForCausalLM:
+    self_attention_module: "attention"
+    value_vector: "value"
+LlamaForCausalLM:
+    self_attention_module: "self_attn"
+    value_vector: "value_states"
+MistralForCausalLM:
+    self_attention_module: "self_attn"
+    value_vector: "value_states"
+MixtralForCausalLM:
+    self_attention_module: "self_attn"
+    value_vector: "value_states"
+MptForCausalLM:
+    self_attention_module: "attn"
+    value_vector: "value_states"
+OpenAIGPTLMHeadModel:
+    self_attention_module: "attn"
+    value_vector: "value"
+OPTForCausalLM:
+    self_attention_module: "self_attn"
+    value_vector: "value_states"
+PhiForCausalLM:
+    self_attention_module: "self_attn"
+    value_vector: "value_states"
+Qwen2ForCausalLM:
+    self_attention_module: "self_attn"
+    value_vector: "value_states"
+StableLmForCausalLM:
+    self_attention_module: "self_attn"
+    value_vector: "value_states"
+XGLMForCausalLM:
+    self_attention_module: "self_attn"
+    value_vector: "value_states"
+
+# Encoder-decoder models
+BartForConditionalGeneration:
+    self_attention_module: "self_attn"
+    cross_attention_module: "encoder_attn"
+    value_vector: "value_states"
+MarianMTModel:
+    self_attention_module: "self_attn"
+    cross_attention_module: "encoder_attn"
+    value_vector: "value_states"
+FSMTForConditionalGeneration:
+    self_attention_module: "self_attn"
+    cross_attention_module: "encoder_attn"
+    value_vector: "v"
+M2M100ForConditionalGeneration:
+    self_attention_module: "self_attn"
+    cross_attention_module: "encoder_attn"
+    value_vector: "value_states"
+MBartForConditionalGeneration:
+    self_attention_module: "self_attn"
+    cross_attention_module: "encoder_attn"
+    value_vector: "value_states"
+MT5ForConditionalGeneration:
+    self_attention_module: "SelfAttention"
+    cross_attention_module: "EncDecAttention"
+    value_vector: "value_states"
+NllbMoeForConditionalGeneration:
+    self_attention_module: "self_attn"
+    cross_attention_module: "cross_attention"
+    value_vector: "value_states"
+PegasusForConditionalGeneration:
+    self_attention_module: "self_attn"
+    cross_attention_module: "encoder_attn"
+    value_vector: "value_states"
+SeamlessM4TForTextToText:
+    self_attention_module: "self_attn"
+    cross_attention_module: "cross_attention"
+    value_vector: "value"
+SeamlessM4Tv2ForTextToText:
+    self_attention_module: "self_attn"
+    cross_attention_module: "cross_attention"
+    value_vector: "value"
+T5ForConditionalGeneration:
+    self_attention_module: "SelfAttention"
+    cross_attention_module: "EncDecAttention"
+    value_vector: "value_states"
+UMT5ForConditionalGeneration:
+    self_attention_module: "SelfAttention"
+    cross_attention_module: "EncDecAttention"
+    value_vector: "value_states"

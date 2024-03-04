@@ -16,12 +16,12 @@
 import logging
 from typing import Any, Optional
 
+import torch
 from captum._utils.typing import TensorOrTupleOfTensorsGeneric
-from captum.attr._utils.attribution import Attribution
 
 from ...data import MultiDimensionalFeatureAttributionStepOutput
 from ...utils import Registry
-from ...utils.typing import MultiLayerMultiUnitScoreTensor
+from ...utils.typing import InseqAttribution, MultiLayerMultiUnitScoreTensor
 from .feature_attribution import FeatureAttribution
 
 logger = logging.getLogger(__name__)
@@ -38,7 +38,7 @@ class AttentionWeightsAttribution(InternalsAttributionRegistry):
 
     method_name = "attention"
 
-    class AttentionWeights(Attribution):
+    class AttentionWeights(InseqAttribution):
         @staticmethod
         def has_convergence_delta() -> bool:
             return False
@@ -74,9 +74,14 @@ class AttentionWeightsAttribution(InternalsAttributionRegistry):
                 :class:`~inseq.data.MultiDimensionalFeatureAttributionStepOutput`: A step output containing attention
                 weights for each layer and head, with shape :obj:`(batch_size, seq_len, n_layers, n_heads)`.
             """
-            # We adopt the format [batch_size, sequence_length, num_layers, num_heads]
+            # We adopt the format [batch_size, sequence_length, sequence_length, num_layers, num_heads]
             # for consistency with other multi-unit methods (e.g. gradient attribution)
-            decoder_self_attentions = decoder_self_attentions[..., -1, :].to("cpu").clone().permute(0, 3, 1, 2)
+            decoder_self_attentions = decoder_self_attentions.to("cpu").clone().permute(0, 4, 3, 1, 2)
+            decoder_self_attentions = torch.where(
+                decoder_self_attentions == 0,
+                (torch.ones_like(decoder_self_attentions) * float("nan")),
+                decoder_self_attentions,
+            )
             if self.forward_func.is_encoder_decoder:
                 sequence_scores = {}
                 if len(inputs) > 1:
@@ -85,10 +90,11 @@ class AttentionWeightsAttribution(InternalsAttributionRegistry):
                     target_attributions = None
                     sequence_scores["decoder_self_attentions"] = decoder_self_attentions
                 sequence_scores["encoder_self_attentions"] = (
-                    encoder_self_attentions.to("cpu").clone().permute(0, 3, 4, 1, 2)
+                    encoder_self_attentions.to("cpu").clone().permute(0, 4, 3, 1, 2)
                 )
+                cross_attentions = cross_attentions.to("cpu").clone().permute(0, 4, 3, 1, 2)
                 return MultiDimensionalFeatureAttributionStepOutput(
-                    source_attributions=cross_attentions[..., -1, :].to("cpu").clone().permute(0, 3, 1, 2),
+                    source_attributions=cross_attentions,
                     target_attributions=target_attributions,
                     sequence_scores=sequence_scores,
                     _num_dimensions=2,  # num_layers, num_heads
@@ -106,6 +112,8 @@ class AttentionWeightsAttribution(InternalsAttributionRegistry):
         self.use_attention_weights = True
         # Does not rely on predicted output (i.e. decoding strategy agnostic)
         self.use_predicted_target = False
+        # Needs only the final generation step to extract scores
+        self.is_final_step_method = True
         self.method = self.AttentionWeights(attribution_model)
 
     def attribute_step(

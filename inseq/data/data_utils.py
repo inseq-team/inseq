@@ -112,7 +112,7 @@ class TensorWrapper:
     def _eq(self_attr: TensorClass, other_attr: TensorClass) -> bool:
         try:
             if isinstance(self_attr, torch.Tensor):
-                return torch.allclose(self_attr, other_attr, equal_nan=True)
+                return torch.allclose(self_attr, other_attr, equal_nan=True, atol=1e-5)
             elif isinstance(self_attr, dict):
                 return all(TensorWrapper._eq(self_attr[k], other_attr[k]) for k in self_attr.keys())
             else:
@@ -173,6 +173,10 @@ class TensorWrapper:
                 out_params[field.name] = deepcopy(attr)
             else:
                 out_params[field.name] = None
+        return self.__class__(**out_params)
+
+    def clone_empty(self: TensorClass) -> TensorClass:
+        out_params = {k: v for k, v in self.__dict__.items() if k.startswith("_") and v is not None}
         return self.__class__(**out_params)
 
     def to_dict(self: TensorClass) -> dict[str, Any]:

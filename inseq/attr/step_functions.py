@@ -462,8 +462,7 @@ def register_step_function(
     attribution targets by gradient-based feature attribution methods.
 
     Args:
-        fn (:obj:`callable`): The function to be used to compute step scores. Default parameters (use kwargs to capture
-        unused ones when defining your function):
+        fn (:obj:`callable`): The function to be used to compute step scores. Default parameters (use kwargs to capture unused ones when defining your function):
 
             - :obj:`attribution_model`: an :class:`~inseq.models.AttributionModel` instance, corresponding to the model
                 used for computing the score.

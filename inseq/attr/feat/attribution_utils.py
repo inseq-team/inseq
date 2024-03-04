@@ -144,11 +144,15 @@ def extract_args(
 def get_source_target_attributions(
     attr: Union[StepAttributionTensor, tuple[StepAttributionTensor, StepAttributionTensor]],
     is_encoder_decoder: bool,
+    has_sequence_scores: bool = False,
 ) -> tuple[Optional[StepAttributionTensor], Optional[StepAttributionTensor]]:
     if isinstance(attr, tuple):
         if is_encoder_decoder:
-            return (attr[0], attr[1]) if len(attr) > 1 else (attr[0], None)
+            if has_sequence_scores:
+                return (attr[0], attr[1], attr[2])
+            else:
+                return (attr[0], attr[1]) if len(attr) > 1 else (attr[0], None)
         else:
-            return (None, attr[0])
+            return (None, None, attr[0]) if has_sequence_scores else (None, attr[0])
     else:
         return (attr, None) if is_encoder_decoder else (None, attr)

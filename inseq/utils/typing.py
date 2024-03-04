@@ -1,12 +1,16 @@
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Optional, Union
+from typing import TYPE_CHECKING, Callable, Optional, Union
 
 import torch
+from captum.attr._utils.attribution import Attribution
 from jaxtyping import Float, Float32, Int64
 from transformers import PreTrainedModel
 
 TextInput = Union[str, Sequence[str]]
+
+if TYPE_CHECKING:
+    from inseq.models import AttributionModel
 
 
 @dataclass
@@ -28,6 +32,34 @@ class TokenWithId:
             return False
 
 
+class InseqAttribution(Attribution):
+    """A wrapper class for the Captum library's Attribution class to type hint the ``forward_func`` attribute
+    as an :class:`~inseq.models.AttributionModel`.
+    """
+
+    def __init__(self, forward_func: "AttributionModel") -> None:
+        r"""
+        Args:
+            forward_func (:class:`~inseq.models.AttributionModel`): The model hooker to the attribution method.
+        """
+        self.forward_func = forward_func
+
+    attribute: Callable
+
+    @property
+    def multiplies_by_inputs(self):
+        return False
+
+    def has_convergence_delta(self) -> bool:
+        return False
+
+    compute_convergence_delta: Callable
+
+    @classmethod
+    def get_name(cls: type["InseqAttribution"]) -> str:
+        return "".join([char if char.islower() or idx == 0 else " " + char for idx, char in enumerate(cls.__name__)])
+
+
 @dataclass
 class TextSequences:
     targets: TextInput
@@ -40,6 +72,8 @@ OneOrMoreTokenWithIdSequences = Sequence[Sequence[TokenWithId]]
 OneOrMoreAttributionSequences = Sequence[Sequence[float]]
 
 IndexSpan = Union[tuple[int, int], Sequence[tuple[int, int]]]
+OneOrMoreIndices = Union[int, list[int], tuple[int, int]]
+OneOrMoreIndicesDict = dict[int, OneOrMoreIndices]
 
 IdsTensor = Int64[torch.Tensor, "batch_size seq_len"]
 TargetIdsTensor = Int64[torch.Tensor, "batch_size"]

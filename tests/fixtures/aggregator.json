@@ -36,6 +36,7 @@
     ],
     "target": "Inseq \u00e8 un framework per l'attribuzione automatica di modelli sequenziali.",
     "target_subwords": [
+        "<pad>",
         "\u2581In",
         "se",
         "q",
@@ -58,6 +59,7 @@
         "</s>"
     ],
     "target_merged": [
+        "<pad>",
         "\u2581Inseq",
         "\u2581\u00e8",
         "\u2581un",

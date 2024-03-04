@@ -12,9 +12,10 @@ from ..utils import (
     aggregate_token_sequence,
     available_classes,
     extract_signature_args,
+    validate_indices,
 )
 from ..utils import normalize as normalize_fn
-from ..utils.typing import IndexSpan, TokenWithId
+from ..utils.typing import IndexSpan, OneOrMoreIndices, TokenWithId
 from .aggregation_functions import AggregationFunction
 from .data_utils import TensorWrapper
 
@@ -305,7 +306,7 @@ class SequenceAttributionAggregator(Aggregator):
         cls,
         attr: "FeatureAttributionSequenceOutput",
         aggregate_fn: AggregationFunction,
-        select_idx: Union[int, tuple[int, int], list[int], None] = None,
+        select_idx: Optional[OneOrMoreIndices] = None,
         normalize: bool = True,
         **kwargs,
     ):
@@ -366,7 +367,7 @@ class SequenceAttributionAggregator(Aggregator):
         cls,
         attr: "FeatureAttributionSequenceOutput",
         aggregate_fn: AggregationFunction,
-        select_idx: Union[int, tuple[int, int], list[int], None] = None,
+        select_idx: Optional[OneOrMoreIndices] = None,
         normalize: bool = True,
         **kwargs,
     ):
@@ -380,7 +381,7 @@ class SequenceAttributionAggregator(Aggregator):
         cls,
         attr: "FeatureAttributionSequenceOutput",
         aggregate_fn: AggregationFunction,
-        select_idx: Union[int, tuple[int, int], list[int], None] = None,
+        select_idx: Optional[OneOrMoreIndices] = None,
         normalize: bool = True,
         **kwargs,
     ):
@@ -398,7 +399,7 @@ class SequenceAttributionAggregator(Aggregator):
         cls,
         attr: "FeatureAttributionSequenceOutput",
         aggregate_fn: AggregationFunction,
-        select_idx: Union[int, tuple[int, int], list[int], None] = None,
+        select_idx: Optional[OneOrMoreIndices] = None,
         **kwargs,
     ):
         if aggregate_fn.takes_sequence_scores:
@@ -439,46 +440,12 @@ class SequenceAttributionAggregator(Aggregator):
     def _filter_scores(
         scores: torch.Tensor,
         dim: int = -1,
-        indices: Union[int, tuple[int, int], list[int], None] = None,
+        indices: Optional[OneOrMoreIndices] = None,
     ) -> torch.Tensor:
-        n_units = scores.shape[dim]
-
-        if hasattr(indices, "__iter__"):
-            if len(indices) == 0:
-                raise RuntimeError("At least two indices must be specified for aggregation.")
-            if len(indices) == 1:
-                indices = indices[0]
-
+        indexed = scores.index_select(dim, validate_indices(scores, dim, indices).to(scores.device))
         if isinstance(indices, int):
-            if indices not in range(-n_units, n_units):
-                raise IndexError(f"Index out of range. Scores only have {n_units} units.")
-            indices = indices if indices >= 0 else n_units + indices
-            return scores.select(dim, torch.tensor(indices, device=scores.device))
-        else:
-            if indices is None:
-                indices = (0, n_units)
-                logger.info("No indices specified for extraction. Using all units by default.")
-
-            # Convert negative indices to positive indices
-            if hasattr(indices, "__iter__"):
-                indices = type(indices)([h_idx if h_idx >= 0 else n_units + h_idx for h_idx in indices])
-            if not hasattr(indices, "__iter__") or (
-                len(indices) == 2 and isinstance(indices, tuple) and indices[0] >= indices[1]
-            ):
-                raise RuntimeError(
-                    "A (start, end) tuple of indices representing a span, a list of individual indices"
-                    " or a single index must be specified for select_idx."
-                )
-            max_idx_val = n_units if isinstance(indices, list) else n_units + 1
-            if not all(h in range(-n_units, max_idx_val) for h in indices):
-                raise IndexError("One or more index out of range. Scores only have {n_units} units.")
-            if len(set(indices)) != len(indices):
-                raise IndexError("Duplicate indices are not allowed.")
-            if isinstance(indices, tuple):
-                scores = scores.index_select(dim, torch.arange(indices[0], indices[1]))
-            else:
-                scores = scores.index_select(dim, torch.tensor(indices, device=scores.device))
-            return scores
+            return indexed.squeeze(dim)
+        return indexed
 
     @staticmethod
     def _aggregate_scores(
