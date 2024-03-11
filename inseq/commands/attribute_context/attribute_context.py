@@ -149,6 +149,9 @@ def attribute_context_with_model(args: AttributeContextArgs, model: HuggingfaceM
     )
     # Part 2: Contextual Cues Imputation (CCI)
     for cci_step_idx, (cti_idx, cti_score, cti_tok) in enumerate(cti_ranked_tokens):
+        contextual_input = model.convert_tokens_to_string(
+            input_full_tokens[:], skip_special_tokens=False
+        )
         contextual_output = model.convert_tokens_to_string(
             output_full_tokens[: output_current_text_offset + cti_idx + 1], skip_special_tokens=False
         )
@@ -184,7 +187,7 @@ def attribute_context_with_model(args: AttributeContextArgs, model: HuggingfaceM
                 cci_kwargs["contrast_force_inputs"] = True
         pos_start = output_current_text_offset + cti_idx + int(model.is_encoder_decoder) + int(has_lang_tag)
         cci_attrib_out = model.attribute(
-            input_full_text,
+            contextual_input,
             contextual_output,
             attribute_target=model.is_encoder_decoder and args.has_output_context,
             show_progress=False,
