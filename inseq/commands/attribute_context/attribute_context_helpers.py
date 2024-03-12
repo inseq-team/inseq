@@ -72,6 +72,14 @@ class AttributeContextOutput:
         return out
 
 
+def concat_with_sep(s1: str, s2: str, sep: str) -> bool:
+    """Adds separator between two strings if needed."""
+    need_sep = not s1.endswith(sep) and not s2.startswith(sep)
+    if need_sep:
+        return s1 + sep + s2
+    return s1 + s2
+
+
 def format_template(template: str, current: str, context: Optional[str] = None) -> str:
     kwargs = {"current": current}
     if context is not None:
@@ -89,7 +97,7 @@ def get_filtered_tokens(
     """Tokenize text and filter out special tokens, keeping only those in ``special_tokens_to_keep``."""
     as_targets = is_target and model.is_encoder_decoder
     return [
-        t.replace("Ġ", " ").replace("Ċ", " ").replace("▁", " ") if replace_special_characters else t
+        t.replace("Ġ", " ").replace("Ċ", "\n").replace("▁", " ") if replace_special_characters else t
         for t in model.convert_string_to_tokens(text, skip_special_tokens=False, as_targets=as_targets)
         if t not in model.special_tokens or t in special_tokens_to_keep
     ]
@@ -236,10 +244,7 @@ def prepare_outputs(
             if "forced_bos_token_id" in generation_kwargs:
                 generation_kwargs["decoder_input_ids"][0, 0] = generation_kwargs["forced_bos_token_id"]
         else:
-            sep = ""
-            if output_current_prefix and not output_current_prefix.startswith((" ", "\n")):
-                sep = decoder_input_output_separator
-            model_input = input_full_text + sep + output_current_prefix
+            model_input = concat_with_sep(input_full_text, output_current_prefix, decoder_input_output_separator)
             output_current_prefix = model_input
 
     output_gen = generate_model_output(
@@ -385,10 +390,7 @@ def generate_contextless_output(
         generation_input = input_current_text
     else:
         generation_kwargs["max_new_tokens"] = 1
-        sep = ""
-        if contextual_prefix and not contextual_prefix.startswith((" ", "\n")):
-            sep = decoder_input_output_separator
-        generation_input = input_current_text + sep + contextual_prefix
+        generation_input = concat_with_sep(input_current_text, contextual_prefix, decoder_input_output_separator)
     contextless_output = generate_with_special_tokens(
         model,
         generation_input,
@@ -410,6 +412,7 @@ def get_source_target_cci_scores(
     has_input_context: bool,
     has_output_context: bool,
     model_has_lang_tag: bool,
+    decoder_input_output_separator: str,
     special_tokens_to_keep: list[str] = [],
 ) -> tuple[Optional[list[float]], Optional[list[float]]]:
     """Extract attribution scores for the input and output contexts."""
@@ -418,7 +421,7 @@ def get_source_target_cci_scores(
         if model.is_encoder_decoder:
             input_scores = cci_attrib_out.source_attributions[:, 0].tolist()
             if model_has_lang_tag:
-                input_scores = input_scores[1:]
+                input_scores = input_scores[2:]
         else:
             input_scores = cci_attrib_out.target_attributions[:, 0].tolist()
         input_prefix, *_ = input_template.partition("{context}")
@@ -430,10 +433,14 @@ def get_source_target_cci_scores(
     if has_output_context:
         output_scores = cci_attrib_out.target_attributions[:, 0].tolist()
         if model_has_lang_tag:
-            output_scores = output_scores[1:]
+            output_scores = output_scores[2:]
         output_prefix, *_ = output_template.partition("{context}")
+        if not model.is_encoder_decoder and output_prefix:
+            output_prefix = decoder_input_output_separator + output_prefix
         output_prefix_tokens = get_filtered_tokens(output_prefix, model, special_tokens_to_keep, is_target=True)
-        prefix_len = len(output_prefix_tokens) + int(not model.is_encoder_decoder) * len(input_full_tokens)
+        prefix_len = len(output_prefix_tokens)
+        if not model.is_encoder_decoder:
+            prefix_len += len(input_full_tokens)
         output_scores = output_scores[prefix_len : len(output_context_tokens) + prefix_len]
     return input_scores, output_scores
 
