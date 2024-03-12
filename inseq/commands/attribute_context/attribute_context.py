@@ -34,6 +34,7 @@ from .attribute_context_args import AttributeContextArgs
 from .attribute_context_helpers import (
     AttributeContextOutput,
     CCIOutput,
+    concat_with_sep,
     filter_rank_tokens,
     format_template,
     get_contextless_output,
@@ -69,10 +70,6 @@ def attribute_context_with_model(args: AttributeContextArgs, model: HuggingfaceM
 
     # Prepare input/outputs (generate if necessary)
     input_full_text = format_template(args.input_template, args.input_current_text, args.input_context_text)
-    if "{current}" in args.contextless_input_current_text:
-        formatted_input_current_text = args.contextless_input_current_text.format(current=args.input_current_text)
-    else:
-        formatted_input_current_text = args.contextless_input_current_text
     args.output_context_text, args.output_current_text = prepare_outputs(
         model=model,
         input_context_text=args.input_context_text,
@@ -92,8 +89,7 @@ def attribute_context_with_model(args: AttributeContextArgs, model: HuggingfaceM
     if args.input_context_text is not None:
         input_context_tokens = get_filtered_tokens(args.input_context_text, model, args.special_tokens_to_keep)
     if not model.is_encoder_decoder:
-        sep = args.decoder_input_output_separator if not output_full_text.startswith((" ", "\n")) else ""
-        output_full_text = input_full_text + sep + output_full_text
+        output_full_text = concat_with_sep(input_full_text, output_full_text, args.decoder_input_output_separator)
     output_current_tokens = get_filtered_tokens(
         args.output_current_text, model, args.special_tokens_to_keep, is_target=True
     )
@@ -105,16 +101,18 @@ def attribute_context_with_model(args: AttributeContextArgs, model: HuggingfaceM
     input_full_tokens = get_filtered_tokens(input_full_text, model, args.special_tokens_to_keep)
     output_full_tokens = get_filtered_tokens(output_full_text, model, args.special_tokens_to_keep, is_target=True)
     output_current_text_offset = len(output_full_tokens) - len(output_current_tokens)
-    if model.is_encoder_decoder:
-        prefixed_output_current_text = args.output_current_text
-    else:
-        sep = args.decoder_input_output_separator if not args.output_current_text.startswith((" ", "\n")) else ""
-        prefixed_output_current_text = formatted_input_current_text + sep + args.output_current_text
+    formatted_input_current_text = args.contextless_input_current_text.format(current=args.input_current_text)
+    formatted_output_current_text = args.contextless_output_current_text.format(current=args.output_current_text)
+    if not model.is_encoder_decoder:
+        formatted_input_current_text = concat_with_sep(
+            formatted_input_current_text, "", args.decoder_input_output_separator
+        )
+        formatted_output_current_text = formatted_input_current_text + formatted_output_current_text
 
     # Part 1: Context-sensitive Token Identification (CTI)
     cti_out = model.attribute(
-        formatted_input_current_text,
-        prefixed_output_current_text,
+        formatted_input_current_text.rstrip(" "),
+        formatted_output_current_text,
         attribute_target=model.is_encoder_decoder,
         step_scores=[args.context_sensitivity_metric],
         contrast_sources=input_full_text if model.is_encoder_decoder else None,
@@ -126,6 +124,11 @@ def attribute_context_with_model(args: AttributeContextArgs, model: HuggingfaceM
         cti_out.show(do_aggregation=False)
 
     start_pos = 1 if has_lang_tag else 0
+    contextless_output_prefix = args.contextless_output_current_text.split("{current}")[0]
+    contextless_output_prefix_tokens = get_filtered_tokens(
+        contextless_output_prefix, model, args.special_tokens_to_keep, is_target=True
+    )
+    start_pos += len(contextless_output_prefix_tokens)
     cti_scores = cti_out.step_scores[args.context_sensitivity_metric][start_pos:].tolist()
     cti_tokens = [t.token for t in cti_out.target][start_pos + cti_out.attr_pos_start :]
     if model.is_encoder_decoder:
@@ -149,6 +152,7 @@ def attribute_context_with_model(args: AttributeContextArgs, model: HuggingfaceM
     )
     # Part 2: Contextual Cues Imputation (CCI)
     for cci_step_idx, (cti_idx, cti_score, cti_tok) in enumerate(cti_ranked_tokens):
+        contextual_input = model.convert_tokens_to_string(input_full_tokens, skip_special_tokens=False)
         contextual_output = model.convert_tokens_to_string(
             output_full_tokens[: output_current_text_offset + cti_idx + 1], skip_special_tokens=False
         )
@@ -158,6 +162,10 @@ def attribute_context_with_model(args: AttributeContextArgs, model: HuggingfaceM
         cci_kwargs = {}
         contextless_output = None
         if args.attributed_fn is not None and is_contrastive_step_function(args.attributed_fn):
+            if not model.is_encoder_decoder:
+                formatted_input_current_text = concat_with_sep(
+                    formatted_input_current_text, contextless_output_prefix, args.decoder_input_output_separator
+                )
             contextless_output = get_contextless_output(
                 model,
                 formatted_input_current_text,
@@ -182,9 +190,10 @@ def attribute_context_with_model(args: AttributeContextArgs, model: HuggingfaceM
             tok_pos = -2 if model.is_encoder_decoder else -1
             if args.attributed_fn == "kl_divergence" or output_ctx_tokens[tok_pos] == output_ctxless_tokens[tok_pos]:
                 cci_kwargs["contrast_force_inputs"] = True
-        pos_start = output_current_text_offset + cti_idx + int(model.is_encoder_decoder) + int(has_lang_tag)
+        bos_offset = int(model.is_encoder_decoder or output_ctx_tokens[0] == model.bos_token)
+        pos_start = output_current_text_offset + cti_idx + bos_offset + int(has_lang_tag)
         cci_attrib_out = model.attribute(
-            input_full_text,
+            contextual_input,
             contextual_output,
             attribute_target=model.is_encoder_decoder and args.has_output_context,
             show_progress=False,
@@ -214,6 +223,7 @@ def attribute_context_with_model(args: AttributeContextArgs, model: HuggingfaceM
             args.has_input_context,
             args.has_output_context,
             has_lang_tag,
+            args.decoder_input_output_separator,
             args.special_tokens_to_keep,
         )
         cci_out = CCIOutput(

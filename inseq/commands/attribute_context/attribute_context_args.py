@@ -91,6 +91,17 @@ class AttributeContextInputArgs:
             " be used as-is for the contrastive comparison, enabling contrastive comparison with different inputs."
         ),
     )
+    contextless_output_current_text: Optional[str] = cli_arg(
+        default=None,
+        help=(
+            "The output current text or template to use in the contrastive comparison with contextual output. By default"
+            " it is the same as ``output_current_text``, but it can be useful in cases where the context is nested "
+            "inside the current text (e.g. for an ``output_template`` like <user>\n{context}\n{current}\n<assistant> we "
+            "can use this parameter to format the contextless version as <user>\n{current}\n<assistant>)."
+            "If it contains the tag {current}, it will be infilled with the ``output_current_text``. Otherwise, it will"
+            " be used as-is for the contrastive comparison, enabling contrastive comparison with different outputs."
+        ),
+    )
 
 
 @command_args_docstring
@@ -212,8 +223,19 @@ class AttributeContextArgs(AttributeContextInputArgs, AttributeContextMethodArgs
     def __repr__(self):
         return f"{self.__class__.__name__}({pretty_dict(self.__dict__)})"
 
+    @classmethod
+    def _to_dict(cls, val: Any) -> dict[str, Any]:
+        if val is None or isinstance(val, (str, int, float, bool)):
+            return val
+        elif isinstance(val, dict):
+            return {k: cls._to_dict(v) for k, v in val.items()}
+        elif isinstance(val, (list, tuple)):
+            return [cls._to_dict(v) for v in val]
+        else:
+            return str(val)
+
     def to_dict(self) -> dict[str, Any]:
-        return dict(self.__dict__.items())
+        return self._to_dict(self.__dict__)
 
     def __post_init__(self):
         if (
@@ -236,6 +258,18 @@ class AttributeContextArgs(AttributeContextInputArgs, AttributeContextMethodArgs
             self.output_template = "{current}" if self.output_context_text is None else "{context} {current}"
         if self.contextless_input_current_text is None:
             self.contextless_input_current_text = "{current}"
+        if "{current}" not in self.contextless_input_current_text:
+            raise ValueError(
+                "{current} placeholder is missing from contextless_input_current_text template"
+                f" {self.contextless_input_current_text}."
+            )
+        if self.contextless_output_current_text is None:
+            self.contextless_output_current_text = "{current}"
+        if "{current}" not in self.contextless_output_current_text:
+            raise ValueError(
+                "{current} placeholder is missing from contextless_output_current_text template"
+                f" {self.contextless_output_current_text}."
+            )
         self.has_input_context = "{context}" in self.input_template
         self.has_output_context = "{context}" in self.output_template
         if not self.input_current_text:
