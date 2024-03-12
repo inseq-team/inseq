@@ -41,6 +41,7 @@ def test_in_out_ctx_encdec_whitespace_sep(encdec_model: MarianMTModel):
         input_template="{context} {current}",
         attributed_fn="contrast_prob_diff",
         show_viz=False,
+        show_intermediate_outputs=True,
         # Pre-defining natural model outputs to avoid user input in unit tests
         output_context_text="",
         output_current_text="Où sont-elles?",

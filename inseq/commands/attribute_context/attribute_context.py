@@ -190,7 +190,8 @@ def attribute_context_with_model(args: AttributeContextArgs, model: HuggingfaceM
             tok_pos = -2 if model.is_encoder_decoder else -1
             if args.attributed_fn == "kl_divergence" or output_ctx_tokens[tok_pos] == output_ctxless_tokens[tok_pos]:
                 cci_kwargs["contrast_force_inputs"] = True
-        pos_start = output_current_text_offset + cti_idx + int(model.is_encoder_decoder) + int(has_lang_tag)
+        bos_offset = int(model.is_encoder_decoder or output_ctx_tokens[0] == model.bos_token)
+        pos_start = output_current_text_offset + cti_idx + bos_offset + int(has_lang_tag)
         cci_attrib_out = model.attribute(
             contextual_input,
             contextual_output,
