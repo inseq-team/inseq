@@ -60,7 +60,7 @@ install-dev:
 
 .PHONY: install-ci
 install-ci:
-	make uv-activate && uv pip install -e .[lint]
+	make uv-activate && uv pip install -r requirements-dev.txt
 
 .PHONY: update-deps
 update-deps:
