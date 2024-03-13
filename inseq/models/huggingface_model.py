@@ -195,6 +195,7 @@ class HuggingfaceModel(AttributionModel):
         inputs: Union[TextInput, BatchEncoding],
         return_generation_output: bool = False,
         skip_special_tokens: bool = True,
+        output_generated_only: bool = False,
         **kwargs,
     ) -> Union[list[str], tuple[list[str], ModelOutput]]:
         """Wrapper of model.generate to handle tokenization and decoding.
@@ -204,6 +205,9 @@ class HuggingfaceModel(AttributionModel):
                 Inputs to be provided to the model for generation.
             return_generation_output (`bool`, *optional*, defaults to False):
                 If true, generation outputs are returned alongside the generated text.
+            output_generated_only (`bool`, *optional*, defaults to False):
+                If true, only the generated text is returned. Relevant for decoder-only models that would otherwise return
+                the full input + output.
 
         Returns:
             `Union[List[str], Tuple[List[str], ModelOutput]]`: Generated text or a tuple of generated text and
@@ -220,6 +224,8 @@ class HuggingfaceModel(AttributionModel):
             **kwargs,
         )
         sequences = generation_out.sequences
+        if output_generated_only and not self.is_encoder_decoder:
+            sequences = sequences[:, inputs.input_ids.shape[1] :]
         texts = self.decode(ids=sequences, skip_special_tokens=skip_special_tokens)
         if return_generation_output:
             return texts, generation_out

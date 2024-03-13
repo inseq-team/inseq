@@ -107,11 +107,14 @@ def generate_with_special_tokens(
     model: HuggingfaceModel,
     model_input: str,
     special_tokens_to_keep: list[str] = [],
+    output_generated_only: bool = True,
     **generation_kwargs,
 ) -> str:
     """Generate text preserving special tokens in ``special_tokens_to_keep``."""
     # Generate outputs, strip special tokens and remove prefix/suffix
-    output_gen = model.generate(model_input, skip_special_tokens=False, **generation_kwargs)[0]
+    output_gen = model.generate(
+        model_input, skip_special_tokens=False, output_generated_only=output_generated_only, **generation_kwargs
+    )[0]
     output_tokens = get_filtered_tokens(output_gen, model, special_tokens_to_keep, is_target=True)
     return model.convert_tokens_to_string(output_tokens, skip_special_tokens=False)
 
@@ -247,13 +250,15 @@ def prepare_outputs(
             model_input = concat_with_sep(input_full_text, output_current_prefix, decoder_input_output_separator)
             output_current_prefix = model_input
 
-    output_gen = generate_model_output(
+    if not model.is_encoder_decoder:
+        model_input = concat_with_sep(input_full_text, "", decoder_input_output_separator)
+
+    final_current = generate_model_output(
         model, model_input, generation_kwargs, special_tokens_to_keep, output_template, output_current_prefix, suffix
     )
 
     # Settings 3, 4
     if (has_out_ctx == use_out_ctx) and not has_out_curr:
-        final_current = output_gen if model.is_encoder_decoder or use_out_ctx else output_gen[len(model_input) :]
         return final_context, final_current.strip()
 
     # Settings 5, 6
@@ -395,6 +400,7 @@ def generate_contextless_output(
         model,
         generation_input,
         special_tokens_to_keep,
+        output_generated_only=False,
         **generation_kwargs,
     )
     return contextless_output
