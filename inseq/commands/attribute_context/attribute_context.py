@@ -152,10 +152,10 @@ def attribute_context_with_model(args: AttributeContextArgs, model: HuggingfaceM
     )
     # Part 2: Contextual Cues Imputation (CCI)
     for cci_step_idx, (cti_idx, cti_score, cti_tok) in enumerate(cti_ranked_tokens):
-        contextual_input = model.convert_tokens_to_string(input_full_tokens, skip_special_tokens=False)
+        contextual_input = model.convert_tokens_to_string(input_full_tokens, skip_special_tokens=False).lstrip(" ")
         contextual_output = model.convert_tokens_to_string(
             output_full_tokens[: output_current_text_offset + cti_idx + 1], skip_special_tokens=False
-        )
+        ).lstrip(" ")
         if not contextual_output:
             contextual_output = output_full_tokens[output_current_text_offset + cti_idx]
 
