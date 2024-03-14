@@ -161,6 +161,9 @@ def attribute_context_with_model(args: AttributeContextArgs, model: HuggingfaceM
 
         cci_kwargs = {}
         contextless_output = None
+        output_ctx_tokens = model.convert_string_to_tokens(
+            contextual_output, skip_special_tokens=False, as_targets=model.is_encoder_decoder
+        )
         if args.attributed_fn is not None and is_contrastive_step_function(args.attributed_fn):
             if not model.is_encoder_decoder:
                 formatted_input_current_text = concat_with_sep(
@@ -181,9 +184,6 @@ def attribute_context_with_model(args: AttributeContextArgs, model: HuggingfaceM
             )
             cci_kwargs["contrast_sources"] = formatted_input_current_text if model.is_encoder_decoder else None
             cci_kwargs["contrast_targets"] = contextless_output
-            output_ctx_tokens = model.convert_string_to_tokens(
-                contextual_output, skip_special_tokens=False, as_targets=model.is_encoder_decoder
-            )
             output_ctxless_tokens = model.convert_string_to_tokens(
                 contextless_output, skip_special_tokens=False, as_targets=model.is_encoder_decoder
             )

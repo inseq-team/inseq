@@ -253,13 +253,13 @@ def prepare_outputs(
     if not model.is_encoder_decoder:
         model_input = concat_with_sep(input_full_text, "", decoder_input_output_separator)
 
-    final_current = generate_model_output(
+    output_gen = generate_model_output(
         model, model_input, generation_kwargs, special_tokens_to_keep, output_template, output_current_prefix, suffix
     )
 
     # Settings 3, 4
     if (has_out_ctx == use_out_ctx) and not has_out_curr:
-        return final_context, final_current.strip()
+        return final_context, output_gen.strip()
 
     # Settings 5, 6
     # Try splitting the output into context and current text using ``separator``. As we have no guarantees of its
