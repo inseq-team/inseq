@@ -195,7 +195,7 @@ class AttributeContextOutputArgs:
         default=False,
         help=(
             "If specified, the intermediate outputs produced by the Inseq library for context-sensitive target "
-            "identification (CTI) and contextual cues imputation (CCI) are shown during the process.",
+            "identification (CTI) and contextual cues imputation (CCI) are shown during the process."
         ),
     )
     save_path: Optional[str] = cli_arg(
