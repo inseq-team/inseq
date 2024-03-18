@@ -11,7 +11,7 @@ from ...data import (
 from ...utils import Registry
 from .attribution_utils import get_source_target_attributions
 from .gradient_attribution import FeatureAttribution
-from .ops import Lime, ValueZeroing
+from .ops import Lime, Reagent, ValueZeroing
 
 logger = logging.getLogger(__name__)
 
@@ -112,6 +112,36 @@ class LimeAttribution(PerturbationAttributionRegistry):
             raise NotImplementedError(
                 "LIME attribution with attribute_target=True currently not supported for encoder-decoder models."
             )
+        out = super().attribute_step(attribute_fn_main_args, attribution_args)
+        return GranularFeatureAttributionStepOutput(
+            source_attributions=out.source_attributions,
+            target_attributions=out.target_attributions,
+            sequence_scores=out.sequence_scores,
+        )
+
+
+class ReagentAttribution(PerturbationAttributionRegistry):
+    """Recursive attribution generator (ReAGent) method.
+
+    Measures importance as the drop in prediction probability produced by replacing a token with a plausible
+    alternative predicted by a LM.
+
+    Reference implementation:
+    `ReAGent: A Model-agnostic Feature Attribution Method for Generative Language Models
+        <https://arxiv.org/abs/2402.00794>`__
+    """
+
+    method_name = "reagent"
+
+    def __init__(self, attribution_model, **kwargs):
+        super().__init__(attribution_model)
+        self.method = Reagent(attribution_model=self.attribution_model, **kwargs)
+
+    def attribute_step(
+        self,
+        attribute_fn_main_args: dict[str, Any],
+        attribution_args: dict[str, Any] = {},
+    ) -> GranularFeatureAttributionStepOutput:
         out = super().attribute_step(attribute_fn_main_args, attribution_args)
         return GranularFeatureAttributionStepOutput(
             source_attributions=out.source_attributions,
