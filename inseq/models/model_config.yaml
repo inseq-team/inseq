@@ -8,6 +8,9 @@ BloomForCausalLM:
 CodeGenForCausalLM:
     self_attention_module: "attn"
     value_vector: "value"
+CohereForCausalLM:
+    self_attention_module: "self_attn"
+    value_vector: "value_states"
 FalconForCausalLM:
     self_attention_module: "self_attention"
     value_vector: "value_layer"
@@ -54,6 +57,9 @@ Qwen2ForCausalLM:
     self_attention_module: "self_attn"
     value_vector: "value_states"
 StableLmForCausalLM:
+    self_attention_module: "self_attn"
+    value_vector: "value_states"
+StarCoder2ForCausalLM:
     self_attention_module: "self_attn"
     value_vector: "value_states"
 XGLMForCausalLM:
