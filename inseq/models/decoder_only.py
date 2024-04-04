@@ -119,7 +119,7 @@ class DecoderOnlyInputFormatter(InputFormatter):
             contrast_target_ids = contrast_batch.target_ids[:, contrast_aligned_idx]
             step_output.target = join_token_ids(
                 tokens=target_tokens,
-                ids=attribution_model.convert_ids_to_tokens(contrast_target_ids),
+                ids=attribution_model.convert_ids_to_tokens(contrast_target_ids, skip_special_tokens=False),
                 contrast_tokens=attribution_model.convert_ids_to_tokens(
                     contrast_target_ids[None, ...], skip_special_tokens=False
                 ),
