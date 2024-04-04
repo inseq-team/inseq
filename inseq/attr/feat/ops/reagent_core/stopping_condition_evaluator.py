@@ -3,9 +3,7 @@ from abc import ABC, abstractmethod
 from typing import Optional
 
 import torch
-from jaxtyping import Int64
-from transformers import AutoModelWithLMHead, AutoTokenizer
-from typing_extensions import override
+from transformers import AutoModelForCausalLM
 
 from .....utils.typing import IdsTensor, MultipleScoresPerStepTensor, TargetIdsTensor
 from .token_replacer import RankingTokenReplacer
@@ -23,7 +21,7 @@ class StoppingConditionEvaluator(ABC):
         importance_score: MultipleScoresPerStepTensor,
         decoder_input_ids: Optional[IdsTensor] = None,
         attribute_target: bool = False,
-    ) -> Int64[torch.Tensor, "batch_size"]:
+    ) -> TargetIdsTensor:
         """Evaluate stop condition according to the specified strategy.
 
         Args:
@@ -34,7 +32,7 @@ class StoppingConditionEvaluator(ABC):
             attribute_target: whether attribute target for encoder-decoder models
 
         Return:
-            Whether the stop condition achieved [batch]
+            Boolean flag per sequence signaling whether the stop condition was reached [batch]
 
         """
         raise NotImplementedError()
@@ -42,39 +40,36 @@ class StoppingConditionEvaluator(ABC):
 
 class TopKStoppingConditionEvaluator(StoppingConditionEvaluator):
     """
-    Stopping Condition Evaluator which stop when target exist in top k predictions,
+    Evaluator stopping when target exist among the top k predictions,
     while top n tokens based on importance_score are not been replaced.
     """
 
-    @override
     def __init__(
         self,
-        model: AutoModelWithLMHead,
-        token_sampler: TokenSampler,
+        model: AutoModelForCausalLM,
+        sampler: TokenSampler,
         top_k: int,
-        top_n: int = 0,
-        top_n_ratio: float = 0,
-        tokenizer: AutoTokenizer = None,
+        keep_top_n: int = 0,
+        keep_ratio: float = 0,
+        invert_keep: bool = False,
     ) -> None:
-        """Constructor
+        """Constructor for the TopKStoppingConditionEvaluator class.
 
         Args:
-            model: A Huggingface AutoModelWithLMHead.
-            token_sampler: A TokenSampler to sample replacement tokens
-            top_k: Stop condition achieved when target exist in top k predictions
-            top_n: Top n tokens based on importance_score are not been replaced during the prediction inference.
-                top_n_ratio will be used if top_n has been set to 0
-            top_n_ratio: Use ratio of input length to control the top n
-            tokenizer: (Optional) Used for logging top_k_words at each step
-
+            model: A Huggingface AutoModelForCausalLM.
+            sampler: A :class:`~inseq.attr.feat.ops.reagent_core.TokenSampler` object to sample replacement tokens.
+            top_k: Top K predictions in which the target must be included in order to achieve the stopping condition.
+            keep_top_n: If set to a value greater than 0, the top n tokens based on their importance score will be
+                kept, and the rest will be flagged for replacement. If set to 0, the top n will be determined by
+                ``keep_ratio``.
+            keep_ratio: If ``keep_top_n`` is set to 0, this specifies the proportion of tokens to keep.
+            invert_keep: If specified, the top tokens selected either via ``keep_top_n`` or ``keep_ratio`` will be
+                replaced instead of being kept.
         """
         self.model = model
-        self.token_sampler = token_sampler
         self.top_k = top_k
-        self.token_replacer = RankingTokenReplacer(self.token_sampler, top_n, top_n_ratio)
-        self.tokenizer = tokenizer
+        self.replacer = RankingTokenReplacer(sampler, keep_top_n, keep_ratio, invert_keep)
 
-    @override
     def __call__(
         self,
         input_ids: IdsTensor,
@@ -82,7 +77,7 @@ class TopKStoppingConditionEvaluator(StoppingConditionEvaluator):
         importance_score: MultipleScoresPerStepTensor,
         decoder_input_ids: Optional[IdsTensor] = None,
         attribute_target: bool = False,
-    ) -> Int64[torch.Tensor, "batch_size"]:
+    ) -> TargetIdsTensor:
         """Evaluate stop condition
 
         Args:
@@ -93,23 +88,20 @@ class TopKStoppingConditionEvaluator(StoppingConditionEvaluator):
             attribute_target: whether attribute target for encoder-decoder models
 
         Return:
-            Whether the stop condition achieved [batch]
-
+            Boolean flag per sequence signaling whether the stop condition was reached [batch]
         """
         # Replace tokens with low importance score and then inference \hat{y^{(e)}_{t+1}}
-
-        self.token_replacer.set_score(importance_score)
+        self.replacer.set_score(importance_score)
         if not attribute_target:
-            input_ids_replaced, mask_replacing = self.token_replacer(input_ids)
+            input_ids_replaced, mask_replacing = self.replacer(input_ids)
         else:
-            ids_replaced, mask_replacing = self.token_replacer(torch.cat((input_ids, decoder_input_ids), 1))
+            ids_replaced, mask_replacing = self.replacer(torch.cat((input_ids, decoder_input_ids), 1))
             input_ids_replaced = ids_replaced[:, : input_ids.shape[1]]
             decoder_input_ids_replaced = ids_replaced[:, input_ids.shape[1] :]
 
         logging.debug(f"Replacing mask based on importance score -> { mask_replacing }")
 
         # Whether the result \hat{y^{(e)}_{t+1}} consistent with y_{t+1}
-
         assert not input_ids_replaced.requires_grad, "Error: auto-diff engine not disabled"
         with torch.no_grad():
             if decoder_input_ids is None:
@@ -126,10 +118,6 @@ class TopKStoppingConditionEvaluator(StoppingConditionEvaluator):
         ids_prediction_sorted = torch.argsort(logits_replaced[:, -1, :], descending=True)
         ids_prediction_top_k = ids_prediction_sorted[:, : self.top_k]
 
-        if self.tokenizer:
-            top_k_words = [[self.tokenizer.decode([token_id]) for token_id in seq] for seq in ids_prediction_top_k]
-            logging.debug(f"Top K words -> {top_k_words}")
-
         match_mask = ids_prediction_top_k == target_id
         match_hit = torch.sum(match_mask, dim=-1, dtype=torch.bool)
 
@@ -143,19 +131,7 @@ class DummyStoppingConditionEvaluator(StoppingConditionEvaluator):
     while top n tokens based on importance_score are not been replaced.
     """
 
-    @override
-    def __init__(self) -> None:
-        """Constructor"""
-
-    @override
-    def __call__(
-        self,
-        input_ids: IdsTensor,
-        target_id: TargetIdsTensor,
-        importance_score: MultipleScoresPerStepTensor,
-        decoder_input_ids: Optional[IdsTensor] = None,
-        attribute_target: bool = False,
-    ) -> Int64[torch.Tensor, "batch_size"]:
+    def __call__(self, input_ids: IdsTensor, **kwargs) -> TargetIdsTensor:
         """Evaluate stop condition
 
         Args:
@@ -165,10 +141,6 @@ class DummyStoppingConditionEvaluator(StoppingConditionEvaluator):
             attribute_target: whether attribute target for encoder-decoder models
 
         Return:
-            Whether the stop condition achieved [batch]
-
+            Boolean flag per sequence signaling whether the stop condition was reached [batch]
         """
-        match_hit = torch.ones([input_ids.shape[0]], dtype=torch.bool, device=input_ids.device)
-
-        # Stop flags for each sample in the batch
-        return match_hit
+        return torch.ones([input_ids.shape[0]], dtype=torch.bool, device=input_ids.device)

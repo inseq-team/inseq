@@ -26,7 +26,6 @@ class TokenSampler(ABC):
 
         Returns:
             token_uniform: A sampled tensor where its shape is the same with the input
-
         """
         raise NotImplementedError()
 
@@ -101,7 +100,6 @@ class POSTagTokenSampler(TokenSampler):
 
         Returns:
             token_uniform: A sampled tensor where its shape is the same with the input
-
         """
         input_ids_pos = self.id2pos[input_ids]
         sample_uniform = torch.rand(input_ids.shape, device=input_ids.device)

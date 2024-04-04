@@ -49,7 +49,6 @@ dependencies = [
   "torch>=2.1.1",
   "matplotlib>=3.5.3",
   "tqdm>=4.64.0",
-  "nltk>=3.8.1",
   "nvidia-cublas-cu11>=11.10.3.66; sys_platform=='Linux'",
   "nvidia-cuda-cupti-cu11>=11.7.101; sys_platform=='Linux'",
   "nvidia-cuda-nvrtc-cu11>=11.7.99; sys_platform=='Linux'",
@@ -93,6 +92,9 @@ datasets = [
 notebook = [
   "ipykernel>=6.29.2",
   "ipywidgets>=8.1.2"
+]
+nltk = [
+  "nltk>=3.8.1",
 ]
 
 [project.urls]

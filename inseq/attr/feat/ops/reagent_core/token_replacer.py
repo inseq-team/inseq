@@ -1,9 +1,7 @@
 import math
 from abc import ABC, abstractmethod
-from typing import Union
 
 import torch
-from jaxtyping import Int64
 from typing_extensions import override
 
 from .....utils.typing import IdsTensor
@@ -16,12 +14,11 @@ class TokenReplacer(ABC):
 
     """
 
-    def __init__(self, token_sampler: TokenSampler) -> None:
-        """Base Constructor"""
-        self.token_sampler = token_sampler
+    def __init__(self, sampler: TokenSampler) -> None:
+        self.sampler = sampler
 
     @abstractmethod
-    def __call__(self, input: IdsTensor) -> Union[IdsTensor, Int64[torch.Tensor, "batch_size seq_len"]]:
+    def __call__(self, input: IdsTensor) -> tuple[IdsTensor, IdsTensor]:
         """Replace tokens according to the specified strategy.
 
         Args:
@@ -29,7 +26,7 @@ class TokenReplacer(ABC):
 
         Returns:
             input_replaced: A replaced sequence [batch, sequence]
-            mask_replacing: Identify which token has been replaced [batch, sequence]
+            replacement_mask: Boolean mask identifying which token has been replaced [batch, sequence]
 
         """
         raise NotImplementedError()
@@ -40,96 +37,75 @@ class RankingTokenReplacer(TokenReplacer):
 
     @override
     def __init__(
-        self, token_sampler: TokenSampler, top_n: int = 0, top_n_ratio: float = 0, replace_greater: bool = False
+        self, sampler: TokenSampler, keep_top_n: int = 0, keep_ratio: float = 0, invert_keep: bool = False
     ) -> None:
-        """Constructor
+        """Constructor for the RankingTokenReplacer class.
 
         Args:
-            token_sampler: A TokenSampler for sampling replace token.
-            top_n: Top N as the threshold. If top_n is 0, use top_n_ratio instead.
-            top_n_ratio: Use ratio of input to control to top_n
-            replace_greater: Whether replace top-n. Otherwise, replace the rests.
-
+            sampler: A :class:`~inseq.attr.feat.ops.reagent_core.TokenSampler` object for sampling replacement tokens.
+            keep_top_n: If set to a value greater than 0, the top n tokens based on their importance score will be
+                kept, and the rest will be flagged for replacement. If set to 0, the top n will be determined by
+                ``keep_ratio``.
+            keep_ratio: If ``keep_top_n`` is set to 0, this specifies the proportion of tokens to keep.
+            invert_keep: If specified, the top tokens selected either via ``keep_top_n`` or ``keep_ratio`` will be
+                replaced instead of being kept.
         """
-        super().__init__(token_sampler)
-
-        self.top_n = top_n
-        self.top_n_ratio = top_n_ratio
-        self.replace_greater = replace_greater
+        super().__init__(sampler)
+        self.keep_top_n = keep_top_n
+        self.keep_ratio = keep_ratio
+        self.invert_keep = invert_keep
 
     def set_score(self, value: torch.Tensor) -> None:
         pos_sorted = torch.argsort(value, descending=True)
-
-        top_n = self.top_n
-
-        if top_n == 0:
-            top_n = int(math.ceil(self.top_n_ratio * value.shape[-1]))
-
+        top_n = int(math.ceil(self.keep_ratio * value.shape[-1])) if not self.keep_top_n else self.keep_top_n
         pos_top_n = pos_sorted[..., :top_n]
-
-        if not self.replace_greater:
-            self.mask_replacing = torch.ones(value.shape, device=value.device, dtype=torch.bool).scatter(
-                -1, pos_top_n, 0
-            )
-        else:
-            self.mask_replacing = torch.zeros(value.shape, device=value.device, dtype=torch.bool).scatter(
-                -1, pos_top_n, 1
-            )
+        self.replacement_mask = torch.ones_like(value, device=value.device, dtype=torch.bool).scatter(
+            -1, pos_top_n, self.invert_keep
+        )
 
     @override
-    def __call__(self, input: IdsTensor) -> Union[IdsTensor, Int64[torch.Tensor, "batch_size seq_len"]]:
+    def __call__(self, input: IdsTensor) -> tuple[IdsTensor, IdsTensor]:
         """Sample a sequence
 
         Args:
-            input: input sequence [batch, sequence]
+            input: Input sequence of ids of shape [batch, sequence]
 
         Returns:
             input_replaced: A replaced sequence [batch, sequence]
-            mask_replacing: Identify which token has been replaced [batch, sequence]
-
+            replacement_mask: Boolean mask identifying which token has been replaced [batch, sequence]
         """
-
-        token_sampled = self.token_sampler(input)
-
-        input_replaced = input * ~self.mask_replacing + token_sampled * self.mask_replacing
-
-        return input_replaced, self.mask_replacing
+        token_sampled = self.sampler(input)
+        input_replaced = input * ~self.replacement_mask + token_sampled * self.replacement_mask
+        return input_replaced, self.replacement_mask
 
 
 class UniformTokenReplacer(TokenReplacer):
     """Replace tokens in a sequence where selecting is base on uniform distribution"""
 
     @override
-    def __init__(self, token_sampler: TokenSampler, ratio: float) -> None:
+    def __init__(self, sampler: TokenSampler, ratio: float) -> None:
         """Constructor
 
         Args:
-            token_sampler: A TokenSampler for sampling replace token.
-            ratio: replacing ratio
-
+            sampler: A :class:`~inseq.attr.feat.ops.reagent_core.TokenSampler` object for sampling replacement tokens.
+            ratio: Ratio of tokens to replace in the sequence.
         """
-        super().__init__(token_sampler)
-
+        super().__init__(sampler)
         self.ratio = ratio
 
     @override
-    def __call__(self, input: IdsTensor) -> Union[IdsTensor, Int64[torch.Tensor, "batch_size seq_len"]]:
+    def __call__(self, input: IdsTensor) -> tuple[IdsTensor, IdsTensor]:
         """Sample a sequence
 
         Args:
-            input: input sequence [batch, sequence]
+            input: Input sequence of ids of shape [batch, sequence]
 
         Returns:
             input_replaced: A replaced sequence [batch, sequence]
-            mask_replacing: Identify which token has been replaced [batch, sequence]
-
+            replacement_mask: Boolean mask identifying which token has been replaced [batch, sequence]
         """
-
         sample_uniform = torch.rand(input.shape, device=input.device)
-        mask_replacing = sample_uniform < self.ratio
-
-        token_sampled = self.token_sampler(input)
-
-        input_replaced = input * ~mask_replacing + token_sampled * mask_replacing
-
-        return input_replaced, mask_replacing
+        replacement_mask = sample_uniform < self.ratio
+        token_sampled = self.sampler(input)
+        input_replaced = input * ~replacement_mask + token_sampled * replacement_mask
+        return input_replaced, replacement_mask

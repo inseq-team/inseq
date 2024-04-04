@@ -2,21 +2,23 @@ from typing import TYPE_CHECKING, Any, Union
 
 import torch
 from captum._utils.typing import TargetType, TensorOrTupleOfTensorsGeneric
-from captum.attr._utils.attribution import PerturbationAttribution
 from torch import Tensor
 from typing_extensions import override
 
-from .reagent_core.importance_score_evaluator import DeltaProbImportanceScoreEvaluator
-from .reagent_core.rationalizer import AggregateRationalizer
-from .reagent_core.stopping_condition_evaluator import TopKStoppingConditionEvaluator
-from .reagent_core.token_replacer import UniformTokenReplacer
-from .reagent_core.token_sampler import POSTagTokenSampler
+from ....utils.typing import InseqAttribution
+from .reagent_core import (
+    AggregateRationalizer,
+    DeltaProbImportanceScoreEvaluator,
+    POSTagTokenSampler,
+    TopKStoppingConditionEvaluator,
+    UniformTokenReplacer,
+)
 
 if TYPE_CHECKING:
     from ....models import HuggingfaceModel
 
 
-class Reagent(PerturbationAttribution):
+class Reagent(InseqAttribution):
     r"""Recursive attribution generator (ReAGent) method.
 
     Measures importance as the drop in prediction probability produced by replacing a token with a plausible
@@ -27,30 +29,30 @@ class Reagent(PerturbationAttribution):
         <https://arxiv.org/abs/2402.00794>`__
 
     Args:
-        forward_func (callable): The forward function of the model or any
-            modification of it
-        rational_size (int): Top n tokens based on importance_score are not been replaced during the prediction inference.
-            top_n_ratio will be used if top_n has been set to 0
-        rational_size_ratio (float): TUse ratio of input length to control the top n
-        stopping_condition_top_k (int): Stop condition achieved when target exist in top k predictions
+        forward_func (callable): The forward function of the model or any modification of it
+        keep_top_n (int): If set to a value greater than 0, the top n tokens based on their importance score will be
+            kept during the prediction inference. If set to 0, the top n will be determined by ``keep_ratio``.
+        keep_ratio (float): If ``keep_top_n`` is set to 0, this specifies the proportion of tokens to keep.
+        invert_keep: If specified, the top tokens selected either via ``keep_top_n`` or ``keep_ratio`` will be
+            replaced instead of being kept.
+        stopping_condition_top_k (int): Threshold indicating that the stop condition achieved when the predicted target
+            exist in top k predictions
         replacing_ratio (float): replacing ratio of tokens for probing
         max_probe_steps (int): max_probe_steps
         num_probes (int): number of probes in parallel
 
-    Examples:
+    Example:
         ```
         import inseq
 
-        model = inseq.load_model("gpt2-medium", "ReAGent",
-                                rational_size=5,
-                                rational_size_ratio=None,
-                                stopping_condition_top_k=3,
-                                replacing_ratio=0.3,
-                                max_probe_steps=3000,
-                                num_probes=8)
-        out = model.attribute(
-        "Super Mario Land is a game that developed by",
+        model = inseq.load_model("gpt2-medium", "reagent",
+            keep_top_n=5,
+            stopping_condition_top_k=3,
+            replacing_ratio=0.3,
+            max_probe_steps=3000,
+            num_probes=8
         )
+        out = model.attribute("Super Mario Land is a game that developed by")
         out.show()
         ```
     """
@@ -58,35 +60,33 @@ class Reagent(PerturbationAttribution):
     def __init__(
         self,
         attribution_model: "HuggingfaceModel",
-        rational_size: int = 5,
-        rational_size_ratio: float = None,
+        keep_top_n: int = 5,
+        keep_ratio: float = None,
+        invert_keep: bool = False,
         stopping_condition_top_k: int = 3,
         replacing_ratio: float = 0.3,
         max_probe_steps: int = 3000,
         num_probes: int = 16,
     ) -> None:
-        PerturbationAttribution.__init__(self, forward_func=attribution_model)
+        super().__init__(attribution_model)
 
         model = attribution_model.model
         tokenizer = attribution_model.tokenizer
+        model_name = attribution_model.model_name
 
-        token_sampler = POSTagTokenSampler(
-            tokenizer=tokenizer, identifier=attribution_model.model_name, device=attribution_model.device
-        )
-
+        sampler = POSTagTokenSampler(tokenizer=tokenizer, identifier=model_name, device=attribution_model.device)
         stopping_condition_evaluator = TopKStoppingConditionEvaluator(
             model=model,
-            token_sampler=token_sampler,
+            sampler=sampler,
             top_k=stopping_condition_top_k,
-            top_n=rational_size,
-            top_n_ratio=rational_size_ratio,
-            tokenizer=tokenizer,
+            keep_top_n=keep_top_n,
+            keep_ratio=keep_ratio,
+            invert_keep=invert_keep,
         )
-
         importance_score_evaluator = DeltaProbImportanceScoreEvaluator(
             model=model,
             tokenizer=tokenizer,
-            token_replacer=UniformTokenReplacer(token_sampler=token_sampler, ratio=replacing_ratio),
+            token_replacer=UniformTokenReplacer(sampler=sampler, ratio=replacing_ratio),
             stopping_condition_evaluator=stopping_condition_evaluator,
             max_steps=max_probe_steps,
         )
@@ -96,8 +96,8 @@ class Reagent(PerturbationAttribution):
             batch_size=num_probes,
             overlap_threshold=0,
             overlap_strict_pos=True,
-            top_n=rational_size,
-            top_n_ratio=rational_size_ratio,
+            keep_top_n=keep_top_n,
+            keep_ratio=keep_ratio,
         )
 
     @override
