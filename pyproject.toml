@@ -74,7 +74,7 @@ docs = [
 ]
 lint = [
   "bandit>=1.7.4",
-  "safety>=2.2.0",
+  "safety>=3.1.0",
   "pydoclint>=0.4.0",
   "pre-commit>=2.19.0",
   "pytest>=7.2.0",

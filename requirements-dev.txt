@@ -44,7 +44,7 @@ contourpy==1.2.0
     # via matplotlib
 coverage==7.4.1
     # via pytest-cov
-cryptography==42.0.2
+cryptography==42.0.5
     # via authlib
 cycler==0.12.1
     # via matplotlib
@@ -286,7 +286,7 @@ ruamel-yaml-clib==0.2.8
 ruff==0.2.1
 safetensors==0.4.2
     # via transformers
-safety==3.0.1
+safety==3.1.0
 safety-schemas==0.0.2
     # via safety
 scikit-learn==1.4.0
