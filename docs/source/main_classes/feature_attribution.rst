@@ -91,3 +91,24 @@ Perturbation-based Attribution Methods
 
 .. autoclass:: inseq.attr.feat.ValueZeroingAttribution
     :members:
+
+.. autoclass:: inseq.attr.feat.ReagentAttribution
+    :members:
+
+    .. automethod:: __init__
+
+.. code:: python
+
+    import inseq
+
+    model = inseq.load_model(
+        "gpt2-medium",
+        "reagent",
+        keep_top_n=5,
+        stopping_condition_top_k=3,
+        replacing_ratio=0.3,
+        max_probe_steps=3000,
+        num_probes=8
+    )
+    out = model.attribute("Super Mario Land is a game that developed by")
+    out.show()

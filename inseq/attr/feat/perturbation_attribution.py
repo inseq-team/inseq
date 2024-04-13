@@ -1,5 +1,5 @@
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from captum.attr import Occlusion
 
@@ -11,7 +11,10 @@ from ...data import (
 from ...utils import Registry
 from .attribution_utils import get_source_target_attributions
 from .gradient_attribution import FeatureAttribution
-from .ops import Lime, ValueZeroing
+from .ops import Lime, Reagent, ValueZeroing
+
+if TYPE_CHECKING:
+    from ...models import HuggingfaceModel
 
 logger = logging.getLogger(__name__)
 
@@ -112,6 +115,70 @@ class LimeAttribution(PerturbationAttributionRegistry):
             raise NotImplementedError(
                 "LIME attribution with attribute_target=True currently not supported for encoder-decoder models."
             )
+        out = super().attribute_step(attribute_fn_main_args, attribution_args)
+        return GranularFeatureAttributionStepOutput(
+            source_attributions=out.source_attributions,
+            target_attributions=out.target_attributions,
+            sequence_scores=out.sequence_scores,
+        )
+
+
+class ReagentAttribution(PerturbationAttributionRegistry):
+    """Recursive attribution generator (ReAGent) method.
+
+    Measures importance as the drop in prediction probability produced by replacing a token with a plausible
+    alternative predicted by a LM.
+
+    Reference implementation:
+    `ReAGent: A Model-agnostic Feature Attribution Method for Generative Language Models <https://arxiv.org/abs/2402.00794>`__
+    """
+
+    method_name = "reagent"
+
+    def __init__(
+        self,
+        attribution_model: "HuggingfaceModel",
+        keep_top_n: int = 5,
+        keep_ratio: float = None,
+        invert_keep: bool = False,
+        stopping_condition_top_k: int = 3,
+        replacing_ratio: float = 0.3,
+        max_probe_steps: int = 3000,
+        num_probes: int = 16,
+    ):
+        """ReAGent method constructor.
+
+        Args:
+            keep_top_n (:obj:`int`, `optional`): If set to a value greater than 0, the top n tokens based on their importance score will be
+                kept during the prediction inference. If set to 0, the top n will be determined by ``keep_ratio``. Default: ``5``.
+            keep_ratio (:obj:`float`, `optional`): If ``keep_top_n`` is set to 0, this specifies the proportion of tokens to keep.
+            invert_keep (:obj:`bool`, `optional`): If specified, the top tokens selected either via ``keep_top_n`` or ``keep_ratio`` will be
+                replaced instead of being kept. Default: ``False``.
+            stopping_condition_top_k (:obj:`int`, `optional`): Threshold indicating that the stop condition achieved when the predicted target
+                exist in top k predictions. Default: ``3``.
+            replacing_ratio (:obj:`float`, `optional`): replacing ratio of tokens for probing. Default: ``0.3``.
+            max_probe_steps (:obj:`int`, `optional`): Max number of steps before stopping the probing. Default: ``3000``.
+            num_probes (:obj:`int`, `optional`): Number of probes performed in parallel. Default: ``16``.
+        """
+        super().__init__(attribution_model)
+        # Custom target attribution is currently not supported
+        self.use_predicted_target = False
+        self.method = Reagent(
+            attribution_model=self.attribution_model,
+            keep_top_n=keep_top_n,
+            keep_ratio=keep_ratio,
+            invert_keep=invert_keep,
+            stopping_condition_top_k=stopping_condition_top_k,
+            replacing_ratio=replacing_ratio,
+            max_probe_steps=max_probe_steps,
+            num_probes=num_probes,
+        )
+
+    def attribute_step(
+        self,
+        attribute_fn_main_args: dict[str, Any],
+        attribution_args: dict[str, Any] = {},
+    ) -> GranularFeatureAttributionStepOutput:
         out = super().attribute_step(attribute_fn_main_args, attribution_args)
         return GranularFeatureAttributionStepOutput(
             source_attributions=out.source_attributions,
