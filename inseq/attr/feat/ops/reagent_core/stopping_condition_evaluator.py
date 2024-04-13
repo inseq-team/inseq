@@ -56,7 +56,7 @@ class TopKStoppingConditionEvaluator(StoppingConditionEvaluator):
         """Constructor for the TopKStoppingConditionEvaluator class.
 
         Args:
-            model: A Huggingface AutoModelForCausalLM.
+            model: A Huggingface ``AutoModelForCausalLM``.
             sampler: A :class:`~inseq.attr.feat.ops.reagent_core.TokenSampler` object to sample replacement tokens.
             top_k: Top K predictions in which the target must be included in order to achieve the stopping condition.
             keep_top_n: If set to a value greater than 0, the top n tokens based on their importance score will be
@@ -104,24 +104,14 @@ class TopKStoppingConditionEvaluator(StoppingConditionEvaluator):
         # Whether the result \hat{y^{(e)}_{t+1}} consistent with y_{t+1}
         assert not input_ids_replaced.requires_grad, "Error: auto-diff engine not disabled"
         with torch.no_grad():
-            if decoder_input_ids is None:
-                logits_replaced = self.model(input_ids_replaced)["logits"]
-            elif not attribute_target:
-                logits_replaced = self.model(input_ids=input_ids_replaced, decoder_input_ids=decoder_input_ids)[
-                    "logits"
-                ]
-            else:
-                logits_replaced = self.model(
-                    input_ids=input_ids_replaced, decoder_input_ids=decoder_input_ids_replaced
-                )["logits"]
-
+            kwargs = {"input_ids": input_ids_replaced}
+            if decoder_input_ids is not None:
+                kwargs["decoder_input_ids"] = decoder_input_ids_replaced if attribute_target else decoder_input_ids
+            logits_replaced = self.model(**kwargs)["logits"]
         ids_prediction_sorted = torch.argsort(logits_replaced[:, -1, :], descending=True)
         ids_prediction_top_k = ids_prediction_sorted[:, : self.top_k]
-
         match_mask = ids_prediction_top_k == target_id
         match_hit = torch.sum(match_mask, dim=-1, dtype=torch.bool)
-
-        # Stop flags for each sample in the batch
         return match_hit
 
 

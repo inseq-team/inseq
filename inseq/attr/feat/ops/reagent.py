@@ -111,20 +111,24 @@ class Reagent(InseqAttribution):
         tuple[TensorOrTupleOfTensorsGeneric, Tensor],
     ]:
         """Implement attribute"""
-        if len(additional_forward_args) == 8:
-            # encoder-decoder with target
-            self.rationalizer(additional_forward_args[0], additional_forward_args[2], additional_forward_args[1], True)
-
-            mean_important_score = torch.unsqueeze(self.rationalizer.mean_important_score, 0)
-            res = torch.unsqueeze(mean_important_score, 2).repeat(1, 1, inputs[0].shape[2])
-            return (res[:, : additional_forward_args[0].shape[1], :], res[:, additional_forward_args[0].shape[1] :, :])
-        elif len(additional_forward_args) == 9:
-            # encoder-decoder
-            self.rationalizer(additional_forward_args[1], additional_forward_args[3], additional_forward_args[2])
-        elif len(additional_forward_args) == 6:
-            # decoder only
-            self.rationalizer(additional_forward_args[0], additional_forward_args[1])
-
-        mean_important_score = torch.unsqueeze(self.rationalizer.mean_important_score, 0)
-        res = torch.unsqueeze(mean_important_score, 2).repeat(1, 1, inputs[0].shape[2])
+        # encoder-decoder
+        if self.forward_func.is_encoder_decoder:
+            # with target-side attribution
+            if len(inputs) > 1:
+                self.rationalizer(
+                    additional_forward_args[0], additional_forward_args[2], additional_forward_args[1], True
+                )
+                mean_importance_score = torch.unsqueeze(self.rationalizer.mean_importance_score, 0)
+                res = torch.unsqueeze(mean_importance_score, 2).repeat(1, 1, inputs[0].shape[2])
+                return (
+                    res[:, : additional_forward_args[0].shape[1], :],
+                    res[:, additional_forward_args[0].shape[1] :, :],
+                )
+            # source-side only
+            else:
+                self.rationalizer(additional_forward_args[1], additional_forward_args[3], additional_forward_args[2])
+        # decoder-only
+        self.rationalizer(additional_forward_args[0], additional_forward_args[1])
+        mean_importance_score = torch.unsqueeze(self.rationalizer.mean_importance_score, 0)
+        res = torch.unsqueeze(mean_importance_score, 2).repeat(1, 1, inputs[0].shape[2])
         return (res,)

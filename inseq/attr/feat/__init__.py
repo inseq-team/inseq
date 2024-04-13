@@ -18,6 +18,7 @@ from .perturbation_attribution import (
     LimeAttribution,
     OcclusionAttribution,
     PerturbationAttributionRegistry,
+    ReagentAttribution,
     ValueZeroingAttribution,
 )
 
@@ -43,4 +44,5 @@ __all__ = [
     "SequentialIntegratedGradientsAttribution",
     "ValueZeroingAttribution",
     "PerturbationAttributionRegistry",
+    "ReagentAttribution",
 ]
