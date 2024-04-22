@@ -22,6 +22,7 @@ from ..utils import (
     format_input_texts,
     get_adjusted_alignments,
     get_default_device,
+    is_accelerate_available,
     isnotebook,
     pretty_tensor,
 )
@@ -219,6 +220,7 @@ class AttributionModel(ABC, torch.nn.Module):
         self.pad_token: Optional[str] = None
         self.embed_scale: Optional[float] = None
         self._device: Optional[str] = None
+        self.device_map: Optional[dict[str, Union[str, int, torch.device]]] = None
         self.attribution_method: Optional[FeatureAttribution] = None
         self.is_hooked: bool = False
         self._default_attributed_fn_id: str = "probability"
@@ -234,7 +236,14 @@ class AttributionModel(ABC, torch.nn.Module):
         check_device(new_device)
         self._device = new_device
         if self.model:
-            self.model.to(self._device)
+            if self.device_map is None:
+                self.model.to(self._device)
+            elif is_accelerate_available():
+                from accelerate import dispatch_model
+
+                self.model = dispatch_model(self.model, device_map=self.device_map)
+            else:
+                raise ImportError("Accelerate is not available, but device_map is set.")
 
     def setup(self, device: Optional[str] = None, attribution_method: Optional[str] = None, **kwargs) -> None:
         """Move the model to device and in eval mode."""

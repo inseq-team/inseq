@@ -127,6 +127,9 @@ class HuggingfaceModel(AttributionModel):
         self.embed_scale = 1.0
         self.encoder_int_embeds = None
         self.decoder_int_embeds = None
+        self.device_map = None
+        if hasattr(self.model, "hf_device_map") and self.model.hf_device_map is not None:
+            self.device_map = self.model.hf_device_map
         self.is_encoder_decoder = self.model.config.is_encoder_decoder
         self.configure_embeddings_scale()
         self.setup(device, attribution_method, **kwargs)
