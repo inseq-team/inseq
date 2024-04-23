@@ -127,6 +127,9 @@ class HuggingfaceModel(AttributionModel):
         self.embed_scale = 1.0
         self.encoder_int_embeds = None
         self.decoder_int_embeds = None
+        self.device_map = None
+        if hasattr(self.model, "hf_device_map") and self.model.hf_device_map is not None:
+            self.device_map = self.model.hf_device_map
         self.is_encoder_decoder = self.model.config.is_encoder_decoder
         self.configure_embeddings_scale()
         self.setup(device, attribution_method, **kwargs)
@@ -162,16 +165,19 @@ class HuggingfaceModel(AttributionModel):
         is_loaded_in_8bit = getattr(self.model, "is_loaded_in_8bit", False)
         is_loaded_in_4bit = getattr(self.model, "is_loaded_in_4bit", False)
         is_quantized = is_loaded_in_8bit or is_loaded_in_4bit
+        has_device_map = self.device_map is not None
 
         # Enable compatibility with 8bit models
         if self.model:
-            if not is_quantized:
-                self.model.to(self._device)
-            else:
+            if is_quantized:
                 mode = "8bit" if is_loaded_in_8bit else "4bit"
                 logger.warning(
                     f"The model is loaded in {mode} mode. The device cannot be changed after loading the model."
                 )
+            elif has_device_map:
+                logger.warning("The model is loaded with a device map. The device cannot be changed after loading.")
+            else:
+                self.model.to(self._device)
 
     @abstractmethod
     def configure_embeddings_scale(self) -> None:

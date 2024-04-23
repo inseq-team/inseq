@@ -219,6 +219,7 @@ class AttributionModel(ABC, torch.nn.Module):
         self.pad_token: Optional[str] = None
         self.embed_scale: Optional[float] = None
         self._device: Optional[str] = None
+        self.device_map: Optional[dict[str, Union[str, int, torch.device]]] = None
         self.attribution_method: Optional[FeatureAttribution] = None
         self.is_hooked: bool = False
         self._default_attributed_fn_id: str = "probability"
