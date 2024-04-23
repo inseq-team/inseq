@@ -10,6 +10,7 @@ from .errors import (
 )
 from .hooks import StackFrame, get_post_variable_assignment_hook
 from .import_utils import (
+    is_accelerate_available,
     is_captum_available,
     is_datasets_available,
     is_ipywidgets_available,
@@ -134,4 +135,5 @@ __all__ = [
     "validate_indices",
     "pad_with_nan",
     "recursive_get_submodule",
+    "is_accelerate_available",
 ]
