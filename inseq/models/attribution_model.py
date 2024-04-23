@@ -22,7 +22,6 @@ from ..utils import (
     format_input_texts,
     get_adjusted_alignments,
     get_default_device,
-    is_accelerate_available,
     isnotebook,
     pretty_tensor,
 )
@@ -236,14 +235,7 @@ class AttributionModel(ABC, torch.nn.Module):
         check_device(new_device)
         self._device = new_device
         if self.model:
-            if self.device_map is None:
-                self.model.to(self._device)
-            elif is_accelerate_available():
-                from accelerate import dispatch_model
-
-                self.model = dispatch_model(self.model, device_map=self.device_map)
-            else:
-                raise ImportError("Accelerate is not available, but device_map is set.")
+            self.model.to(self._device)
 
     def setup(self, device: Optional[str] = None, attribution_method: Optional[str] = None, **kwargs) -> None:
         """Move the model to device and in eval mode."""
