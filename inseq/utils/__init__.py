@@ -8,7 +8,7 @@ from .errors import (
     MissingAttributionMethodError,
     UnknownAttributionMethodError,
 )
-from .hooks import StackFrame, get_post_variable_assignment_hook
+from .hooks import get_post_variable_assignment_hook
 from .import_utils import (
     is_accelerate_available,
     is_captum_available,
@@ -131,7 +131,6 @@ __all__ = [
     "filter_logits",
     "cli_arg",
     "get_post_variable_assignment_hook",
-    "StackFrame",
     "validate_indices",
     "pad_with_nan",
     "recursive_get_submodule",

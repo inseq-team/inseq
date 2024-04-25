@@ -95,9 +95,6 @@ class HuggingfaceModel(AttributionModel):
         if isinstance(model, PreTrainedModel):
             self.model = model
         else:
-            if "output_attentions" not in model_kwargs:
-                model_kwargs["output_attentions"] = True
-
             self.model = self._autoclass.from_pretrained(model, **model_kwargs)
         self.model_name = self.model.config.name_or_path
         self.tokenizer_name = tokenizer if isinstance(tokenizer, str) else None
