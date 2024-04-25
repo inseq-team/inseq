@@ -14,6 +14,7 @@
 
 import logging
 from enum import Enum
+from types import FrameType
 from typing import TYPE_CHECKING, Callable, Optional
 
 import torch
@@ -22,7 +23,6 @@ from torch import nn
 from torch.utils.hooks import RemovableHandle
 
 from ....utils import (
-    StackFrame,
     find_block_stack,
     get_post_variable_assignment_hook,
     recursive_get_submodule,
@@ -100,7 +100,7 @@ class ValueZeroing(InseqAttribution):
         """
 
         def value_zeroing_forward_mid_hook(
-            frame: StackFrame,
+            frame: FrameType,
             zeroed_token_index: Optional[int] = None,
             zeroed_units_indices: Optional[OneOrMoreIndices] = None,
             batch_size: int = 1,
