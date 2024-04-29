@@ -109,14 +109,23 @@ class HuggingfaceModel(AttributionModel):
             self.tokenizer = tokenizer
         else:
             self.tokenizer = AutoTokenizer.from_pretrained(tokenizer, **tokenizer_kwargs)
-        if self.model.config.pad_token_id is not None:
-            self.pad_token = self._convert_ids_to_tokens(self.model.config.pad_token_id, skip_special_tokens=False)
+        self.eos_token_id = getattr(self.model.config, "eos_token_id", None)
+        pad_token_id = self.model.config.pad_token_id
+        if pad_token_id is None:
+            if self.tokenizer.pad_token_id is None:
+                logger.info(f"Setting `pad_token_id` to `eos_token_id`:{self.eos_token_id} for open-end generation.")
+                pad_token_id = self.eos_token_id
+            else:
+                pad_token_id = self.tokenizer.pad_token_id
+        self.pad_token = self._convert_ids_to_tokens(pad_token_id, skip_special_tokens=False)
+        if self.tokenizer.pad_token is None:
             self.tokenizer.pad_token = self.pad_token
+        if self.model.config.pad_token_id is None:
+            self.model.config.pad_token_id = pad_token_id
         self.bos_token_id = getattr(self.model.config, "decoder_start_token_id", None)
         if self.bos_token_id is None:
             self.bos_token_id = self.model.config.bos_token_id
         self.bos_token = self._convert_ids_to_tokens(self.bos_token_id, skip_special_tokens=False)
-        self.eos_token_id = getattr(self.model.config, "eos_token_id", None)
         if self.eos_token_id is None:
             self.eos_token_id = self.tokenizer.pad_token_id
         if self.tokenizer.unk_token_id is None:
