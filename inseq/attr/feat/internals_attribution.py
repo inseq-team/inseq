@@ -16,7 +16,6 @@
 import logging
 from typing import Any, Optional
 
-import torch
 from captum._utils.typing import TensorOrTupleOfTensorsGeneric
 
 from ...data import MultiDimensionalFeatureAttributionStepOutput
@@ -77,11 +76,6 @@ class AttentionWeightsAttribution(InternalsAttributionRegistry):
             # We adopt the format [batch_size, sequence_length, sequence_length, num_layers, num_heads]
             # for consistency with other multi-unit methods (e.g. gradient attribution)
             decoder_self_attentions = decoder_self_attentions.to("cpu").clone().permute(0, 4, 3, 1, 2)
-            decoder_self_attentions = torch.where(
-                decoder_self_attentions == 0,
-                (torch.ones_like(decoder_self_attentions) * float("nan")),
-                decoder_self_attentions,
-            )
             if self.forward_func.is_encoder_decoder:
                 sequence_scores = {}
                 if len(inputs) > 1:
