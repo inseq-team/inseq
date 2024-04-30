@@ -219,6 +219,7 @@ class AttributionModel(ABC, torch.nn.Module):
         self.pad_token: Optional[str] = None
         self.embed_scale: Optional[float] = None
         self._device: Optional[str] = None
+        self.device_map: Optional[dict[str, Union[str, int, torch.device]]] = None
         self.attribution_method: Optional[FeatureAttribution] = None
         self.is_hooked: bool = False
         self._default_attributed_fn_id: str = "probability"
@@ -386,6 +387,24 @@ class AttributionModel(ABC, torch.nn.Module):
         original_device = self.device
         if device is not None:
             self.device = device
+        attribution_method = self.get_attribution_method(method, override_default_attribution)
+        attributed_fn = self.get_attributed_fn(attributed_fn)
+        attribution_args, attributed_fn_args, step_scores_args = extract_args(
+            attribution_method,
+            attributed_fn,
+            step_scores,
+            default_args=self.formatter.get_step_function_reserved_args(),
+            **kwargs,
+        )
+        if isnotebook():
+            logger.debug("Pretty progress currently not supported in notebooks, falling back to tqdm.")
+            pretty_progress = False
+        if attribution_method.is_final_step_method:
+            if step_scores:
+                raise ValueError(
+                    "Step scores are not supported for final step methods since they do not iterate over the full"
+                    " sequence. Please remove the step scores and compute them separatly passing method='dummy'."
+                )
         input_texts, generated_texts = format_input_texts(input_texts, generated_texts)
         has_generated_texts = generated_texts is not None
         if not self.is_encoder_decoder:
@@ -411,36 +430,30 @@ class AttributionModel(ABC, torch.nn.Module):
                 f"Generation arguments {generation_args} are provided, but will be ignored (constrained decoding)."
             )
         logger.debug(f"reference_texts={generated_texts}")
-        attribution_method = self.get_attribution_method(method, override_default_attribution)
-        attributed_fn = self.get_attributed_fn(attributed_fn)
-        attribution_args, attributed_fn_args, step_scores_args = extract_args(
-            attribution_method,
-            attributed_fn,
-            step_scores,
-            default_args=self.formatter.get_step_function_reserved_args(),
-            **kwargs,
-        )
-        if isnotebook():
-            logger.debug("Pretty progress currently not supported in notebooks, falling back to tqdm.")
-            pretty_progress = False
         if not self.is_encoder_decoder:
             assert all(
                 generated_texts[idx].startswith(input_texts[idx]) for idx in range(len(input_texts))
             ), "Forced generations with decoder-only models must start with the input texts."
             if has_generated_texts and len(input_texts) > 1:
-                logger.info(
+                logger.warning(
                     "Batched constrained decoding is currently not supported for decoder-only models."
                     " Using batch size of 1."
                 )
                 batch_size = 1
             if len(input_texts) > 1 and (attr_pos_start is not None or attr_pos_end is not None):
-                logger.info(
+                logger.warning(
                     "Custom attribution positions are currently not supported when batching generations for"
                     " decoder-only models. Using batch size of 1."
                 )
                 batch_size = 1
+        elif attribution_method.is_final_step_method and len(input_texts) > 1:
+            logger.warning(
+                "Batched attribution with encoder-decoder models currently not supported for final-step methods."
+                " Using batch size of 1."
+            )
+            batch_size = 1
         if attribution_method.method_name == "lime":
-            logger.info("Batched attribution currently not supported for LIME. Using batch size of 1.")
+            logger.warning("Batched attribution currently not supported for LIME. Using batch size of 1.")
             batch_size = 1
         attribution_outputs = attribution_method.prepare_and_attribute(
             input_texts,

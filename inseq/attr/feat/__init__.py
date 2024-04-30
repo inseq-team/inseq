@@ -17,6 +17,9 @@ from .internals_attribution import AttentionWeightsAttribution, InternalsAttribu
 from .perturbation_attribution import (
     LimeAttribution,
     OcclusionAttribution,
+    PerturbationAttributionRegistry,
+    ReagentAttribution,
+    ValueZeroingAttribution,
 )
 
 __all__ = [
@@ -39,4 +42,7 @@ __all__ = [
     "OcclusionAttribution",
     "LimeAttribution",
     "SequentialIntegratedGradientsAttribution",
+    "ValueZeroingAttribution",
+    "PerturbationAttributionRegistry",
+    "ReagentAttribution",
 ]

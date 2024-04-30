@@ -7,6 +7,8 @@ _sentencepiece_available = find_spec("sentencepiece") is not None and find_spec(
 _datasets_available = find_spec("datasets") is not None
 _captum_available = find_spec("captum") is not None
 _joblib_available = find_spec("joblib") is not None
+_nltk_available = find_spec("nltk") is not None
+_accelerate_available = find_spec("accelerate") is not None
 
 
 def is_ipywidgets_available():
@@ -35,3 +37,11 @@ def is_captum_available():
 
 def is_joblib_available():
     return _joblib_available
+
+
+def is_nltk_available():
+    return _nltk_available
+
+
+def is_accelerate_available():
+    return _accelerate_available

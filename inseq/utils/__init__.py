@@ -8,11 +8,14 @@ from .errors import (
     MissingAttributionMethodError,
     UnknownAttributionMethodError,
 )
+from .hooks import get_post_variable_assignment_hook
 from .import_utils import (
+    is_accelerate_available,
     is_captum_available,
     is_datasets_available,
     is_ipywidgets_available,
     is_joblib_available,
+    is_nltk_available,
     is_scikitlearn_available,
     is_sentencepiece_available,
     is_transformers_available,
@@ -49,12 +52,16 @@ from .torch_utils import (
     check_device,
     euclidean_distance,
     filter_logits,
+    find_block_stack,
     get_default_device,
     get_front_padding,
     get_sequences_from_batched_steps,
     normalize,
+    pad_with_nan,
+    recursive_get_submodule,
     remap_from_filtered,
     top_p_logits_mask,
+    validate_indices,
 )
 
 __all__ = [
@@ -94,6 +101,7 @@ __all__ = [
     "is_datasets_available",
     "is_captum_available",
     "is_joblib_available",
+    "is_nltk_available",
     "check_device",
     "get_default_device",
     "ndarray_to_bin_str",
@@ -118,4 +126,9 @@ __all__ = [
     "top_p_logits_mask",
     "filter_logits",
     "cli_arg",
+    "get_post_variable_assignment_hook",
+    "validate_indices",
+    "pad_with_nan",
+    "recursive_get_submodule",
+    "is_accelerate_available",
 ]

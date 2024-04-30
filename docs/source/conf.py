@@ -21,13 +21,13 @@ sys.path.insert(0, str(_PATH_ROOT.absolute()))
 # -- Project information -----------------------------------------------------
 
 project = "inseq"
-copyright = "2023, The Inseq Team, Licensed under the Apache License, Version 2.0"
+copyright = "2024 , The Inseq Team, Licensed under the Apache License, Version 2.0"
 author = "The Inseq Team"
 
 # The short X.Y version
-version = "0.6"
+version = "0.7"
 # The full version, including alpha/beta/rc tags
-release = "0.6.0.dev0"
+release = "0.7.0.dev0"
 
 
 # Prefix link to point to master, comment this during version release and uncomment below line

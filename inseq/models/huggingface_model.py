@@ -95,9 +95,6 @@ class HuggingfaceModel(AttributionModel):
         if isinstance(model, PreTrainedModel):
             self.model = model
         else:
-            if "output_attentions" not in model_kwargs:
-                model_kwargs["output_attentions"] = True
-
             self.model = self._autoclass.from_pretrained(model, **model_kwargs)
         self.model_name = self.model.config.name_or_path
         self.tokenizer_name = tokenizer if isinstance(tokenizer, str) else None
@@ -112,14 +109,23 @@ class HuggingfaceModel(AttributionModel):
             self.tokenizer = tokenizer
         else:
             self.tokenizer = AutoTokenizer.from_pretrained(tokenizer, **tokenizer_kwargs)
-        if self.model.config.pad_token_id is not None:
-            self.pad_token = self._convert_ids_to_tokens(self.model.config.pad_token_id, skip_special_tokens=False)
+        self.eos_token_id = getattr(self.model.config, "eos_token_id", None)
+        pad_token_id = self.model.config.pad_token_id
+        if pad_token_id is None:
+            if self.tokenizer.pad_token_id is None:
+                logger.info(f"Setting `pad_token_id` to `eos_token_id`:{self.eos_token_id} for open-end generation.")
+                pad_token_id = self.eos_token_id
+            else:
+                pad_token_id = self.tokenizer.pad_token_id
+        self.pad_token = self._convert_ids_to_tokens(pad_token_id, skip_special_tokens=False)
+        if self.tokenizer.pad_token is None:
             self.tokenizer.pad_token = self.pad_token
+        if self.model.config.pad_token_id is None:
+            self.model.config.pad_token_id = pad_token_id
         self.bos_token_id = getattr(self.model.config, "decoder_start_token_id", None)
         if self.bos_token_id is None:
             self.bos_token_id = self.model.config.bos_token_id
         self.bos_token = self._convert_ids_to_tokens(self.bos_token_id, skip_special_tokens=False)
-        self.eos_token_id = getattr(self.model.config, "eos_token_id", None)
         if self.eos_token_id is None:
             self.eos_token_id = self.tokenizer.pad_token_id
         if self.tokenizer.unk_token_id is None:
@@ -127,6 +133,9 @@ class HuggingfaceModel(AttributionModel):
         self.embed_scale = 1.0
         self.encoder_int_embeds = None
         self.decoder_int_embeds = None
+        self.device_map = None
+        if hasattr(self.model, "hf_device_map") and self.model.hf_device_map is not None:
+            self.device_map = self.model.hf_device_map
         self.is_encoder_decoder = self.model.config.is_encoder_decoder
         self.configure_embeddings_scale()
         self.setup(device, attribution_method, **kwargs)
@@ -162,16 +171,19 @@ class HuggingfaceModel(AttributionModel):
         is_loaded_in_8bit = getattr(self.model, "is_loaded_in_8bit", False)
         is_loaded_in_4bit = getattr(self.model, "is_loaded_in_4bit", False)
         is_quantized = is_loaded_in_8bit or is_loaded_in_4bit
+        has_device_map = self.device_map is not None
 
         # Enable compatibility with 8bit models
         if self.model:
-            if not is_quantized:
-                self.model.to(self._device)
-            else:
+            if is_quantized:
                 mode = "8bit" if is_loaded_in_8bit else "4bit"
                 logger.warning(
                     f"The model is loaded in {mode} mode. The device cannot be changed after loading the model."
                 )
+            elif has_device_map:
+                logger.warning("The model is loaded with a device map. The device cannot be changed after loading.")
+            else:
+                self.model.to(self._device)
 
     @abstractmethod
     def configure_embeddings_scale(self) -> None:
@@ -195,6 +207,7 @@ class HuggingfaceModel(AttributionModel):
         inputs: Union[TextInput, BatchEncoding],
         return_generation_output: bool = False,
         skip_special_tokens: bool = True,
+        output_generated_only: bool = False,
         **kwargs,
     ) -> Union[list[str], tuple[list[str], ModelOutput]]:
         """Wrapper of model.generate to handle tokenization and decoding.
@@ -204,6 +217,9 @@ class HuggingfaceModel(AttributionModel):
                 Inputs to be provided to the model for generation.
             return_generation_output (`bool`, *optional*, defaults to False):
                 If true, generation outputs are returned alongside the generated text.
+            output_generated_only (`bool`, *optional*, defaults to False):
+                If true, only the generated text is returned. Relevant for decoder-only models that would otherwise return
+                the full input + output.
 
         Returns:
             `Union[List[str], Tuple[List[str], ModelOutput]]`: Generated text or a tuple of generated text and
@@ -220,6 +236,8 @@ class HuggingfaceModel(AttributionModel):
             **kwargs,
         )
         sequences = generation_out.sequences
+        if output_generated_only and not self.is_encoder_decoder:
+            sequences = sequences[:, inputs.input_ids.shape[1] :]
         texts = self.decode(ids=sequences, skip_special_tokens=skip_special_tokens)
         if return_generation_output:
             return texts, generation_out

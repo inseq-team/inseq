@@ -23,7 +23,7 @@ Three commands are supported:
 
 - ``inseq attribute-dataset``: Extends ``attribute`` to full dataset using Hugging Face ``datasets.load_dataset`` API.
 
-- ``inseq attribute-context``: Detects and attribute context dependence for generation tasks using the approach of `Sarti et al. (2023) <https://arxiv.org/abs/2310.0118>`__.
+- ``inseq attribute-context``: Detects and attribute context dependence for generation tasks using the approach of `Sarti et al. (2023) <https://arxiv.org/abs/2310.01188>`__.
 
 ``attribute``
 -----------------------------------------------------------------------------------------------------------------------
@@ -47,6 +47,6 @@ The ``attribute-dataset`` command extends the ``attribute`` command to full data
 -----------------------------------------------------------------------------------------------------------------------
 
 The ``attribute-context`` command detects and attributes context dependence for generation tasks using the approach of
-`Sarti et al. (2023) <https://arxiv.org/abs/2310.0118>`__. The command takes the following arguments:
+`Sarti et al. (2023) <https://arxiv.org/abs/2310.01188>`__. The command takes the following arguments:
 
 .. autoclass:: inseq.commands.attribute_context.attribute_context_args.AttributeContextArgs

@@ -4,21 +4,15 @@
 
 ## 🚀 Features
 
-- Support for multi-GPU attribution ([#238](https://github.com/inseq-team/inseq/pull/238))
-- Added `inseq attribute-context` CLI command to support the [PECoRe framework] for detecting and attributing context reliance in generative LMs ([#237](https://github.com/inseq-team/inseq/pull/237))
+- Added new models `DbrxForCausalLM`, `OlmoForCausalLM`, `Phi3ForCausalLM`, `Qwen2MoeForCausalLM` to model config.
 
-## 🔧 Fixes & Refactoring
+## 🔧 Fixes and Refactoring
 
-- Fix `ContiguousSpanAggregator` and `SubwordAggregator` edge case of single-step generation ([#247](https://github.com/inseq-team/inseq/pull/247))
-- Move tensors to CPU right away in the forward pass to avoid OOM when cloning ([#245](https://github.com/inseq-team/inseq/pull/245))
-- Fix `remap_from_filtered` behavior on sequence_scores tensors. ([#245](https://github.com/inseq-team/inseq/pull/245))
-- Use torch-native padding when converting lists of `FeatureAttributionStepOutput` to `FeatureAttributionSequenceOutput` in `get_sequences_from_batched_steps`. ([#245](https://github.com/inseq-team/inseq/pull/245))
-- Bump `ruff` version ([#245](https://github.com/inseq-team/inseq/pull/245))
-- Drop `poetry` in favor of [`uv`](https://github.com/astral-sh/uv) to accelerate package installation and simplify config in `pyproject.toml`. ([#249](https://github.com/inseq-team/inseq/pull/249))
-- Drop `darglint` in favor of `pydoclint`. ([#249](https://github.com/inseq-team/inseq/pull/249))
-- Replace Arxiv with ACL Anthology badge in `README`. ([#249](https://github.com/inseq-team/inseq/pull/249))
-- Add first version of `CHANGELOG.md` ([#249](https://github.com/inseq-team/inseq/pull/249))
-- Added multithread support for running tests using `pytest-xdist`
+- Fix the issue in the attention implementation from [#268](https://github.com/inseq-team/inseq/issues/268) where non-terminal position in the tensor were set to nan if they were 0s ([#269](https://github.com/inseq-team/inseq/pull/269)).
+  
+- Fix the pad token in cases where it is not specified by default in the loaded model (e.g. for Qwen models) ([#269](https://github.com/inseq-team/inseq/pull/269)).
+
+- Fix bug reported in [#266](https://github.com/inseq-team/inseq/issues/266) making `value_zeroing` unusable for SDPA attention. This enables using the method on models using SDPA attention as default (e.g. `GemmaForCausalLM`) without passing `model_kwargs={'attn_implementation': 'eager'}` ([#267](https://github.com/inseq-team/inseq/pull/267)).
 
 ## 📝 Documentation and Tutorials
 

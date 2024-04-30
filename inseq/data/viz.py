@@ -26,6 +26,7 @@ from rich import box
 from rich.color import Color
 from rich.console import Console
 from rich.live import Live
+from rich.markup import escape
 from rich.padding import Padding
 from rich.panel import Panel
 from rich.progress import BarColumn, Progress, TextColumn, TimeRemainingColumn
@@ -255,7 +256,7 @@ def get_saliency_heatmap_rich(
 ):
     columns = [Column(header="", justify="right", overflow="fold")]
     for column_label in column_labels:
-        columns.append(Column(header=column_label, justify="center", overflow="fold"))
+        columns.append(Column(header=escape(column_label), justify="center", overflow="fold"))
     table = Table(
         *columns,
         title=f"{label + ' ' if label else ''}Saliency Heatmap",
@@ -266,7 +267,7 @@ def get_saliency_heatmap_rich(
     )
     if scores is not None:
         for row_index in range(scores.shape[0]):
-            row = [Text(row_labels[row_index], style="bold")]
+            row = [Text(escape(row_labels[row_index]), style="bold")]
             for col_index in range(scores.shape[1]):
                 color = Color.from_rgb(*input_colors[row_index][col_index])
                 score = ""
@@ -281,7 +282,7 @@ def get_saliency_heatmap_rich(
             else:
                 threshold = step_scores_threshold.get(step_score_name, 0.5)
             style = lambda val, limit: "bold" if abs(val) >= limit and isinstance(val, float) else ""
-            score_row = [Text(step_score_name, style="bold")]
+            score_row = [Text(escape(step_score_name), style="bold")]
             for score in step_score_values:
                 curr_score = round(score.item(), 2) if isinstance(score, float) else score.item()
                 score_row.append(Text(f"{score:.2f}", justify="center", style=style(curr_score, threshold)))
@@ -317,13 +318,13 @@ def get_progress_bar(
             TimeRemainingColumn(),
         )
         for idx, (tgt, tgt_len) in enumerate(zip(sequences.targets, target_lengths)):
-            clean_tgt = tgt.replace("\n", "\\n")
+            clean_tgt = escape(tgt.replace("\n", "\\n"))
             job_progress.add_task(f"{idx}. {clean_tgt}", total=tgt_len)
         progress_table = Table.grid()
         row_contents = [
             Panel.fit(
                 job_progress,
-                title=f"[b]Attributing with {method_name}",
+                title=f"[b]Attributing with {escape(method_name)}",
                 border_style="green",
                 padding=(1, 2),
             )
@@ -331,7 +332,7 @@ def get_progress_bar(
         if sequences.sources is not None:
             sources = []
             for idx, src in enumerate(sequences.sources):
-                clean_src = src.replace("\n", "\\n")
+                clean_src = escape(src.replace("\n", "\\n"))
                 sources.append(f"{idx}. {clean_src}")
             row_contents = [
                 Panel.fit(
@@ -370,7 +371,7 @@ def update_progress_bar(
                 past_length = 0
                 for split, color in zip(split_targets, ["grey58", "green", "orange1", "grey58"]):
                     if split[job.id]:
-                        formatted_desc += f"[{color}]" + split[job.id].replace("\n", "\\n") + "[/]"
+                        formatted_desc += f"[{color}]" + escape(split[job.id].replace("\n", "\\n")) + "[/]"
                         past_length += len(split[job.id])
                         if past_length in whitespace_indexes[job.id]:
                             formatted_desc += " "
