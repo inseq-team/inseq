@@ -11,6 +11,9 @@ CodeGenForCausalLM:
 CohereForCausalLM:
     self_attention_module: "self_attn"
     value_vector: "value_states"
+DbrxForCausalLM:
+    self_attention_module: "attn"
+    value_vector: "value_states"
 FalconForCausalLM:
     self_attention_module: "self_attention"
     value_vector: "value_layer"
@@ -44,6 +47,9 @@ MixtralForCausalLM:
 MptForCausalLM:
     self_attention_module: "attn"
     value_vector: "value_states"
+OlmoForCausalLM:
+    self_attention_module: "self_attn"
+    value_vector: "value_states"
 OpenAIGPTLMHeadModel:
     self_attention_module: "attn"
     value_vector: "value"
@@ -53,7 +59,13 @@ OPTForCausalLM:
 PhiForCausalLM:
     self_attention_module: "self_attn"
     value_vector: "value_states"
+Phi3ForCausalLM:
+    self_attention_module: "self_attn"
+    value_vector: "value_states"
 Qwen2ForCausalLM:
+    self_attention_module: "self_attn"
+    value_vector: "value_states"
+Qwen2MoeForCausalLM:
     self_attention_module: "self_attn"
     value_vector: "value_states"
 StableLmForCausalLM:
