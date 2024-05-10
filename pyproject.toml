@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "inseq"
-version = "0.6.0"
+version = "0.7.0.dev0"
 description = "Interpretability for Sequence Generation Models 🔍"
 readme = "README.md"
 requires-python = ">=3.9"

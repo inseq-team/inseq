@@ -1,13 +1,12 @@
 import re
 from inspect import getsourcelines
 from sys import gettrace, settrace
-from typing import Callable, Optional, TypeVar
+from types import FrameType
+from typing import Callable, Optional
 
 from torch import nn
 
 from .misc import get_left_padding
-
-StackFrame = TypeVar("StackFrame")
 
 
 def get_last_variable_assignment_position(
@@ -57,7 +56,7 @@ def get_post_variable_assignment_hook(
     module: nn.Module,
     varname: str,
     fname: str = "forward",
-    hook_fn: Callable[[StackFrame], None] = lambda **kwargs: None,
+    hook_fn: Callable[[FrameType], None] = lambda **kwargs: None,
     **kwargs,
 ) -> Callable[[], None]:
     """Creates a hook that is called after the last variable assignment in the specified method of a `nn.Module`.
