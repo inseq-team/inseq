@@ -1,7 +1,10 @@
+import json
 import logging
+import struct
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Callable, Literal, Optional, Union
 
+import safetensors
 import torch
 import torch.nn.functional as F
 from jaxtyping import Int, Num
@@ -36,6 +39,58 @@ def remap_from_filtered(
     index = index.expand_as(filtered)
     new_source = torch.ones(original_shape, dtype=filtered.dtype, device=filtered.device) * float("nan")
     return new_source.scatter(0, index, filtered)
+
+
+def convert_to_safetensor(tensor: torch.Tensor, quantization="float32") -> bytes:
+    """
+    Converts a torch tensor to a safetensor, and optionally quantizes the weights with zero-point quantization.
+    Quantization parameters are saved in the safetensor to be used on reloading.
+    Adapted from https://towardsdatascience.com/introduction-to-weight-quantization-2494701b9c0c
+
+    Args:
+        tensor (torch.Tensor): some torch tensor
+        quantization (str): format to quantize weights to [float32, float16, float8]
+    Returns:
+        bytes: A safetensor in bytes format
+    Raises:
+        ValueError if `quantization` doesn't match the possible options
+
+    """
+    metadata_dict = {"quantization": quantization}
+    if quantization == "float32":
+        return safetensors.torch.save({"attribution": tensor}, metadata=metadata_dict)
+
+    negatives = torch.any(tensor < 0)
+    if quantization == "float16":
+        return safetensors.torch.save({"attribution": tensor.to(torch.float16)}, metadata=metadata_dict)
+    elif quantization == "float8":
+        xrange = torch.max(tensor) - torch.min(tensor)
+        scale = 255 / xrange
+        if negatives:
+            zeropoint = (-scale * torch.min(tensor)).round() - 128
+            quant_tensor = torch.clip((tensor * scale + zeropoint).round(), -128, 127).to(torch.int8)
+        else:
+            zeropoint = (-scale * torch.min(tensor)).round()
+            quant_tensor = torch.clip((tensor * scale + zeropoint).round(), 0, 255).to(torch.uint8)
+
+        metadata_dict["scale"], metadata_dict["zeropoint"] = f"{scale}", f"{zeropoint}"
+        return safetensors.torch.save({"attribution": quant_tensor}, metadata=metadata_dict)
+    else:
+        raise ValueError("`quantization` has to be one of [float32, float16, float8]")
+
+
+def dequantize_safetensor(safetensor: bytes) -> torch.Tensor:
+    """
+    Convert a safetensor to a torch tensor and dequantize weights to float32.
+    Adapted from https://huggingface.co/docs/safetensors/metadata_parsing
+    """
+    header_length = struct.unpack("<Q", safetensor[0:8])[0]
+    metadata = json.loads(safetensor[8 : (7 + header_length)])["__metadata__"]
+    recovered_tensor = safetensors.torch.load(safetensor)["attribution"].to(torch.float32)
+    if metadata["quantization"] in ["float32", "float16"]:
+        return recovered_tensor
+    else:
+        return (recovered_tensor - eval(metadata["zeropoint"])) / eval(metadata["scale"])
 
 
 def normalize(

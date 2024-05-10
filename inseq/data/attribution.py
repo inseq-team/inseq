@@ -1,3 +1,4 @@
+import base64
 import logging
 from copy import deepcopy
 from dataclasses import dataclass, field
@@ -8,6 +9,8 @@ from typing import TYPE_CHECKING, Any, Callable, Optional, Union
 import torch
 
 from ..utils import (
+    convert_to_safetensor,
+    dequantize_safetensor,
     drop_padding,
     get_sequences_from_batched_steps,
     json_advanced_dump,
@@ -158,6 +161,59 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
             self._aggregator = "scores"
         if self.attr_pos_end is None or self.attr_pos_end > len(self.target):
             self.attr_pos_end = len(self.target)
+
+    def _convert_to_safetensors(self, scores_precision="float32"):
+        """
+        Converts tensor attributes within the class to the specified precision.
+        The conversion is based on the specified `scores_precision`.
+        If the input tensor is already of the desired precision, no conversion occurs.
+        For float8, the function performs scaling and converts to uint8, which can be later converted back to float16 upon reloading.
+
+        Args:
+            scores_precision (str, optional): Desired output data type precision.Defaults to "float32".
+        Returns:
+            self: The function modifies the class attributes in-place.
+        """
+
+        if self.source_attributions is not None:
+            self.source_attributions = convert_to_safetensor(
+                self.source_attributions.contiguous(), quantization=scores_precision
+            )
+        if self.target_attributions is not None:
+            self.target_attributions = convert_to_safetensor(
+                self.target_attributions.contiguous(), quantization=scores_precision
+            )
+        if self.step_scores is not None:
+            self.step_scores = {
+                k: convert_to_safetensor(v.contiguous(), quantization=scores_precision)
+                for k, v in self.step_scores.items()
+            }
+        if self.sequence_scores is not None:
+            self.sequence_scores = {
+                k: convert_to_safetensor(v.contiguous(), quantization=scores_precision)
+                for k, v in self.sequence_scores.items()
+            }
+        return self
+
+    def _recover_from_safetensors(self):
+        """
+        Converts tensor attributes within the class from b64-encoded safetensors to torch tensors.`.
+        Args:
+            self
+        Returns:
+            self
+        """
+        if self.source_attributions is not None:
+            self.source_attributions = dequantize_safetensor(base64.b64decode(self.source_attributions))
+        if self.target_attributions is not None:
+            self.target_attributions = dequantize_safetensor(base64.b64decode(self.target_attributions))
+        if self.step_scores is not None:
+            self.step_scores = {k: dequantize_safetensor(base64.b64decode(v)) for k, v in self.step_scores.items()}
+        if self.sequence_scores is not None:
+            self.sequence_scores = {
+                k: dequantize_safetensor(base64.b64decode(v)) for k, v in self.sequence_scores.items()
+            }
+        return self
 
     @staticmethod
     def get_remove_pad_fn(attr: "FeatureAttributionStepOutput", name: str) -> Callable:
@@ -546,6 +602,7 @@ class FeatureAttributionOutput:
         ndarray_compact: bool = True,
         use_primitives: bool = False,
         split_sequences: bool = False,
+        scores_precision: str = "float32",
     ) -> None:
         """Save class contents to a JSON file.
 
@@ -572,17 +629,25 @@ class FeatureAttributionOutput:
             raise ValueError(f"{path} already exists. Override with overwrite=True.")
         save_outs = []
         paths = []
+        self_out = deepcopy(self)
         if split_sequences:
-            for i, seq in enumerate(self.sequence_attributions):
+            for i, seq in enumerate(self_out.sequence_attributions):
                 attr_out = deepcopy(self)
-                attr_out.sequence_attributions = [seq]
+                attr_out.sequence_attributions = [
+                    seq._convert_to_safetensors(scores_precision=scores_precision)
+                ]  # this overwrites the original
                 attr_out.step_attributions = None
                 attr_out.info["input_texts"] = [attr_out.info["input_texts"][i]]
                 attr_out.info["generated_texts"] = [attr_out.info["generated_texts"][i]]
                 save_outs.append(attr_out)
                 paths.append(f"{str(path).split('.json')[0]}_{i}.json{'.gz' if compress else ''}")
         else:
-            save_outs.append(self)
+            self_out = deepcopy(self)
+            self_out.sequence_attributions = [
+                seq._convert_to_safetensors(scores_precision=scores_precision)
+                for seq in self_out.sequence_attributions
+            ]
+            save_outs.append(self_out)
             paths.append(path)
         for attr_out, path_out in zip(save_outs, paths):
             with open(path_out, f"w{'b' if compress else ''}") as f:
@@ -615,9 +680,9 @@ class FeatureAttributionOutput:
             :class:`~inseq.data.FeatureAttributionOutput`: Loaded attribution output
         """
         out = json_advanced_load(path, decompression=decompress)
-        out.sequence_attributions = [seq.torch() for seq in out.sequence_attributions]
+        out.sequence_attributions = [seq._recover_from_safetensors() for seq in out.sequence_attributions]
         if out.step_attributions is not None:
-            out.step_attributions = [step.torch() for step in out.step_attributions]
+            out.step_attributions = [step._recover_from_safetensors() for step in out.step_attributions]
         return out
 
     def aggregate(
