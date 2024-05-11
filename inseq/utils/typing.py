@@ -1,6 +1,6 @@
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Callable, Optional, Union
+from typing import TYPE_CHECKING, Callable, Literal, Optional, Union
 
 import torch
 from captum.attr._utils.attribution import Attribution
@@ -70,6 +70,8 @@ OneOrMoreIdSequences = Sequence[Sequence[int]]
 OneOrMoreTokenSequences = Sequence[Sequence[str]]
 OneOrMoreTokenWithIdSequences = Sequence[Sequence[TokenWithId]]
 OneOrMoreAttributionSequences = Sequence[Sequence[float]]
+
+ScorePrecision = Literal["float32", "float16", "float8"]
 
 IndexSpan = Union[tuple[int, int], Sequence[tuple[int, int]]]
 OneOrMoreIndices = Union[int, list[int], tuple[int, int]]
