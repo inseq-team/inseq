@@ -39,12 +39,14 @@ class DecoderOnlyInputFormatter(InputFormatter):
         attribution_model: "DecoderOnlyAttributionModel",
         inputs: FeatureAttributionInput,
         include_eos_baseline: bool = False,
+        skip_special_tokens: bool = False,
     ) -> DecoderOnlyBatch:
         batch = get_batch_from_inputs(
             attribution_model,
             inputs=inputs,
             include_eos_baseline=include_eos_baseline,
             as_targets=False,
+            skip_special_tokens=skip_special_tokens,
         )
         return DecoderOnlyBatch.from_batch(batch)
 

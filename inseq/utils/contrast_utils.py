@@ -64,6 +64,7 @@ def _get_contrast_inputs(
     contrast_targets_alignments: Optional[list[list[tuple[int, int]]]] = None,
     return_contrastive_target_ids: bool = False,
     return_contrastive_batch: bool = False,
+    skip_special_tokens: bool = False,
     **forward_kwargs,
 ) -> ContrastInputs:
     """Utility function to return the output of the model for given contrastive inputs.
@@ -81,6 +82,7 @@ def _get_contrast_inputs(
                 attribution_model=args.attribution_model,
                 inputs=contrast_targets,
                 as_targets=is_enc_dec,
+                skip_special_tokens=skip_special_tokens,
             )
         ).to(args.decoder_input_ids.device)
         curr_prefix_len = args.decoder_input_ids.size(1)
@@ -107,7 +109,9 @@ def _get_contrast_inputs(
                 "Contrastive source inputs can only be used with encoder-decoder models. "
                 "Use `contrast_targets` to set a contrastive target containing a prefix for decoder-only models."
             )
-        c_enc_in = args.attribution_model.encode(contrast_sources).to(args.encoder_input_ids.device)
+        c_enc_in = args.attribution_model.encode(contrast_sources, add_special_tokens=not skip_special_tokens).to(
+            args.encoder_input_ids.device
+        )
         if (
             args.encoder_input_ids.shape != c_enc_in.input_ids.shape
             or torch.ne(args.encoder_input_ids, c_enc_in.input_ids).any()
@@ -128,6 +132,7 @@ def _setup_contrast_args(
     contrast_targets: Optional[FeatureAttributionInput] = None,
     contrast_targets_alignments: Optional[list[list[tuple[int, int]]]] = None,
     contrast_force_inputs: bool = False,
+    skip_special_tokens: bool = False,
 ):
     c_inputs = _get_contrast_inputs(
         args,
@@ -136,6 +141,7 @@ def _setup_contrast_args(
         contrast_targets_alignments=contrast_targets_alignments,
         return_contrastive_target_ids=True,
         return_contrastive_batch=True,
+        skip_special_tokens=skip_special_tokens,
     )
     if args.is_attributed_fn:
         if contrast_force_inputs:
