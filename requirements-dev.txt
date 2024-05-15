@@ -101,7 +101,7 @@ huggingface-hub==0.20.3
     #   transformers
 identify==2.5.34
     # via pre-commit
-idna==3.6
+idna==3.7
     # via
     #   requests
     #   yarl
@@ -199,7 +199,7 @@ pbr==6.0.0
     # via stevedore
 pexpect==4.9.0
     # via ipython
-pillow==10.2.0
+pillow==10.3.0
     # via matplotlib
 platformdirs==4.2.0
     # via

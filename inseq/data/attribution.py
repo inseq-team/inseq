@@ -47,6 +47,7 @@ def get_batch_from_inputs(
     inputs: FeatureAttributionInput,
     include_eos_baseline: bool = False,
     as_targets: bool = False,
+    skip_special_tokens: bool = False,
 ) -> Batch:
     if isinstance(inputs, Batch):
         batch = inputs
@@ -57,6 +58,7 @@ def get_batch_from_inputs(
                 as_targets=as_targets,
                 return_baseline=True,
                 include_eos_baseline=include_eos_baseline,
+                add_special_tokens=not skip_special_tokens,
             )
         elif isinstance(inputs, BatchEncoding):
             encodings = inputs
@@ -66,8 +68,12 @@ def get_batch_from_inputs(
                 "Inputs must be either a string, a list of strings, a BatchEncoding or a Batch."
             )
         embeddings = BatchEmbedding(
-            input_embeds=attribution_model.embed(encodings.input_ids, as_targets=as_targets),
-            baseline_embeds=attribution_model.embed(encodings.baseline_ids, as_targets=as_targets),
+            input_embeds=attribution_model.embed(
+                encodings.input_ids, as_targets=as_targets, add_special_tokens=not skip_special_tokens
+            ),
+            baseline_embeds=attribution_model.embed(
+                encodings.baseline_ids, as_targets=as_targets, add_special_tokens=not skip_special_tokens
+            ),
         )
         batch = Batch(encodings, embeddings)
     return batch

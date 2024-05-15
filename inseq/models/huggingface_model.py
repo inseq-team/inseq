@@ -228,7 +228,7 @@ class HuggingfaceModel(AttributionModel):
         if isinstance(inputs, str) or (
             isinstance(inputs, list) and len(inputs) > 0 and all(isinstance(x, str) for x in inputs)
         ):
-            inputs = self.encode(inputs)
+            inputs = self.encode(inputs, add_special_tokens=not skip_special_tokens)
         inputs = inputs.to(self.device)
         generation_out = self.model.generate(
             inputs=inputs.input_ids,
