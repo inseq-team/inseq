@@ -55,7 +55,7 @@ packaging==23.2
     #   huggingface-hub
     #   matplotlib
     #   transformers
-pillow==10.2.0
+pillow==10.3.0
     # via matplotlib
 protobuf==4.25.2
     # via transformers
