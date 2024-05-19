@@ -29,6 +29,7 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
 # USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import base64
 import json
 from collections import OrderedDict
 from json import JSONEncoder
@@ -59,6 +60,8 @@ def class_instance_encode(obj: EncodableObject, use_primitives: bool = True, **k
     """
     if isinstance(obj, (list, dict)):
         return obj
+    if isinstance(obj, bytes):
+        return base64.b64encode(obj).decode("UTF8")
     if hasattr(obj, "__class__") and hasattr(obj, "__dict__"):
         if not hasattr(obj, "__new__"):
             raise TypeError(f"class '{obj.__class__}' does not have a __new__ method; ")
@@ -84,9 +87,7 @@ def class_instance_encode(obj: EncodableObject, use_primitives: bool = True, **k
             dct["attributes"] = hashodict(obj.__dict__)
         if use_primitives:
             attrs = dct.get("attributes", {})
-            return attrs
-        else:
-            return dct
+        return attrs if use_primitives else dct
     return obj
 
 

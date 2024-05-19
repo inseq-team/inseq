@@ -26,10 +26,10 @@ def test_save_load_attribution_split(tmp_path, saliency_mt_model):
     out_path = tmp_path / "tmp_attr.json"
     out = saliency_mt_model.attribute(["This is a test.", "sequence number two"], device="cpu", show_progress=False)
     out.save(out_path, split_sequences=True)
-    out_path_1 = tmp_path / "tmp_attr_1.json"
+    out_path_1 = tmp_path / "tmp_attr_0.json"
     loaded_out = FeatureAttributionOutput.load(out_path_1)
     assert torch.allclose(
-        out.sequence_attributions[1].source_attributions, loaded_out.sequence_attributions[0].source_attributions
+        out.sequence_attributions[0].source_attributions, loaded_out.sequence_attributions[0].source_attributions
     )
 
 
@@ -39,6 +39,30 @@ def test_save_load_attribution_compressed(tmp_path, saliency_mt_model):
     out.save(out_path, compress=True)
     loaded_out = FeatureAttributionOutput.load(out_path, decompress=True)
     assert out == loaded_out
+
+
+def test_save_load_attribution_float16(tmp_path, saliency_mt_model):
+    out_path = tmp_path / "tmp_attr_compress.json.gz"
+    out = saliency_mt_model.attribute("This is a test.", device="cpu", show_progress=False)
+    out.save(out_path, compress=True, scores_precision="float16")
+    loaded_out = FeatureAttributionOutput.load(out_path, decompress=True)
+    assert torch.allclose(
+        out.sequence_attributions[0].source_attributions,
+        loaded_out.sequence_attributions[0].source_attributions,
+        atol=1e-05,
+    )
+
+
+def test_save_load_attribution_float8(tmp_path, saliency_mt_model):
+    out_path = tmp_path / "tmp_attr_compress.json.gz"
+    out = saliency_mt_model.attribute("This is a test.", device="cpu", show_progress=False)
+    out.save(out_path, compress=True, scores_precision="float8")
+    loaded_out = FeatureAttributionOutput.load(out_path, decompress=True)
+    assert torch.allclose(
+        out.sequence_attributions[0].source_attributions,
+        loaded_out.sequence_attributions[0].source_attributions,
+        atol=1e-02,
+    )
 
 
 def test_get_scores_dicts_encoder_decoder(saliency_mt_model):
