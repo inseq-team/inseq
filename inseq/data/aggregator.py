@@ -15,6 +15,7 @@ from ..utils import (
     validate_indices,
 )
 from ..utils import normalize as normalize_fn
+from ..utils import rescale as rescale_fn
 from ..utils.typing import IndexSpan, OneOrMoreIndices, TokenWithId
 from .aggregation_functions import AggregationFunction
 from .data_utils import TensorWrapper
@@ -307,9 +308,14 @@ class SequenceAttributionAggregator(Aggregator):
         attr: "FeatureAttributionSequenceOutput",
         aggregate_fn: AggregationFunction,
         select_idx: Optional[OneOrMoreIndices] = None,
-        normalize: bool = True,
+        normalize: Optional[bool] = None,
+        rescale: Optional[bool] = None,
         **kwargs,
     ):
+        if normalize and rescale:
+            raise ValueError("Only one of normalize and rescale can be set to True.")
+        if normalize is None:
+            normalize = rescale is None or not rescale
         fn_kwargs = extract_signature_args(kwargs, aggregate_fn)
         # If select_idx is a single int, no aggregation is performed
         do_aggregate = not isinstance(select_idx, int)
@@ -331,6 +337,8 @@ class SequenceAttributionAggregator(Aggregator):
             scores = cls._aggregate_scores(scores, aggregate_fn, dim=-1, **fn_kwargs)
         if normalize:
             scores = normalize_fn(scores)
+        if rescale:
+            scores = rescale_fn(scores)
         return scores
 
     @classmethod
@@ -369,11 +377,12 @@ class SequenceAttributionAggregator(Aggregator):
         aggregate_fn: AggregationFunction,
         select_idx: Optional[OneOrMoreIndices] = None,
         normalize: bool = True,
+        rescale: bool = False,
         **kwargs,
     ):
         if attr.source_attributions is None:
             return attr.source_attributions
-        scores = cls._process_attribution_scores(attr, aggregate_fn, select_idx, normalize, **kwargs)
+        scores = cls._process_attribution_scores(attr, aggregate_fn, select_idx, normalize, rescale, **kwargs)
         return scores[0] if attr.target_attributions is not None else scores
 
     @classmethod
@@ -383,11 +392,12 @@ class SequenceAttributionAggregator(Aggregator):
         aggregate_fn: AggregationFunction,
         select_idx: Optional[OneOrMoreIndices] = None,
         normalize: bool = True,
+        rescale: bool = False,
         **kwargs,
     ):
         if attr.target_attributions is None:
             return attr.target_attributions
-        scores = cls._process_attribution_scores(attr, aggregate_fn, select_idx, normalize, **kwargs)
+        scores = cls._process_attribution_scores(attr, aggregate_fn, select_idx, normalize, rescale, **kwargs)
         return scores[1] if attr.source_attributions is not None else scores
 
     @staticmethod

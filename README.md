@@ -26,11 +26,11 @@
 
 </div>
 
-Inseq is a Pytorch-based hackable toolkit to democratize the access to common post-hoc **in**terpretability analyses of **seq**uence generation models.
+Inseq is a Pytorch-based hackable toolkit to democratize access to common post-hoc **in**terpretability analyses of **seq**uence generation models.
 
 ## Installation
 
-Inseq is available on PyPI and can be installed with `pip` for Python >= 3.9, <= 3.11:
+Inseq is available on PyPI and can be installed with `pip` for Python >= 3.9, <= 3.12:
 
 ```bash
 # Install latest stable version
@@ -308,13 +308,13 @@ If you use Inseq in your research we suggest to include a mention to the specifi
 Inseq has been used in various research projects. A list of known publications that use Inseq to conduct interpretability analyses of generative models is shown below.
 
 > [!TIP]
-> Last update: April 2024. Please open a pull request to add your publication to the list.
+> Last update: May 2024. Please open a pull request to add your publication to the list.
 
 <details>
   <summary><b>2023</b></summary>
   <ol>
     <li> <a href="https://aclanthology.org/2023.acl-demo.40/">Inseq: An Interpretability Toolkit for Sequence Generation Models</a> (Sarti et al., 2023) </li>
-    <li> <a href="https://arxiv.org/abs/2302.14220">Are Character-level Translations Worth the Wait? Comparing ByT5 and mT5 for Machine Translation</a> (Edman et al., 2023) </li>
+    <li> <a href="https://doi.org/10.1162/tacl_a_00651">Are Character-level Translations Worth the Wait? Comparing ByT5 and mT5 for Machine Translation</a> (Edman et al., 2023) </li>
     <li> <a href="https://aclanthology.org/2023.nlp4convai-1.1/">Response Generation in Longitudinal Dialogues: Which Knowledge Representation Helps?</a> (Mousavi et al., 2023)  </li>
     <li> <a href="https://openreview.net/forum?id=XTHfNGI3zT">Quantifying the Plausibility of Context Reliance in Neural Machine Translation</a> (Sarti et al., 2023)</li>
     <li> <a href="https://aclanthology.org/2023.emnlp-main.243/">A Tale of Pronouns: Interpretability Informs Gender Bias Mitigation for Fairer Instruction-Tuned Machine Translation</a> (Attanasio et al., 2023)</li>
@@ -330,6 +330,7 @@ Inseq has been used in various research projects. A list of known publications t
     <li><a href="https://arxiv.org/abs/2401.12576">LLMCheckup: Conversational Examination of Large Language Models via Interpretability Tools</a> (Wang et al., 2024)</li>
     <li><a href="https://arxiv.org/abs/2402.00794">ReAGent: A Model-agnostic Feature Attribution Method for Generative Language Models</a> (Zhao et al., 2024)</li>
     <li><a href="https://arxiv.org/abs/2404.02421">Revisiting subword tokenization: A case study on affixal negation in large language models</a> (Truong et al., 2024)</li>
+    <li><a href="https://hal.science/hal-04581586">Exploring NMT Explainability for Translators Using NMT Visualising Tools</a> (Gonzalez-Saez et al., 2024)</li>
   </ol>
 
 </details>
