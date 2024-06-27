@@ -61,6 +61,14 @@ class AttributeBaseArgs:
             "for each context are normalized to sum up to 1, providing a relative notion of input salience."
         ),
     )
+    rescale_attributions: bool = cli_arg(
+        default=False,
+        help=(
+            "Whether to rescale the attribution scores for each context. If ``True``, the attribution scores "
+            "for each context are rescaled to sum up to the number of tokens in the input, providing an absolute"
+            " notion of input salience."
+        ),
+    )
     model_kwargs: dict = cli_arg(
         default_factory=dict,
         help="Additional keyword arguments passed to the model constructor in JSON format.",

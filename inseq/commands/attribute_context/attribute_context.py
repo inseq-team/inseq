@@ -211,6 +211,7 @@ def attribute_context_with_model(args: AttributeContextArgs, model: HuggingfaceM
             selectors=args.attribution_selectors,
             aggregators=args.attribution_aggregators,
             normalize_attributions=args.normalize_attributions,
+            rescale_attributions=args.rescale_attributions,
         )[0]
         if args.show_intermediate_outputs:
             cci_attrib_out.show(do_aggregation=False)

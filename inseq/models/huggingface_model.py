@@ -456,6 +456,12 @@ class HuggingfaceEncoderDecoderModel(HuggingfaceModel, EncoderDecoderAttribution
     ) -> dict[str, MultiLayerMultiUnitScoreTensor]:
         if output.encoder_attentions is None or output.decoder_attentions is None:
             raise ValueError("Model does not support attribution relying on attention outputs.")
+        if output.encoder_attentions is not None:
+            output.encoder_attentions = tuple(att.to("cpu") for att in output.encoder_attentions)
+        if output.decoder_attentions is not None:
+            output.decoder_attentions = tuple(att.to("cpu") for att in output.decoder_attentions)
+        if output.cross_attentions is not None:
+            output.cross_attentions = tuple(att.to("cpu") for att in output.cross_attentions)
         return {
             "encoder_self_attentions": torch.stack(output.encoder_attentions, dim=1),
             "decoder_self_attentions": torch.stack(output.decoder_attentions, dim=1),
@@ -506,6 +512,8 @@ class HuggingfaceDecoderOnlyModel(HuggingfaceModel, DecoderOnlyAttributionModel)
     def get_attentions_dict(output: CausalLMOutput) -> dict[str, MultiLayerMultiUnitScoreTensor]:
         if output.attentions is None:
             raise ValueError("Model does not support attribution relying on attention outputs.")
+        else:
+            output.attentions = tuple(att.to("cpu") for att in output.attentions)
         return {
             "decoder_self_attentions": torch.stack(output.attentions, dim=1),
         }

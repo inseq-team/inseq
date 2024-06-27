@@ -411,7 +411,9 @@ class AttributionModel(ABC, torch.nn.Module):
                     "Step scores are not supported for final step methods since they do not iterate over the full"
                     " sequence. Please remove the step scores and compute them separatly passing method='dummy'."
                 )
-        input_texts, generated_texts = format_input_texts(input_texts, generated_texts)
+        input_texts, generated_texts = format_input_texts(
+            input_texts, generated_texts, skip_special_tokens, self.special_tokens
+        )
         has_generated_texts = generated_texts is not None
         if not self.is_encoder_decoder:
             for i in range(len(input_texts)):

@@ -11,12 +11,14 @@ def aggregate_attribution_scores(
     selectors: Optional[list[int]] = None,
     aggregators: Optional[list[str]] = None,
     normalize_attributions: bool = False,
+    rescale_attributions: bool = False,
 ) -> FeatureAttributionOutput:
     if selectors is not None and aggregators is not None:
         for select_idx, aggregator_fn in zip(selectors, aggregators):
             out = out.aggregate(
                 aggregator=aggregator_fn,
                 normalize=normalize_attributions,
+                rescale=rescale_attributions,
                 select_idx=select_idx,
                 do_post_aggregation_checks=False,
             )
@@ -79,6 +81,7 @@ def attribute(input_texts, generated_texts, args: AttributeExtendedArgs):
                 selectors=args.attribution_selectors,
                 aggregators=args.attribution_aggregators,
                 normalize_attributions=args.normalize_attributions,
+                rescale_attributions=args.rescale_attributions,
             )
         print(f"Saving {'aggregated ' if args.aggregate_output else ''}attributions to {args.save_path}")
         out.save(args.save_path, overwrite=True)
