@@ -109,7 +109,6 @@ final_plot_html = """
 saliency_heatmap_table_header = """
 <table border="1" cellpadding="5" cellspacing="5"
     style="overflow-x:scroll;display:block;">
-    <tr><th></th>
 """
 
 saliency_heatmap_html = """
@@ -117,7 +116,7 @@ saliency_heatmap_html = """
     <div style="margin:5px;font-family:sans-serif;font-weight:bold;">
         <span style="font-size: 20px;">{label} Saliency Heatmap</span>
         <br>
-        x: Generated tokens, y: Attributed tokens
+        → : Generated tokens, ↓ : Attributed tokens
     </div>
     {content}
 </div>

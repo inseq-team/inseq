@@ -209,12 +209,16 @@ def get_saliency_heatmap_html(
     uuid = "".join(random.choices(string.ascii_lowercase, k=20))
     out = saliency_heatmap_table_header
     # add top row containing target tokens
+    out += "<tr><th></th><th></th>"
+    for column_idx in range(len(column_labels)):
+        out += f"<th>{column_idx}</th>"
+    out += "</tr><tr><th></th><th></th>"
     for column_label in column_labels:
         out += f"<th>{sanitize_html(column_label)}</th>"
     out += "</tr>"
     if scores is not None:
         for row_index in range(scores.shape[0]):
-            out += f"<tr><th>{sanitize_html(row_labels[row_index])}</th>"
+            out += f"<tr><th>{row_index}</th><th>{sanitize_html(row_labels[row_index])}</th>"
             for col_index in range(scores.shape[1]):
                 score = ""
                 if not np.isnan(scores[row_index, col_index]):
