@@ -227,7 +227,7 @@ def get_saliency_heatmap_html(
             out += "</tr>"
     if step_scores is not None:
         for step_score_name, step_score_values in step_scores.items():
-            out += f'<tr style="outline: thin solid"><th><b>{step_score_name}</b></th>'
+            out += f'<tr style="outline: thin solid"><th></th><th><b>{step_score_name}</b></th>'
             if isinstance(step_scores_threshold, float):
                 threshold = step_scores_threshold
             else:
@@ -258,20 +258,23 @@ def get_saliency_heatmap_rich(
     label: str = "",
     step_scores_threshold: Union[float, dict[str, float]] = 0.5,
 ):
-    columns = [Column(header="", justify="right", overflow="fold")]
-    for column_label in column_labels:
-        columns.append(Column(header=escape(column_label), justify="center", overflow="fold"))
+    columns = [
+        Column(header="", justify="right", overflow="fold"),
+        Column(header="", justify="right", overflow="fold"),
+    ]
+    for idx, column_label in enumerate(column_labels):
+        columns.append(Column(header=f"{idx}\n{escape(column_label)}", justify="center", overflow="fold"))
     table = Table(
         *columns,
         title=f"{label + ' ' if label else ''}Saliency Heatmap",
-        caption="x: Generated tokens, y: Attributed tokens",
+        caption="→ : Generated tokens, ↓ : Attributed tokens",
         padding=(0, 1, 0, 1),
         show_lines=False,
         box=box.HEAVY_HEAD,
     )
     if scores is not None:
         for row_index in range(scores.shape[0]):
-            row = [Text(escape(row_labels[row_index]), style="bold")]
+            row = [Text(f"{row_index}", style="bold"), Text(escape(row_labels[row_index]), style="bold")]
             for col_index in range(scores.shape[1]):
                 color = Color.from_rgb(*input_colors[row_index][col_index])
                 score = ""
@@ -286,7 +289,7 @@ def get_saliency_heatmap_rich(
             else:
                 threshold = step_scores_threshold.get(step_score_name, 0.5)
             style = lambda val, limit: "bold" if abs(val) >= limit and isinstance(val, float) else ""
-            score_row = [Text(escape(step_score_name), style="bold")]
+            score_row = [Text(""), Text(escape(step_score_name), style="bold")]
             for score in step_score_values:
                 curr_score = round(score.item(), 2) if isinstance(score, float) else score.item()
                 score_row.append(Text(f"{score:.2f}", justify="center", style=style(curr_score, threshold)))

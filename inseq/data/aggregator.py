@@ -357,9 +357,9 @@ class SequenceAttributionAggregator(Aggregator):
                 assert attr.target_attributions.ndim == 2, attr.target_attributions.shape
         except AssertionError as e:
             raise RuntimeError(
-                f"The aggregated attributions should be 2-dimensional to be visualized. Found dimensions: {e.args[0]}"
-                "If you're performing intermediate aggregation and don't aim to visualize the output right away, use"
-                "do_post_aggregation_checks=False in the aggregate method to bypass this check."
+                f"The aggregated attributions should be 2-dimensional to be visualized.\nFound dimensions: {e.args[0]}"
+                "\n\nIf you're performing intermediate aggregation and don't aim to visualize the output right away, "
+                "use do_post_aggregation_checks=False in the aggregate method to bypass this check."
             ) from e
 
     @staticmethod

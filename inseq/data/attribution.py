@@ -173,7 +173,7 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
     def __sub__(self, other: "FeatureAttributionSequenceOutput") -> "FeatureAttributionSequenceOutput":
         if not isinstance(other, self.__class__):
             raise ValueError(f"Cannot compare {type(other)} with {type(self)}")
-        return self.aggregate("pair", paired_attr=other)
+        return self.aggregate("pair", paired_attr=other, do_post_aggregation_checks=False)
 
     @staticmethod
     def get_remove_pad_fn(attr: "FeatureAttributionStepOutput", name: str) -> Callable:
