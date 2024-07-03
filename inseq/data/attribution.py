@@ -165,6 +165,16 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
         if self.attr_pos_end is None or self.attr_pos_end > len(self.target):
             self.attr_pos_end = len(self.target)
 
+    def __getitem__(self, s: Union[slice, int]) -> "FeatureAttributionSequenceOutput":
+        source_spans = None if self.source_attributions is None else (s.start, s.stop)
+        target_spans = None if self.source_attributions is not None else (s.start, s.stop)
+        return self.aggregate("slices", source_spans=source_spans, target_spans=target_spans)
+
+    def __sub__(self, other: "FeatureAttributionSequenceOutput") -> "FeatureAttributionSequenceOutput":
+        if not isinstance(other, self.__class__):
+            raise ValueError(f"Cannot compare {type(other)} with {type(self)}")
+        return self.aggregate("pair", paired_attr=other, do_post_aggregation_checks=False)
+
     @staticmethod
     def get_remove_pad_fn(attr: "FeatureAttributionStepOutput", name: str) -> Callable:
         if attr.source_attributions is None or name.startswith("decoder"):
