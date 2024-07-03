@@ -40,3 +40,6 @@ Aggregators
 
 .. autoclass:: inseq.data.aggregator.PairAggregator
     :members:
+
+.. autoclass:: inseq.data.aggregator.SliceAggregator
+    :members:
