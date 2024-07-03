@@ -165,36 +165,15 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
         if self.attr_pos_end is None or self.attr_pos_end > len(self.target):
             self.attr_pos_end = len(self.target)
 
-    def __getitem__(self, subscript: Union[slice, int]) -> "FeatureAttributionSequenceOutput":
-        if isinstance(subscript, int):
-            subscript = slice(self.attr_pos_start, subscript)
-        full_target_slice = None
-        if subscript.stop > self.attr_pos_start:
-            full_target_slice = slice(subscript.start, self.attr_pos_end)
-        return self.__class__(
-            source=self.source[subscript],
-            target=self.target[full_target_slice]
-            if full_target_slice is not None
-            else self.target[subscript] + self.target[self.attr_pos_start : self.attr_pos_end],
-            source_attributions=self.source_attributions,
-            target_attributions=None
-            if self.target_attributions is None
-            else self.target_attributions[full_target_slice, ...]
-            if full_target_slice is not None
-            else torch.cat(
-                (
-                    self.target_attributions[subscript],
-                    self.target_attributions[self.attr_pos_start : self.attr_pos_end],
-                ),
-                dim=0,
-            ),
-            step_scores=self.step_scores,
-            sequence_scores=self.sequence_scores,
-            attr_pos_start=subscript.stop - subscript.start,
-            attr_pos_end=self.attr_pos_end,
-            _aggregator=self._aggregator,
-            _dict_aggregate_fn=self._dict_aggregate_fn,
-        )
+    def __getitem__(self, s: Union[slice, int]) -> "FeatureAttributionSequenceOutput":
+        source_spans = None if self.source_attributions is None else (s.start, s.stop)
+        target_spans = None if self.source_attributions is not None else (s.start, s.stop)
+        return self.aggregate("slices", source_spans=source_spans, target_spans=target_spans)
+
+    def __sub__(self, other: "FeatureAttributionSequenceOutput") -> "FeatureAttributionSequenceOutput":
+        if not isinstance(other, self.__class__):
+            raise ValueError(f"Cannot compare {type(other)} with {type(self)}")
+        return self.aggregate("pair", paired_attr=other)
 
     @staticmethod
     def get_remove_pad_fn(attr: "FeatureAttributionStepOutput", name: str) -> Callable:
