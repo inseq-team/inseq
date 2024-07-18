@@ -85,7 +85,7 @@ def dequantize_safetensor(safetensor: bytes) -> torch.Tensor:
     Adapted from https://huggingface.co/docs/safetensors/metadata_parsing
     """
     header_length = struct.unpack("<Q", safetensor[:8])[0]
-    metadata = json.loads(safetensor[8 : (7 + header_length)])["__metadata__"]
+    metadata = json.loads(safetensor[8 : (8 + header_length)])["__metadata__"]
     recovered_tensor = safetensors.torch.load(safetensor)["attribution"].to(torch.float32)
     if metadata["quantization"] in ["float32", "float16"]:
         return recovered_tensor
