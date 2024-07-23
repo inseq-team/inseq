@@ -2,6 +2,8 @@ import json
 import logging
 import struct
 from collections.abc import Sequence
+from functools import wraps
+from inspect import signature
 from typing import TYPE_CHECKING, Callable, Literal, Optional, Union
 
 import safetensors
@@ -93,23 +95,43 @@ def dequantize_safetensor(safetensor: bytes) -> torch.Tensor:
         return (recovered_tensor - eval(metadata["zeropoint"])) / eval(metadata["scale"])
 
 
+def postprocess_attribution_scores(func: Callable) -> Callable:
+    @wraps(func)
+    def postprocess_scores_wrapper(
+        attributions: Union[torch.Tensor, tuple[torch.Tensor, ...]], dim: int = 0, *args, **kwargs
+    ) -> Union[torch.Tensor, tuple[torch.Tensor, ...]]:
+        multi_input = False
+        if isinstance(attributions, tuple):
+            orig_sizes = [a.shape[dim] for a in attributions]
+            attributions = torch.cat(attributions, dim=dim)
+            multi_input = True
+        nan_mask = attributions.isnan()
+        attributions[nan_mask] = 0.0
+        if "dim" in signature(func).parameters:
+            kwargs["dim"] = dim
+        attributions = func(attributions, *args, **kwargs)
+        attributions[nan_mask] = float("nan")
+        if multi_input:
+            return tuple(attributions.split(orig_sizes, dim=dim))
+        return attributions
+
+    return postprocess_scores_wrapper
+
+
+@postprocess_attribution_scores
 def normalize(
     attributions: Union[torch.Tensor, tuple[torch.Tensor, ...]],
-    norm_dim: int = 0,
+    dim: int = 0,
     norm_ord: int = 1,
 ) -> Union[torch.Tensor, tuple[torch.Tensor, ...]]:
-    multi_input = False
-    if isinstance(attributions, tuple):
-        orig_sizes = [a.shape[norm_dim] for a in attributions]
-        attributions = torch.cat(attributions, dim=norm_dim)
-        multi_input = True
-    nan_mask = attributions.isnan()
-    attributions[nan_mask] = 0.0
-    attributions = F.normalize(attributions, p=norm_ord, dim=norm_dim)
-    attributions[nan_mask] = float("nan")
-    if multi_input:
-        return tuple(attributions.split(orig_sizes, dim=norm_dim))
-    return attributions
+    return F.normalize(attributions, p=norm_ord, dim=dim)
+
+
+@postprocess_attribution_scores
+def rescale(
+    attributions: Union[torch.Tensor, tuple[torch.Tensor, ...]],
+) -> Union[torch.Tensor, tuple[torch.Tensor, ...]]:
+    return attributions / attributions.abs().max()
 
 
 def top_p_logits_mask(logits: torch.Tensor, top_p: float, min_tokens_to_keep: int) -> torch.Tensor:

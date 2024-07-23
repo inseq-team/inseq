@@ -38,6 +38,7 @@ class EncoderDecoderInputFormatter(InputFormatter):
         attribution_model: "EncoderDecoderAttributionModel",
         inputs: tuple[FeatureAttributionInput, FeatureAttributionInput],
         include_eos_baseline: bool = False,
+        skip_special_tokens: bool = False,
     ) -> EncoderDecoderBatch:
         r"""Prepares sources and target to produce an :class:`~inseq.data.EncoderDecoderBatch`.
         There are two stages of preparation:
@@ -67,12 +68,14 @@ class EncoderDecoderInputFormatter(InputFormatter):
             inputs=sources,
             include_eos_baseline=include_eos_baseline,
             as_targets=False,
+            skip_special_tokens=skip_special_tokens,
         )
         target_batch = get_batch_from_inputs(
             attribution_model,
             inputs=targets,
             include_eos_baseline=include_eos_baseline,
             as_targets=True,
+            skip_special_tokens=skip_special_tokens,
         )
         return EncoderDecoderBatch(source_batch, target_batch)
 

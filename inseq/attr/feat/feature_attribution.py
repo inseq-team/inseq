@@ -176,6 +176,7 @@ class FeatureAttribution(Registry):
         attribute_target: bool = False,
         step_scores: list[str] = [],
         include_eos_baseline: bool = False,
+        skip_special_tokens: bool = False,
         attributed_fn: Union[str, Callable[..., SingleScorePerStepTensor], None] = None,
         attribution_args: dict[str, Any] = {},
         attributed_fn_args: dict[str, Any] = {},
@@ -206,6 +207,8 @@ class FeatureAttribution(Registry):
                 step scores can be added by using the :meth:`~inseq.register_step_function` function.
             include_eos_baseline (:obj:`bool`, `optional`): Whether to include the EOS token in the baseline for
                 attribution. By default the EOS token is not used for attribution. Defaults to False.
+            skip_special_tokens (:obj:`bool`, `optional`): Whether to skip special tokens when encoding the input.
+                Defaults to False.
             attributed_fn (:obj:`str` or :obj:`Callable[..., SingleScorePerStepTensor]`, `optional`): The identifier or
                 function of model outputs representing what should be attributed (e.g. output probits of model best
                 prediction after softmax). If it is a string, it must be a valid function.
@@ -224,12 +227,14 @@ class FeatureAttribution(Registry):
         inputs = (sources, targets)
         if not self.attribution_model.is_encoder_decoder:
             inputs = targets
-            encoded_sources = self.attribution_model.encode(sources, return_baseline=True)
+            encoded_sources = self.attribution_model.encode(
+                sources, return_baseline=True, add_special_tokens=not skip_special_tokens
+            )
             # We do this here to support separate attr_pos_start for different sentences when batching
             if attr_pos_start is None or attr_pos_start < encoded_sources.input_ids.shape[1]:
                 attr_pos_start = encoded_sources.input_ids.shape[1]
         batch = self.attribution_model.formatter.prepare_inputs_for_attribution(
-            self.attribution_model, inputs, include_eos_baseline
+            self.attribution_model, inputs, include_eos_baseline, skip_special_tokens
         )
         # If prepare_and_attribute was called from AttributionModel.attribute,
         # attributed_fn is already a Callable. Keep here to allow for usage independently
@@ -245,6 +250,7 @@ class FeatureAttribution(Registry):
             output_step_attributions=output_step_attributions,
             attribute_target=attribute_target,
             step_scores=step_scores,
+            skip_special_tokens=skip_special_tokens,
             attribution_args=attribution_args,
             attributed_fn_args=attributed_fn_args,
             step_scores_args=step_scores_args,
@@ -310,6 +316,7 @@ class FeatureAttribution(Registry):
         step_scores_args: dict[str, Any],
         attr_pos_start: int,
         attr_pos_end: int,
+        skip_special_tokens: bool = False,
     ) -> tuple[Optional[DecoderOnlyBatch], Optional[list[list[tuple[int, int]]]], dict[str, Any], dict[str, Any]]:
         contrast_batch, contrast_targets_alignments = None, None
         contrast_targets = attributed_fn_args.get("contrast_targets", None)
@@ -327,6 +334,7 @@ class FeatureAttribution(Registry):
                 attribution_model=self.attribution_model,
                 inputs=contrast_targets,
                 as_targets=as_targets,
+                skip_special_tokens=skip_special_tokens,
             )
             contrast_batch = DecoderOnlyBatch.from_batch(contrast_batch)
             clean_tgt_tokens = self.attribution_model.clean_tokens(target_tokens, as_targets=as_targets)
@@ -358,6 +366,7 @@ class FeatureAttribution(Registry):
         output_step_attributions: bool = False,
         attribute_target: bool = False,
         step_scores: list[str] = [],
+        skip_special_tokens: bool = False,
         attribution_args: dict[str, Any] = {},
         attributed_fn_args: dict[str, Any] = {},
         step_scores_args: dict[str, Any] = {},
@@ -385,6 +394,8 @@ class FeatureAttribution(Registry):
             step_scores (:obj:`list` of `str`): List of identifiers for step scores that need to be computed during
                 attribution. The available step scores are defined in :obj:`inseq.attr.feat.STEP_SCORES_MAP` and new
                 step scores can be added by using the :meth:`~inseq.register_step_function` function.
+            skip_special_tokens (:obj:`bool`, `optional`): Whether to skip special tokens when encoding the input.
+                Defaults to False.
             attribution_args (:obj:`dict`, `optional`): Additional arguments to pass to the attribution method.
             attributed_fn_args (:obj:`dict`, `optional`): Additional arguments to pass to the attributed function.
             step_scores_args (:obj:`dict`, `optional`): Additional arguments to pass to the step scores function.
@@ -419,6 +430,7 @@ class FeatureAttribution(Registry):
             step_scores_args,
             attr_pos_start,
             attr_pos_end,
+            skip_special_tokens,
         )
         target_tokens_with_ids = self.attribution_model.get_token_with_ids(
             batch,

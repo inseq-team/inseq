@@ -15,6 +15,7 @@ from ..utils import (
     validate_indices,
 )
 from ..utils import normalize as normalize_fn
+from ..utils import rescale as rescale_fn
 from ..utils.typing import IndexSpan, OneOrMoreIndices, TokenWithId
 from .aggregation_functions import AggregationFunction
 from .data_utils import TensorWrapper
@@ -307,9 +308,14 @@ class SequenceAttributionAggregator(Aggregator):
         attr: "FeatureAttributionSequenceOutput",
         aggregate_fn: AggregationFunction,
         select_idx: Optional[OneOrMoreIndices] = None,
-        normalize: bool = True,
+        normalize: Optional[bool] = None,
+        rescale: Optional[bool] = None,
         **kwargs,
     ):
+        if normalize and rescale:
+            raise ValueError("Only one of normalize and rescale can be set to True.")
+        if normalize is None:
+            normalize = rescale is None or not rescale
         fn_kwargs = extract_signature_args(kwargs, aggregate_fn)
         # If select_idx is a single int, no aggregation is performed
         do_aggregate = not isinstance(select_idx, int)
@@ -331,6 +337,8 @@ class SequenceAttributionAggregator(Aggregator):
             scores = cls._aggregate_scores(scores, aggregate_fn, dim=-1, **fn_kwargs)
         if normalize:
             scores = normalize_fn(scores)
+        if rescale:
+            scores = rescale_fn(scores)
         return scores
 
     @classmethod
@@ -349,9 +357,9 @@ class SequenceAttributionAggregator(Aggregator):
                 assert attr.target_attributions.ndim == 2, attr.target_attributions.shape
         except AssertionError as e:
             raise RuntimeError(
-                f"The aggregated attributions should be 2-dimensional to be visualized. Found dimensions: {e.args[0]}"
-                "If you're performing intermediate aggregation and don't aim to visualize the output right away, use"
-                "do_post_aggregation_checks=False in the aggregate method to bypass this check."
+                f"The aggregated attributions should be 2-dimensional to be visualized.\nFound dimensions: {e.args[0]}"
+                "\n\nIf you're performing intermediate aggregation and don't aim to visualize the output right away, "
+                "use do_post_aggregation_checks=False in the aggregate method to bypass this check."
             ) from e
 
     @staticmethod
@@ -369,11 +377,12 @@ class SequenceAttributionAggregator(Aggregator):
         aggregate_fn: AggregationFunction,
         select_idx: Optional[OneOrMoreIndices] = None,
         normalize: bool = True,
+        rescale: bool = False,
         **kwargs,
     ):
         if attr.source_attributions is None:
             return attr.source_attributions
-        scores = cls._process_attribution_scores(attr, aggregate_fn, select_idx, normalize, **kwargs)
+        scores = cls._process_attribution_scores(attr, aggregate_fn, select_idx, normalize, rescale, **kwargs)
         return scores[0] if attr.target_attributions is not None else scores
 
     @classmethod
@@ -383,11 +392,12 @@ class SequenceAttributionAggregator(Aggregator):
         aggregate_fn: AggregationFunction,
         select_idx: Optional[OneOrMoreIndices] = None,
         normalize: bool = True,
+        rescale: bool = False,
         **kwargs,
     ):
         if attr.target_attributions is None:
             return attr.target_attributions
-        scores = cls._process_attribution_scores(attr, aggregate_fn, select_idx, normalize, **kwargs)
+        scores = cls._process_attribution_scores(attr, aggregate_fn, select_idx, normalize, rescale, **kwargs)
         return scores[1] if attr.source_attributions is not None else scores
 
     @staticmethod
@@ -520,7 +530,7 @@ class ContiguousSpanAggregator(SequenceAttributionAggregator):
         return [spans] if isinstance(spans[0], int) else spans
 
     @classmethod
-    def validate_spans(cls, span_sequence: "FeatureAttributionSequenceOutput", spans: Optional[IndexSpan] = None):
+    def validate_spans(cls, span_sequence: list[TokenWithId], spans: Optional[IndexSpan] = None):
         if not spans:
             return
         allmatch = lambda l, type: all(isinstance(x, type) for x in l)
@@ -535,7 +545,7 @@ class ContiguousSpanAggregator(SequenceAttributionAggregator):
             assert (
                 span[0] >= prev_span_max
             ), f"Spans must be postive-valued, non-overlapping and in ascending order, got {spans}"
-            assert span[1] < len(span_sequence), f"Span values must be indexes of the original span, got {spans}"
+            assert span[1] <= len(span_sequence), f"Span values must be indexes of the original span, got {spans}"
             prev_span_max = span[1]
 
     @staticmethod
@@ -798,3 +808,136 @@ class PairAggregator(SequenceAttributionAggregator):
             agg_fn = aggregate_fn[name] if isinstance(aggregate_fn, dict) else aggregate_fn
             out_dict[name] = agg_fn(sequence_scores, paired_attr.sequence_scores[name])
         return out_dict
+
+
+class SliceAggregator(ContiguousSpanAggregator):
+    """Slices the FeatureAttributionSequenceOutput object into a smaller one containing a subset of its elements.
+
+    Args:
+        attr (:class:`~inseq.data.FeatureAttributionSequenceOutput`): The starting attribution object.
+        source_spans (tuple of [int, int] or sequence of tuples of [int, int], optional): Spans to slice for the
+            source sequence. Defaults to no slicing performed.
+        target_spans (tuple of [int, int] or sequence of tuples of [int, int], optional): Spans to slice for the
+            target sequence. Defaults to no slicing performed.
+    """
+
+    aggregator_name = "slices"
+    default_fn = None
+
+    @classmethod
+    def aggregate(
+        cls,
+        attr: "FeatureAttributionSequenceOutput",
+        source_spans: Optional[IndexSpan] = None,
+        target_spans: Optional[IndexSpan] = None,
+        **kwargs,
+    ):
+        """Spans can be:
+
+        1. A list of the form [pos_start, pos_end] including the contiguous positions of tokens that
+            are to be aggregated, if all values are integers and len(span) < len(original_seq)
+        2. A list of the form [(pos_start_0, pos_end_0), (pos_start_1, pos_end_1)], same as above but
+            for multiple contiguous spans.
+        """
+        source_spans = cls.format_spans(source_spans)
+        target_spans = cls.format_spans(target_spans)
+
+        if attr.source_attributions is None:
+            if source_spans is not None:
+                logger.warn(
+                    "Source spans are specified but no source scores are given for decoder-only models. "
+                    "Ignoring source spans and using target spans instead."
+                )
+            source_spans = [(s[0], min(s[1], attr.attr_pos_start)) for s in target_spans]
+
+        # Generated tokens are always included in the slices to preserve the output scores
+        is_gen_added = False
+        new_target_spans = []
+        if target_spans is not None:
+            for span in target_spans:
+                if span[1] > attr.attr_pos_start and is_gen_added:
+                    continue
+                elif span[1] > attr.attr_pos_start and not is_gen_added:
+                    new_target_spans.append((span[0], attr.attr_pos_end))
+                    is_gen_added = True
+                else:
+                    new_target_spans.append(span)
+        if not is_gen_added:
+            new_target_spans.append((attr.attr_pos_start, attr.attr_pos_end))
+        return super().aggregate(attr, source_spans=source_spans, target_spans=new_target_spans, **kwargs)
+
+    @staticmethod
+    def aggregate_source(attr: "FeatureAttributionSequenceOutput", source_spans: list[tuple[int, int]], **kwargs):
+        sliced_source = []
+        for span in source_spans:
+            sliced_source.extend(attr.source[span[0] : span[1]])
+        return sliced_source
+
+    @staticmethod
+    def aggregate_target(attr: "FeatureAttributionSequenceOutput", target_spans: list[tuple[int, int]], **kwargs):
+        sliced_target = []
+        for span in target_spans:
+            sliced_target.extend(attr.target[span[0] : span[1]])
+        return sliced_target
+
+    @staticmethod
+    def aggregate_source_attributions(attr: "FeatureAttributionSequenceOutput", source_spans, **kwargs):
+        if attr.source_attributions is None:
+            return attr.source_attributions
+        return torch.cat(
+            tuple(attr.source_attributions[span[0] : span[1], ...] for span in source_spans),
+            dim=0,
+        )
+
+    @staticmethod
+    def aggregate_target_attributions(attr: "FeatureAttributionSequenceOutput", target_spans, **kwargs):
+        if attr.target_attributions is None:
+            return attr.target_attributions
+        return torch.cat(
+            tuple(attr.target_attributions[span[0] : span[1], ...] for span in target_spans),
+            dim=0,
+        )
+
+    @staticmethod
+    def aggregate_step_scores(attr: "FeatureAttributionSequenceOutput", **kwargs):
+        return attr.step_scores
+
+    @classmethod
+    def aggregate_sequence_scores(
+        cls,
+        attr: "FeatureAttributionSequenceOutput",
+        source_spans,
+        target_spans,
+        **kwargs,
+    ):
+        if not attr.sequence_scores:
+            return attr.sequence_scores
+        out_dict = {}
+        for name, step_scores in attr.sequence_scores.items():
+            if name.startswith("decoder"):
+                out_dict[name] = torch.cat(
+                    tuple(step_scores[span[0] : span[1], ...] for span in target_spans),
+                    dim=0,
+                )
+            elif name.startswith("encoder"):
+                out_dict[name] = torch.cat(
+                    tuple(step_scores[span[0] : span[1], span[0] : span[1], ...] for span in source_spans),
+                    dim=0,
+                )
+            else:
+                out_dict[name] = torch.cat(
+                    tuple(step_scores[span[0] : span[1], ...] for span in source_spans),
+                    dim=0,
+                )
+        return out_dict
+
+    @staticmethod
+    def aggregate_attr_pos_start(attr: "FeatureAttributionSequenceOutput", target_spans, **kwargs):
+        if not target_spans:
+            return attr.attr_pos_start
+        tot_sliced_len = sum(min(s[1], attr.attr_pos_start) - s[0] for s in target_spans)
+        return tot_sliced_len
+
+    @staticmethod
+    def aggregate_attr_pos_end(attr: "FeatureAttributionSequenceOutput", **kwargs):
+        return attr.attr_pos_end

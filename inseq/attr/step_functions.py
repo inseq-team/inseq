@@ -132,6 +132,7 @@ def contrast_logits_fn(
     contrast_targets: Optional[FeatureAttributionInput] = None,
     contrast_targets_alignments: Optional[list[list[tuple[int, int]]]] = None,
     contrast_force_inputs: bool = False,
+    skip_special_tokens: bool = False,
 ):
     """Returns the logit of a generation target given contrastive context or target prediction alternative.
     If only ``contrast_targets`` are specified, the logit of the contrastive prediction is computed given same
@@ -144,6 +145,7 @@ def contrast_logits_fn(
         contrast_targets=contrast_targets,
         contrast_targets_alignments=contrast_targets_alignments,
         contrast_force_inputs=contrast_force_inputs,
+        skip_special_tokens=skip_special_tokens,
     )
     return logit_fn(c_args)
 
@@ -156,6 +158,7 @@ def contrast_prob_fn(
     contrast_targets_alignments: Optional[list[list[tuple[int, int]]]] = None,
     logprob: bool = False,
     contrast_force_inputs: bool = False,
+    skip_special_tokens: bool = False,
 ):
     """Returns the probability of a generation target given contrastive context or target prediction alternative.
     If only ``contrast_targets`` are specified, the probability of the contrastive prediction is computed given same
@@ -168,6 +171,7 @@ def contrast_prob_fn(
         contrast_targets=contrast_targets,
         contrast_targets_alignments=contrast_targets_alignments,
         contrast_force_inputs=contrast_force_inputs,
+        skip_special_tokens=skip_special_tokens,
     )
     return probability_fn(c_args, logprob=logprob)
 
@@ -179,6 +183,7 @@ def pcxmi_fn(
     contrast_targets: Optional[FeatureAttributionInput] = None,
     contrast_targets_alignments: Optional[list[list[tuple[int, int]]]] = None,
     contrast_force_inputs: bool = False,
+    skip_special_tokens: bool = False,
 ) -> SingleScorePerStepTensor:
     """Compute the pointwise conditional cross-mutual information (P-CXMI) of target ids given original and contrastive
     input options. The P-CXMI is defined as the negative log-ratio between the conditional probability of the target
@@ -192,6 +197,7 @@ def pcxmi_fn(
         contrast_targets=contrast_targets,
         contrast_targets_alignments=contrast_targets_alignments,
         contrast_force_inputs=contrast_force_inputs,
+        skip_special_tokens=skip_special_tokens,
     ).to(original_probs.device)
     return -torch.log2(torch.div(original_probs, contrast_probs))
 
@@ -206,6 +212,7 @@ def kl_divergence_fn(
     top_p: float = 1.0,
     min_tokens_to_keep: int = 1,
     contrast_force_inputs: bool = False,
+    skip_special_tokens: bool = False,
 ) -> SingleScorePerStepTensor:
     """Compute the pointwise Kullback-Leibler divergence of target ids given original and contrastive input options.
     The KL divergence is the expectation of the log difference between the probabilities of regular (P) and contrastive
@@ -233,6 +240,7 @@ def kl_divergence_fn(
         contrast_targets_alignments=contrast_targets_alignments,
         return_contrastive_target_ids=False,
         return_contrastive_batch=True,
+        skip_special_tokens=skip_special_tokens,
     )
     c_forward_output = args.attribution_model.get_forward_output(
         contrast_inputs.batch, use_embeddings=args.attribution_model.is_encoder_decoder
@@ -263,6 +271,7 @@ def contrast_prob_diff_fn(
     contrast_targets_alignments: Optional[list[list[tuple[int, int]]]] = None,
     logprob: bool = False,
     contrast_force_inputs: bool = False,
+    skip_special_tokens: bool = False,
 ):
     """Returns the difference between next step probability for a candidate generation target vs. a contrastive
     alternative. Can be used as attribution target to answer the question: "Which features were salient in the
@@ -279,6 +288,7 @@ def contrast_prob_diff_fn(
         contrast_targets_alignments=contrast_targets_alignments,
         logprob=logprob,
         contrast_force_inputs=contrast_force_inputs,
+        skip_special_tokens=skip_special_tokens,
     ).to(model_probs.device)
     return model_probs - contrast_probs
 
@@ -290,6 +300,7 @@ def contrast_logits_diff_fn(
     contrast_targets: Optional[FeatureAttributionInput] = None,
     contrast_targets_alignments: Optional[list[list[tuple[int, int]]]] = None,
     contrast_force_inputs: bool = False,
+    skip_special_tokens: bool = False,
 ):
     """Equivalent to ``contrast_prob_diff_fn`` but for logits. The original target function used in
     `Yin and Neubig (2022) <https://aclanthology.org/2022.emnlp-main.14>`__
@@ -301,6 +312,7 @@ def contrast_logits_diff_fn(
         contrast_targets=contrast_targets,
         contrast_targets_alignments=contrast_targets_alignments,
         contrast_force_inputs=contrast_force_inputs,
+        skip_special_tokens=skip_special_tokens,
     ).to(model_logits.device)
     return model_logits - contrast_logits
 
@@ -312,6 +324,7 @@ def in_context_pvi_fn(
     contrast_targets: Optional[FeatureAttributionInput] = None,
     contrast_targets_alignments: Optional[list[list[tuple[int, int]]]] = None,
     contrast_force_inputs: bool = False,
+    skip_special_tokens: bool = False,
 ):
     """Returns the in-context pointwise V-usable information as defined by `Lu et al. (2023)
     <https://arxiv.org/abs/2310.12300>`__. In-context PVI is a variant of P-CXMI that captures the amount of usable
@@ -330,6 +343,7 @@ def in_context_pvi_fn(
         contrast_targets_alignments=contrast_targets_alignments,
         logprob=True,
         contrast_force_inputs=contrast_force_inputs,
+        skip_special_tokens=skip_special_tokens,
     ).to(orig_logprob.device)
     return -orig_logprob + contrast_logprob
 

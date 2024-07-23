@@ -5,6 +5,7 @@ import torch
 from pytest import fixture
 
 import inseq
+from inseq.data import FeatureAttributionSequenceOutput
 from inseq.data.aggregator import (
     AggregatorPipeline,
     ContiguousSpanAggregator,
@@ -149,6 +150,10 @@ def test_pair_aggregator(saliency_mt_model: HuggingfaceEncoderDecoderModel):
     diff_seqattr_other = orig_seqattr_other.aggregate("pair", paired_attr=alt_seqattr_other)
     assert torch.allclose(diff_seqattr_other.source_attributions, diff_seqattr.source_attributions)
 
+    # Aggregate with __sub__
+    diff_seqattr_sub = orig_seqattr - alt_seqattr
+    assert diff_seqattr_other == diff_seqattr_sub
+
 
 def test_named_aggregate_fn_aggregation(saliency_mt_model: HuggingfaceEncoderDecoderModel):
     out = saliency_mt_model.attribute(
@@ -192,3 +197,29 @@ def test_named_aggregate_fn_aggregation(saliency_mt_model: HuggingfaceEncoderDec
         aggregator=["scores", "scores", "subwords"], aggregate_fn=["mean", "mean", None]
     )
     assert out_allmean_subwords == out_allmean_subwords_expanded
+
+
+def test_slice_aggregator_decoder_only(saliency_gpt_model: HuggingfaceDecoderOnlyModel):
+    out = saliency_gpt_model.attribute(
+        EXAMPLES["source_summary"], EXAMPLES["source_summary"] + EXAMPLES["gen_summary"], show_progress=False
+    )[0]
+    out_sliced: FeatureAttributionSequenceOutput = out.aggregate("slices", target_spans=(14, 75))
+    assert [t.token for t in out_sliced.source] == EXAMPLES["source_summary_tokens"]
+    assert [t.token for t in out_sliced.target] == EXAMPLES["source_summary_tokens"] + EXAMPLES["gen_summary_tokens"]
+
+    # Slice with __getitem__
+    out_sliced_getitem = out[14:75]
+    assert out_sliced == out_sliced_getitem
+
+
+def test_slice_aggregator_encoder_decoder(saliency_mt_model: HuggingfaceEncoderDecoderModel):
+    out = saliency_mt_model.attribute(
+        EXAMPLES["source"], EXAMPLES["target"], show_progress=False, attribute_target=True
+    )[0]
+    out_sliced: FeatureAttributionSequenceOutput = out.aggregate("slices", source_spans=(1, 4))
+    assert [t.token for t in out_sliced.source] == EXAMPLES["source_subwords"][1:4]
+    assert [t.token for t in out_sliced.target] == EXAMPLES["target_subwords"][1:]
+
+    # Slice with __getitem__
+    out_sliced_getitem = out[1:4]
+    assert out_sliced == out_sliced_getitem

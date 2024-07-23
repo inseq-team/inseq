@@ -51,6 +51,7 @@ def get_batch_from_inputs(
     inputs: FeatureAttributionInput,
     include_eos_baseline: bool = False,
     as_targets: bool = False,
+    skip_special_tokens: bool = False,
 ) -> Batch:
     if isinstance(inputs, Batch):
         batch = inputs
@@ -61,6 +62,7 @@ def get_batch_from_inputs(
                 as_targets=as_targets,
                 return_baseline=True,
                 include_eos_baseline=include_eos_baseline,
+                add_special_tokens=not skip_special_tokens,
             )
         elif isinstance(inputs, BatchEncoding):
             encodings = inputs
@@ -70,8 +72,12 @@ def get_batch_from_inputs(
                 "Inputs must be either a string, a list of strings, a BatchEncoding or a Batch."
             )
         embeddings = BatchEmbedding(
-            input_embeds=attribution_model.embed(encodings.input_ids, as_targets=as_targets),
-            baseline_embeds=attribution_model.embed(encodings.baseline_ids, as_targets=as_targets),
+            input_embeds=attribution_model.embed(
+                encodings.input_ids, as_targets=as_targets, add_special_tokens=not skip_special_tokens
+            ),
+            baseline_embeds=attribution_model.embed(
+                encodings.baseline_ids, as_targets=as_targets, add_special_tokens=not skip_special_tokens
+            ),
         )
         batch = Batch(encodings, embeddings)
     return batch
@@ -163,6 +169,16 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
         if self.attr_pos_end is None or self.attr_pos_end > len(self.target):
             self.attr_pos_end = len(self.target)
 
+    def __getitem__(self, s: Union[slice, int]) -> "FeatureAttributionSequenceOutput":
+        source_spans = None if self.source_attributions is None else (s.start, s.stop)
+        target_spans = None if self.source_attributions is not None else (s.start, s.stop)
+        return self.aggregate("slices", source_spans=source_spans, target_spans=target_spans)
+
+    def __sub__(self, other: "FeatureAttributionSequenceOutput") -> "FeatureAttributionSequenceOutput":
+        if not isinstance(other, self.__class__):
+            raise ValueError(f"Cannot compare {type(other)} with {type(self)}")
+        return self.aggregate("pair", paired_attr=other, do_post_aggregation_checks=False)
+
     def _convert_to_safetensors(self, scores_precision: ScorePrecision = "float32"):
         """
         Converts tensor attributes within the class to the specified precision.
@@ -199,10 +215,6 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
     def _recover_from_safetensors(self):
         """
         Converts tensor attributes within the class from b64-encoded safetensors to torch tensors.`.
-        Args:
-            self
-        Returns:
-            self
         """
         if self.source_attributions is not None:
             self.source_attributions = dequantize_safetensor(base64.b64decode(self.source_attributions))

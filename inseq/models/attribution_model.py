@@ -69,6 +69,7 @@ class InputFormatter:
         attribution_model: "AttributionModel",
         inputs: FeatureAttributionInput,
         include_eos_baseline: bool = False,
+        skip_special_tokens: bool = False,
     ) -> Union[DecoderOnlyBatch, EncoderDecoderBatch]:
         raise NotImplementedError()
 
@@ -316,6 +317,7 @@ class AttributionModel(ABC, torch.nn.Module):
         device: Optional[str] = None,
         batch_size: Optional[int] = None,
         generate_from_target_prefix: bool = False,
+        skip_special_tokens: bool = False,
         generation_args: dict[str, Any] = {},
         **kwargs,
     ) -> FeatureAttributionOutput:
@@ -365,6 +367,8 @@ class AttributionModel(ABC, torch.nn.Module):
                 target prefixes for the generation process. If False, the ``generated_texts`` will be used as full
                 targets. This option is only available for encoder-decoder models, since the same behavior can be
                 achieved by modifying the input texts for decoder-only models. Default: False.
+            skip_special_tokens (:obj:`bool`, `optional`): Whether to skip special tokens when attributing the input
+                texts. Default: False.
             **kwargs: Additional keyword arguments. These can include keyword arguments for the attribution method, for
                 the generation process or for the attributed function. Generation arguments can be provided explicitly
                 as a dictionary named ``generation_args``.
@@ -389,6 +393,8 @@ class AttributionModel(ABC, torch.nn.Module):
             self.device = device
         attribution_method = self.get_attribution_method(method, override_default_attribution)
         attributed_fn = self.get_attributed_fn(attributed_fn)
+        if skip_special_tokens:
+            kwargs["skip_special_tokens"] = True
         attribution_args, attributed_fn_args, step_scores_args = extract_args(
             attribution_method,
             attributed_fn,
@@ -418,9 +424,16 @@ class AttributionModel(ABC, torch.nn.Module):
             logger.info(f"Splitting input texts into {n_batches} batches of size {batch_size}.")
         # If constrained decoding is not enabled, output texts are generated from input texts.
         if not has_generated_texts or generate_from_target_prefix:
-            encoded_input = self.encode(input_texts, return_baseline=True, include_eos_baseline=include_eos_baseline)
+            encoded_input = self.encode(
+                input_texts,
+                return_baseline=True,
+                include_eos_baseline=include_eos_baseline,
+                add_special_tokens=not skip_special_tokens,
+            )
             if generate_from_target_prefix:
-                decoder_input = self.encode(generated_texts, as_targets=True)
+                decoder_input = self.encode(
+                    generated_texts, as_targets=True, add_special_tokens=not skip_special_tokens
+                )
                 generation_args["decoder_input_ids"] = decoder_input.input_ids
             generated_texts = self.generate(
                 encoded_input, return_generation_output=False, batch_size=batch_size, **generation_args
@@ -467,6 +480,7 @@ class AttributionModel(ABC, torch.nn.Module):
             attribute_target=attribute_target,
             step_scores=step_scores,
             include_eos_baseline=include_eos_baseline,
+            skip_special_tokens=skip_special_tokens,
             attributed_fn=attributed_fn,
             attribution_args=attribution_args,
             attributed_fn_args=attributed_fn_args,
@@ -484,11 +498,11 @@ class AttributionModel(ABC, torch.nn.Module):
             self.device = original_device
         return attribution_output
 
-    def embed(self, inputs: Union[TextInput, IdsTensor], as_targets: bool = False):
+    def embed(self, inputs: Union[TextInput, IdsTensor], as_targets: bool = False, add_special_tokens: bool = True):
         if isinstance(inputs, str) or (
             isinstance(inputs, list) and len(inputs) > 0 and all(isinstance(x, str) for x in inputs)
         ):
-            batch = self.encode(inputs, as_targets)
+            batch = self.encode(inputs, as_targets, add_special_tokens=add_special_tokens)
             inputs = batch.input_ids
         return self.embed_ids(inputs, as_targets=as_targets)
 
@@ -531,6 +545,7 @@ class AttributionModel(ABC, torch.nn.Module):
         as_targets: bool = False,
         return_baseline: bool = False,
         include_eos_baseline: bool = False,
+        add_special_tokens: bool = True,
     ) -> BatchEncoding:
         pass
 

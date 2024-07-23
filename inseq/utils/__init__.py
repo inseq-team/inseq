@@ -62,6 +62,7 @@ from .torch_utils import (
     pad_with_nan,
     recursive_get_submodule,
     remap_from_filtered,
+    rescale,
     top_p_logits_mask,
     validate_indices,
 )
@@ -90,6 +91,7 @@ __all__ = [
     "remap_from_filtered",
     "drop_padding",
     "normalize",
+    "rescale",
     "aggregate_contiguous",
     "get_front_padding",
     "get_sequences_from_batched_steps",
