@@ -14,7 +14,7 @@ asttokens==2.4.1
     # via stack-data
 attrs==23.2.0
     # via aiohttp
-authlib==1.3.0
+authlib==1.3.1
     # via safety
 babel==2.14.0
     # via sphinx
@@ -46,7 +46,7 @@ contourpy==1.2.0
     # via matplotlib
 coverage==7.4.1
     # via pytest-cov
-cryptography==42.0.5
+cryptography==43.0.0
     # via authlib
 cycler==0.12.1
     # via matplotlib
@@ -311,11 +311,11 @@ safety==3.1.0
     # via inseq (pyproject.toml)
 safety-schemas==0.0.2
     # via safety
-scikit-learn==1.4.0
+scikit-learn==1.5.1
     # via inseq (pyproject.toml)
 scipy==1.12.0
     # via scikit-learn
-sentencepiece==0.1.99
+sentencepiece==0.2.0
     # via transformers
 setuptools==69.1.0
     # via
@@ -375,7 +375,7 @@ threadpoolctl==3.2.0
     # via scikit-learn
 tokenizers==0.15.2
     # via transformers
-torch==2.2.0
+torch==2.3.1
     # via
     #   inseq (pyproject.toml)
     #   captum

@@ -8,6 +8,24 @@
 
 - Rows and columns in the visualization now have indices alongside tokens to facilitate index-based slicing, aggregation and alignment [#282](https://github.com/inseq-team/inseq/pull/282)
 
+- Added a `scores_precision` to `FeatureAttributionOutput.save` to enable efficient saving in `float16` and `float8` formats. This is useful for saving large attribution outputs in a more memory-efficient way. [#273](https://github.com/inseq-team/inseq/pull/273)
+
+```python
+import inseq
+
+attrib_model = inseq.load_model("gpt2", "attention")
+out = attrib_model.attribute("Hello world", generation_kwargs={'max_new_tokens': 100})
+
+# Previous usage, memory inefficient
+out.save("output.json")
+
+# Memory-efficient saving
+out.save("output_fp16.json", scores_precision="float16") # or "float8"
+
+# Automatic conversion to float32
+out_loaded = inseq.FeatureAttributionOutput.load("output_fp16.json") 
+```
+
 - - A new `SliceAggregator` (`"slices"`) is added to allow for slicing source (in encoder-decoder) or target (in decoder-only) tokens from a `FeatureAttributionSequenceOutput` object, using the same syntax of `ContiguousSpanAggregator`. The `__getitem__` method of the `FeatureAttributionSequenceOutput` is a shortcut for this, allowing slicing with `[start:stop]` syntax. [#282](https://github.com/inseq-team/inseq/pull/282)
 
 ```python
