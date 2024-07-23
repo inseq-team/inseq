@@ -202,6 +202,8 @@ def isnotebook():
 def format_input_texts(
     texts: TextInput,
     ref_texts: Optional[TextInput] = None,
+    skip_special_tokens: bool = False,
+    special_tokens: list[str] = [],
 ) -> tuple[list[str], list[str]]:
     texts = [texts] if isinstance(texts, str) else texts
     reference_texts = [ref_texts] if isinstance(ref_texts, str) else ref_texts
@@ -211,6 +213,11 @@ def format_input_texts(
                 len(texts), len(reference_texts)
             )
         )
+    if skip_special_tokens:
+        for special_token in special_tokens:
+            texts = [text.replace(special_token, "") for text in texts]
+            if reference_texts is not None:
+                reference_texts = [text.replace(special_token, "") for text in reference_texts]
     return texts, reference_texts
 
 

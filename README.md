@@ -280,7 +280,7 @@ Our vision for Inseq is to create a centralized, comprehensive and robust set of
 
 ## Citing Inseq
 
-If you use Inseq in your research we suggest to include a mention to the specific release (e.g. v0.4.0) and we kindly ask you to cite our reference paper as:
+If you use Inseq in your research we suggest to include a mention to the specific release (e.g. v0.6.0) and we kindly ask you to cite our reference paper as:
 
 ```bibtex
 @inproceedings{sarti-etal-2023-inseq,
@@ -308,7 +308,7 @@ If you use Inseq in your research we suggest to include a mention to the specifi
 Inseq has been used in various research projects. A list of known publications that use Inseq to conduct interpretability analyses of generative models is shown below.
 
 > [!TIP]
-> Last update: May 2024. Please open a pull request to add your publication to the list.
+> Last update: June 2024. Please open a pull request to add your publication to the list.
 
 <details>
   <summary><b>2023</b></summary>
@@ -331,6 +331,9 @@ Inseq has been used in various research projects. A list of known publications t
     <li><a href="https://arxiv.org/abs/2402.00794">ReAGent: A Model-agnostic Feature Attribution Method for Generative Language Models</a> (Zhao et al., 2024)</li>
     <li><a href="https://arxiv.org/abs/2404.02421">Revisiting subword tokenization: A case study on affixal negation in large language models</a> (Truong et al., 2024)</li>
     <li><a href="https://hal.science/hal-04581586">Exploring NMT Explainability for Translators Using NMT Visualising Tools</a> (Gonzalez-Saez et al., 2024)</li>
+    <li><a href="https://arxiv.org/abs/2405.14899">DETAIL: Task DEmonsTration Attribution for Interpretable In-context Learning</a> (Zhou et al., 2024)</li>
+    <li><a href="https://arxiv.org/abs/2406.06399">Should We Fine-Tune or RAG? Evaluating Different Techniques to Adapt LLMs for Dialogue</a> (Alghisi et al., 2024)</li>
+    <li><a href="https://arxiv.org/abs/2406.13663">Model Internals-based Answer Attribution for Trustworthy Retrieval-Augmented Generation</a> (Qi, Sarti et al., 2024)</li>
   </ol>
 
 </details>
