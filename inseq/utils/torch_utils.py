@@ -4,6 +4,7 @@ from functools import wraps
 from inspect import signature
 from typing import TYPE_CHECKING, Callable, Literal, Optional, Union
 
+import safetensors
 import torch
 import torch.nn.functional as F
 from jaxtyping import Int, Num
@@ -38,6 +39,38 @@ def remap_from_filtered(
     index = index.expand_as(filtered)
     new_source = torch.ones(original_shape, dtype=filtered.dtype, device=filtered.device) * float("nan")
     return new_source.scatter(0, index, filtered)
+
+
+def convert_to_safetensor(tensor: torch.Tensor, scores_precision="float32") -> bytes:
+    """
+    Converts a torch tensor to a safetensor.
+
+    Args:
+        tensor (torch.Tensor): some torch tensor
+        scores_precision (str): format to convert weights to: [float32, float16, float8]
+    Returns:
+        bytes: A safetensor in bytes format
+    Raises:
+        ValueError if `scores_precision` doesn't match the possible options
+
+    """
+    if scores_precision == "float32":
+        return safetensors.torch.save({"attribution": tensor})
+    elif scores_precision == "float16":
+        return safetensors.torch.save({"attribution": tensor.to(torch.float16)})
+    elif scores_precision == "float8":
+        logger.warning("Float8 precision is experimental and may result in loss of precision.")
+        return safetensors.torch.save({"attribution": tensor.to(torch.float8_e4m3fn)})
+    else:
+        raise ValueError("`scores_precision` has to be one of [float32, float16, float8]")
+
+
+def convert_from_safetensor(safetensor: bytes) -> torch.Tensor:
+    """
+    Convert a safetensor to a torch tensor and convert weights to float32.
+    Adapted from https://huggingface.co/docs/safetensors/metadata_parsing
+    """
+    return safetensors.torch.load(safetensor)["attribution"].to(torch.float32)
 
 
 def postprocess_attribution_scores(func: Callable) -> Callable:
