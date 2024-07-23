@@ -43,56 +43,36 @@ def remap_from_filtered(
     return new_source.scatter(0, index, filtered)
 
 
-def convert_to_safetensor(tensor: torch.Tensor, quantization="float32") -> bytes:
+def convert_to_safetensor(tensor: torch.Tensor, scores_precision="float32") -> bytes:
     """
-    Converts a torch tensor to a safetensor, and optionally quantizes the weights with zero-point quantization.
-    Quantization parameters are saved in the safetensor to be used on reloading.
-    Adapted from https://towardsdatascience.com/introduction-to-weight-quantization-2494701b9c0c
+    Converts a torch tensor to a safetensor.
 
     Args:
         tensor (torch.Tensor): some torch tensor
-        quantization (str): format to quantize weights to [float32, float16, float8]
+        scores_precision (str): format to convert weights to: [float32, float16, float8]
     Returns:
         bytes: A safetensor in bytes format
     Raises:
-        ValueError if `quantization` doesn't match the possible options
+        ValueError if `scores_precision` doesn't match the possible options
 
     """
-    metadata_dict = {"quantization": quantization}
-    if quantization == "float32":
-        return safetensors.torch.save({"attribution": tensor}, metadata=metadata_dict)
-
-    negatives = torch.any(tensor < 0)
-    if quantization == "float16":
-        return safetensors.torch.save({"attribution": tensor.to(torch.float16)}, metadata=metadata_dict)
-    elif quantization == "float8":
-        xrange = torch.max(tensor) - torch.min(tensor)
-        scale = 255 / xrange
-        if negatives:
-            zeropoint = (-scale * torch.min(tensor)).round() - 128
-            quant_tensor = torch.clip((tensor * scale + zeropoint).round(), -128, 127).to(torch.int8)
-        else:
-            zeropoint = (-scale * torch.min(tensor)).round()
-            quant_tensor = torch.clip((tensor * scale + zeropoint).round(), 0, 255).to(torch.uint8)
-
-        metadata_dict["scale"], metadata_dict["zeropoint"] = f"{scale}", f"{zeropoint}"
-        return safetensors.torch.save({"attribution": quant_tensor}, metadata=metadata_dict)
+    if scores_precision == "float32":
+        return safetensors.torch.save({"attribution": tensor})
+    elif scores_precision == "float16":
+        return safetensors.torch.save({"attribution": tensor.to(torch.float16)})
+    elif scores_precision == "float8":
+        logger.warning("Float8 precision is experimental and may result in loss of precision.")
+        return safetensors.torch.save({"attribution": tensor.to(torch.float8_e4m3fn)})
     else:
-        raise ValueError("`quantization` has to be one of [float32, float16, float8]")
+        raise ValueError("`scores_precision` has to be one of [float32, float16, float8]")
 
 
-def dequantize_safetensor(safetensor: bytes) -> torch.Tensor:
+def convert_from_safetensor(safetensor: bytes) -> torch.Tensor:
     """
-    Convert a safetensor to a torch tensor and dequantize weights to float32.
+    Convert a safetensor to a torch tensor and convert weights to float32.
     Adapted from https://huggingface.co/docs/safetensors/metadata_parsing
     """
-    header_length = struct.unpack("<Q", safetensor[:8])[0]
-    metadata = json.loads(safetensor[8 : (8 + header_length)])["__metadata__"]
-    recovered_tensor = safetensors.torch.load(safetensor)["attribution"].to(torch.float32)
-    if metadata["quantization"] in ["float32", "float16"]:
-        return recovered_tensor
-    else:
-        return (recovered_tensor - eval(metadata["zeropoint"])) / eval(metadata["scale"])
+    return safetensors.torch.load(safetensor)["attribution"].to(torch.float32)
 
 
 def postprocess_attribution_scores(func: Callable) -> Callable:

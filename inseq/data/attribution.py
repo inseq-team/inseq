@@ -10,7 +10,7 @@ import torch
 
 from ..utils import (
     convert_to_safetensor,
-    dequantize_safetensor,
+    convert_from_safetensor,
     drop_padding,
     get_sequences_from_batched_steps,
     json_advanced_dump,
@@ -194,20 +194,20 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
 
         if self.source_attributions is not None:
             self.source_attributions = convert_to_safetensor(
-                self.source_attributions.contiguous(), quantization=scores_precision
+                self.source_attributions.contiguous(), scores_precision=scores_precision
             )
         if self.target_attributions is not None:
             self.target_attributions = convert_to_safetensor(
-                self.target_attributions.contiguous(), quantization=scores_precision
+                self.target_attributions.contiguous(), scores_precision=scores_precision
             )
         if self.step_scores is not None:
             self.step_scores = {
-                k: convert_to_safetensor(v.contiguous(), quantization=scores_precision)
+                k: convert_to_safetensor(v.contiguous(), scores_precision=scores_precision)
                 for k, v in self.step_scores.items()
             }
         if self.sequence_scores is not None:
             self.sequence_scores = {
-                k: convert_to_safetensor(v.contiguous(), quantization=scores_precision)
+                k: convert_to_safetensor(v.contiguous(), scores_precision=scores_precision)
                 for k, v in self.sequence_scores.items()
             }
         return self
@@ -217,14 +217,14 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
         Converts tensor attributes within the class from b64-encoded safetensors to torch tensors.`.
         """
         if self.source_attributions is not None:
-            self.source_attributions = dequantize_safetensor(base64.b64decode(self.source_attributions))
+            self.source_attributions = convert_from_safetensor(base64.b64decode(self.source_attributions))
         if self.target_attributions is not None:
-            self.target_attributions = dequantize_safetensor(base64.b64decode(self.target_attributions))
+            self.target_attributions = convert_from_safetensor(base64.b64decode(self.target_attributions))
         if self.step_scores is not None:
-            self.step_scores = {k: dequantize_safetensor(base64.b64decode(v)) for k, v in self.step_scores.items()}
+            self.step_scores = {k: convert_from_safetensor(base64.b64decode(v)) for k, v in self.step_scores.items()}
         if self.sequence_scores is not None:
             self.sequence_scores = {
-                k: dequantize_safetensor(base64.b64decode(v)) for k, v in self.sequence_scores.items()
+                k: convert_from_safetensor(base64.b64decode(v)) for k, v in self.sequence_scores.items()
             }
         return self
 
