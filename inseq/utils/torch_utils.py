@@ -1,6 +1,4 @@
-import json
 import logging
-import struct
 from collections.abc import Sequence
 from functools import wraps
 from inspect import signature

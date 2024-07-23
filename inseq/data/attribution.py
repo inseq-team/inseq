@@ -9,8 +9,8 @@ from typing import TYPE_CHECKING, Any, Callable, Optional, Union
 import torch
 
 from ..utils import (
-    convert_to_safetensor,
     convert_from_safetensor,
+    convert_to_safetensor,
     drop_padding,
     get_sequences_from_batched_steps,
     json_advanced_dump,

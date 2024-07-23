@@ -50,8 +50,8 @@ from .serialization import json_advanced_dump, json_advanced_dumps, json_advance
 from .torch_utils import (
     aggregate_contiguous,
     check_device,
-    convert_to_safetensor,
     convert_from_safetensor,
+    convert_to_safetensor,
     euclidean_distance,
     filter_logits,
     find_block_stack,
