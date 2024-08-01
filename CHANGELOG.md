@@ -4,6 +4,8 @@
 
 ## 🚀 Features
 
+- Added [treescope](https://github.com/google-deepmind/treescope) for model and tensor visualization.
+
 - Added new models `DbrxForCausalLM`, `OlmoForCausalLM`, `Phi3ForCausalLM`, `Qwen2MoeForCausalLM`, `Gemma2ForCausalLM` to model config.
 
 - Add `rescale_attributions` to Inseq CLI commands for `rescale=True` ([#280](https://github.com/inseq-team/inseq/pull/280)).

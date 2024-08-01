@@ -50,6 +50,7 @@ dependencies = [
   "torch>=2.0",
   "matplotlib>=3.5.3",
   "tqdm>=4.64.0",
+  "treescope>=0.1.0",
   "nvidia-cublas-cu11>=11.10.3.66; sys_platform=='Linux'",
   "nvidia-cuda-cupti-cu11>=11.7.101; sys_platform=='Linux'",
   "nvidia-cuda-nvrtc-cu11>=11.7.99; sys_platform=='Linux'",

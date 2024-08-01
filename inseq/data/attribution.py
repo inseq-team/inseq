@@ -290,8 +290,8 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
             pos_start.append(curr_pos_start)
             source = tokenized_target_sentences[seq_idx][:curr_pos_start] if not sources else sources[seq_idx]
             curr_seq_attribution: FeatureAttributionSequenceOutput = attr.get_sequence_cls(
-                source=source,
-                target=tokenized_target_sentences[seq_idx],
+                source=deepcopy(source),
+                target=deepcopy(tokenized_target_sentences[seq_idx]),
                 attr_pos_start=pos_start[seq_idx],
                 attr_pos_end=attr_pos_end,
             )
