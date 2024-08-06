@@ -380,7 +380,7 @@ torch==2.3.1
     # via
     #   inseq (pyproject.toml)
     #   captum
-tornado==6.4
+tornado==6.4.1
     # via
     #   ipykernel
     #   jupyter-client
