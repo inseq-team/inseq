@@ -21,6 +21,7 @@ import string
 from typing import Literal
 
 import numpy as np
+import treescope
 from matplotlib.colors import Colormap
 from rich import box
 from rich.color import Color
@@ -45,8 +46,15 @@ from ..utils.viz_utils import (
     saliency_heatmap_html,
     saliency_heatmap_table_header,
     sanitize_html,
+    treescope_cmap,
 )
 from .attribution import FeatureAttributionSequenceOutput
+
+if isnotebook():
+    cmap = treescope_cmap()
+    treescope.basic_interactive_setup(autovisualize_arrays=False)
+    treescope.default_diverging_colormap.set_globally(cmap)
+    treescope.default_sequential_colormap.set_globally(cmap)
 
 
 def show_attributions(
@@ -126,6 +134,78 @@ def show_attributions(
             idx += 2
     if return_html:
         return html_out
+
+
+def show_granular_attributions(
+    attributions: FeatureAttributionSequenceOutput,
+    max_show_size: int = 20,
+    min_val: int | None = None,
+    max_val: int | None = None,
+    show_dim: int | str | None = None,
+    display: bool = True,
+    return_html: bool | None = False,
+) -> str | None:
+    """Visualizes granular attribution heatmaps in HTML format.
+
+    Args:
+        attributions (:class:`~inseq.data.attribution.FeatureAttributionSequenceOutput`):
+            Sequence attributions to be visualized.
+        min_val (:obj:`Optional[int]`, *optional*, defaults to None):
+            Lower attribution score threshold for color map.
+        max_val (`Optional[int]`, *optional*, defaults to None):
+            Upper attribution score threshold for color map.
+        display (`bool`, *optional*, defaults to True):
+            Whether to show the output of the visualization function.
+        return_html (`Optional[bool]`, *optional*, defaults to False):
+            If true, returns the HTML corresponding to the notebook visualization of the attributions in string format,
+            for saving purposes.
+
+    Returns:
+        `Optional[str]`: Returns the HTML output if `return_html=True`
+    """
+    if isinstance(attributions, FeatureAttributionSequenceOutput):
+        attributions: list[FeatureAttributionSequenceOutput] = [attributions]
+    if not isnotebook() and display:
+        raise ValueError(
+            "Granular attribution heatmaps visualization is  only supported in Jupyter notebooks. "
+            "Please set `display=False` and `return_html=True` to avoid this error."
+        )
+    items_to_render = []
+    for ex_id, attribution in enumerate(attributions):
+        if attribution.source_attributions is not None:
+            items_to_render += [
+                treescope.figures.bolded(f"Example {ex_id}: Source Saliency Heatmap"),
+                get_saliency_heatmap_treescope(
+                    attribution.source_attributions.numpy(),
+                    [t.token for t in attribution.target[attribution.attr_pos_start : attribution.attr_pos_end]],
+                    [t.token for t in attribution.source],
+                    attribution._attribution_dim_names["source_attributions"],
+                    max_show_size=max_show_size,
+                    max_val=max_val,
+                    min_val=min_val,
+                    show_dim=show_dim,
+                ),
+            ]
+        if attribution.target_attributions is not None:
+            items_to_render += [
+                treescope.figures.bolded(f"Example {ex_id}: Target Saliency Heatmap"),
+                get_saliency_heatmap_treescope(
+                    attribution.target_attributions.numpy(),
+                    [t.token for t in attribution.target[attribution.attr_pos_start : attribution.attr_pos_end]],
+                    [t.token for t in attribution.source],
+                    attribution._attribution_dim_names["target_attributions"],
+                    max_show_size=max_show_size,
+                    max_val=max_val,
+                    min_val=min_val,
+                    show_dim=show_dim,
+                ),
+            ]
+        items_to_render.append("")
+    fig = treescope.figures.inline(*items_to_render)
+    if display:
+        treescope.show(fig)
+    if return_html:
+        return treescope.render_to_html(fig)
 
 
 def get_attribution_colors(
@@ -295,6 +375,57 @@ def get_saliency_heatmap_rich(
                 score_row.append(Text(f"{score:.2f}", justify="center", style=style(curr_score, threshold)))
             table.add_row(*score_row, end_section=True)
     return table
+
+
+def get_saliency_heatmap_treescope(
+    scores: np.ndarray | None,
+    column_labels: list[str],
+    row_labels: list[str],
+    dim_names: dict[int, str] | None = None,
+    max_show_size: int | None = None,
+    max_val: float | None = None,
+    min_val: float | None = None,
+    show_dim: int | str | None = None,
+):
+    if max_show_size is None:
+        max_show_size = 20
+    item_labels_dict = {0: row_labels, 1: column_labels}
+    rev_dim_names = {v: k for k, v in dim_names.items()}
+    col_dims = [1]
+    slider_dims = []
+    if show_dim is not None:
+        if isinstance(show_dim, str):
+            if show_dim not in rev_dim_names:
+                raise ValueError(f"Invalid dimension name {show_dim}: valid names are {list(rev_dim_names.keys())}")
+            show_dim_idx = rev_dim_names[show_dim_idx]
+        else:
+            show_dim_idx = show_dim
+        if show_dim_idx <= 1 or show_dim_idx > scores.ndim or show_dim_idx not in dim_names:
+            raise ValueError(f"Invalid dimension {show_dim_idx}: valid indices are {list(range(2, scores.ndim))}")
+        if scores.shape[show_dim_idx] > max_show_size:
+            raise ValueError(
+                f"Dimension {show_dim_idx} has size {scores.shape[show_dim_idx]} which is greater than the maximum "
+                f"show size {max_show_size}. Please choose a different dimension or slice the tensor before "
+                "visualizing it using SliceAggregator."
+            )
+        col_dims.append(show_dim_idx)
+    for dim_idx, dim_name in dim_names.items():
+        if dim_idx > 1:
+            if scores.shape[dim_idx] <= max_show_size and len(col_dims) < 2:
+                col_dims.append(dim_idx)
+            else:
+                slider_dims.append(dim_idx)
+            item_labels_dict[dim_idx] = [f"{dim_name} #{i}" for i in range(scores.shape[dim_idx])]
+    return treescope.render_array(
+        scores,
+        rows=[0],
+        columns=col_dims,
+        sliders=slider_dims,
+        axis_labels=dim_names,
+        axis_item_labels=item_labels_dict,
+        vmax=max_val,
+        vmin=min_val,
+    )
 
 
 # Progress bar utilities

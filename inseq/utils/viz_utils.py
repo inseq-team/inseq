@@ -39,6 +39,32 @@ def red_transparent_blue_colormap():
     return LinearSegmentedColormap.from_list("red_transparent_blue", colors)
 
 
+def treescope_cmap():
+    return list(
+        reversed(
+            [
+                (96, 14, 34),
+                (134, 14, 41),
+                (167, 36, 36),
+                (186, 72, 46),
+                (198, 107, 77),
+                (208, 139, 115),
+                (218, 171, 155),
+                (228, 203, 196),
+                (241, 236, 235),
+                (202, 212, 216),
+                (161, 190, 200),
+                (117, 170, 190),
+                (75, 148, 186),
+                (38, 123, 186),
+                (12, 94, 190),
+                (41, 66, 162),
+                (37, 47, 111),
+            ]
+        )
+    )
+
+
 def get_color(
     score: float,
     min_value: float | int,

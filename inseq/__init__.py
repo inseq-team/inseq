@@ -7,6 +7,7 @@ from .data import (
     list_aggregators,
     merge_attributions,
     show_attributions,
+    show_granular_attributions,
 )
 from .models import AttributionModel, list_supported_frameworks, load_model, register_model_config
 from .utils.id_utils import explain
@@ -28,6 +29,7 @@ __all__ = [
     "load_model",
     "explain",
     "show_attributions",
+    "show_granular_attributions",
     "list_feature_attribution_methods",
     "list_aggregators",
     "list_aggregation_functions",

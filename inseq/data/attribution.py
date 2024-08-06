@@ -47,6 +47,12 @@ FeatureAttributionInput = TextInput | BatchEncoding | Batch
 logger = logging.getLogger(__name__)
 
 
+DEFAULT_ATTRIBUTION_DIM_NAMES = {
+    "source_attributions": {0: "Input Tokens", 1: "Generated Tokens"},
+    "target_attributions": {0: "Input Tokens", 1: "Generated Tokens"},
+}
+
+
 def get_batch_from_inputs(
     attribution_model: "AttributionModel",
     inputs: FeatureAttributionInput,
@@ -158,6 +164,7 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
     attr_pos_end: int | None = None
     _aggregator: str | list[str] | None = None
     _dict_aggregate_fn: dict[str, str] | None = None
+    _attribution_dim_names: dict[str, dict[int, str]] | None = None
 
     def __post_init__(self):
         if self._dict_aggregate_fn is None:
@@ -165,6 +172,11 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
         default_aggregate_fn = DEFAULT_ATTRIBUTION_AGGREGATE_DICT
         default_aggregate_fn.update(self._dict_aggregate_fn)
         self._dict_aggregate_fn = default_aggregate_fn
+        if self._attribution_dim_names is None:
+            self._attribution_dim_names = {}
+        default_dim_names = DEFAULT_ATTRIBUTION_DIM_NAMES
+        default_dim_names.update(self._attribution_dim_names)
+        self._attribution_dim_names = default_dim_names
         if self._aggregator is None:
             self._aggregator = "scores"
         if self.attr_pos_end is None or self.attr_pos_end > len(self.target):
@@ -268,7 +280,6 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
         num_sequences = len(attr.prefix)
         if not all(len(attr.prefix) == num_sequences for attr in attributions):
             raise ValueError("All the attributions must include the same number of sequences.")
-        seq_attributions: list[FeatureAttributionSequenceOutput] = []
         sources = []
         targets = []
         pos_start = []
@@ -289,22 +300,13 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
             # If the model is decoder-only, the source is the input prefix
             curr_pos_start = min(len(tokenized_target_sentences[seq_idx]), attr_pos_end) - len(targets[seq_idx])
             pos_start.append(curr_pos_start)
-            source = tokenized_target_sentences[seq_idx][:curr_pos_start] if not sources else sources[seq_idx]
-            curr_seq_attribution: FeatureAttributionSequenceOutput = attr.get_sequence_cls(
-                source=deepcopy(source),
-                target=deepcopy(tokenized_target_sentences[seq_idx]),
-                attr_pos_start=pos_start[seq_idx],
-                attr_pos_end=attr_pos_end,
-            )
-            seq_attributions.append(curr_seq_attribution)
         if attr.source_attributions is not None:
             source_attributions = get_sequences_from_batched_steps([att.source_attributions for att in attributions])
             for seq_id in range(num_sequences):
                 # Remove padding from tensor
-                filtered_source_attribution = source_attributions[seq_id][
+                source_attributions[seq_id] = source_attributions[seq_id][
                     : len(sources[seq_id]), : len(targets[seq_id]), ...
                 ]
-                seq_attributions[seq_id].source_attributions = filtered_source_attribution
         if attr.target_attributions is not None:
             target_attributions = get_sequences_from_batched_steps(
                 [att.target_attributions for att in attributions], padding_dims=[1]
@@ -317,7 +319,6 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
                 ]
                 if target_attributions[seq_id].shape[0] != len(tokenized_target_sentences[seq_id]):
                     target_attributions[seq_id] = pad_with_nan(target_attributions[seq_id], dim=0, pad_size=1)
-                seq_attributions[seq_id].target_attributions = target_attributions[seq_id]
         if attr.step_scores is not None:
             step_scores = [{} for _ in range(num_sequences)]
             for step_score_name in attr.step_scores.keys():
@@ -326,8 +327,6 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
                 )
                 for seq_id in range(num_sequences):
                     step_scores[seq_id][step_score_name] = out_step_scores[seq_id][: len(targets[seq_id])]
-            for seq_id in range(num_sequences):
-                seq_attributions[seq_id].step_scores = step_scores[seq_id]
         if attr.sequence_scores is not None:
             seq_scores = [{} for _ in range(num_sequences)]
             for seq_score_name in attr.sequence_scores.keys():
@@ -344,14 +343,29 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
                     )
                 for seq_id in range(num_sequences):
                     seq_scores[seq_id][seq_score_name] = remove_pad_fn(out_seq_scores, sources, targets, seq_id)
-            for seq_id in range(num_sequences):
-                seq_attributions[seq_id].sequence_scores = seq_scores[seq_id]
+        seq_attributions: list[FeatureAttributionSequenceOutput] = []
+        for seq_idx in range(num_sequences):
+            curr_seq_attribution: FeatureAttributionSequenceOutput = attr.get_sequence_cls(
+                source=deepcopy(
+                    tokenized_target_sentences[seq_idx][: pos_start[seq_idx]] if not sources else sources[seq_idx]
+                ),
+                target=deepcopy(tokenized_target_sentences[seq_idx]),
+                source_attributions=source_attributions[seq_idx] if attr.source_attributions is not None else None,
+                target_attributions=target_attributions[seq_idx] if attr.target_attributions is not None else None,
+                step_scores=step_scores[seq_idx] if attr.step_scores is not None else None,
+                sequence_scores=seq_scores[seq_idx] if attr.sequence_scores is not None else None,
+                attr_pos_start=pos_start[seq_idx],
+                attr_pos_end=attr_pos_end,
+            )
+            seq_attributions.append(curr_seq_attribution)
         return seq_attributions
 
     def show(
         self,
         min_val: int | None = None,
         max_val: int | None = None,
+        max_show_size: int | None = None,
+        show_dim: int | str | None = None,
         display: bool = True,
         return_html: bool | None = False,
         aggregator: AggregatorPipeline | type[Aggregator] = None,
@@ -367,6 +381,13 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
             max_val (:obj:`int`, *optional*, defaults to None):
                 Maximum value in the color range of the visualization. If None, the maximum value of the attributions
                 across all visualized examples is used.
+            max_show_size (:obj:`int`, *optional*, defaults to None):
+                For granular visualization, this parameter specifies the maximum dimension size for additional dimensions
+                to be visualized. Default: 20.
+            show_dim (:obj:`int` or :obj:`str`, *optional*, defaults to None):
+                For granular visualization, this parameter specifies the dimension that should be visualized along with
+                the source and target tokens. Can be either the dimension index or the dimension name. Works only if
+                the dimension size is less than or equal to `max_show_size`.
             display (:obj:`bool`, *optional*, defaults to True):
                 Whether to display the visualization. Can be set to False if the visualization is produced and stored
                 for later use.
@@ -382,7 +403,7 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
         Returns:
             :obj:`str`: The HTML code of the visualization if :obj:`return_html` is set to True, otherwise None.
         """
-        from inseq import show_attributions
+        from inseq import show_attributions, show_granular_attributions
 
         # If no aggregator is specified, the default aggregator for the class is used
         aggregated = self.aggregate(aggregator, **kwargs) if do_aggregation else self
@@ -391,8 +412,41 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
         ):
             tokens = "".join(tid.token for tid in self.target)
             logger.warning(f"Found empty attributions, skipping attribution matching generation: {tokens}")
+        if aggregated.source_attributions.ndim == 2 and aggregated.target_attributions.ndim == 2:
+            return show_attributions(
+                attributions=aggregated, min_val=min_val, max_val=max_val, display=display, return_html=return_html
+            )
         else:
-            return show_attributions(aggregated, min_val, max_val, display, return_html)
+            return show_granular_attributions(
+                attributions=aggregated,
+                max_show_size=max_show_size,
+                min_val=min_val,
+                max_val=max_val,
+                show_dim=show_dim,
+                display=display,
+                return_html=return_html,
+            )
+
+    def show_granular(
+        self,
+        min_val: int | None = None,
+        max_val: int | None = None,
+        max_show_size: int | None = None,
+        show_dim: int | str | None = None,
+        display: bool = True,
+        return_html: bool | None = False,
+    ) -> str | None:
+        from inseq import show_granular_attributions
+
+        return show_granular_attributions(
+            attributions=self,
+            max_show_size=max_show_size,
+            min_val=min_val,
+            max_val=max_val,
+            show_dim=show_dim,
+            display=display,
+            return_html=return_html,
+        )
 
     @property
     def minimum(self) -> float:
@@ -726,6 +780,8 @@ class FeatureAttributionOutput:
         self,
         min_val: int | None = None,
         max_val: int | None = None,
+        max_show_size: int | None = None,
+        show_dim: int | str | None = None,
         display: bool = True,
         return_html: bool | None = False,
         aggregator: AggregatorPipeline | type[Aggregator] = None,
@@ -737,6 +793,8 @@ class FeatureAttributionOutput:
         Args:
             min_val (int, optional): Minimum value for color scale.
             max_val (int, optional): Maximum value for color scale.
+            max_show_size (int, optional): Maximum size of the dimension to show.
+            show_dim (int or str, optional): Dimension to show.
             display (bool, optional): If True, display the attribution visualization.
             return_html (bool, optional): If True, return the attribution visualization as HTML.
             aggregator (:obj:`AggregatorPipeline` or :obj:`Type[Aggregator]`, optional): Aggregator
@@ -751,10 +809,43 @@ class FeatureAttributionOutput:
         """
         out_str = ""
         for attr in self.sequence_attributions:
+            curr_out_str = attr.show(
+                min_val=min_val,
+                max_val=max_val,
+                max_show_size=max_show_size,
+                show_dim=show_dim,
+                display=display,
+                return_html=return_html,
+                aggregator=aggregator,
+                do_aggregation=do_aggregation,
+                **kwargs,
+            )
             if return_html:
-                out_str += attr.show(min_val, max_val, display, return_html, aggregator, do_aggregation, **kwargs)
-            else:
-                attr.show(min_val, max_val, display, return_html, aggregator, do_aggregation, **kwargs)
+                out_str += curr_out_str
+        if return_html:
+            return out_str
+        
+    def show_granular(
+        self,
+        min_val: int | None = None,
+        max_val: int | None = None,
+        max_show_size: int | None = None,
+        show_dim: int | str | None = None,
+        display: bool = True,
+        return_html: bool = False,
+    ) -> str | None:
+        out_str = ""
+        for attr in self.sequence_attributions:
+            curr_out_str = attr.show_granular(
+                min_val=min_val,
+                max_val=max_val,
+                max_show_size=max_show_size,
+                show_dim=show_dim,
+                display=display,
+                return_html=return_html,
+            )
+            if return_html:
+                out_str += curr_out_str
         if return_html:
             return out_str
 
@@ -802,6 +893,10 @@ class GranularFeatureAttributionSequenceOutput(FeatureAttributionSequenceOutput)
         self._dict_aggregate_fn["target_attributions"]["scores"] = "vnorm"
         if "deltas" not in self._dict_aggregate_fn["step_scores"]["spans"]:
             self._dict_aggregate_fn["step_scores"]["spans"]["deltas"] = "absmax"
+        self._attribution_dim_names = {
+            "source_attributions": {0: "Input Tokens", 1: "Generated Tokens", 2: "Embedding Dimension"},
+            "target_attributions": {0: "Input Tokens", 1: "Generated Tokens", 2: "Embedding Dimension"},
+        }
 
 
 @dataclass(eq=False, repr=False)
@@ -845,6 +940,13 @@ class MultiDimensionalFeatureAttributionSequenceOutput(FeatureAttributionSequenc
     def __post_init__(self):
         super().__post_init__()
         self._aggregator = ["mean"] * self._num_dimensions
+        self._attribution_dim_names = {
+            "source_attributions": {0: "Input Tokens", 1: "Generated Tokens", 2: "Model Layer"},
+            "target_attributions": {0: "Input Tokens", 1: "Generated Tokens", 2: "Model Layer"},
+        }
+        if self._num_dimensions == 2:
+            self._attribution_dim_names["source_attributions"][3] = "Attention Head"
+            self._attribution_dim_names["target_attributions"][3] = "Attention Head"
 
 
 @dataclass(eq=False, repr=False)
