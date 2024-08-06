@@ -1,5 +1,5 @@
 from copy import deepcopy
-from typing import Literal, Optional, Union
+from typing import Literal
 
 from rich.console import Console
 
@@ -15,7 +15,7 @@ from .attribute_context_helpers import (
 
 
 def get_formatted_procedure_details(args: AttributeContextArgs) -> str:
-    def format_comment(std: Optional[float] = None, topk: Optional[int] = None) -> str:
+    def format_comment(std: float | None = None, topk: int | None = None) -> str:
         comment = []
         if std:
             comment.append(f"std λ={std:.2f}")
@@ -55,7 +55,7 @@ def get_formatted_attribute_context_results(
         special_tokens_to_keep: list[str],
         context: str,
         context_scores: list[float],
-        other_context_scores: Optional[list[float]] = None,
+        other_context_scores: list[float] | None = None,
         is_target: bool = False,
         context_type: Literal["Input", "Output"] = "Input",
     ) -> str:
@@ -119,10 +119,10 @@ def get_formatted_attribute_context_results(
 
 def visualize_attribute_context(
     output: AttributeContextOutput,
-    model: Union[HuggingfaceModel, str, None] = None,
-    cti_threshold: Optional[float] = None,
+    model: HuggingfaceModel | str | None = None,
+    cti_threshold: float | None = None,
     return_html: bool = False,
-) -> Optional[str]:
+) -> str | None:
     if output.info is None:
         raise ValueError("Cannot visualize attribution results without args. Set add_output_info = True.")
     console = Console(record=True)

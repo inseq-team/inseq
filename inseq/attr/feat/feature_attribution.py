@@ -17,8 +17,9 @@ Todo:
     * 🟡: Allow custom arguments for model loading in the :class:`FeatureAttribution` :meth:`load` method.
 """
 import logging
+from collections.abc import Callable
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Callable, Optional, Union
+from typing import TYPE_CHECKING, Any, Optional
 
 import torch
 from jaxtyping import Int
@@ -123,7 +124,7 @@ class FeatureAttribution(Registry):
         cls,
         method_name: str,
         attribution_model: Optional["AttributionModel"] = None,
-        model_name_or_path: Optional[ModelIdentifier] = None,
+        model_name_or_path: ModelIdentifier | None = None,
         **kwargs,
     ) -> "FeatureAttribution":
         r"""Load the selected method and hook it to an existing or available
@@ -168,8 +169,8 @@ class FeatureAttribution(Registry):
         self,
         sources: FeatureAttributionInput,
         targets: FeatureAttributionInput,
-        attr_pos_start: Optional[int] = None,
-        attr_pos_end: Optional[int] = None,
+        attr_pos_start: int | None = None,
+        attr_pos_end: int | None = None,
         show_progress: bool = True,
         pretty_progress: bool = True,
         output_step_attributions: bool = False,
@@ -177,7 +178,7 @@ class FeatureAttribution(Registry):
         step_scores: list[str] = [],
         include_eos_baseline: bool = False,
         skip_special_tokens: bool = False,
-        attributed_fn: Union[str, Callable[..., SingleScorePerStepTensor], None] = None,
+        attributed_fn: str | Callable[..., SingleScorePerStepTensor] | None = None,
         attribution_args: dict[str, Any] = {},
         attributed_fn_args: dict[str, Any] = {},
         step_scores_args: dict[str, Any] = {},
@@ -317,7 +318,7 @@ class FeatureAttribution(Registry):
         attr_pos_start: int,
         attr_pos_end: int,
         skip_special_tokens: bool = False,
-    ) -> tuple[Optional[DecoderOnlyBatch], Optional[list[list[tuple[int, int]]]], dict[str, Any], dict[str, Any]]:
+    ) -> tuple[DecoderOnlyBatch | None, list[list[tuple[int, int]]] | None, dict[str, Any], dict[str, Any]]:
         contrast_batch, contrast_targets_alignments = None, None
         contrast_targets = attributed_fn_args.get("contrast_targets", None)
         if contrast_targets is None:
@@ -357,10 +358,10 @@ class FeatureAttribution(Registry):
 
     def attribute(
         self,
-        batch: Union[DecoderOnlyBatch, EncoderDecoderBatch],
+        batch: DecoderOnlyBatch | EncoderDecoderBatch,
         attributed_fn: Callable[..., SingleScorePerStepTensor],
-        attr_pos_start: Optional[int] = None,
-        attr_pos_end: Optional[int] = None,
+        attr_pos_start: int | None = None,
+        attr_pos_end: int | None = None,
         show_progress: bool = True,
         pretty_progress: bool = True,
         output_step_attributions: bool = False,
@@ -545,10 +546,10 @@ class FeatureAttribution(Registry):
 
     def filtered_attribute_step(
         self,
-        batch: Union[DecoderOnlyBatch, EncoderDecoderBatch],
+        batch: DecoderOnlyBatch | EncoderDecoderBatch,
         target_ids: Int[torch.Tensor, "batch_size 1"],
         attributed_fn: Callable[..., SingleScorePerStepTensor],
-        target_attention_mask: Optional[Int[torch.Tensor, "batch_size 1"]] = None,
+        target_attention_mask: Int[torch.Tensor, "batch_size 1"] | None = None,
         attribute_target: bool = False,
         step_scores: list[str] = [],
         attribution_args: dict[str, Any] = {},

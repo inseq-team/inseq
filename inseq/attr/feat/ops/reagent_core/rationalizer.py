@@ -1,6 +1,5 @@
 import math
 from abc import ABC, abstractmethod
-from typing import Optional
 
 import torch
 from jaxtyping import Int64
@@ -21,7 +20,7 @@ class BaseRationalizer(ABC):
         self,
         input_ids: IdsTensor,
         target_id: TargetIdsTensor,
-        decoder_input_ids: Optional[IdsTensor] = None,
+        decoder_input_ids: IdsTensor | None = None,
         attribute_target: bool = False,
     ) -> Int64[torch.Tensor, "batch_size other_dims"]:
         """Compute rational of a sequence on a target
@@ -78,7 +77,7 @@ class AggregateRationalizer(BaseRationalizer):
         self,
         input_ids: IdsTensor,
         target_id: TargetIdsTensor,
-        decoder_input_ids: Optional[IdsTensor] = None,
+        decoder_input_ids: IdsTensor | None = None,
         attribute_target: bool = False,
     ) -> Int64[torch.Tensor, "batch_size other_dims"]:
         """Compute rational of a sequence on a target

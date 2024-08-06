@@ -1,8 +1,9 @@
 import inspect
 import logging
 import math
+from collections.abc import Callable
 from functools import partial
-from typing import Any, Callable, Optional, cast
+from typing import Any, cast
 
 import torch
 from captum._utils.common import _expand_additional_forward_args, _expand_target
@@ -25,8 +26,8 @@ class Lime(LimeBase):
         similarity_func: Callable = None,
         perturb_func: Callable = None,
         perturb_interpretable_space: bool = False,
-        from_interp_rep_transform: Optional[Callable] = None,
-        to_interp_rep_transform: Optional[Callable] = None,
+        from_interp_rep_transform: Callable | None = None,
+        to_interp_rep_transform: Callable | None = None,
         mask_prob: float = 0.3,
     ) -> None:
         if interpretable_model is None:
@@ -271,7 +272,12 @@ class Lime(LimeBase):
 
             # Merge the binary mask with the special_token_ids mask
             mask = (
-                torch.tensor([m + s if s == 0 else s for m, s in zip(mask_multinomial_binary, mask_special_token_ids)])
+                torch.tensor(
+                    [
+                        m + s if s == 0 else s
+                        for m, s in zip(mask_multinomial_binary, mask_special_token_ids, strict=False)
+                    ]
+                )
                 .to(self.attribution_model.device)
                 .unsqueeze(-1)  # 1D -> 2D
             )

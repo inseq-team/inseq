@@ -1,7 +1,8 @@
 import logging
 import warnings
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Callable, Optional, Union
+from typing import TYPE_CHECKING
 
 import torch
 
@@ -53,15 +54,15 @@ def contrast_fn_docstring() -> Callable[..., "StepFunction"]:
 
 @dataclass
 class ContrastInputs:
-    batch: Union[EncoderDecoderBatch, DecoderOnlyBatch, None] = None
-    target_ids: Optional[TargetIdsTensor] = None
+    batch: EncoderDecoderBatch | DecoderOnlyBatch | None = None
+    target_ids: TargetIdsTensor | None = None
 
 
 def _get_contrast_inputs(
     args: "StepFunctionArgs",
-    contrast_sources: Optional[FeatureAttributionInput] = None,
-    contrast_targets: Optional[FeatureAttributionInput] = None,
-    contrast_targets_alignments: Optional[list[list[tuple[int, int]]]] = None,
+    contrast_sources: FeatureAttributionInput | None = None,
+    contrast_targets: FeatureAttributionInput | None = None,
+    contrast_targets_alignments: list[list[tuple[int, int]]] | None = None,
     return_contrastive_target_ids: bool = False,
     return_contrastive_batch: bool = False,
     skip_special_tokens: bool = False,
@@ -128,9 +129,9 @@ def _get_contrast_inputs(
 
 def _setup_contrast_args(
     args: "StepFunctionArgs",
-    contrast_sources: Optional[FeatureAttributionInput] = None,
-    contrast_targets: Optional[FeatureAttributionInput] = None,
-    contrast_targets_alignments: Optional[list[list[tuple[int, int]]]] = None,
+    contrast_sources: FeatureAttributionInput | None = None,
+    contrast_targets: FeatureAttributionInput | None = None,
+    contrast_targets_alignments: list[list[tuple[int, int]]] | None = None,
     contrast_force_inputs: bool = False,
     skip_special_tokens: bool = False,
 ):

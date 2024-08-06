@@ -1,6 +1,7 @@
 import logging
+from collections.abc import Callable
 from functools import wraps
-from typing import Any, Callable, Optional, TypeVar, Union
+from typing import Any, TypeVar
 
 import torch
 
@@ -60,7 +61,7 @@ class DecoderOnlyInputFormatter(InputFormatter):
         attribute_batch_ids: bool = False,
         forward_batch_embeds: bool = True,
         use_baselines: bool = False,
-    ) -> tuple[dict[str, Any], tuple[Union[IdsTensor, EmbeddingsTensor, None], ...]]:
+    ) -> tuple[dict[str, Any], tuple[IdsTensor | EmbeddingsTensor | None, ...]]:
         if attribute_batch_ids:
             inputs = (batch.input_ids,)
             baselines = (batch.baseline_ids,)
@@ -97,8 +98,8 @@ class DecoderOnlyInputFormatter(InputFormatter):
         batch: DecoderOnlyBatch,
         target_tokens: OneOrMoreTokenSequences,
         target_ids: TargetIdsTensor,
-        contrast_batch: Optional[DecoderOnlyBatch] = None,
-        contrast_targets_alignments: Optional[list[list[tuple[int, int]]]] = None,
+        contrast_batch: DecoderOnlyBatch | None = None,
+        contrast_targets_alignments: list[list[tuple[int, int]]] | None = None,
     ) -> FeatureAttributionStepOutput:
         r"""Enriches the attribution output with token information, producing the finished
         :class:`~inseq.data.FeatureAttributionStepOutput` object.
@@ -153,9 +154,9 @@ class DecoderOnlyInputFormatter(InputFormatter):
     @staticmethod
     def convert_args_to_batch(
         args: StepFunctionDecoderOnlyArgs = None,
-        decoder_input_ids: Optional[IdsTensor] = None,
-        decoder_attention_mask: Optional[IdsTensor] = None,
-        decoder_input_embeds: Optional[EmbeddingsTensor] = None,
+        decoder_input_ids: IdsTensor | None = None,
+        decoder_attention_mask: IdsTensor | None = None,
+        decoder_input_embeds: EmbeddingsTensor | None = None,
         **kwargs,
     ) -> DecoderOnlyBatch:
         if args is not None:
@@ -175,9 +176,9 @@ class DecoderOnlyInputFormatter(InputFormatter):
             input_ids: IdsTensor,
             target_ids: ExpandedTargetIdsTensor,
             attributed_fn: Callable[..., SingleScorePerStepTensor],
-            attention_mask: Optional[IdsTensor] = None,
+            attention_mask: IdsTensor | None = None,
             use_embeddings: bool = True,
-            attributed_fn_argnames: Optional[list[str]] = None,
+            attributed_fn_argnames: list[str] | None = None,
             *args,
             **kwargs,
         ) -> CustomForwardOutput:

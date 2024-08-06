@@ -13,9 +13,10 @@
 # limitations under the License.
 
 import logging
+from collections.abc import Callable
 from enum import Enum
 from types import FrameType
-from typing import TYPE_CHECKING, Callable, Optional
+from typing import TYPE_CHECKING
 
 import torch
 from captum._utils.typing import TensorOrTupleOfTensorsGeneric
@@ -101,8 +102,8 @@ class ValueZeroing(InseqAttribution):
 
         def value_zeroing_forward_mid_hook(
             frame: FrameType,
-            zeroed_token_index: Optional[int] = None,
-            zeroed_units_indices: Optional[OneOrMoreIndices] = None,
+            zeroed_token_index: int | None = None,
+            zeroed_units_indices: OneOrMoreIndices | None = None,
             batch_size: int = 1,
         ) -> None:
             if varname not in frame.f_locals:
@@ -166,10 +167,10 @@ class ValueZeroing(InseqAttribution):
         additional_forward_args: TensorOrTupleOfTensorsGeneric,
         hidden_states: MultiLayerEmbeddingsTensor,
         attention_module_name: str,
-        attributed_seq_len: Optional[int] = None,
+        attributed_seq_len: int | None = None,
         similarity_metric: str = ValueZeroingSimilarityMetric.COSINE.value,
         mode: str = ValueZeroingModule.DECODER.value,
-        zeroed_units_indices: Optional[OneOrMoreIndicesDict] = None,
+        zeroed_units_indices: OneOrMoreIndicesDict | None = None,
         min_score_threshold: float = 1e-5,
         use_causal_mask: bool = False,
     ) -> MultiLayerScoreTensor:
@@ -306,11 +307,11 @@ class ValueZeroing(InseqAttribution):
         inputs: TensorOrTupleOfTensorsGeneric,
         additional_forward_args: TensorOrTupleOfTensorsGeneric,
         similarity_metric: str = ValueZeroingSimilarityMetric.COSINE.value,
-        encoder_zeroed_units_indices: Optional[OneOrMoreIndicesDict] = None,
-        decoder_zeroed_units_indices: Optional[OneOrMoreIndicesDict] = None,
-        cross_zeroed_units_indices: Optional[OneOrMoreIndicesDict] = None,
-        encoder_hidden_states: Optional[MultiLayerEmbeddingsTensor] = None,
-        decoder_hidden_states: Optional[MultiLayerEmbeddingsTensor] = None,
+        encoder_zeroed_units_indices: OneOrMoreIndicesDict | None = None,
+        decoder_zeroed_units_indices: OneOrMoreIndicesDict | None = None,
+        cross_zeroed_units_indices: OneOrMoreIndicesDict | None = None,
+        encoder_hidden_states: MultiLayerEmbeddingsTensor | None = None,
+        decoder_hidden_states: MultiLayerEmbeddingsTensor | None = None,
         output_decoder_self_scores: bool = True,
         output_encoder_self_scores: bool = True,
     ) -> TensorOrTupleOfTensorsGeneric:

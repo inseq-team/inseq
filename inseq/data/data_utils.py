@@ -38,7 +38,7 @@ class TensorWrapper:
                 return attr[subscript]
             if attr.ndim >= 2:
                 return attr[subscript, ...]
-        elif isinstance(attr, (TensorWrapper, list)):
+        elif isinstance(attr, TensorWrapper | list):
             return attr[subscript]
         elif isinstance(attr, dict):
             return {key: TensorWrapper._slice_batch(val, subscript) for key, val in attr.items()}
@@ -69,7 +69,7 @@ class TensorWrapper:
 
     @staticmethod
     def _to(attr, device: str):
-        if isinstance(attr, (torch.Tensor, TensorWrapper)):
+        if isinstance(attr, torch.Tensor | TensorWrapper):
             return attr.to(device)
         elif isinstance(attr, dict):
             return {key: TensorWrapper._to(val, device) for key, val in attr.items()}
@@ -78,7 +78,7 @@ class TensorWrapper:
 
     @staticmethod
     def _detach(attr):
-        if isinstance(attr, (torch.Tensor, TensorWrapper)):
+        if isinstance(attr, torch.Tensor | TensorWrapper):
             return attr.detach()
         elif isinstance(attr, dict):
             return {key: TensorWrapper._detach(val) for key, val in attr.items()}
@@ -87,7 +87,7 @@ class TensorWrapper:
 
     @staticmethod
     def _numpy(attr):
-        if isinstance(attr, (torch.Tensor, TensorWrapper)):
+        if isinstance(attr, torch.Tensor | TensorWrapper):
             np_array = attr.numpy()
             if isinstance(np_array, np.ndarray):
                 return np.ascontiguousarray(np_array, dtype=np_array.dtype)
@@ -167,7 +167,7 @@ class TensorWrapper:
         out_params = {}
         for field in fields(self.__class__):
             attr = getattr(self, field.name)
-            if isinstance(attr, (torch.Tensor, TensorWrapper)):
+            if isinstance(attr, torch.Tensor | TensorWrapper):
                 out_params[field.name] = attr.clone()
             elif attr is not None:
                 out_params[field.name] = deepcopy(attr)

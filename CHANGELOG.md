@@ -4,7 +4,7 @@
 
 ## 🚀 Features
 
-- Added [treescope](https://github.com/google-deepmind/treescope) for model and tensor visualization.
+- Added [treescope](https://github.com/google-deepmind/treescope) for interactive model and tensor visualization. ([#283](https://github.com/inseq-team/inseq/pull/283))
 
 - Added new models `DbrxForCausalLM`, `OlmoForCausalLM`, `Phi3ForCausalLM`, `Qwen2MoeForCausalLM`, `Gemma2ForCausalLM` to model config.
 
@@ -90,4 +90,4 @@ out_female = attrib_model.attribute(
 
 ## 💥 Breaking Changes
 
-*No changes*
+- Dropped support for Python 3.9. Please use Python >= 3.10. ([#283](https://github.com/inseq-team/inseq/pull/283))

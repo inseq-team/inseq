@@ -1,8 +1,8 @@
 import re
+from collections.abc import Callable
 from inspect import getsourcelines
 from sys import gettrace, settrace
 from types import FrameType
-from typing import Callable, Optional
 
 from torch import nn
 
@@ -13,7 +13,7 @@ def get_last_variable_assignment_position(
     module: nn.Module,
     varname: str,
     fname: str = "forward",
-) -> Optional[int]:
+) -> int | None:
     """Extract the code line number of the last variable assignment for a variable of interest in the specified method
     of a `nn.Module` object.
 

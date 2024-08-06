@@ -1,8 +1,8 @@
 import logging
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from functools import wraps
 from inspect import signature
-from typing import TYPE_CHECKING, Callable, Literal, Optional, Union
+from typing import TYPE_CHECKING, Literal
 
 import safetensors
 import torch
@@ -76,8 +76,8 @@ def convert_from_safetensor(safetensor: bytes) -> torch.Tensor:
 def postprocess_attribution_scores(func: Callable) -> Callable:
     @wraps(func)
     def postprocess_scores_wrapper(
-        attributions: Union[torch.Tensor, tuple[torch.Tensor, ...]], dim: int = 0, *args, **kwargs
-    ) -> Union[torch.Tensor, tuple[torch.Tensor, ...]]:
+        attributions: torch.Tensor | tuple[torch.Tensor, ...], dim: int = 0, *args, **kwargs
+    ) -> torch.Tensor | tuple[torch.Tensor, ...]:
         multi_input = False
         if isinstance(attributions, tuple):
             orig_sizes = [a.shape[dim] for a in attributions]
@@ -98,17 +98,17 @@ def postprocess_attribution_scores(func: Callable) -> Callable:
 
 @postprocess_attribution_scores
 def normalize(
-    attributions: Union[torch.Tensor, tuple[torch.Tensor, ...]],
+    attributions: torch.Tensor | tuple[torch.Tensor, ...],
     dim: int = 0,
     norm_ord: int = 1,
-) -> Union[torch.Tensor, tuple[torch.Tensor, ...]]:
+) -> torch.Tensor | tuple[torch.Tensor, ...]:
     return F.normalize(attributions, p=norm_ord, dim=dim)
 
 
 @postprocess_attribution_scores
 def rescale(
-    attributions: Union[torch.Tensor, tuple[torch.Tensor, ...]],
-) -> Union[torch.Tensor, tuple[torch.Tensor, ...]]:
+    attributions: torch.Tensor | tuple[torch.Tensor, ...],
+) -> torch.Tensor | tuple[torch.Tensor, ...]:
     return attributions / attributions.abs().max()
 
 
@@ -140,9 +140,9 @@ def top_k_logits_mask(logits: torch.Tensor, top_k: int, min_tokens_to_keep: int)
 
 
 def get_logits_from_filter_strategy(
-    filter_strategy: Union[Literal["original"], Literal["contrast"], Literal["merged"]],
+    filter_strategy: Literal["original"] | Literal["contrast"] | Literal["merged"],
     original_logits: torch.Tensor,
-    contrast_logits: Optional[torch.Tensor] = None,
+    contrast_logits: torch.Tensor | None = None,
 ) -> torch.Tensor:
     if filter_strategy == "original":
         return original_logits
@@ -154,12 +154,12 @@ def get_logits_from_filter_strategy(
 
 def filter_logits(
     original_logits: torch.Tensor,
-    contrast_logits: Optional[torch.Tensor] = None,
+    contrast_logits: torch.Tensor | None = None,
     top_p: float = 1.0,
     top_k: int = 0,
     min_tokens_to_keep: int = 1,
-    filter_strategy: Union[Literal["original"], Literal["contrast"], Literal["merged"], None] = None,
-) -> Union[torch.Tensor, tuple[torch.Tensor, torch.Tensor]]:
+    filter_strategy: Literal["original"] | Literal["contrast"] | Literal["merged"] | None = None,
+) -> torch.Tensor | tuple[torch.Tensor, torch.Tensor]:
     """Applies top-k and top-p filtering to logits, and optionally to an additional set of contrastive logits."""
     if top_k > original_logits.size(-1) or top_k < 0:
         raise ValueError(f"`top_k` has to be a positive integer < {original_logits.size(-1)}, but is {top_k}")
@@ -201,7 +201,7 @@ def euclidean_distance(vec_a: torch.Tensor, vec_b: torch.Tensor) -> torch.Tensor
 def aggregate_contiguous(
     t: torch.Tensor,
     spans: Sequence[tuple[int, int]],
-    aggregate_fn: Optional[Callable] = None,
+    aggregate_fn: Callable | None = None,
     aggregate_dim: int = 0,
 ):
     """Given a tensor, aggregate contiguous spans of the tensor along a given dimension using the provided
@@ -269,7 +269,7 @@ def get_sequences_from_batched_steps(
     padding_dims = set(padding_dims)
     max_dims = tuple(max([bstep.shape[dim] for bstep in bsteps]) for dim in padding_dims)
     for bstep_idx, bstep in enumerate(bsteps):
-        for curr_dim, max_dim in zip(padding_dims, max_dims):
+        for curr_dim, max_dim in zip(padding_dims, max_dims, strict=False):
             bstep_dim = bstep.shape[curr_dim]
             if bstep_dim < max_dim:
                 # Pad the end of curr_dim with nans
@@ -331,7 +331,7 @@ def find_block_stack(module):
 def validate_indices(
     scores: torch.Tensor,
     dim: int = -1,
-    indices: Optional[OneOrMoreIndices] = None,
+    indices: OneOrMoreIndices | None = None,
 ) -> OneOrMoreIndices:
     """Validates a set of indices for a given dimension of a tensor of scores. Supports single indices, spans and lists
     of indices, including negative indices to specify positions relative to the end of the tensor.
@@ -350,7 +350,7 @@ def validate_indices(
     if dim >= scores.ndim:
         raise IndexError(f"Dimension {dim} is greater than tensor dimension {scores.ndim}")
     n_units = scores.shape[dim]
-    if not isinstance(indices, (int, tuple, list)) and indices is not None:
+    if not isinstance(indices, int | tuple | list) and indices is not None:
         raise TypeError(
             "Indices must be an integer, a (start, end) tuple of indices representing a span, a list of individual"
             " indices or a single index."
@@ -405,7 +405,7 @@ def pad_with_nan(t: torch.Tensor, dim: int, pad_size: int, front: bool = False) 
     return torch.cat([t, nan_tensor], dim=dim)
 
 
-def recursive_get_submodule(parent: nn.Module, target: str) -> Optional[nn.Module]:
+def recursive_get_submodule(parent: nn.Module, target: str) -> nn.Module | None:
     if target == "":
         return parent
     mod = None

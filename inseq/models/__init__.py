@@ -19,8 +19,8 @@ FRAMEWORKS_MAP = {
 
 
 def load_model(
-    model: Union[ModelIdentifier, ModelClass],
-    attribution_method: Optional[str] = None,
+    model: ModelIdentifier | ModelClass,
+    attribution_method: str | None = None,
     framework: str = "hf_transformers",
     **kwargs,
 ) -> AttributionModel:

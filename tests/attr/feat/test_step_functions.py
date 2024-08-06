@@ -32,7 +32,7 @@ def test_contrast_prob_consistency_decoder(saliency_gpt2: DecoderOnlyAttribution
         step_scores=["probability"],
     )
     regular_prob = out_regular.sequence_attributions[0].step_scores["probability"]
-    assert all(c == r for c, r in zip(contrast_prob, regular_prob))
+    assert all(c == r for c, r in zip(contrast_prob, regular_prob, strict=False))
 
 
 def test_contrast_prob_consistency_enc_dec(saliency_mt_model: EncoderDecoderAttributionModel):
@@ -52,7 +52,7 @@ def test_contrast_prob_consistency_enc_dec(saliency_mt_model: EncoderDecoderAttr
         step_scores=["probability"],
     )
     regular_prob = out_regular.sequence_attributions[0].step_scores["probability"]
-    assert all(c == r for c, r in zip(contrast_prob, regular_prob[-len(contrast_prob) :]))
+    assert all(c == r for c, r in zip(contrast_prob, regular_prob[-len(contrast_prob) :], strict=False))
 
 
 def attr_prob_diff_fn(

@@ -14,9 +14,9 @@
 """Decorators for attribution methods."""
 
 import logging
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from functools import wraps
-from typing import Any, Callable, Optional
+from typing import Any
 
 from ..data.data_utils import TensorWrapper
 
@@ -55,14 +55,14 @@ def batched(f: Callable[..., Any]) -> Callable[..., Any]:
     """Decorator that enables batching of the args."""
 
     @wraps(f)
-    def batched_wrapper(self, *args, batch_size: Optional[int] = None, **kwargs):
-        def get_batched(bs: Optional[int], seq: Sequence[Any]) -> list[list[Any]]:
+    def batched_wrapper(self, *args, batch_size: int | None = None, **kwargs):
+        def get_batched(bs: int | None, seq: Sequence[Any]) -> list[list[Any]]:
             if isinstance(seq, str):
                 seq = [seq]
             if isinstance(seq, list):
                 return [seq[i : i + bs] for i in range(0, len(seq), bs)]  # noqa
             if isinstance(seq, tuple):
-                return list(zip(*[get_batched(bs, s) for s in seq]))
+                return list(zip(*[get_batched(bs, s) for s in seq], strict=False))
             elif isinstance(seq, TensorWrapper):
                 return [seq.slice_batch(slice(i, i + bs)) for i in range(0, len(seq), bs)]  # noqa
             else:
@@ -75,7 +75,9 @@ def batched(f: Callable[..., Any]) -> Callable[..., Any]:
         len_batches = len(batched_args[0])
         assert all(len(batch) == len_batches for batch in batched_args)
         output = []
-        zipped_batched_args = zip(*batched_args) if len(batched_args) > 1 else [(x,) for x in batched_args[0]]
+        zipped_batched_args = (
+            zip(*batched_args, strict=False) if len(batched_args) > 1 else [(x,) for x in batched_args[0]]
+        )
         for i, batch in enumerate(zipped_batched_args):
             logger.debug(f"Batching enabled: processing batch {i + 1} of {len_batches}...")
             out = f(self, *batch, **kwargs)

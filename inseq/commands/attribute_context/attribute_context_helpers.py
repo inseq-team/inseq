@@ -1,7 +1,7 @@
 import logging
 import re
 from dataclasses import dataclass, field, fields
-from typing import Any, Optional
+from typing import Any
 
 from rich import print as rprint
 from rich.prompt import Confirm, Prompt
@@ -25,8 +25,8 @@ class CCIOutput:
     cti_score: float
     contextual_output: str
     contextless_output: str
-    input_context_scores: Optional[list[float]] = None
-    output_context_scores: Optional[list[float]] = None
+    input_context_scores: list[float] | None = None
+    output_context_scores: list[float] | None = None
 
     def __repr__(self):
         return f"{self.__class__.__name__}({pretty_dict(self.__dict__)})"
@@ -39,15 +39,15 @@ class CCIOutput:
 class AttributeContextOutput:
     """Output of the overall context attribution process."""
 
-    input_context: Optional[str] = None
-    input_context_tokens: Optional[list[str]] = None
-    output_context: Optional[str] = None
-    output_context_tokens: Optional[list[str]] = None
-    output_current: Optional[str] = None
-    output_current_tokens: Optional[list[str]] = None
-    cti_scores: Optional[list[float]] = None
+    input_context: str | None = None
+    input_context_tokens: list[str] | None = None
+    output_context: str | None = None
+    output_context_tokens: list[str] | None = None
+    output_current: str | None = None
+    output_current_tokens: list[str] | None = None
+    cti_scores: list[float] | None = None
     cci_scores: list[CCIOutput] = field(default_factory=list)
-    info: Optional[AttributeContextArgs] = None
+    info: AttributeContextArgs | None = None
 
     def __repr__(self):
         return f"{self.__class__.__name__}({pretty_dict(self.__dict__)})"
@@ -80,7 +80,7 @@ def concat_with_sep(s1: str, s2: str, sep: str) -> bool:
     return s1 + s2
 
 
-def format_template(template: str, current: str, context: Optional[str] = None) -> str:
+def format_template(template: str, current: str, context: str | None = None) -> str:
     kwargs = {"current": current}
     if context is not None:
         kwargs["context"] = context
@@ -149,7 +149,7 @@ def generate_model_output(
     return output_gen
 
 
-def prompt_user_for_context(output: str, context_candidate: Optional[str] = None) -> str:
+def prompt_user_for_context(output: str, context_candidate: str | None = None) -> str:
     """Prompt the user to provide the correct context for the provided output."""
     while True:
         if context_candidate:
@@ -194,16 +194,16 @@ def get_output_context_from_aligned_inputs(input_context: str, output_text: str)
 
 def prepare_outputs(
     model: HuggingfaceModel,
-    input_context_text: Optional[str],
+    input_context_text: str | None,
     input_full_text: str,
-    output_context_text: Optional[str],
-    output_current_text: Optional[str],
+    output_context_text: str | None,
+    output_current_text: str | None,
     output_template: str,
     handle_output_context_strategy: str,
     generation_kwargs: dict[str, Any] = {},
     special_tokens_to_keep: list[str] = [],
     decoder_input_output_separator: str = " ",
-) -> tuple[Optional[str], str]:
+) -> tuple[str | None, str]:
     """Handle model outputs and prepare them for attribution.
     This procedure is valid both for encoder-decoder and decoder-only models.
 
@@ -318,11 +318,11 @@ def get_scores_threshold(scores: list[float], std_weight: float) -> float:
 def filter_rank_tokens(
     tokens: list[str],
     scores: list[float],
-    std_threshold: Optional[float] = None,
-    topk: Optional[int] = None,
+    std_threshold: float | None = None,
+    topk: int | None = None,
 ) -> tuple[list[tuple[int, float, str]], float]:
     indices = list(range(0, len(scores)))
-    token_score_tuples = sorted(zip(indices, scores, tokens), key=lambda x: abs(x[1]), reverse=True)
+    token_score_tuples = sorted(zip(indices, scores, tokens, strict=False), key=lambda x: abs(x[1]), reverse=True)
     threshold = get_scores_threshold(scores, std_threshold)
     token_score_tuples = [(i, s, t) for i, s, t in token_score_tuples if abs(s) >= threshold]
     if topk:
@@ -336,7 +336,7 @@ def get_contextless_output(
     output_current_tokens: list[str],
     cti_idx: int,
     cti_ranked_tokens: tuple[int, float, str],
-    contextless_output_next_tokens: Optional[list[str]],
+    contextless_output_next_tokens: list[str] | None,
     prompt_user_for_contextless_output_next_tokens: bool,
     cci_step_idx: int,
     decoder_input_output_separator: str = " ",
@@ -420,7 +420,7 @@ def get_source_target_cci_scores(
     model_has_lang_tag: bool,
     decoder_input_output_separator: str,
     special_tokens_to_keep: list[str] = [],
-) -> tuple[Optional[list[float]], Optional[list[float]]]:
+) -> tuple[list[float] | None, list[float] | None]:
     """Extract attribution scores for the input and output contexts."""
     input_scores, output_scores = None, None
     if has_input_context:
@@ -456,7 +456,7 @@ def prompt_user_for_contextless_output_next_tokens(
     cti_idx: int,
     model: HuggingfaceModel,
     special_tokens_to_keep: list[str] = [],
-) -> Optional[str]:
+) -> str | None:
     """Prompt the user to provide the next tokens of the contextless output.
 
     Args:

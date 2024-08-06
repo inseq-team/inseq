@@ -1,6 +1,7 @@
 import logging
 import math
-from typing import TYPE_CHECKING, Any, Callable, Optional, Union
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any
 
 from ...utils import extract_signature_args, get_aligned_idx
 from ...utils.typing import (
@@ -24,8 +25,8 @@ logger = logging.getLogger(__name__)
 def tok2string(
     attribution_model: "AttributionModel",
     token_lists: OneOrMoreTokenSequences,
-    start: Optional[int] = None,
-    end: Optional[int] = None,
+    start: int | None = None,
+    end: int | None = None,
     as_targets: bool = True,
 ) -> TextInput:
     """Enables bounded tokenization of a list of lists of tokens with start and end positions."""
@@ -42,14 +43,14 @@ def rescale_attributions_to_tokens(
 ) -> OneOrMoreAttributionSequences:
     return [
         attr[: len(tokens)] if not all(math.isnan(x) for x in attr) else []
-        for attr, tokens in zip(attributions, tokens)
+        for attr, tokens in zip(attributions, tokens, strict=False)
     ]
 
 
 def check_attribute_positions(
     max_length: int,
-    attr_pos_start: Optional[int] = None,
-    attr_pos_end: Optional[int] = None,
+    attr_pos_start: int | None = None,
+    attr_pos_end: int | None = None,
 ) -> tuple[int, int]:
     r"""Checks whether the combination of start/end positions for attribution is valid.
 
@@ -88,8 +89,8 @@ def check_attribute_positions(
 def join_token_ids(
     tokens: OneOrMoreTokenSequences,
     ids: OneOrMoreIdSequences,
-    contrast_tokens: Optional[OneOrMoreTokenSequences] = None,
-    contrast_targets_alignments: Optional[list[list[tuple[int, int]]]] = None,
+    contrast_tokens: OneOrMoreTokenSequences | None = None,
+    contrast_targets_alignments: list[list[tuple[int, int]]] | None = None,
 ) -> list[TokenWithId]:
     """Joins tokens and ids into a list of TokenWithId objects."""
     if contrast_tokens is None:
@@ -99,10 +100,10 @@ def join_token_ids(
         contrast_targets_alignments = [[(idx, idx) for idx, _ in enumerate(seq)] for seq in tokens]
     sequences = []
     for target_tokens_seq, contrast_target_tokens_seq, input_ids_seq, alignments_seq in zip(
-        tokens, contrast_tokens, ids, contrast_targets_alignments
+        tokens, contrast_tokens, ids, contrast_targets_alignments, strict=False
     ):
         curr_seq = []
-        for pos_idx, (token, token_idx) in enumerate(zip(target_tokens_seq, input_ids_seq)):
+        for pos_idx, (token, token_idx) in enumerate(zip(target_tokens_seq, input_ids_seq, strict=False)):
             contrast_pos_idx = get_aligned_idx(pos_idx, alignments_seq)
             if contrast_pos_idx != -1 and token != contrast_target_tokens_seq[contrast_pos_idx]:
                 curr_seq.append(TokenWithId(f"{contrast_target_tokens_seq[contrast_pos_idx]} → {token}", -1))
@@ -142,10 +143,10 @@ def extract_args(
 
 
 def get_source_target_attributions(
-    attr: Union[StepAttributionTensor, tuple[StepAttributionTensor, StepAttributionTensor]],
+    attr: StepAttributionTensor | tuple[StepAttributionTensor, StepAttributionTensor],
     is_encoder_decoder: bool,
     has_sequence_scores: bool = False,
-) -> tuple[Optional[StepAttributionTensor], Optional[StepAttributionTensor]]:
+) -> tuple[StepAttributionTensor | None, StepAttributionTensor | None]:
     if isinstance(attr, tuple):
         if is_encoder_decoder:
             if has_sequence_scores:

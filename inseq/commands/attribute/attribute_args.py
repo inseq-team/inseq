@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from typing import Optional
 
 from ... import (
     list_aggregation_functions,
@@ -17,7 +16,7 @@ class AttributeBaseArgs:
     model_name_or_path: str = cli_arg(
         default=None, aliases=["-m"], help="The name or path of the model on which attribution is performed."
     )
-    attribution_method: Optional[str] = cli_arg(
+    attribution_method: str | None = cli_arg(
         default="saliency",
         aliases=["-a"],
         help="The attribution method used to perform feature attribution.",
@@ -28,7 +27,7 @@ class AttributeBaseArgs:
         aliases=["--dev"],
         help="The device used for inference with Pytorch. Multi-GPU is not supported.",
     )
-    attributed_fn: Optional[str] = cli_arg(
+    attributed_fn: str | None = cli_arg(
         default=None,
         aliases=["-fn"],
         choices=list_step_functions(),
@@ -38,7 +37,7 @@ class AttributeBaseArgs:
             " specified using the ``attribution_kwargs`` argument."
         ),
     )
-    attribution_selectors: Optional[list[int]] = cli_arg(
+    attribution_selectors: list[int] | None = cli_arg(
         default=None,
         help=(
             "The indices of the attribution scores to be used for the attribution aggregation. If specified, the"
@@ -125,19 +124,19 @@ class AttributeExtendedArgs(AttributeBaseArgs):
         aliases=["--hide"],
         help="If specified, the attribution visualization are not shown in the output.",
     )
-    save_path: Optional[str] = cli_arg(
+    save_path: str | None = cli_arg(
         default=None,
         aliases=["-o"],
         help="Path where the attribution output should be saved in JSON format.",
     )
-    viz_path: Optional[str] = cli_arg(
+    viz_path: str | None = cli_arg(
         default=None,
         help="Path where the attribution visualization should be saved in HTML format.",
     )
-    start_pos: Optional[int] = cli_arg(
+    start_pos: int | None = cli_arg(
         default=None, aliases=["-s"], help="Start position for the attribution. Default: first token"
     )
-    end_pos: Optional[int] = cli_arg(
+    end_pos: int | None = cli_arg(
         default=None, aliases=["-e"], help="End position for the attribution. Default: last token"
     )
     verbose: bool = cli_arg(
@@ -152,7 +151,7 @@ class AttributeExtendedArgs(AttributeBaseArgs):
 @dataclass
 class AttributeWithInputsArgs(AttributeExtendedArgs):
     input_texts: list[str] = cli_arg(default=None, aliases=["-i"], help="One or more input texts used for generation.")
-    generated_texts: Optional[list[str]] = cli_arg(
+    generated_texts: list[str] | None = cli_arg(
         default=None, aliases=["-g"], help="If specified, constrains the decoding procedure to the specified outputs."
     )
 

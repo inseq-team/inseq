@@ -18,7 +18,7 @@
 
 import random
 import string
-from typing import Literal, Optional, Union
+from typing import Literal
 
 import numpy as np
 from matplotlib.colors import Colormap
@@ -51,11 +51,11 @@ from .attribution import FeatureAttributionSequenceOutput
 
 def show_attributions(
     attributions: FeatureAttributionSequenceOutput,
-    min_val: Optional[int] = None,
-    max_val: Optional[int] = None,
+    min_val: int | None = None,
+    max_val: int | None = None,
     display: bool = True,
-    return_html: Optional[bool] = False,
-) -> Optional[str]:
+    return_html: bool | None = False,
+) -> str | None:
     """Core function allowing for visualization of feature attribution maps in console/HTML format.
 
     Args:
@@ -130,12 +130,12 @@ def show_attributions(
 
 def get_attribution_colors(
     attributions: list[FeatureAttributionSequenceOutput],
-    min_val: Optional[int] = None,
-    max_val: Optional[int] = None,
-    cmap: Union[str, Colormap, None] = None,
+    min_val: int | None = None,
+    max_val: int | None = None,
+    cmap: str | Colormap | None = None,
     return_alpha: bool = True,
     return_strings: bool = True,
-) -> list[list[list[Union[str, tuple[float, float, float]]]]]:
+) -> list[list[list[str | tuple[float, float, float]]]]:
     """A list (one element = one sentence) of lists (one element = attributions for one token)
     of lists (one element = one attribution) of colors. Colors are either strings or RGB(A) tuples.
     """
@@ -197,13 +197,13 @@ def get_heatmap_type(
 
 
 def get_saliency_heatmap_html(
-    scores: Union[np.ndarray, None],
+    scores: np.ndarray | None,
     column_labels: list[str],
     row_labels: list[str],
     input_colors: list[list[str]],
-    step_scores: Optional[dict[str, np.ndarray]] = None,
+    step_scores: dict[str, np.ndarray] | None = None,
     label: str = "",
-    step_scores_threshold: Union[float, dict[str, float]] = 0.5,
+    step_scores_threshold: float | dict[str, float] = 0.5,
 ):
     # unique ID added to HTML elements and function to avoid collision of differnent instances
     uuid = "".join(random.choices(string.ascii_lowercase, k=20))
@@ -250,13 +250,13 @@ def get_saliency_heatmap_html(
 
 
 def get_saliency_heatmap_rich(
-    scores: Union[np.ndarray, None],
+    scores: np.ndarray | None,
     column_labels: list[str],
     row_labels: list[str],
     input_colors: list[list[str]],
-    step_scores: Optional[dict[str, np.ndarray]] = None,
+    step_scores: dict[str, np.ndarray] | None = None,
     label: str = "",
-    step_scores_threshold: Union[float, dict[str, float]] = 0.5,
+    step_scores_threshold: float | dict[str, float] = 0.5,
 ):
     columns = [
         Column(header="", justify="right", overflow="fold"),
@@ -308,7 +308,7 @@ def get_progress_bar(
     pretty: bool,
     attr_pos_start: int,
     attr_pos_end: int,
-) -> Union[tqdm, tuple[Progress, Live], None]:
+) -> tqdm | tuple[Progress, Live] | None:
     if not show:
         return None
     elif show and not pretty:
@@ -324,7 +324,7 @@ def get_progress_bar(
             TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
             TimeRemainingColumn(),
         )
-        for idx, (tgt, tgt_len) in enumerate(zip(sequences.targets, target_lengths)):
+        for idx, (tgt, tgt_len) in enumerate(zip(sequences.targets, target_lengths, strict=False)):
             clean_tgt = escape(tgt.replace("\n", "\\n"))
             job_progress.add_task(f"{idx}. {clean_tgt}", total=tgt_len)
         progress_table = Table.grid()
@@ -356,11 +356,11 @@ def get_progress_bar(
 
 
 def update_progress_bar(
-    pbar: Union[tqdm, tuple[Progress, Live], None],
-    skipped_prefixes: Optional[list[str]] = None,
-    attributed_sentences: Optional[list[str]] = None,
-    unattributed_suffixes: Optional[list[str]] = None,
-    skipped_suffixes: Optional[list[str]] = None,
+    pbar: tqdm | tuple[Progress, Live] | None,
+    skipped_prefixes: list[str] | None = None,
+    attributed_sentences: list[str] | None = None,
+    unattributed_suffixes: list[str] | None = None,
+    skipped_suffixes: list[str] | None = None,
     whitespace_indexes: list[list[int]] = None,
     show: bool = False,
     pretty: bool = False,
@@ -376,7 +376,7 @@ def update_progress_bar(
                 pbar[0].advance(job.id)
                 formatted_desc = f"{job.id}. "
                 past_length = 0
-                for split, color in zip(split_targets, ["grey58", "green", "orange1", "grey58"]):
+                for split, color in zip(split_targets, ["grey58", "green", "orange1", "grey58"], strict=False):
                     if split[job.id]:
                         formatted_desc += f"[{color}]" + escape(split[job.id].replace("\n", "\\n")) + "[/]"
                         past_length += len(split[job.id])
@@ -386,7 +386,7 @@ def update_progress_bar(
                 pbar[0].update(job.id, description=formatted_desc, refresh=True)
 
 
-def close_progress_bar(pbar: Union[tqdm, tuple[Progress, Live], None], show: bool, pretty: bool) -> None:
+def close_progress_bar(pbar: tqdm | tuple[Progress, Live] | None, show: bool, pretty: bool) -> None:
     if not show:
         return
     elif show and not pretty:

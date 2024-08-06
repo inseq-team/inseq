@@ -101,11 +101,11 @@ def test_cuda_attribution_consistency_seq2seq(texts, reference_texts, attribute_
         )
         assert isinstance(out[device], FeatureAttributionOutput)
         assert isinstance(out[device].sequence_attributions[0], FeatureAttributionSequenceOutput)
-    for out_cpu, out_gpu in zip(out["cpu"].sequence_attributions, out["cuda"].sequence_attributions):
-        assert all(tok_cpu == tok_gpu for tok_cpu, tok_gpu in zip(out_cpu.target, out_gpu.target))
+    for out_cpu, out_gpu in zip(out["cpu"].sequence_attributions, out["cuda"].sequence_attributions, strict=False):
+        assert all(tok_cpu == tok_gpu for tok_cpu, tok_gpu in zip(out_cpu.target, out_gpu.target, strict=False))
         attr_score_matches = [
             torch.allclose(cpu_attr, gpu_attr, atol=1e-3)
-            for cpu_attr, gpu_attr in zip(out_cpu.source_attributions, out_gpu.source_attributions)
+            for cpu_attr, gpu_attr in zip(out_cpu.source_attributions, out_gpu.source_attributions, strict=False)
         ]
         assert all(attr_score_matches)
 

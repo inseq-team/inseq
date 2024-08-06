@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from enum import Enum
 from functools import lru_cache
 from itertools import chain
-from typing import Optional, Union
 
 import torch
 from transformers import AutoModel, AutoTokenizer, PreTrainedModel, PreTrainedTokenizerBase
@@ -91,8 +90,8 @@ def _get_aligner_subword_aligns(
 
 
 def compute_word_aligns(
-    src: Union[str, list[str]],
-    tgt: Union[str, list[str]],
+    src: str | list[str],
+    tgt: str | list[str],
     split_pattern: str = r"\s+|\b",
     align_layer: int = 8,
     score_threshold: float = 1e-3,
@@ -207,10 +206,10 @@ def add_alignment_extra_positions(
 
 
 def auto_align_sequences(
-    a_sequence: Optional[str] = None,
-    a_tokens: Optional[list[str]] = None,
-    b_sequence: Optional[str] = None,
-    b_tokens: Optional[list[str]] = None,
+    a_sequence: str | None = None,
+    a_tokens: list[str] | None = None,
+    b_sequence: str | None = None,
+    b_tokens: list[str] | None = None,
     filter_special_tokens: list[str] = [],
     split_pattern: str = r"\s+|\b",
 ) -> AlignedSequences:
@@ -246,7 +245,7 @@ def auto_align_sequences(
                     rm_b_idx = removed_b_token_idxs[removed_b_tokens.index(rm_a)]
                     aligned_special_tokens.append((rm_a_idx, rm_b_idx))
         else:
-            aligned_special_tokens = list(zip(removed_a_token_idxs, removed_b_token_idxs))
+            aligned_special_tokens = list(zip(removed_a_token_idxs, removed_b_token_idxs, strict=False))
         a_word_to_token_align = align_tokenizations(a_words, clean_a_tokens)
         b_word_to_token_align = align_tokenizations(b_words, clean_b_tokens)
         # 3. Propagate word-level alignments to token-level alignments.
@@ -274,15 +273,15 @@ def auto_align_sequences(
 
 
 def get_adjusted_alignments(
-    alignments: Union[list[tuple[int, int]], str],
-    target_sequence: Optional[str] = None,
-    target_tokens: Optional[list[str]] = None,
-    contrast_sequence: Optional[str] = None,
-    contrast_tokens: Optional[list[str]] = None,
+    alignments: list[tuple[int, int]] | str,
+    target_sequence: str | None = None,
+    target_tokens: list[str] | None = None,
+    contrast_sequence: str | None = None,
+    contrast_tokens: list[str] | None = None,
     fill_missing: bool = False,
     special_tokens: list[str] = [],
     start_pos: int = 0,
-    end_pos: Optional[int] = None,
+    end_pos: int | None = None,
 ) -> list[tuple[int, int]]:
     is_auto_aligned = False
     if fill_missing and not target_tokens:

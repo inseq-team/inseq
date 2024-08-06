@@ -17,7 +17,8 @@
 # OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 import typing
-from typing import Any, Callable, Union
+from collections.abc import Callable
+from typing import Any
 
 import torch
 from captum._utils.common import (
@@ -121,7 +122,7 @@ class SequentialIntegratedGradients(GradientAttribution):
         additional_forward_args: Any = None,
         n_steps: int = 50,
         method: str = "gausslegendre",
-        internal_batch_size: Union[None, int] = None,
+        internal_batch_size: None | int = None,
         return_convergence_delta: Literal[False] = False,
     ) -> TensorOrTupleOfTensorsGeneric:
         ...
@@ -135,7 +136,7 @@ class SequentialIntegratedGradients(GradientAttribution):
         additional_forward_args: Any = None,
         n_steps: int = 50,
         method: str = "gausslegendre",
-        internal_batch_size: Union[None, int] = None,
+        internal_batch_size: None | int = None,
         *,
         return_convergence_delta: Literal[True],
     ) -> tuple[TensorOrTupleOfTensorsGeneric, Tensor]:
@@ -149,12 +150,9 @@ class SequentialIntegratedGradients(GradientAttribution):
         additional_forward_args: Any = None,
         n_steps: int = 50,
         method: str = "gausslegendre",
-        internal_batch_size: Union[None, int] = None,
+        internal_batch_size: None | int = None,
         return_convergence_delta: bool = False,
-    ) -> Union[
-        TensorOrTupleOfTensorsGeneric,
-        tuple[TensorOrTupleOfTensorsGeneric, Tensor],
-    ]:
+    ) -> TensorOrTupleOfTensorsGeneric | tuple[TensorOrTupleOfTensorsGeneric, Tensor]:
         r"""
         This method attributes the output of the model with given target index
         (in case it is provided, otherwise it assumes that output is a
@@ -368,13 +366,13 @@ class SequentialIntegratedGradients(GradientAttribution):
     def _attribute(
         self,
         inputs: tuple[Tensor, ...],
-        baselines: tuple[Union[Tensor, int, float], ...],
+        baselines: tuple[Tensor | int | float, ...],
         target: TargetType = None,
         additional_forward_args: Any = None,
         n_steps: int = 50,
         method: str = "gausslegendre",
         idx: int = None,
-        step_sizes_and_alphas: Union[None, tuple[list[float], list[float]]] = None,
+        step_sizes_and_alphas: None | tuple[list[float], list[float]] = None,
     ) -> tuple[Tensor, ...]:
         if step_sizes_and_alphas is None:
             # retrieve step size and scaling factor for specified
@@ -412,7 +410,7 @@ class SequentialIntegratedGradients(GradientAttribution):
                 ],
                 dim=1,
             )
-            for input, baseline in zip(inputs, baselines_)
+            for input, baseline in zip(inputs, baselines_, strict=False)
         )
 
         additional_forward_args = _format_additional_forward_args(additional_forward_args)
@@ -447,7 +445,7 @@ class SequentialIntegratedGradients(GradientAttribution):
         # total_grads has the same dimensionality as inputs
         total_grads = tuple(
             _reshape_and_sum(scaled_grad, n_steps, grad.shape[0] // n_steps, grad.shape[1:])
-            for (scaled_grad, grad) in zip(scaled_grads, grads)
+            for (scaled_grad, grad) in zip(scaled_grads, grads, strict=False)
         )
 
         # computes attribution for each tensor in input tuple
@@ -456,7 +454,8 @@ class SequentialIntegratedGradients(GradientAttribution):
             attributions = total_grads
         else:
             attributions = tuple(
-                total_grad * (input - baseline) for total_grad, input, baseline in zip(total_grads, inputs, baselines)
+                total_grad * (input - baseline)
+                for total_grad, input, baseline in zip(total_grads, inputs, baselines, strict=False)
             )
         return attributions
 

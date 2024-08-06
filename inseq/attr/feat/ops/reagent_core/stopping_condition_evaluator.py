@@ -1,6 +1,5 @@
 import logging
 from abc import ABC, abstractmethod
-from typing import Optional
 
 import torch
 from transformers import AutoModelForCausalLM
@@ -19,7 +18,7 @@ class StoppingConditionEvaluator(ABC):
         input_ids: IdsTensor,
         target_id: TargetIdsTensor,
         importance_score: MultipleScoresPerStepTensor,
-        decoder_input_ids: Optional[IdsTensor] = None,
+        decoder_input_ids: IdsTensor | None = None,
         attribute_target: bool = False,
     ) -> TargetIdsTensor:
         """Evaluate stop condition according to the specified strategy.
@@ -75,7 +74,7 @@ class TopKStoppingConditionEvaluator(StoppingConditionEvaluator):
         input_ids: IdsTensor,
         target_id: TargetIdsTensor,
         importance_score: MultipleScoresPerStepTensor,
-        decoder_input_ids: Optional[IdsTensor] = None,
+        decoder_input_ids: IdsTensor | None = None,
         attribute_target: bool = False,
     ) -> TargetIdsTensor:
         """Evaluate stop condition

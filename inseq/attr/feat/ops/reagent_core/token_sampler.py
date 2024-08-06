@@ -2,7 +2,7 @@ import logging
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, Optional, Union
+from typing import Any
 
 import torch
 from transformers import AutoTokenizer, PreTrainedTokenizerBase
@@ -35,13 +35,13 @@ class POSTagTokenSampler(TokenSampler):
 
     def __init__(
         self,
-        tokenizer: Union[str, PreTrainedTokenizerBase],
+        tokenizer: str | PreTrainedTokenizerBase,
         identifier: str = "pos_tag_sampler",
         save_cache: bool = True,
         overwrite_cache: bool = False,
         cache_dir: Path = INSEQ_ARTIFACTS_CACHE / "pos_tag_sampler_cache",
-        device: Optional[str] = None,
-        tokenizer_kwargs: Optional[dict[str, Any]] = {},
+        device: str | None = None,
+        tokenizer_kwargs: dict[str, Any] | None = {},
     ) -> None:
         if isinstance(tokenizer, PreTrainedTokenizerBase):
             self.tokenizer = tokenizer

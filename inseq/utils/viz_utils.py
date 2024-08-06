@@ -16,7 +16,6 @@
 # WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
 # OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-from typing import Union
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -42,8 +41,8 @@ def red_transparent_blue_colormap():
 
 def get_color(
     score: float,
-    min_value: Union[float, int],
-    max_value: Union[float, int],
+    min_value: float | int,
+    max_value: float | int,
     cmap: Colormap,
     return_alpha: bool = True,
     return_string: bool = True,
@@ -62,7 +61,7 @@ def get_color(
     return color
 
 
-def sanitize_html(txt: Union[str, TokenWithId]) -> str:
+def sanitize_html(txt: str | TokenWithId) -> str:
     if isinstance(txt, TokenWithId):
         txt = txt.token
     return txt.replace("<", "&lt;").replace(">", "&gt;")
@@ -70,9 +69,9 @@ def sanitize_html(txt: Union[str, TokenWithId]) -> str:
 
 def get_colors(
     scores: NDArray,
-    min_value: Union[float, int],
-    max_value: Union[float, int],
-    cmap: Union[str, Colormap, None] = None,
+    min_value: float | int,
+    max_value: float | int,
+    cmap: str | Colormap | None = None,
     return_alpha: bool = True,
     return_strings: bool = True,
 ):
