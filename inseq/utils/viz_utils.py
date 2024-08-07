@@ -115,6 +115,18 @@ def get_colors(
     return input_colors
 
 
+def test_dim(dim: int | str, dim_names: dict[int, str], rev_dim_names: dict[str, int], scores: np.ndarray) -> int:
+    if isinstance(dim, str):
+        if dim not in rev_dim_names:
+            raise ValueError(f"Invalid dimension name {dim}: valid names are {list(rev_dim_names.keys())}")
+        dim_idx = rev_dim_names[dim]
+    else:
+        dim_idx = dim
+    if dim_idx <= 1 or dim_idx > scores.ndim or dim_idx not in dim_names:
+        raise ValueError(f"Invalid dimension {dim_idx}: valid indices are {list(range(2, scores.ndim))}")
+    return dim_idx
+
+
 # Full plot
 
 final_plot_html = """

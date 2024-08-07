@@ -428,6 +428,7 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
         max_val: int | None = None,
         max_show_size: int | None = None,
         show_dim: int | str | None = None,
+        slice_dims: dict[int | str, tuple[int, int]] | None = None,
         display: bool = True,
         return_html: bool | None = False,
         aggregator: AggregatorPipeline | type[Aggregator] = None,
@@ -450,6 +451,10 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
                 For granular visualization, this parameter specifies the dimension that should be visualized along with
                 the source and target tokens. Can be either the dimension index or the dimension name. Works only if
                 the dimension size is less than or equal to `max_show_size`.
+            slice_dims (:obj:`dict[int or str, tuple[int, int]]`, *optional*, defaults to None):
+                For granular visualization, this parameter specifies the dimensions that should be sliced and visualized
+                along with the source and target tokens. The dictionary should contain the dimension index or name as the
+                key and the slice range as the value.
             display (:obj:`bool`, *optional*, defaults to True):
                 Whether to display the visualization. Can be set to False if the visualization is produced and stored
                 for later use.
@@ -474,7 +479,11 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
         ):
             tokens = "".join(tid.token for tid in self.target)
             logger.warning(f"Found empty attributions, skipping attribution matching generation: {tokens}")
-        if aggregated.source_attributions.ndim == 2 and aggregated.target_attributions.ndim == 2:
+        if (
+            (aggregated.source_attributions is not None and aggregated.source_attributions.ndim == 2)
+            or (aggregated.target_attributions is not None and aggregated.target_attributions.ndim == 2)
+            or (aggregated.source_attributions is None and aggregated.target_attributions is None)
+        ):
             return show_attributions(
                 attributions=aggregated, min_val=min_val, max_val=max_val, display=display, return_html=return_html
             )
@@ -487,6 +496,7 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
                 show_dim=show_dim,
                 display=display,
                 return_html=return_html,
+                slice_dims=slice_dims,
             )
 
     def show_granular(
@@ -495,6 +505,7 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
         max_val: int | None = None,
         max_show_size: int | None = None,
         show_dim: int | str | None = None,
+        slice_dims: dict[int | str, tuple[int, int]] | None = None,
         display: bool = True,
         return_html: bool | None = False,
     ) -> str | None:
@@ -506,6 +517,7 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
             min_val=min_val,
             max_val=max_val,
             show_dim=show_dim,
+            slice_dims=slice_dims,
             display=display,
             return_html=return_html,
         )
@@ -844,6 +856,7 @@ class FeatureAttributionOutput:
         max_val: int | None = None,
         max_show_size: int | None = None,
         show_dim: int | str | None = None,
+        slice_dims: dict[int | str, tuple[int, int]] | None = None,
         display: bool = True,
         return_html: bool | None = False,
         aggregator: AggregatorPipeline | type[Aggregator] = None,
@@ -857,6 +870,7 @@ class FeatureAttributionOutput:
             max_val (int, optional): Maximum value for color scale.
             max_show_size (int, optional): Maximum size of the dimension to show.
             show_dim (int or str, optional): Dimension to show.
+            slice_dims (dict[int or str, tuple[int, int]], optional): Dimensions to slice.
             display (bool, optional): If True, display the attribution visualization.
             return_html (bool, optional): If True, return the attribution visualization as HTML.
             aggregator (:obj:`AggregatorPipeline` or :obj:`Type[Aggregator]`, optional): Aggregator
@@ -876,6 +890,7 @@ class FeatureAttributionOutput:
                 max_val=max_val,
                 max_show_size=max_show_size,
                 show_dim=show_dim,
+                slice_dims=slice_dims,
                 display=display,
                 return_html=return_html,
                 aggregator=aggregator,
@@ -893,6 +908,7 @@ class FeatureAttributionOutput:
         max_val: int | None = None,
         max_show_size: int | None = None,
         show_dim: int | str | None = None,
+        slice_dims: dict[int | str, tuple[int, int]] | None = None,
         display: bool = True,
         return_html: bool = False,
     ) -> str | None:
@@ -903,6 +919,7 @@ class FeatureAttributionOutput:
                 max_val=max_val,
                 max_show_size=max_show_size,
                 show_dim=show_dim,
+                slice_dims=slice_dims,
                 display=display,
                 return_html=return_html,
             )

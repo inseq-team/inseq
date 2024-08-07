@@ -46,6 +46,7 @@ from ..utils.viz_utils import (
     saliency_heatmap_html,
     saliency_heatmap_table_header,
     sanitize_html,
+    test_dim,
     treescope_cmap,
 )
 
@@ -146,6 +147,7 @@ def show_granular_attributions(
     min_val: int | None = None,
     max_val: int | None = None,
     show_dim: int | str | None = None,
+    slice_dims: dict[int | str, tuple[int, int]] | None = None,
     display: bool = True,
     return_html: bool | None = False,
     return_figure: bool = False,
@@ -195,6 +197,7 @@ def show_granular_attributions(
                     max_val=max_val,
                     min_val=min_val,
                     show_dim=show_dim,
+                    slice_dims=slice_dims,
                 ),
             ]
         if attribution.target_attributions is not None:
@@ -209,6 +212,7 @@ def show_granular_attributions(
                     max_val=max_val,
                     min_val=min_val,
                     show_dim=show_dim,
+                    slice_dims=slice_dims,
                 ),
             ]
         items_to_render.append("")
@@ -219,6 +223,38 @@ def show_granular_attributions(
         treescope.show(fig)
     if return_html:
         return treescope.render_to_html(fig)
+
+
+def show_token_attributions(
+    attributions: "FeatureAttributionSequenceOutput",
+    display: bool = True,
+    return_html: bool | None = False,
+    return_figure: bool = False,
+    replace_char: dict[str, str] | None = None,
+    wrap_after: int | str | None = None,
+):
+    # from inseq.data.attribution import FeatureAttributionSequenceOutput
+    #
+    # if isinstance(attributions, FeatureAttributionSequenceOutput):
+    #    attributions: list["FeatureAttributionSequenceOutput"] = [attributions]
+    # if not isnotebook() and display:
+    #    raise ValueError(
+    #        "Token attribution heatmaps visualization is  only supported in Jupyter notebooks. "
+    #        "Please set `display=False` and `return_html=True` to avoid this error."
+    #    )
+    # if return_html and return_figure:
+    #    raise ValueError("Only one of `return_html` and `return_figure` can be set to True.")
+    # if replace_char is None:
+    #    replace_char = {"Ġ": " ", "▁": " ", "Ċ": ""}
+    # items_to_render = []
+    # for attr_idx, attr in enumerate(attributions):
+    #    cleaned_tokens = []
+    #    for t in attr.target:
+    #        curr_tok = t.token
+    #        for k, v in replace_char.items():
+    #            curr_tok = curr_tok.replace(k, v)
+    #        cleaned_tokens.append(curr_tok)
+    pass
 
 
 def get_attribution_colors(
@@ -399,6 +435,7 @@ def get_saliency_heatmap_treescope(
     max_val: float | None = None,
     min_val: float | None = None,
     show_dim: int | str | None = None,
+    slice_dims: dict[int | str, tuple[int, int]] | None = None,
 ):
     if max_show_size is None:
         max_show_size = 20
@@ -408,15 +445,14 @@ def get_saliency_heatmap_treescope(
     rev_dim_names = {v: k for k, v in dim_names.items()}
     col_dims = [1]
     slider_dims = []
+    if slice_dims is not None:
+        slices = [slice(None)] * scores.ndim
+        for dim_name, slice_idxs in slice_dims.items():
+            dim_idx = test_dim(dim_name, dim_names, rev_dim_names, scores)
+            slices[dim_idx] = slice(slice_idxs[0], slice_idxs[1])
+        scores = scores[tuple(slices)]
     if show_dim is not None:
-        if isinstance(show_dim, str):
-            if show_dim not in rev_dim_names:
-                raise ValueError(f"Invalid dimension name {show_dim}: valid names are {list(rev_dim_names.keys())}")
-            show_dim_idx = rev_dim_names[show_dim_idx]
-        else:
-            show_dim_idx = show_dim
-        if show_dim_idx <= 1 or show_dim_idx > scores.ndim or show_dim_idx not in dim_names:
-            raise ValueError(f"Invalid dimension {show_dim_idx}: valid indices are {list(range(2, scores.ndim))}")
+        show_dim_idx = test_dim(show_dim, dim_names, rev_dim_names, scores)
         if scores.shape[show_dim_idx] > max_show_size:
             raise ValueError(
                 f"Dimension {show_dim_idx} has size {scores.shape[show_dim_idx]} which is greater than the maximum "
@@ -441,6 +477,10 @@ def get_saliency_heatmap_treescope(
         vmax=max_val,
         vmin=min_val,
     )
+
+
+def get_tokens_heatmap_treescope():
+    pass
 
 
 # Progress bar utilities
