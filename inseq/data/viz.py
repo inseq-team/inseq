@@ -18,7 +18,7 @@
 
 import random
 import string
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 import numpy as np
 import treescope
@@ -48,17 +48,19 @@ from ..utils.viz_utils import (
     sanitize_html,
     treescope_cmap,
 )
-from .attribution import FeatureAttributionSequenceOutput
+
+if TYPE_CHECKING:
+    from .attribution import FeatureAttributionSequenceOutput
 
 if isnotebook():
     cmap = treescope_cmap()
-    treescope.basic_interactive_setup(autovisualize_arrays=False)
+    treescope.basic_interactive_setup(autovisualize_arrays=True)
     treescope.default_diverging_colormap.set_globally(cmap)
     treescope.default_sequential_colormap.set_globally(cmap)
 
 
 def show_attributions(
-    attributions: FeatureAttributionSequenceOutput,
+    attributions: "FeatureAttributionSequenceOutput",
     min_val: int | None = None,
     max_val: int | None = None,
     display: bool = True,
@@ -82,6 +84,8 @@ def show_attributions(
     Returns:
         `Optional[str]`: Returns the HTML output if `return_html=True`
     """
+    from inseq.data.attribution import FeatureAttributionSequenceOutput
+
     if isinstance(attributions, FeatureAttributionSequenceOutput):
         attributions = [attributions]
     html_out = ""
@@ -137,13 +141,14 @@ def show_attributions(
 
 
 def show_granular_attributions(
-    attributions: FeatureAttributionSequenceOutput,
+    attributions: "FeatureAttributionSequenceOutput",
     max_show_size: int = 20,
     min_val: int | None = None,
     max_val: int | None = None,
     show_dim: int | str | None = None,
     display: bool = True,
     return_html: bool | None = False,
+    return_figure: bool = False,
 ) -> str | None:
     """Visualizes granular attribution heatmaps in HTML format.
 
@@ -159,17 +164,23 @@ def show_granular_attributions(
         return_html (`Optional[bool]`, *optional*, defaults to False):
             If true, returns the HTML corresponding to the notebook visualization of the attributions in string format,
             for saving purposes.
+        return_figure (`Optional[bool]`, *optional*, defaults to False):
+            If true, returns the Treescope figure object for further manipulation.
 
     Returns:
         `Optional[str]`: Returns the HTML output if `return_html=True`
     """
+    from inseq.data.attribution import FeatureAttributionSequenceOutput
+
     if isinstance(attributions, FeatureAttributionSequenceOutput):
-        attributions: list[FeatureAttributionSequenceOutput] = [attributions]
+        attributions: list["FeatureAttributionSequenceOutput"] = [attributions]
     if not isnotebook() and display:
         raise ValueError(
             "Granular attribution heatmaps visualization is  only supported in Jupyter notebooks. "
             "Please set `display=False` and `return_html=True` to avoid this error."
         )
+    if return_html and return_figure:
+        raise ValueError("Only one of `return_html` and `return_figure` can be set to True.")
     items_to_render = []
     for ex_id, attribution in enumerate(attributions):
         if attribution.source_attributions is not None:
@@ -192,7 +203,7 @@ def show_granular_attributions(
                 get_saliency_heatmap_treescope(
                     attribution.target_attributions.numpy(),
                     [t.token for t in attribution.target[attribution.attr_pos_start : attribution.attr_pos_end]],
-                    [t.token for t in attribution.source],
+                    [t.token for t in attribution.target],
                     attribution._attribution_dim_names["target_attributions"],
                     max_show_size=max_show_size,
                     max_val=max_val,
@@ -202,6 +213,8 @@ def show_granular_attributions(
             ]
         items_to_render.append("")
     fig = treescope.figures.inline(*items_to_render)
+    if return_figure:
+        return fig
     if display:
         treescope.show(fig)
     if return_html:
@@ -209,7 +222,7 @@ def show_granular_attributions(
 
 
 def get_attribution_colors(
-    attributions: list[FeatureAttributionSequenceOutput],
+    attributions: list["FeatureAttributionSequenceOutput"],
     min_val: int | None = None,
     max_val: int | None = None,
     cmap: str | Colormap | None = None,
@@ -241,7 +254,7 @@ def get_attribution_colors(
 
 
 def get_heatmap_type(
-    attribution: FeatureAttributionSequenceOutput,
+    attribution: "FeatureAttributionSequenceOutput",
     colors,
     heatmap_type: Literal["Source", "Target"] = "Source",
     use_html: bool = False,
@@ -389,6 +402,8 @@ def get_saliency_heatmap_treescope(
 ):
     if max_show_size is None:
         max_show_size = 20
+    if dim_names is None:
+        dim_names = {}
     item_labels_dict = {0: row_labels, 1: column_labels}
     rev_dim_names = {v: k for k, v in dim_names.items()}
     col_dims = [1]
@@ -421,7 +436,7 @@ def get_saliency_heatmap_treescope(
         rows=[0],
         columns=col_dims,
         sliders=slider_dims,
-        axis_labels=dim_names,
+        axis_labels={k: f"{v}: {scores.shape[k]}" for k, v in dim_names.items()},
         axis_item_labels=item_labels_dict,
         vmax=max_val,
         vmin=min_val,

@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import torch
+import treescope
 
 from ..utils import (
     convert_from_safetensor,
@@ -37,6 +38,7 @@ from .aggregation_functions import DEFAULT_ATTRIBUTION_AGGREGATE_DICT
 from .aggregator import AggregableMixin, Aggregator, AggregatorPipeline
 from .batch import Batch, BatchEmbedding, BatchEncoding, DecoderOnlyBatch, EncoderDecoderBatch
 from .data_utils import TensorWrapper
+from .viz import get_saliency_heatmap_treescope
 
 if TYPE_CHECKING:
     from ..models import AttributionModel
@@ -192,6 +194,66 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
             raise ValueError(f"Cannot compare {type(other)} with {type(self)}")
         return self.aggregate("pair", paired_attr=other, do_post_aggregation_checks=False)
 
+    def __treescope_repr__(
+        self,
+        path: str,
+        subtree_renderer: Callable[[Any, str | None], treescope.rendering_parts.Rendering],
+    ) -> treescope.rendering_parts.Rendering:
+        def granular_attribution_visualizer(
+            value: Any,
+            path: tuple[Any, ...] | None,
+        ):
+            if isinstance(value, torch.Tensor):
+                tname = path.split(".")[-1]
+                column_labels = [t.token for t in self.target[self.attr_pos_start : self.attr_pos_end]]
+                if tname == "source_attributions":
+                    row_labels = [t.token for t in self.source]
+                elif tname == "target_attributions":
+                    row_labels = [t.token for t in self.target]
+                elif tname.startswith("sequence_scores"):
+                    tname = tname[17:].split("_")[0]
+                    if tname.startswith("encoder"):
+                        row_labels = [t.token for t in self.source]
+                        column_labels = [t.token for t in self.source]
+                    elif tname.startswith("decoder"):
+                        row_labels = [t.token for t in self.target]
+                        column_labels = [t.token for t in self.target]
+                adapter = treescope.type_registries.lookup_ndarray_adapter(value)
+                if value.ndim >= 2:
+                    return treescope.IPythonVisualization(
+                        treescope.figures.inline(
+                            adapter.get_array_summary(value, fast=False),
+                            get_saliency_heatmap_treescope(
+                                scores=value.numpy(),
+                                column_labels=column_labels,
+                                row_labels=row_labels,
+                                dim_names=self._attribution_dim_names.get(tname, None),
+                            ),
+                        ),
+                        replace=True,
+                    )
+                else:
+                    return treescope.IPythonVisualization(
+                        treescope.figures.inline(
+                            adapter.get_array_summary(value, fast=False),
+                            treescope.render_array(
+                                value,
+                                axis_labels={0: f"Generated Tokens: {value.shape[0]}"},
+                                axis_item_labels={0: column_labels},
+                            ),
+                        ),
+                        replace=True,
+                    )
+
+        with treescope.active_autovisualizer.set_scoped(granular_attribution_visualizer):
+            return treescope.repr_lib.render_object_constructor(
+                object_type=type(self),
+                attributes=self.__dict__,
+                path=path,
+                subtree_renderer=subtree_renderer,
+                roundtrippable=True,
+            )
+
     def _convert_to_safetensors(self, scores_precision: ScorePrecision = "float32"):
         """
         Converts tensor attributes within the class to the specified precision.
@@ -335,7 +397,7 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
                 # that are not source-to-target (default for encoder-decoder) or target-to-target
                 # (default for decoder only).
                 remove_pad_fn = cls.get_remove_pad_fn(attr, seq_score_name)
-                if seq_score_name.startswith("encoder"):
+                if seq_score_name.startswith("encoder") or seq_score_name.startswith("decoder"):
                     out_seq_scores = [attr.sequence_scores[seq_score_name][i, ...] for i in range(num_sequences)]
                 else:
                     out_seq_scores = get_sequences_from_batched_steps(
@@ -824,7 +886,7 @@ class FeatureAttributionOutput:
                 out_str += curr_out_str
         if return_html:
             return out_str
-        
+
     def show_granular(
         self,
         min_val: int | None = None,
@@ -943,10 +1005,12 @@ class MultiDimensionalFeatureAttributionSequenceOutput(FeatureAttributionSequenc
         self._attribution_dim_names = {
             "source_attributions": {0: "Input Tokens", 1: "Generated Tokens", 2: "Model Layer"},
             "target_attributions": {0: "Input Tokens", 1: "Generated Tokens", 2: "Model Layer"},
+            "encoder": {0: "Input Tokens", 1: "Input Tokens", 2: "Model Layer"},
+            "decoder": {0: "Generated Tokens", 1: "Generated Tokens", 2: "Model Layer"},
         }
         if self._num_dimensions == 2:
-            self._attribution_dim_names["source_attributions"][3] = "Attention Head"
-            self._attribution_dim_names["target_attributions"][3] = "Attention Head"
+            for key in self._attribution_dim_names.keys():
+                self._attribution_dim_names[key][3] = "Attention Head"
 
 
 @dataclass(eq=False, repr=False)
