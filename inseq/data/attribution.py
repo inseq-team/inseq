@@ -38,7 +38,7 @@ from .aggregation_functions import DEFAULT_ATTRIBUTION_AGGREGATE_DICT
 from .aggregator import AggregableMixin, Aggregator, AggregatorPipeline
 from .batch import Batch, BatchEmbedding, BatchEncoding, DecoderOnlyBatch, EncoderDecoderBatch
 from .data_utils import TensorWrapper
-from .viz import get_saliency_heatmap_treescope
+from .viz import get_saliency_heatmap_treescope, get_tokens_heatmap_treescope
 
 if TYPE_CHECKING:
     from ..models import AttributionModel
@@ -235,12 +235,23 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
                 else:
                     return treescope.IPythonVisualization(
                         treescope.figures.inline(
-                            adapter.get_array_summary(value, fast=False),
-                            treescope.render_array(
-                                value,
-                                axis_labels={0: f"Generated Tokens: {value.shape[0]}"},
-                                axis_item_labels={0: column_labels},
+                            adapter.get_array_summary(value, fast=False) + "\n\n",
+                            treescope.figures.figure_from_treescope_rendering_part(
+                                treescope.rendering_parts.indented_children(
+                                    [
+                                        get_tokens_heatmap_treescope(
+                                            tokens=column_labels,
+                                            scores=value.numpy(),
+                                            max_val=value.max().item(),
+                                        )
+                                    ]
+                                )
                             ),
+                            # treescope.render_array(
+                            #    value,
+                            #    axis_labels={0: f"Generated Tokens: {value.shape[0]}"},
+                            #    axis_item_labels={0: column_labels},
+                            # ),
                         ),
                         replace=True,
                     )
@@ -431,6 +442,7 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
         slice_dims: dict[int | str, tuple[int, int]] | None = None,
         display: bool = True,
         return_html: bool | None = False,
+        return_figure: bool = False,
         aggregator: AggregatorPipeline | type[Aggregator] = None,
         do_aggregation: bool = True,
         **kwargs,
@@ -460,6 +472,8 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
                 for later use.
             return_html (:obj:`bool`, *optional*, defaults to False):
                 Whether to return the HTML code of the visualization.
+            return_figure (:obj:`bool`, *optional*, defaults to False):
+                For granular visualization, whether to return the Treescope figure object for further manipulation.
             aggregator (:obj:`AggregatorPipeline`, *optional*, defaults to None):
                 Aggregates attributions before visualizing them. If not specified, the default aggregator for the class
                 is used.
@@ -496,6 +510,7 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
                 show_dim=show_dim,
                 display=display,
                 return_html=return_html,
+                return_figure=return_figure,
                 slice_dims=slice_dims,
             )
 
@@ -508,6 +523,7 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
         slice_dims: dict[int | str, tuple[int, int]] | None = None,
         display: bool = True,
         return_html: bool | None = False,
+        return_figure: bool = False,
     ) -> str | None:
         from inseq import show_granular_attributions
 
@@ -520,6 +536,36 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
             slice_dims=slice_dims,
             display=display,
             return_html=return_html,
+            return_figure=return_figure,
+        )
+
+    def show_tokens(
+        self,
+        min_val: int | None = None,
+        max_val: int | None = None,
+        display: bool = True,
+        return_html: bool | None = False,
+        return_figure: bool = False,
+        replace_char: dict[str, str] | None = None,
+        wrap_after: int | str | list[str] | tuple[str] | None = None,
+        step_score_highlight: str | None = None,
+        aggregator: AggregatorPipeline | type[Aggregator] = None,
+        do_aggregation: bool = True,
+        **kwargs,
+    ) -> str | None:
+        from inseq import show_token_attributions
+
+        aggregated = self.aggregate(aggregator, **kwargs) if do_aggregation else self
+        return show_token_attributions(
+            attributions=aggregated,
+            min_val=min_val,
+            max_val=max_val,
+            display=display,
+            return_html=return_html,
+            return_figure=return_figure,
+            replace_char=replace_char,
+            wrap_after=wrap_after,
+            step_score_highlight=step_score_highlight,
         )
 
     @property
@@ -859,10 +905,11 @@ class FeatureAttributionOutput:
         slice_dims: dict[int | str, tuple[int, int]] | None = None,
         display: bool = True,
         return_html: bool | None = False,
+        return_figure: bool = False,
         aggregator: AggregatorPipeline | type[Aggregator] = None,
         do_aggregation: bool = True,
         **kwargs,
-    ) -> str | None:
+    ) -> str | list | None:
         """Visualize the sequence attributions.
 
         Args:
@@ -873,6 +920,7 @@ class FeatureAttributionOutput:
             slice_dims (dict[int or str, tuple[int, int]], optional): Dimensions to slice.
             display (bool, optional): If True, display the attribution visualization.
             return_html (bool, optional): If True, return the attribution visualization as HTML.
+            return_figure (bool, optional): If True, return the Treescope figure object for further manipulation.
             aggregator (:obj:`AggregatorPipeline` or :obj:`Type[Aggregator]`, optional): Aggregator
                 or pipeline to use. If not provided, the default aggregator for every sequence attribution
                 is used.
@@ -881,11 +929,15 @@ class FeatureAttributionOutput:
                 attributions are already aggregated.
 
         Returns:
-            str: Attribution visualization as HTML if `return_html=True`, None otherwise.
+            str: Attribution visualization as HTML if `return_html=True`
+            list: List of Treescope figure objects if `return_figure=True`
+            None if `return_html=False` and `return_figure=False`
+
         """
         out_str = ""
+        out_figs = []
         for attr in self.sequence_attributions:
-            curr_out_str = attr.show(
+            curr_out = attr.show(
                 min_val=min_val,
                 max_val=max_val,
                 max_show_size=max_show_size,
@@ -893,14 +945,19 @@ class FeatureAttributionOutput:
                 slice_dims=slice_dims,
                 display=display,
                 return_html=return_html,
+                return_figure=return_figure,
                 aggregator=aggregator,
                 do_aggregation=do_aggregation,
                 **kwargs,
             )
             if return_html:
-                out_str += curr_out_str
+                out_str += curr_out
+            if return_figure:
+                out_figs.append(curr_out)
         if return_html:
             return out_str
+        if return_figure:
+            return out_figs
 
     def show_granular(
         self,
@@ -911,10 +968,12 @@ class FeatureAttributionOutput:
         slice_dims: dict[int | str, tuple[int, int]] | None = None,
         display: bool = True,
         return_html: bool = False,
+        return_figure: bool = False,
     ) -> str | None:
         out_str = ""
+        out_figs = []
         for attr in self.sequence_attributions:
-            curr_out_str = attr.show_granular(
+            curr_out = attr.show_granular(
                 min_val=min_val,
                 max_val=max_val,
                 max_show_size=max_show_size,
@@ -924,9 +983,52 @@ class FeatureAttributionOutput:
                 return_html=return_html,
             )
             if return_html:
-                out_str += curr_out_str
+                out_str += curr_out
+            if return_figure:
+                out_figs.append(curr_out)
         if return_html:
             return out_str
+        if return_figure:
+            return out_figs
+
+    def show_tokens(
+        self,
+        min_val: int | None = None,
+        max_val: int | None = None,
+        display: bool = True,
+        return_html: bool = False,
+        return_figure: bool = False,
+        replace_char: dict[str, str] | None = None,
+        wrap_after: int | str | list[str] | tuple[str] | None = None,
+        step_score_highlight: str | None = None,
+        aggregator: AggregatorPipeline | type[Aggregator] = None,
+        do_aggregation: bool = True,
+        **kwargs,
+    ) -> str | None:
+        out_str = ""
+        out_figs = []
+        for attr in self.sequence_attributions:
+            curr_out = attr.show_tokens(
+                min_val=min_val,
+                max_val=max_val,
+                display=display,
+                return_html=return_html,
+                return_figure=return_figure,
+                replace_char=replace_char,
+                wrap_after=wrap_after,
+                step_score_highlight=step_score_highlight,
+                aggregator=aggregator,
+                do_aggregation=do_aggregation,
+                **kwargs,
+            )
+            if return_html:
+                out_str += curr_out
+            if return_figure:
+                out_figs.append(curr_out)
+        if return_html:
+            return out_str
+        if return_figure:
+            return out_figs
 
     def weight_attributions(self, step_score_id: str):
         for i, attr in enumerate(self.sequence_attributions):

@@ -31,7 +31,7 @@ from .batch import (
     EncoderDecoderBatch,
     slice_batch_from_position,
 )
-from .viz import show_attributions, show_granular_attributions
+from .viz import show_attributions, show_granular_attributions, show_token_attributions
 
 __all__ = [
     "Aggregator",
@@ -59,6 +59,7 @@ __all__ = [
     "TextInput",
     "show_attributions",
     "show_granular_attributions",
+    "show_token_attributions",
     "list_aggregation_functions",
     "MultiDimensionalFeatureAttributionStepOutput",
     "get_batch_from_inputs",

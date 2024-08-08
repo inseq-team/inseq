@@ -431,16 +431,27 @@ def get_cls_from_instance_type(mod, name, cls_lookup_map):
     return curr_class
 
 
-def clean_tokens(tokens: list[str], remove_tokens: list[str]) -> tuple[list[str], list[int]]:
+def clean_tokens(
+    tokens: list[str],
+    remove_tokens: list[str] = [],
+    return_removed_idxs: bool = False,
+    replace_chars: dict[str, str] | None = None,
+) -> list[str] | tuple[list[str], list[int]]:
     """Removes tokens from a list of tokens and returns the cleaned list and the removed token indexes."""
     clean_tokens = []
     removed_token_idxs = []
     for idx, tok in enumerate(tokens):
-        if tok not in remove_tokens:
-            clean_tokens += [tok.strip()]
-        else:
+        new_tok = tok
+        if new_tok in remove_tokens:
             removed_token_idxs += [idx]
-    return clean_tokens, removed_token_idxs
+        else:
+            if replace_chars is not None:
+                for k, v in replace_chars.items():
+                    new_tok = new_tok.replace(k, v)
+            clean_tokens += [new_tok.strip()]
+    if return_removed_idxs:
+        return clean_tokens, removed_token_idxs
+    return clean_tokens
 
 
 def get_left_padding(text: str):

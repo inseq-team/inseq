@@ -227,8 +227,8 @@ def auto_align_sequences(
         a_to_b_word_align = compute_word_aligns(a_words, b_words)
         # 2. Align word-level alignments to token-level alignments from the generative model tokenizer.
         # Requires cleaning up the model tokens from special tokens (special characters already removed)
-        clean_a_tokens, removed_a_token_idxs = clean_tokens(a_tokens, filter_special_tokens)
-        clean_b_tokens, removed_b_token_idxs = clean_tokens(b_tokens, filter_special_tokens)
+        clean_a_tokens, removed_a_token_idxs = clean_tokens(a_tokens, filter_special_tokens, return_removed_idxs=True)
+        clean_b_tokens, removed_b_token_idxs = clean_tokens(b_tokens, filter_special_tokens, return_removed_idxs=True)
         if len(removed_a_token_idxs) != len(removed_b_token_idxs):
             logger.debug(
                 "The number of special tokens in the target and contrast sequences do not match. "

@@ -19,6 +19,7 @@
 
 import matplotlib.pyplot as plt
 import numpy as np
+import treescope as ts
 from matplotlib.colors import Colormap, LinearSegmentedColormap
 from numpy.typing import NDArray
 
@@ -125,6 +126,17 @@ def test_dim(dim: int | str, dim_names: dict[int, str], rev_dim_names: dict[str,
     if dim_idx <= 1 or dim_idx > scores.ndim or dim_idx not in dim_names:
         raise ValueError(f"Invalid dimension {dim_idx}: valid indices are {list(range(2, scores.ndim))}")
     return dim_idx
+
+
+def maybe_add_linebreak(tok: str, i: int, wrap_after: int | str | list[str] | tuple[str]) -> list[str]:
+    if isinstance(wrap_after, str) and tok == wrap_after:
+        return [ts.rendering_parts.text("\n")]
+    elif isinstance(wrap_after, list | tuple) and tok in wrap_after:
+        return [ts.rendering_parts.text("\n")]
+    elif isinstance(wrap_after, int) and i % wrap_after == 0:
+        return [ts.rendering_parts.text("\n")]
+    else:
+        return []
 
 
 # Full plot

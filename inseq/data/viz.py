@@ -21,7 +21,9 @@ import string
 from typing import TYPE_CHECKING, Literal
 
 import numpy as np
-import treescope
+import treescope as ts
+import treescope.figures as fg
+import treescope.rendering_parts as rp
 from matplotlib.colors import Colormap
 from rich import box
 from rich.color import Color
@@ -37,11 +39,13 @@ from rich.text import Text
 from tqdm.std import tqdm
 
 from ..utils import isnotebook
+from ..utils.misc import clean_tokens
 from ..utils.typing import TextSequences
 from ..utils.viz_utils import (
     final_plot_html,
     get_colors,
     get_instance_html,
+    maybe_add_linebreak,
     red_transparent_blue_colormap,
     saliency_heatmap_html,
     saliency_heatmap_table_header,
@@ -55,9 +59,9 @@ if TYPE_CHECKING:
 
 if isnotebook():
     cmap = treescope_cmap()
-    treescope.basic_interactive_setup(autovisualize_arrays=True)
-    treescope.default_diverging_colormap.set_globally(cmap)
-    treescope.default_sequential_colormap.set_globally(cmap)
+    ts.basic_interactive_setup(autovisualize_arrays=True)
+    ts.default_diverging_colormap.set_globally(cmap)
+    ts.default_sequential_colormap.set_globally(cmap)
 
 
 def show_attributions(
@@ -187,7 +191,7 @@ def show_granular_attributions(
     for ex_id, attribution in enumerate(attributions):
         if attribution.source_attributions is not None:
             items_to_render += [
-                treescope.figures.bolded(f"Example {ex_id}: Source Saliency Heatmap"),
+                fg.bolded("Source Saliency Heatmap"),
                 get_saliency_heatmap_treescope(
                     attribution.source_attributions.numpy(),
                     [t.token for t in attribution.target[attribution.attr_pos_start : attribution.attr_pos_end]],
@@ -202,7 +206,7 @@ def show_granular_attributions(
             ]
         if attribution.target_attributions is not None:
             items_to_render += [
-                treescope.figures.bolded(f"Example {ex_id}: Target Saliency Heatmap"),
+                fg.bolded("Target Saliency Heatmap"),
                 get_saliency_heatmap_treescope(
                     attribution.target_attributions.numpy(),
                     [t.token for t in attribution.target[attribution.attr_pos_start : attribution.attr_pos_end]],
@@ -216,45 +220,144 @@ def show_granular_attributions(
                 ),
             ]
         items_to_render.append("")
-    fig = treescope.figures.inline(*items_to_render)
+    fig = fg.inline(*items_to_render)
     if return_figure:
         return fig
     if display:
-        treescope.show(fig)
+        ts.show(fig)
     if return_html:
-        return treescope.render_to_html(fig)
+        return ts.render_to_html(fig)
 
 
 def show_token_attributions(
     attributions: "FeatureAttributionSequenceOutput",
+    min_val: int | None = None,
+    max_val: int | None = None,
     display: bool = True,
     return_html: bool | None = False,
     return_figure: bool = False,
     replace_char: dict[str, str] | None = None,
-    wrap_after: int | str | None = None,
+    wrap_after: int | str | list[str] | tuple[str] | None = None,
+    step_score_highlight: str | None = None,
 ):
-    # from inseq.data.attribution import FeatureAttributionSequenceOutput
-    #
-    # if isinstance(attributions, FeatureAttributionSequenceOutput):
-    #    attributions: list["FeatureAttributionSequenceOutput"] = [attributions]
-    # if not isnotebook() and display:
-    #    raise ValueError(
-    #        "Token attribution heatmaps visualization is  only supported in Jupyter notebooks. "
-    #        "Please set `display=False` and `return_html=True` to avoid this error."
-    #    )
-    # if return_html and return_figure:
-    #    raise ValueError("Only one of `return_html` and `return_figure` can be set to True.")
-    # if replace_char is None:
-    #    replace_char = {"Ġ": " ", "▁": " ", "Ċ": ""}
-    # items_to_render = []
-    # for attr_idx, attr in enumerate(attributions):
-    #    cleaned_tokens = []
-    #    for t in attr.target:
-    #        curr_tok = t.token
-    #        for k, v in replace_char.items():
-    #            curr_tok = curr_tok.replace(k, v)
-    #        cleaned_tokens.append(curr_tok)
-    pass
+    """Visualizes token-level attributions in HTML format.
+
+    Args:
+        attributions (:class:`~inseq.data.attribution.FeatureAttributionSequenceOutput`):
+            Sequence attributions to be visualized.
+        min_val (:obj:`Optional[int]`, *optional*, defaults to None):
+            Lower attribution score threshold for color map.
+        max_val (`Optional[int]`, *optional*, defaults to None):
+            Upper attribution score threshold for color map.
+        display (`bool`, *optional*, defaults to True):
+            Whether to show the output of the visualization function.
+        return_html (`Optional[bool]`, *optional*, defaults to False):
+            If true, returns the HTML corresponding to the notebook visualization of the attributions in string format,
+            for saving purposes.
+        return_figure (`Optional[bool]`, *optional*, defaults to False):
+            If true, returns the Treescope figure object for further manipulation.
+        replace_char (`Optional[dict[str, str]]`, *optional*, defaults to None):
+            Dictionary mapping strings to be replaced to replacement options, used for cleaning special characters.
+            Default: {}.
+        wrap_after (`Optional[int | str | list[str] | tuple[str]]`, *optional*, defaults to None):
+            Token indices or tokens after which to wrap lines. E.g. 10 = wrap after every 10 tokens, "hi" = wrap after
+            word hi occurs, ["." "!", "?"] or ".!?" = wrap after every sentence-ending punctuation.
+        step_score_highlight (`Optional[str]`, *optional*, defaults to None):
+            Name of the step score to use to highlight generated tokens in the visualization. If None, no highlights are
+            shown. Default: None.
+    """
+    from inseq.data.attribution import FeatureAttributionSequenceOutput
+
+    if isinstance(attributions, FeatureAttributionSequenceOutput):
+        attributions: list["FeatureAttributionSequenceOutput"] = [attributions]
+    if not isnotebook() and display:
+        raise ValueError(
+            "Token attribution visualization is only supported in Jupyter notebooks. "
+            "Please set `display=False` and `return_html=True` to avoid this error."
+        )
+    if return_html and return_figure:
+        raise ValueError("Only one of `return_html` and `return_figure` can be set to True.")
+    if replace_char is None:
+        replace_char = {}
+    if max_val is None:
+        max_val = max(attribution.maximum for attribution in attributions)
+    if step_score_highlight is not None and (
+        attributions[0].step_scores is None or step_score_highlight not in attributions[0].step_scores
+    ):
+        raise ValueError(
+            f'The requested step score "{step_score_highlight}" is not available for highlights in the provided '
+            "attribution object. Please set `step_score_highlight=None` or recompute `model.attribute` by passing "
+            f'`step_scores=["{step_score_highlight}"].'
+        )
+    generated_token_parts = []
+    for attr in attributions:
+        cleaned_generated_tokens = clean_tokens(t.token for t in attr.target[attr.attr_pos_start : attr.attr_pos_end])
+        cleaned_input_tokens = clean_tokens(t.token for t in attr.source)
+        cleaned_target_tokens = clean_tokens(t.token for t in attr.target)
+        step_scores = None
+        title = "Generated text:\n\n"
+        if step_score_highlight is not None:
+            step_scores = attr.step_scores[step_score_highlight]
+            scores_vmin = step_scores.min().item()
+            scores_vmax = step_scores.max().item()
+            title = f"Generated text with {step_score_highlight} highlights:\n\n"
+        generated_token_parts.append(rp.custom_style(rp.text(title), css_style="font-weight: bold;"))
+        for gen_idx, curr_gen_tok in enumerate(cleaned_generated_tokens):
+            attributed_token_parts = [rp.text("\n")]
+            if attr.source_attributions is not None:
+                attributed_token_parts.append(
+                    get_tokens_heatmap_treescope(
+                        tokens=cleaned_input_tokens,
+                        scores=attr.source_attributions[:, gen_idx].numpy(),
+                        title=f'Source attributions for "{curr_gen_tok}"',
+                        title_style="font-style: italic; color: #888888;",
+                        min_val=min_val,
+                        max_val=max_val,
+                        wrap_after=wrap_after,
+                    )
+                )
+                attributed_token_parts.append(rp.text("\n\n"))
+            if attr.target_attributions is not None:
+                attributed_token_parts.append(
+                    get_tokens_heatmap_treescope(
+                        tokens=cleaned_target_tokens[: attr.attr_pos_start + gen_idx],
+                        scores=attr.target_attributions[:, gen_idx].numpy(),
+                        title=f'Target attributions for "{curr_gen_tok}"',
+                        title_style="font-style: italic; color: #888888;",
+                        min_val=min_val,
+                        max_val=max_val,
+                        wrap_after=wrap_after,
+                    )
+                )
+                attributed_token_parts.append(rp.text("\n\n"))
+            if step_scores is not None:
+                gen_tok_label = fg.treescope_part_from_display_object(
+                    fg.text_on_color(
+                        curr_gen_tok, value=round(step_scores[gen_idx].item(), 4), vmin=scores_vmin, vmax=scores_vmax
+                    )
+                )
+            else:
+                gen_tok_label = rp.text(curr_gen_tok)
+            generated_token_parts.append(
+                rp.build_full_line_with_annotations(
+                    rp.build_custom_foldable_tree_node(
+                        label=gen_tok_label,
+                        contents=rp.fold_condition(
+                            collapsed=rp.text(" "),
+                            expanded=rp.indented_children([rp.siblings(*attributed_token_parts)]),
+                        ),
+                    )
+                )
+            )
+    fig = fg.figure_from_treescope_rendering_part(
+        rp.custom_style(rp.siblings(*generated_token_parts), css_style="white-space: pre-wrap")
+    )
+    if return_figure:
+        return fig
+    if display:
+        ts.show(fig)
+    if return_html:
+        return ts.render_to_html(fig)
 
 
 def get_attribution_colors(
@@ -467,7 +570,7 @@ def get_saliency_heatmap_treescope(
             else:
                 slider_dims.append(dim_idx)
             item_labels_dict[dim_idx] = [f"{dim_name} #{i}" for i in range(scores.shape[dim_idx])]
-    return treescope.render_array(
+    return ts.render_array(
         scores,
         rows=[0],
         columns=col_dims,
@@ -479,8 +582,32 @@ def get_saliency_heatmap_treescope(
     )
 
 
-def get_tokens_heatmap_treescope():
-    pass
+def get_tokens_heatmap_treescope(
+    tokens: list[str],
+    scores: np.ndarray,
+    title: str | None = None,
+    title_style: str | None = None,
+    min_val: float | None = None,
+    max_val: float | None = None,
+    wrap_after: int | str | list[str] | tuple[str] | None = None,
+):
+    parts = []
+    if title is not None:
+        parts.append(
+            rp.custom_style(
+                rp.text(title + ":\n"),
+                css_style=title_style,
+            )
+        )
+    for idx, tok in enumerate(tokens):
+        if not np.isnan(scores[idx]):
+            parts.append(
+                fg.treescope_part_from_display_object(
+                    fg.text_on_color(tok, value=round(scores[idx], 4), vmin=min_val, vmax=max_val)
+                )
+            )
+            parts += maybe_add_linebreak(tok, idx, wrap_after)
+    return rp.siblings(*parts)
 
 
 # Progress bar utilities

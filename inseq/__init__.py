@@ -8,6 +8,7 @@ from .data import (
     merge_attributions,
     show_attributions,
     show_granular_attributions,
+    show_token_attributions,
 )
 from .models import AttributionModel, list_supported_frameworks, load_model, register_model_config
 from .utils.id_utils import explain
