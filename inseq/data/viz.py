@@ -188,7 +188,7 @@ def show_granular_attributions(
     if return_html and return_figure:
         raise ValueError("Only one of `return_html` and `return_figure` can be set to True.")
     items_to_render = []
-    for ex_id, attribution in enumerate(attributions):
+    for attribution in attributions:
         if attribution.source_attributions is not None:
             items_to_render += [
                 fg.bolded("Source Saliency Heatmap"),
@@ -331,9 +331,7 @@ def show_token_attributions(
                 attributed_token_parts.append(rp.text("\n\n"))
             if step_scores is not None:
                 gen_tok_label = fg.treescope_part_from_display_object(
-                    fg.text_on_color(
-                        curr_gen_tok, value=round(step_scores[gen_idx].item(), 4), vmax=scores_vmax
-                    )
+                    fg.text_on_color(curr_gen_tok, value=round(step_scores[gen_idx].item(), 4), vmax=scores_vmax)
                 )
             else:
                 gen_tok_label = rp.text(curr_gen_tok)
