@@ -38,4 +38,8 @@ functionalities required for its usage.
 
 .. autofunction:: show_attributions
 
+.. autofunction:: show_granular_attributions
+
+.. autofunction:: show_token_attributions
+
 .. autofunction:: merge_attributions

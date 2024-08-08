@@ -247,11 +247,6 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
                                     ]
                                 )
                             ),
-                            # treescope.render_array(
-                            #    value,
-                            #    axis_labels={0: f"Generated Tokens: {value.shape[0]}"},
-                            #    axis_item_labels={0: column_labels},
-                            # ),
                         ),
                         replace=True,
                     )
@@ -525,6 +520,32 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
         return_html: bool | None = False,
         return_figure: bool = False,
     ) -> str | None:
+        """Visualizes granular attribution heatmaps in HTML format.
+
+        Args:
+            min_val (:obj:`int`, *optional*, defaults to None):
+                Lower attribution score threshold for color map.
+            max_val (:obj:`int`, *optional*, defaults to None):
+                Upper attribution score threshold for color map.
+            max_show_size (:obj:`int`, *optional*, defaults to None):
+                Maximum dimension size for additional dimensions to be visualized. Default: 20.
+            show_dim (:obj:`int` or :obj:`str`, *optional*, defaults to None):
+                Dimension to be visualized along with the source and target tokens. Can be either the dimension index or
+                the dimension name. Works only if the dimension size is less than or equal to `max_show_size`.
+            slice_dims (:obj:`dict[int or str, tuple[int, int]]`, *optional*, defaults to None):
+                Dimensions to be sliced and visualized along with the source and target tokens. The dictionary should
+                contain the dimension index or name as the key and the slice range as the value.
+            display (:obj:`bool`, *optional*, defaults to True):
+                Whether to show the output of the visualization function.
+            return_html (:obj:`bool`, *optional*, defaults to False):
+                If true, returns the HTML corresponding to the notebook visualization of the attributions in
+                string format, for saving purposes.
+            return_figure (:obj:`bool`, *optional*, defaults to False):
+                If true, returns the Treescope figure object for further manipulation.
+
+        Returns:
+            `str`: Returns the HTML output if `return_html=True`
+        """
         from inseq import show_granular_attributions
 
         return show_granular_attributions(
@@ -553,6 +574,32 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
         do_aggregation: bool = True,
         **kwargs,
     ) -> str | None:
+        """Visualizes token-level attributions in HTML format.
+
+        Args:
+            attributions (:class:`~inseq.data.attribution.FeatureAttributionSequenceOutput`):
+                Sequence attributions to be visualized.
+            min_val (:obj:`int`, *optional*, defaults to None):
+                Lower attribution score threshold for color map.
+            max_val (:obj:`int`, *optional*, defaults to None):
+                Upper attribution score threshold for color map.
+            display (:obj:`bool`, *optional*, defaults to True):
+                Whether to show the output of the visualization function.
+            return_html (:obj:`bool`, *optional*, defaults to False):
+                If true, returns the HTML corresponding to the notebook visualization of the attributions in string format,
+                for saving purposes.
+            return_figure (:obj:`bool`, *optional*, defaults to False):
+                If true, returns the Treescope figure object for further manipulation.
+            replace_char (:obj:`dict[str, str]`, *optional*, defaults to None):
+                Dictionary mapping strings to be replaced to replacement options, used for cleaning special characters.
+                Default: {}.
+            wrap_after (:obj:`int` or :obj:`str` or :obj:`list[str]` :obj:`tuple[str]]`, *optional*, defaults to None):
+                Token indices or tokens after which to wrap lines. E.g. 10 = wrap after every 10 tokens, "hi" = wrap after
+                word hi occurs, ["." "!", "?"] or ".!?" = wrap after every sentence-ending punctuation.
+            step_score_highlight (`str`, *optional*, defaults to None):
+                Name of the step score to use to highlight generated tokens in the visualization. If None, no highlights are
+                shown. Default: None.
+        """
         from inseq import show_token_attributions
 
         aggregated = self.aggregate(aggregator, **kwargs) if do_aggregation else self
@@ -970,6 +1017,32 @@ class FeatureAttributionOutput:
         return_html: bool = False,
         return_figure: bool = False,
     ) -> str | None:
+        """Visualizes granular attribution heatmaps in HTML format.
+
+        Args:
+            min_val (:obj:`int`, *optional*, defaults to None):
+                Lower attribution score threshold for color map.
+            max_val (:obj:`int`, *optional*, defaults to None):
+                Upper attribution score threshold for color map.
+            max_show_size (:obj:`int`, *optional*, defaults to None):
+                Maximum dimension size for additional dimensions to be visualized. Default: 20.
+            show_dim (:obj:`int` or :obj:`str`, *optional*, defaults to None):
+                Dimension to be visualized along with the source and target tokens. Can be either the dimension index or
+                the dimension name. Works only if the dimension size is less than or equal to `max_show_size`.
+            slice_dims (:obj:`dict[int or str, tuple[int, int]]`, *optional*, defaults to None):
+                Dimensions to be sliced and visualized along with the source and target tokens. The dictionary should
+                contain the dimension index or name as the key and the slice range as the value.
+            display (:obj:`bool`, *optional*, defaults to True):
+                Whether to show the output of the visualization function.
+            return_html (:obj:`bool`, *optional*, defaults to False):
+                If true, returns the HTML corresponding to the notebook visualization of the attributions in
+                string format, for saving purposes.
+            return_figure (:obj:`bool`, *optional*, defaults to False):
+                If true, returns the Treescope figure object for further manipulation.
+
+        Returns:
+            `str`: Returns the HTML output if `return_html=True`
+        """
         out_str = ""
         out_figs = []
         for attr in self.sequence_attributions:
@@ -1005,6 +1078,30 @@ class FeatureAttributionOutput:
         do_aggregation: bool = True,
         **kwargs,
     ) -> str | None:
+        """Visualizes token-level attributions in HTML format.
+
+        Args:
+            min_val (:obj:`int`, *optional*, defaults to None):
+                Lower attribution score threshold for color map.
+            max_val (:obj:`int`, *optional*, defaults to None):
+                Upper attribution score threshold for color map.
+            display (:obj:`bool`, *optional*, defaults to True):
+                Whether to show the output of the visualization function.
+            return_html (:obj:`bool`, *optional*, defaults to False):
+                If true, returns the HTML corresponding to the notebook visualization of the attributions in string format,
+                for saving purposes.
+            return_figure (:obj:`bool`, *optional*, defaults to False):
+                If true, returns the Treescope figure object for further manipulation.
+            replace_char (:obj:`dict[str, str]`, *optional*, defaults to None):
+                Dictionary mapping strings to be replaced to replacement options, used for cleaning special characters.
+                Default: {}.
+            wrap_after (:obj:`int` or :obj:`str` or :obj:`list[str]` :obj:`tuple[str]]`, *optional*, defaults to None):
+                Token indices or tokens after which to wrap lines. E.g. 10 = wrap after every 10 tokens, "hi" = wrap after
+                word hi occurs, ["." "!", "?"] or ".!?" = wrap after every sentence-ending punctuation.
+            step_score_highlight (`str`, *optional*, defaults to None):
+                Name of the step score to use to highlight generated tokens in the visualization. If None, no highlights are
+                shown. Default: None.
+        """
         out_str = ""
         out_figs = []
         for attr in self.sequence_attributions:

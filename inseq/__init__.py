@@ -31,6 +31,7 @@ __all__ = [
     "explain",
     "show_attributions",
     "show_granular_attributions",
+    "show_token_attributions",
     "list_feature_attribution_methods",
     "list_aggregators",
     "list_aggregation_functions",

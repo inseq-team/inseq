@@ -160,21 +160,29 @@ def show_granular_attributions(
 
     Args:
         attributions (:class:`~inseq.data.attribution.FeatureAttributionSequenceOutput`):
-            Sequence attributions to be visualized.
-        min_val (:obj:`Optional[int]`, *optional*, defaults to None):
+            Sequence attributions to be visualized. Does not require pre-aggregation.
+        min_val (:obj:`int`, *optional*, defaults to None):
             Lower attribution score threshold for color map.
-        max_val (`Optional[int]`, *optional*, defaults to None):
+        max_val (:obj:`int`, *optional*, defaults to None):
             Upper attribution score threshold for color map.
-        display (`bool`, *optional*, defaults to True):
+        max_show_size (:obj:`int`, *optional*, defaults to None):
+            Maximum dimension size for additional dimensions to be visualized. Default: 20.
+        show_dim (:obj:`int` or :obj:`str`, *optional*, defaults to None):
+            Dimension to be visualized along with the source and target tokens. Can be either the dimension index or
+            the dimension name. Works only if the dimension size is less than or equal to `max_show_size`.
+        slice_dims (:obj:`dict[int or str, tuple[int, int]]`, *optional*, defaults to None):
+            Dimensions to be sliced and visualized along with the source and target tokens. The dictionary should
+            contain the dimension index or name as the key and the slice range as the value.
+        display (:obj:`bool`, *optional*, defaults to True):
             Whether to show the output of the visualization function.
-        return_html (`Optional[bool]`, *optional*, defaults to False):
-            If true, returns the HTML corresponding to the notebook visualization of the attributions in string format,
-            for saving purposes.
-        return_figure (`Optional[bool]`, *optional*, defaults to False):
+        return_html (:obj:`bool`, *optional*, defaults to False):
+            If true, returns the HTML corresponding to the notebook visualization of the attributions in
+            string format, for saving purposes.
+        return_figure (:obj:`bool`, *optional*, defaults to False):
             If true, returns the Treescope figure object for further manipulation.
 
     Returns:
-        `Optional[str]`: Returns the HTML output if `return_html=True`
+        `str`: Returns the HTML output if `return_html=True`
     """
     from inseq.data.attribution import FeatureAttributionSequenceOutput
 
