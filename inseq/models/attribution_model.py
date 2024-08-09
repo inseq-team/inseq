@@ -1,7 +1,8 @@
 import logging
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from functools import wraps
-from typing import Any, Callable, Optional, Protocol, TypeVar, Union
+from typing import Any, Protocol, TypeVar
 
 import torch
 
@@ -52,11 +53,11 @@ logger = logging.getLogger(__name__)
 class ForwardMethod(Protocol):
     def __call__(
         self,
-        batch: Union[DecoderOnlyBatch, EncoderDecoderBatch],
+        batch: DecoderOnlyBatch | EncoderDecoderBatch,
         target_ids: ExpandedTargetIdsTensor,
         attributed_fn: Callable[..., SingleScorePerStepTensor],
         use_embeddings: bool,
-        attributed_fn_argnames: Optional[list[str]],
+        attributed_fn_argnames: list[str] | None,
         *args,
     ) -> CustomForwardOutput:
         ...
@@ -70,13 +71,13 @@ class InputFormatter:
         inputs: FeatureAttributionInput,
         include_eos_baseline: bool = False,
         skip_special_tokens: bool = False,
-    ) -> Union[DecoderOnlyBatch, EncoderDecoderBatch]:
+    ) -> DecoderOnlyBatch | EncoderDecoderBatch:
         raise NotImplementedError()
 
     @staticmethod
     @abstractmethod
     def format_attribution_args(
-        batch: Union[DecoderOnlyBatch, EncoderDecoderBatch],
+        batch: DecoderOnlyBatch | EncoderDecoderBatch,
         target_ids: TargetIdsTensor,
         attributed_fn: Callable[..., SingleScorePerStepTensor],
         attribute_target: bool = False,
@@ -84,7 +85,7 @@ class InputFormatter:
         attribute_batch_ids: bool = False,
         forward_batch_embeds: bool = True,
         use_baselines: bool = False,
-    ) -> tuple[dict[str, Any], tuple[Union[IdsTensor, EmbeddingsTensor, None], ...]]:
+    ) -> tuple[dict[str, Any], tuple[IdsTensor | EmbeddingsTensor | None, ...]]:
         raise NotImplementedError()
 
     @staticmethod
@@ -92,11 +93,11 @@ class InputFormatter:
     def enrich_step_output(
         attribution_model: "AttributionModel",
         step_output: FeatureAttributionStepOutput,
-        batch: Union[DecoderOnlyBatch, EncoderDecoderBatch],
+        batch: DecoderOnlyBatch | EncoderDecoderBatch,
         target_tokens: OneOrMoreTokenSequences,
         target_ids: TargetIdsTensor,
-        contrast_batch: Optional[DecoderOnlyBatch] = None,
-        contrast_targets_alignments: Optional[list[list[tuple[int, int]]]] = None,
+        contrast_batch: DecoderOnlyBatch | None = None,
+        contrast_targets_alignments: list[list[tuple[int, int]]] | None = None,
     ) -> FeatureAttributionStepOutput:
         r"""Enriches the attribution output with token information, producing the finished
         :class:`~inseq.data.FeatureAttributionStepOutput` object.
@@ -116,7 +117,7 @@ class InputFormatter:
 
     @staticmethod
     @abstractmethod
-    def convert_args_to_batch(args: StepFunctionArgs = None, **kwargs) -> Union[DecoderOnlyBatch, EncoderDecoderBatch]:
+    def convert_args_to_batch(args: StepFunctionArgs = None, **kwargs) -> DecoderOnlyBatch | EncoderDecoderBatch:
         raise NotImplementedError()
 
     @staticmethod
@@ -141,7 +142,7 @@ class InputFormatter:
     @staticmethod
     @abstractmethod
     def get_text_sequences(
-        attribution_model: "AttributionModel", batch: Union[DecoderOnlyBatch, EncoderDecoderBatch]
+        attribution_model: "AttributionModel", batch: DecoderOnlyBatch | EncoderDecoderBatch
     ) -> TextSequences:
         raise NotImplementedError()
 
@@ -152,15 +153,15 @@ class InputFormatter:
 
     @staticmethod
     def format_contrast_targets_alignments(
-        contrast_targets_alignments: Union[list[tuple[int, int]], list[list[tuple[int, int]]], str],
+        contrast_targets_alignments: list[tuple[int, int]] | list[list[tuple[int, int]]] | str,
         target_sequences: list[str],
         target_tokens: list[list[str]],
         contrast_sequences: list[str],
         contrast_tokens: list[list[str]],
         special_tokens: list[str] = [],
         start_pos: int = 0,
-        end_pos: Optional[int] = None,
-    ) -> tuple[DecoderOnlyBatch, Optional[list[list[tuple[int, int]]]]]:
+        end_pos: int | None = None,
+    ) -> tuple[DecoderOnlyBatch, list[list[tuple[int, int]]] | None]:
         # Ensure that the contrast_targets_alignments are in the correct format (list of lists of idxs pairs)
         if contrast_targets_alignments:
             if isinstance(contrast_targets_alignments, list) and len(contrast_targets_alignments) > 0:
@@ -174,7 +175,7 @@ class InputFormatter:
         adjusted_alignments = []
         aligns = contrast_targets_alignments
         for seq_idx, (tgt_seq, tgt_tok, c_seq, c_tok) in enumerate(
-            zip(target_sequences, target_tokens, contrast_sequences, contrast_tokens)
+            zip(target_sequences, target_tokens, contrast_sequences, contrast_tokens, strict=False)
         ):
             if isinstance(contrast_targets_alignments, list):
                 aligns = contrast_targets_alignments[seq_idx]
@@ -217,18 +218,18 @@ class AttributionModel(ABC, torch.nn.Module):
             self.model = None
             self.model_name: str = None
             self.is_encoder_decoder: bool = True
-        self.pad_token: Optional[str] = None
-        self.embed_scale: Optional[float] = None
-        self._device: Optional[str] = None
-        self.device_map: Optional[dict[str, Union[str, int, torch.device]]] = None
-        self.attribution_method: Optional[FeatureAttribution] = None
+        self.pad_token: str | None = None
+        self.embed_scale: float | None = None
+        self._device: str | None = None
+        self.device_map: dict[str, str | int | torch.device] | None = None
+        self.attribution_method: FeatureAttribution | None = None
         self.is_hooked: bool = False
         self._default_attributed_fn_id: str = "probability"
-        self.config: Optional[ModelConfig] = None
-        self.is_distributed: Optional[bool] = None
+        self.config: ModelConfig | None = None
+        self.is_distributed: bool | None = None
 
     @property
-    def device(self) -> Optional[str]:
+    def device(self) -> str | None:
         return self._device
 
     @device.setter
@@ -238,7 +239,7 @@ class AttributionModel(ABC, torch.nn.Module):
         if self.model:
             self.model.to(self._device)
 
-    def setup(self, device: Optional[str] = None, attribution_method: Optional[str] = None, **kwargs) -> None:
+    def setup(self, device: str | None = None, attribution_method: str | None = None, **kwargs) -> None:
         """Move the model to device and in eval mode."""
         self.device = device if device is not None else get_default_device()
         if self.model:
@@ -258,7 +259,7 @@ class AttributionModel(ABC, torch.nn.Module):
         self._default_attributed_fn_id = fn
 
     @property
-    def info(self) -> dict[Optional[str], Optional[str]]:
+    def info(self) -> dict[str | None, str | None]:
         return {
             "model_name": self.model_name,
             "model_class": self.model.__class__.__name__ if self.model is not None else None,
@@ -266,8 +267,8 @@ class AttributionModel(ABC, torch.nn.Module):
 
     def get_attribution_method(
         self,
-        method: Optional[str] = None,
-        override_default_attribution: Optional[bool] = False,
+        method: str | None = None,
+        override_default_attribution: bool | None = False,
         **kwargs,
     ) -> FeatureAttribution:
         # No method present -> missing method error
@@ -287,7 +288,7 @@ class AttributionModel(ABC, torch.nn.Module):
         return self.attribution_method
 
     def get_attributed_fn(
-        self, attributed_fn: Union[str, Callable[..., SingleScorePerStepTensor], None] = None
+        self, attributed_fn: str | Callable[..., SingleScorePerStepTensor] | None = None
     ) -> Callable[..., SingleScorePerStepTensor]:
         if attributed_fn is None:
             attributed_fn = self.default_attributed_fn_id
@@ -302,20 +303,20 @@ class AttributionModel(ABC, torch.nn.Module):
     def attribute(
         self,
         input_texts: TextInput,
-        generated_texts: Optional[TextInput] = None,
-        method: Optional[str] = None,
-        override_default_attribution: Optional[bool] = False,
-        attr_pos_start: Optional[int] = None,
-        attr_pos_end: Optional[int] = None,
+        generated_texts: TextInput | None = None,
+        method: str | None = None,
+        override_default_attribution: bool | None = False,
+        attr_pos_start: int | None = None,
+        attr_pos_end: int | None = None,
         show_progress: bool = True,
         pretty_progress: bool = True,
         output_step_attributions: bool = False,
         attribute_target: bool = False,
         step_scores: list[str] = [],
         include_eos_baseline: bool = False,
-        attributed_fn: Union[str, Callable[..., SingleScorePerStepTensor], None] = None,
-        device: Optional[str] = None,
-        batch_size: Optional[int] = None,
+        attributed_fn: str | Callable[..., SingleScorePerStepTensor] | None = None,
+        device: str | None = None,
+        batch_size: int | None = None,
         generate_from_target_prefix: bool = False,
         skip_special_tokens: bool = False,
         generation_args: dict[str, Any] = {},
@@ -500,7 +501,7 @@ class AttributionModel(ABC, torch.nn.Module):
             self.device = original_device
         return attribution_output
 
-    def embed(self, inputs: Union[TextInput, IdsTensor], as_targets: bool = False, add_special_tokens: bool = True):
+    def embed(self, inputs: TextInput | IdsTensor, as_targets: bool = False, add_special_tokens: bool = True):
         if isinstance(inputs, str) or (
             isinstance(inputs, list) and len(inputs) > 0 and all(isinstance(x, str) for x in inputs)
         ):
@@ -510,9 +511,9 @@ class AttributionModel(ABC, torch.nn.Module):
 
     def get_token_with_ids(
         self,
-        batch: Union[EncoderDecoderBatch, DecoderOnlyBatch],
-        contrast_target_tokens: Optional[OneOrMoreTokenSequences] = None,
-        contrast_targets_alignments: Optional[list[list[tuple[int, int]]]] = None,
+        batch: EncoderDecoderBatch | DecoderOnlyBatch,
+        contrast_target_tokens: OneOrMoreTokenSequences | None = None,
+        contrast_targets_alignments: list[list[tuple[int, int]]] | None = None,
     ) -> list[list[TokenWithId]]:
         if contrast_target_tokens is not None:
             return join_token_ids(
@@ -529,10 +530,10 @@ class AttributionModel(ABC, torch.nn.Module):
     @abstractmethod
     def generate(
         self,
-        encodings: Union[TextInput, BatchEncoding],
-        return_generation_output: Optional[bool] = False,
+        encodings: TextInput | BatchEncoding,
+        return_generation_output: bool | None = False,
         **kwargs,
-    ) -> Union[list[str], tuple[list[str], Any]]:
+    ) -> list[str] | tuple[list[str], Any]:
         pass
 
     @staticmethod
@@ -561,14 +562,14 @@ class AttributionModel(ABC, torch.nn.Module):
 
     @abstractmethod
     def convert_ids_to_tokens(
-        self, ids: torch.Tensor, skip_special_tokens: Optional[bool] = True
+        self, ids: torch.Tensor, skip_special_tokens: bool | None = True
     ) -> OneOrMoreTokenSequences:
         pass
 
     @abstractmethod
     def convert_tokens_to_ids(
         self,
-        tokens: Union[list[str], list[list[str]]],
+        tokens: list[str] | list[list[str]],
     ) -> OneOrMoreIdSequences:
         pass
 
@@ -576,7 +577,7 @@ class AttributionModel(ABC, torch.nn.Module):
     def convert_tokens_to_string(
         self,
         tokens: OneOrMoreTokenSequences,
-        skip_special_tokens: Optional[bool] = True,
+        skip_special_tokens: bool | None = True,
         as_targets: bool = False,
     ) -> TextInput:
         pass
@@ -668,11 +669,11 @@ class AttributionModel(ABC, torch.nn.Module):
 
     def _forward(
         self,
-        batch: Union[DecoderOnlyBatch, EncoderDecoderBatch],
+        batch: DecoderOnlyBatch | EncoderDecoderBatch,
         target_ids: ExpandedTargetIdsTensor,
         attributed_fn: Callable[..., SingleScorePerStepTensor],
         use_embeddings: bool = True,
-        attributed_fn_argnames: Optional[list[str]] = None,
+        attributed_fn_argnames: list[str] | None = None,
         *args,
         **kwargs,
     ) -> LogitsTensor:
@@ -683,12 +684,12 @@ class AttributionModel(ABC, torch.nn.Module):
         step_fn_args = self.formatter.format_step_function_args(
             attribution_model=self, forward_output=output, target_ids=target_ids, is_attributed_fn=True, batch=batch
         )
-        step_fn_extra_args = {k: v for k, v in zip(attributed_fn_argnames, args) if v is not None}
+        step_fn_extra_args = {k: v for k, v in zip(attributed_fn_argnames, args, strict=False) if v is not None}
         return attributed_fn(step_fn_args, **step_fn_extra_args)
 
     def _forward_with_output(
         self,
-        batch: Union[DecoderOnlyBatch, EncoderDecoderBatch],
+        batch: DecoderOnlyBatch | EncoderDecoderBatch,
         use_embeddings: bool = True,
         *args,
         **kwargs,

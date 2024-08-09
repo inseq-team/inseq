@@ -14,7 +14,6 @@
 
 import logging
 from abc import abstractmethod
-from typing import Union
 
 import torch
 from torch.linalg import vector_norm
@@ -37,7 +36,7 @@ class AggregationFunction(Registry):
     @abstractmethod
     def __call__(
         self,
-        scores: Union[torch.Tensor, tuple[torch.Tensor, ...]],
+        scores: torch.Tensor | tuple[torch.Tensor, ...],
         dim: int,
         **kwargs,
     ) -> ScoreTensor:

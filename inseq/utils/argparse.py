@@ -17,12 +17,12 @@ import json
 import sys
 import types
 from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser, ArgumentTypeError
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from copy import copy
 from enum import Enum
 from inspect import isclass
 from pathlib import Path
-from typing import Any, Callable, Literal, NewType, Optional, Union, get_type_hints
+from typing import Any, Literal, NewType, Union, get_type_hints
 
 import yaml
 
@@ -61,7 +61,7 @@ def make_choice_type_function(choices: list) -> Callable[[str], Any]:
 
 def cli_arg(
     *,
-    aliases: Union[str, list[str]] = None,
+    aliases: str | list[str] = None,
     help: str = None,
     default: Any = dataclasses.MISSING,
     default_factory: Callable[[], Any] = dataclasses.MISSING,
@@ -121,7 +121,7 @@ class InseqArgumentParser(ArgumentParser):
 
     dataclass_types: Iterable[DataClassType]
 
-    def __init__(self, dataclass_types: Optional[Union[DataClassType, Iterable[DataClassType]]] = None, **kwargs):
+    def __init__(self, dataclass_types: DataClassType | Iterable[DataClassType] | None = None, **kwargs):
         """
         Args:
             dataclass_types (`Union[DataClassType, Iterable[DataClassType]]`, *optional*):
@@ -192,7 +192,7 @@ class InseqArgumentParser(ArgumentParser):
                 kwargs["default"] = field.default
             else:
                 kwargs["required"] = True
-        elif field.type is bool or field.type == Optional[bool]:
+        elif field.type is bool or field.type == bool | None:
             # Copy the currect kwargs to use to instantiate a `no_*` complement argument below.
             # We do not initialize it here because the `no_*` alternative must be instantiated after the real argument
             bool_kwargs = copy(kwargs)
@@ -232,7 +232,7 @@ class InseqArgumentParser(ArgumentParser):
         # Order is important for arguments with the same destination!
         # We use a copy of earlier kwargs because the original kwargs have changed a lot before reaching down
         # here and we do not need those changes/additional keys.
-        if field.default is True and (field.type is bool or field.type == Optional[bool]):
+        if field.default is True and (field.type is bool or field.type == bool | None):
             bool_kwargs["default"] = False
             parser.add_argument(f"--no_{field.name}", action="store_false", dest=field.name, **bool_kwargs)
 
@@ -250,19 +250,6 @@ class InseqArgumentParser(ArgumentParser):
                 "removing line of `from __future__ import annotations` which opts in Postponed "
                 "Evaluation of Annotations (PEP 563)"
             ) from ex
-        except TypeError as ex:
-            # Remove this block when we drop Python 3.9 support
-            if sys.version_info[:2] < (3, 10) and "unsupported operand type(s) for |" in str(ex):
-                python_version = ".".join(map(str, sys.version_info[:3]))
-                raise RuntimeError(
-                    f"Type resolution failed for {dtype} on Python {python_version}. Try removing "
-                    "line of `from __future__ import annotations` which opts in union types as "
-                    "`X | Y` (PEP 604) via Postponed Evaluation of Annotations (PEP 563). To "
-                    "support Python versions that lower than 3.10, you need to use "
-                    "`typing.Union[X, Y]` instead of `X | Y` and `typing.Optional[X]` instead of "
-                    "`X | None`."
-                ) from ex
-            raise
         for field in dataclasses.fields(dtype):
             if not field.init:
                 continue

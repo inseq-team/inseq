@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Any
 
 import torch
 from captum._utils.typing import TensorOrTupleOfTensorsGeneric
@@ -147,9 +147,9 @@ class MultiStepAttentionWeights(InseqAttribution):
         self,
         inputs: TensorOrTupleOfTensorsGeneric,
         additional_forward_args: TensorOrTupleOfTensorsGeneric,
-        encoder_self_attentions: Optional[MultiLayerMultiUnitScoreTensor] = None,
-        decoder_self_attentions: Optional[MultiLayerMultiUnitScoreTensor] = None,
-        cross_attentions: Optional[MultiLayerMultiUnitScoreTensor] = None,
+        encoder_self_attentions: MultiLayerMultiUnitScoreTensor | None = None,
+        decoder_self_attentions: MultiLayerMultiUnitScoreTensor | None = None,
+        cross_attentions: MultiLayerMultiUnitScoreTensor | None = None,
     ) -> MultiDimensionalFeatureAttributionStepOutput:
         # We adopt the format [batch_size, sequence_length, num_layers, num_heads]
         # for consistency with other multi-unit methods (e.g. gradient attribution)

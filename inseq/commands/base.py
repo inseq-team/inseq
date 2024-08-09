@@ -1,13 +1,13 @@
 import dataclasses
-from abc import ABC, abstractstaticmethod
+from abc import ABC, abstractmethod
 from argparse import Namespace
 from collections.abc import Iterable
-from typing import Any, NewType, Union
+from typing import Any, NewType
 
 from ..utils import InseqArgumentParser
 
 DataClassType = NewType("DataClassType", Any)
-OneOrMoreDataClasses = Union[DataClassType, Iterable[DataClassType]]
+OneOrMoreDataClasses = DataClassType | Iterable[DataClassType]
 
 
 class BaseCLICommand(ABC):
@@ -44,6 +44,7 @@ class BaseCLICommand(ABC):
             dataclasses_args = dataclasses_args[0]
         return cls, dataclasses_args
 
-    @abstractstaticmethod
+    @staticmethod
+    @abstractmethod
     def run(args: OneOrMoreDataClasses):
         raise NotImplementedError()

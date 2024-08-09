@@ -32,9 +32,10 @@
 import base64
 import json
 from collections import OrderedDict
+from collections.abc import Callable
 from json import JSONEncoder
 from os import PathLike
-from typing import Any, Callable, Optional, TypeVar, Union
+from typing import Any, TypeVar
 
 from numpy import generic, ndarray
 
@@ -58,7 +59,7 @@ def class_instance_encode(obj: EncodableObject, use_primitives: bool = True, **k
     """Encodes a class instance to json. Note that it can only be recovered if the environment allows the class to be
     imported in the same way.
     """
-    if isinstance(obj, (list, dict)):
+    if isinstance(obj, list | dict):
         return obj
     if isinstance(obj, bytes):
         return base64.b64encode(obj).decode("UTF8")
@@ -94,7 +95,7 @@ def class_instance_encode(obj: EncodableObject, use_primitives: bool = True, **k
 def ndarray_encode(
     obj: EncodableObject,
     use_primitives: bool = True,
-    ndarray_compact: Optional[bool] = None,
+    ndarray_compact: bool | None = None,
     compression: bool = False,
     **kwargs,
 ) -> dict[str, Any]:
@@ -136,9 +137,9 @@ ENCODE_HOOKS = [class_instance_encode, ndarray_encode]
 class AttributionSerializer(JSONEncoder):
     def __init__(
         self,
-        encoders: Optional[list[Callable]] = None,
+        encoders: list[Callable] | None = None,
         use_primitives: bool = True,
-        ndarray_compact: Optional[bool] = None,
+        ndarray_compact: bool | None = None,
         compression: bool = False,
         **json_kwargs,
     ):
@@ -178,7 +179,7 @@ def json_advanced_dumps(
     encoders: list[Callable] = ENCODE_HOOKS,
     use_primitives: bool = True,
     allow_nan: bool = True,
-    ndarray_compact: Optional[bool] = None,
+    ndarray_compact: bool | None = None,
     compression: bool = False,
     **jsonkwargs,
 ) -> str:
@@ -225,7 +226,7 @@ def json_advanced_dump(
     encoders: list[Callable] = ENCODE_HOOKS,
     use_primitives: bool = False,
     allow_nan: bool = True,
-    ndarray_compact: Optional[bool] = None,
+    ndarray_compact: bool | None = None,
     compression: bool = False,
     **jsonkwargs,
 ) -> str:
@@ -302,7 +303,7 @@ def ndarray_hook(dct: Any, **kwargs) -> DecodableObject:
         return scalar_to_numpy(data_json, nptype)
 
 
-def class_instance_hook(dct: Any, cls_lookup_map: Optional[dict[str, type]] = None, **kwargs) -> DecodableObject:
+def class_instance_hook(dct: Any, cls_lookup_map: dict[str, type] | None = None, **kwargs) -> DecodableObject:
     """This hook tries to convert json encoded by class_instance_encoder back to it's original instance.
     It only works if the environment is the same, e.g. the class is similarly importable and hasn't changed.
 
@@ -344,8 +345,8 @@ class AttributionDeserializer:
     def __init__(
         self,
         ordered: bool = False,
-        hooks: Optional[list[Callable]] = None,
-        cls_lookup_map: Optional[dict[str, type]] = None,
+        hooks: list[Callable] | None = None,
+        cls_lookup_map: dict[str, type] | None = None,
     ):
         self.map_type = OrderedDict if ordered else dict
         self.hooks = hooks if hooks else []
@@ -367,7 +368,7 @@ def json_advanced_loads(
     ordered: bool = False,
     decompression: bool = False,
     hooks: list[Callable] = DECODE_HOOKS,
-    cls_lookup_map: Optional[dict[str, type]] = None,
+    cls_lookup_map: dict[str, type] | None = None,
     **jsonkwargs,
 ) -> Any:
     """Load a complex object containing classes and arrays object from a string.
@@ -403,11 +404,11 @@ def json_advanced_loads(
 
 
 def json_advanced_load(
-    fp: Union[str, bytes, PathLike],
+    fp: str | bytes | PathLike,
     ordered: bool = True,
     decompression: bool = False,
     hooks: list[Callable] = DECODE_HOOKS,
-    cls_lookup_map: Optional[dict[str, type]] = None,
+    cls_lookup_map: dict[str, type] | None = None,
     **jsonkwargs,
 ) -> Any:
     """Load a complex object containing classes and arrays from a JSON file.
@@ -431,7 +432,7 @@ def json_advanced_load(
         The loaded object.
     """
     try:
-        if isinstance(fp, (PathLike, bytes, str)):
+        if isinstance(fp, PathLike | bytes | str):
             with open(fp, "rb" if decompression else "r") as fh:
                 string = fh.read()
         else:

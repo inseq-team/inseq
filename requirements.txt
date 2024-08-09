@@ -2,7 +2,7 @@
 #    uv pip compile pyproject.toml -o requirements.txt
 captum==0.7.0
     # via inseq (pyproject.toml)
-certifi==2024.6.2
+certifi==2024.7.4
     # via requests
 charset-normalizer==3.3.2
     # via requests
@@ -55,6 +55,7 @@ numpy==1.26.4
     #   jaxtyping
     #   matplotlib
     #   transformers
+    #   treescope
 packaging==23.2
     # via
     #   huggingface-hub
@@ -105,6 +106,8 @@ tqdm==4.66.4
     #   huggingface-hub
     #   transformers
 transformers==4.38.1
+    # via inseq (pyproject.toml)
+treescope==0.1.0
     # via inseq (pyproject.toml)
 typeguard==2.13.3
     # via

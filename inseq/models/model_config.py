@@ -1,7 +1,6 @@
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
 import yaml
 
@@ -29,7 +28,7 @@ class ModelConfig:
 
     self_attention_module: str
     value_vector: str
-    cross_attention_module: Optional[str] = None
+    cross_attention_module: str | None = None
 
 
 MODEL_CONFIGS = {

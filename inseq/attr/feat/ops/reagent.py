@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Union
+from typing import TYPE_CHECKING, Any
 
 import torch
 from captum._utils.typing import TargetType, TensorOrTupleOfTensorsGeneric
@@ -106,10 +106,7 @@ class Reagent(InseqAttribution):
         inputs: TensorOrTupleOfTensorsGeneric,
         _target: TargetType = None,
         additional_forward_args: Any = None,
-    ) -> Union[
-        TensorOrTupleOfTensorsGeneric,
-        tuple[TensorOrTupleOfTensorsGeneric, Tensor],
-    ]:
+    ) -> TensorOrTupleOfTensorsGeneric | tuple[TensorOrTupleOfTensorsGeneric, Tensor]:
         """Implement attribute"""
         # encoder-decoder
         if self.forward_func.is_encoder_decoder:

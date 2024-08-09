@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from typing import Optional
 
 import torch
 from jaxtyping import Float
@@ -33,7 +32,7 @@ class BaseImportanceScoreEvaluator(ABC):
         self,
         input_ids: IdsTensor,
         target_id: TargetIdsTensor,
-        decoder_input_ids: Optional[IdsTensor] = None,
+        decoder_input_ids: IdsTensor | None = None,
         attribute_target: bool = False,
     ) -> MultipleScoresPerStepTensor:
         """Evaluate importance score of input sequence
@@ -84,7 +83,7 @@ class DeltaProbImportanceScoreEvaluator(BaseImportanceScoreEvaluator):
         input_ids: IdsTensor,
         target_id: TargetIdsTensor,
         prob_original_target: Float[torch.Tensor, "batch_size 1"],
-        decoder_input_ids: Optional[IdsTensor] = None,
+        decoder_input_ids: IdsTensor | None = None,
         attribute_target: bool = False,
     ) -> MultipleScoresPerStepTensor:
         """Update importance score by one step
@@ -138,7 +137,7 @@ class DeltaProbImportanceScoreEvaluator(BaseImportanceScoreEvaluator):
         self,
         input_ids: IdsTensor,
         target_id: TargetIdsTensor,
-        decoder_input_ids: Optional[IdsTensor] = None,
+        decoder_input_ids: IdsTensor | None = None,
         attribute_target: bool = False,
     ) -> MultipleScoresPerStepTensor:
         """Evaluate importance score of input sequence

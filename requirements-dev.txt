@@ -24,7 +24,7 @@ beautifulsoup4==4.12.3
     # via furo
 captum==0.7.0
     # via inseq (pyproject.toml)
-certifi==2024.6.2
+certifi==2024.7.4
     # via requests
 cffi==1.16.0
     # via cryptography
@@ -190,6 +190,7 @@ numpy==1.26.4
     #   scikit-learn
     #   scipy
     #   transformers
+    #   treescope
 packaging==23.2
     # via
     #   datasets
@@ -379,7 +380,7 @@ torch==2.3.1
     # via
     #   inseq (pyproject.toml)
     #   captum
-tornado==6.4
+tornado==6.4.1
     # via
     #   ipykernel
     #   jupyter-client
@@ -401,6 +402,8 @@ traitlets==5.14.1
     #   jupyter-core
     #   matplotlib-inline
 transformers==4.38.1
+    # via inseq (pyproject.toml)
+treescope==0.1.0
     # via inseq (pyproject.toml)
 typeguard==2.13.3
     # via

@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from typing import Optional, Union
 
 from ..utils import get_aligned_idx
 from ..utils.typing import EmbeddingsTensor, ExpandedTargetIdsTensor, IdsTensor, OneOrMoreTokenSequences
@@ -22,8 +21,8 @@ class BatchEncoding(TensorWrapper):
 
     input_ids: IdsTensor
     attention_mask: IdsTensor
-    input_tokens: Optional[OneOrMoreTokenSequences] = None
-    baseline_ids: Optional[IdsTensor] = None
+    input_tokens: OneOrMoreTokenSequences | None = None
+    baseline_ids: IdsTensor | None = None
 
     def __len__(self) -> int:
         return len(self.input_tokens)
@@ -40,10 +39,10 @@ class BatchEmbedding(TensorWrapper):
             ``[batch_size, longest_seq_length, embedding_size]`` for each sentence in the batch.
     """
 
-    input_embeds: Optional[EmbeddingsTensor] = None
-    baseline_embeds: Optional[EmbeddingsTensor] = None
+    input_embeds: EmbeddingsTensor | None = None
+    baseline_embeds: EmbeddingsTensor | None = None
 
-    def __len__(self) -> Optional[int]:
+    def __len__(self) -> int | None:
         if self.input_embeds is not None:
             return self.input_embeds.shape[0]
         return None
@@ -79,15 +78,15 @@ class Batch(TensorWrapper):
         return self.encoding.attention_mask
 
     @property
-    def baseline_ids(self) -> Optional[IdsTensor]:
+    def baseline_ids(self) -> IdsTensor | None:
         return self.encoding.baseline_ids
 
     @property
-    def input_embeds(self) -> Optional[EmbeddingsTensor]:
+    def input_embeds(self) -> EmbeddingsTensor | None:
         return self.embedding.input_embeds
 
     @property
-    def baseline_embeds(self) -> Optional[EmbeddingsTensor]:
+    def baseline_embeds(self) -> EmbeddingsTensor | None:
         return self.embedding.baseline_embeds
 
     @input_ids.setter
@@ -103,15 +102,15 @@ class Batch(TensorWrapper):
         self.encoding.attention_mask = value
 
     @baseline_ids.setter
-    def baseline_ids(self, value: Optional[IdsTensor]):
+    def baseline_ids(self, value: IdsTensor | None):
         self.encoding.baseline_ids = value
 
     @input_embeds.setter
-    def input_embeds(self, value: Optional[EmbeddingsTensor]):
+    def input_embeds(self, value: EmbeddingsTensor | None):
         self.embedding.input_embeds = value
 
     @baseline_embeds.setter
-    def baseline_embeds(self, value: Optional[EmbeddingsTensor]):
+    def baseline_embeds(self, value: EmbeddingsTensor | None):
         self.embedding.baseline_embeds = value
 
 
@@ -128,7 +127,7 @@ class EncoderDecoderBatch(TensorWrapper):
     sources: Batch
     targets: Batch
 
-    def __getitem__(self, subscript: Union[slice, int]) -> "EncoderDecoderBatch":
+    def __getitem__(self, subscript: slice | int) -> "EncoderDecoderBatch":
         return EncoderDecoderBatch(sources=self.sources, targets=self.targets[subscript])
 
     @property
@@ -169,7 +168,7 @@ class EncoderDecoderBatch(TensorWrapper):
 
     def get_step_target(
         self, step: int, with_attention: bool = False
-    ) -> Union[ExpandedTargetIdsTensor, tuple[ExpandedTargetIdsTensor, ExpandedTargetIdsTensor]]:
+    ) -> ExpandedTargetIdsTensor | tuple[ExpandedTargetIdsTensor, ExpandedTargetIdsTensor]:
         tgt = self.targets.input_ids[:, step]
         if with_attention:
             return tgt, self.targets.attention_mask[:, step]
@@ -218,7 +217,7 @@ class DecoderOnlyBatch(Batch):
 
     def get_step_target(
         self, step: int, with_attention: bool = False
-    ) -> Union[ExpandedTargetIdsTensor, tuple[ExpandedTargetIdsTensor, ExpandedTargetIdsTensor]]:
+    ) -> ExpandedTargetIdsTensor | tuple[ExpandedTargetIdsTensor, ExpandedTargetIdsTensor]:
         tgt = self.input_ids[:, step]
         if with_attention:
             return tgt, self.attention_mask[:, step]
@@ -233,7 +232,7 @@ class DecoderOnlyBatch(Batch):
 
 
 def slice_batch_from_position(
-    batch: DecoderOnlyBatch, curr_idx: int, alignments: Optional[list[tuple[int, int]]] = None
+    batch: DecoderOnlyBatch, curr_idx: int, alignments: list[tuple[int, int]] | None = None
 ) -> tuple[DecoderOnlyBatch, IdsTensor]:
     if len(alignments) > 0 and isinstance(alignments[0], list):
         alignments = alignments[0]

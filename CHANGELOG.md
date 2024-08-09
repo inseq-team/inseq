@@ -4,6 +4,10 @@
 
 ## 🚀 Features
 
+- Added [treescope](https://github.com/google-deepmind/treescope) for interactive model and tensor visualization. ([#283](https://github.com/inseq-team/inseq/pull/283))
+
+- New `treescope`-powered methods `FeatureAttributionOutput.show_granular` and `FeatureAttributionSequenceOutput.show_tokens` for interactive visualization of multidimensional attribution tensors and token highlights. ([#283](https://github.com/inseq-team/inseq/pull/283))
+
 - Added new models `DbrxForCausalLM`, `OlmoForCausalLM`, `Phi3ForCausalLM`, `Qwen2MoeForCausalLM`, `Gemma2ForCausalLM` to model config.
 
 - Add `rescale_attributions` to Inseq CLI commands for `rescale=True` ([#280](https://github.com/inseq-team/inseq/pull/280)).
@@ -84,8 +88,8 @@ out_female = attrib_model.attribute(
 
 ## 📝 Documentation and Tutorials
 
-*No changes*
+- Updated tutorial with `treescope` usage examples.
 
 ## 💥 Breaking Changes
 
-*No changes*
+- Dropped support for Python 3.9. Please use Python >= 3.10. ([#283](https://github.com/inseq-team/inseq/pull/283))

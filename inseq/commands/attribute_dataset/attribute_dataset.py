@@ -1,5 +1,3 @@
-from typing import Optional
-
 from ...utils import is_datasets_available
 from ..attribute import AttributeExtendedArgs
 from ..attribute.attribute import attribute
@@ -10,7 +8,7 @@ if is_datasets_available():
     from datasets import load_dataset
 
 
-def load_fields_from_dataset(dataset_args: LoadDatasetArgs) -> tuple[list[str], Optional[list[str]]]:
+def load_fields_from_dataset(dataset_args: LoadDatasetArgs) -> tuple[list[str], list[str] | None]:
     if not is_datasets_available():
         raise ImportError("The datasets library needs to be installed to use the attribute-dataset client.")
     dataset = load_dataset(

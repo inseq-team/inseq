@@ -1,10 +1,11 @@
 from copy import deepcopy
-from typing import Literal, Optional, Union
+from typing import Literal
 
 from rich.console import Console
 
 from ... import load_model
 from ...models import HuggingfaceModel
+from ...utils.viz_utils import treescope_ignore
 from .attribute_context_args import AttributeContextArgs
 from .attribute_context_helpers import (
     AttributeContextOutput,
@@ -15,7 +16,7 @@ from .attribute_context_helpers import (
 
 
 def get_formatted_procedure_details(args: AttributeContextArgs) -> str:
-    def format_comment(std: Optional[float] = None, topk: Optional[int] = None) -> str:
+    def format_comment(std: float | None = None, topk: int | None = None) -> str:
         comment = []
         if std:
             comment.append(f"std λ={std:.2f}")
@@ -55,7 +56,7 @@ def get_formatted_attribute_context_results(
         special_tokens_to_keep: list[str],
         context: str,
         context_scores: list[float],
-        other_context_scores: Optional[list[float]] = None,
+        other_context_scores: list[float] | None = None,
         is_target: bool = False,
         context_type: Literal["Input", "Output"] = "Input",
     ) -> str:
@@ -117,16 +118,16 @@ def get_formatted_attribute_context_results(
     return out_string
 
 
+@treescope_ignore
 def visualize_attribute_context(
     output: AttributeContextOutput,
-    model: Union[HuggingfaceModel, str, None] = None,
-    cti_threshold: Optional[float] = None,
+    model: HuggingfaceModel | str | None = None,
+    cti_threshold: float | None = None,
     return_html: bool = False,
-) -> Optional[str]:
+) -> str | None:
     if output.info is None:
         raise ValueError("Cannot visualize attribution results without args. Set add_output_info = True.")
     console = Console(record=True)
-    viz = get_formatted_procedure_details(output.info)
     if model is None:
         model = output.info.model_name_or_path
     if isinstance(model, str):
@@ -140,15 +141,16 @@ def visualize_attribute_context(
         raise TypeError(f"Unsupported model type {type(model)} for visualization.")
     if cti_threshold is None and len(output.cti_scores) > 1:
         cti_threshold = get_scores_threshold(output.cti_scores, output.info.context_sensitivity_std_threshold)
+    viz = get_formatted_procedure_details(output.info)
     viz += "\n\n" + get_formatted_attribute_context_results(model, output.info, output, cti_threshold)
     with console.capture() as _:
+        console.print(viz, soft_wrap=False)
+    if output.info.show_viz:
         console.print(viz, soft_wrap=False)
     html = console.export_html()
     if output.info.viz_path:
         with open(output.info.viz_path, "w", encoding="utf-8") as f:
             f.write(html)
-    if output.info.show_viz:
-        console.print(viz, soft_wrap=False)
     if return_html:
         return html
     return None

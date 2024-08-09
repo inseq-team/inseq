@@ -14,7 +14,7 @@
 """Attention-based feature attribution methods."""
 
 import logging
-from typing import Any, Optional
+from typing import Any
 
 from captum._utils.typing import TensorOrTupleOfTensorsGeneric
 
@@ -46,9 +46,9 @@ class AttentionWeightsAttribution(InternalsAttributionRegistry):
             self,
             inputs: TensorOrTupleOfTensorsGeneric,
             additional_forward_args: TensorOrTupleOfTensorsGeneric,
-            encoder_self_attentions: Optional[MultiLayerMultiUnitScoreTensor] = None,
-            decoder_self_attentions: Optional[MultiLayerMultiUnitScoreTensor] = None,
-            cross_attentions: Optional[MultiLayerMultiUnitScoreTensor] = None,
+            encoder_self_attentions: MultiLayerMultiUnitScoreTensor | None = None,
+            decoder_self_attentions: MultiLayerMultiUnitScoreTensor | None = None,
+            cross_attentions: MultiLayerMultiUnitScoreTensor | None = None,
         ) -> MultiDimensionalFeatureAttributionStepOutput:
             """Extracts the attention weights from the model.
 

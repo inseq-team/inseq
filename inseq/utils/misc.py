@@ -5,14 +5,14 @@ import logging
 import math
 from base64 import standard_b64decode, standard_b64encode
 from collections import OrderedDict
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from contextlib import contextmanager
 from functools import wraps
 from importlib import import_module
 from inspect import signature
 from numbers import Number
 from os import PathLike, fsync
-from typing import Any, Callable, Optional, Union
+from typing import Any
 
 from numpy import asarray, frombuffer
 from torch import Tensor
@@ -44,7 +44,7 @@ def _pretty_list_contents(l: Sequence[Any]) -> str:
     )
 
 
-def _pretty_list(l: Optional[Sequence[Any]], lpad: int = 8) -> str:
+def _pretty_list(l: Sequence[Any] | None, lpad: int = 8) -> str:
     if all(isinstance(x, list) for x in l):
         line_sep = f" ],\n{' ' * lpad}[ "
         contents = " " * lpad + "[ " + line_sep.join([_pretty_list_contents(subl) for subl in l]) + " ]"
@@ -57,7 +57,7 @@ def _pretty_list(l: Optional[Sequence[Any]], lpad: int = 8) -> str:
     return "[\n" + contents + f"\n{' ' * (lpad - 4)}]"
 
 
-def pretty_list(l: Optional[Sequence[Any]], lpad: int = 8) -> str:
+def pretty_list(l: Sequence[Any] | None, lpad: int = 8) -> str:
     if l is None:
         return "None"
     if len(l) == 0:
@@ -74,7 +74,7 @@ def pretty_list(l: Optional[Sequence[Any]], lpad: int = 8) -> str:
     return f"{out_txt}: {_pretty_list(l, lpad)}"
 
 
-def pretty_tensor(t: Optional[Tensor] = None, lpad: int = 8) -> str:
+def pretty_tensor(t: Tensor | None = None, lpad: int = 8) -> str:
     if t is None:
         return "None"
     if t.ndim > 2 or any(x > 20 for x in t.shape):
@@ -91,7 +91,7 @@ def pretty_dict(d: dict[str, Any], lpad: int = 4) -> str:
     out_txt = "{\n"
     for k, v in d.items():
         out_txt += f"{' ' * lpad}{k}: "
-        if isinstance(v, (list, tuple)):
+        if isinstance(v, list | tuple):
             out_txt += pretty_list(v, lpad + 4)
         elif isinstance(v, Tensor):
             out_txt += pretty_tensor(v, lpad + 4)
@@ -112,9 +112,9 @@ def pretty_dict(d: dict[str, Any], lpad: int = 4) -> str:
 def extract_signature_args(
     full_args: dict[str, Any],
     func: Callable[[Any], Any],
-    exclude_args: Optional[Sequence[str]] = None,
+    exclude_args: Sequence[str] | None = None,
     return_remaining: bool = False,
-) -> Union[dict[str, Any], tuple[dict[str, Any], dict[str, Any]]]:
+) -> dict[str, Any] | tuple[dict[str, Any], dict[str, Any]]:
     extracted_args = {
         k: v
         for k, v in full_args.items()
@@ -201,7 +201,7 @@ def isnotebook():
 
 def format_input_texts(
     texts: TextInput,
-    ref_texts: Optional[TextInput] = None,
+    ref_texts: TextInput | None = None,
     skip_special_tokens: bool = False,
     special_tokens: list[str] = [],
 ) -> tuple[list[str], list[str]]:
@@ -246,7 +246,7 @@ def aggregate_token_pair(tokens: list[TokenWithId], other_tokens: list[TokenWith
     if not other_tokens:
         return tokens
     out_tokens = []
-    for tok, other in zip(tokens, other_tokens):
+    for tok, other in zip(tokens, other_tokens, strict=False):
         if tok.token == other.token:
             out_tokens.append(TokenWithId(tok.token, tok.id))
         else:
@@ -310,13 +310,13 @@ def save_to_file(f: Callable[[Any], Any]) -> Callable[[Any], Any]:
     @wraps(f)
     def save_to_file_wrapper(
         obj: Any,
-        fp: Union[str, bytes, PathLike] = None,
+        fp: str | bytes | PathLike = None,
         *args,
-        compression: Union[int, bool] = None,
+        compression: int | bool = None,
         force_flush: bool = False,
         return_output: bool = True,
         **kwargs,
-    ) -> Optional[Any]:
+    ) -> Any | None:
         if "compression" in signature(f).parameters:
             kwargs["compression"] = compression
         txt = f(obj, *args, **kwargs)
@@ -431,16 +431,27 @@ def get_cls_from_instance_type(mod, name, cls_lookup_map):
     return curr_class
 
 
-def clean_tokens(tokens: list[str], remove_tokens: list[str]) -> tuple[list[str], list[int]]:
+def clean_tokens(
+    tokens: list[str],
+    remove_tokens: list[str] = [],
+    return_removed_idxs: bool = False,
+    replace_chars: dict[str, str] | None = None,
+) -> list[str] | tuple[list[str], list[int]]:
     """Removes tokens from a list of tokens and returns the cleaned list and the removed token indexes."""
     clean_tokens = []
     removed_token_idxs = []
     for idx, tok in enumerate(tokens):
-        if tok not in remove_tokens:
-            clean_tokens += [tok.strip()]
-        else:
+        new_tok = tok
+        if new_tok in remove_tokens:
             removed_token_idxs += [idx]
-    return clean_tokens, removed_token_idxs
+        else:
+            if replace_chars is not None:
+                for k, v in replace_chars.items():
+                    new_tok = new_tok.replace(k, v)
+            clean_tokens += [new_tok.strip()]
+    if return_removed_idxs:
+        return clean_tokens, removed_token_idxs
+    return clean_tokens
 
 
 def get_left_padding(text: str):

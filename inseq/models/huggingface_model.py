@@ -1,7 +1,7 @@
 """HuggingFace Seq2seq model."""
 import logging
 from abc import abstractmethod
-from typing import Any, NoReturn, Optional, Union
+from typing import Any, NoReturn
 
 import torch
 from torch import long
@@ -65,12 +65,12 @@ class HuggingfaceModel(AttributionModel):
 
     def __init__(
         self,
-        model: Union[str, PreTrainedModel],
-        attribution_method: Optional[str] = None,
-        tokenizer: Union[str, PreTrainedTokenizerBase, None] = None,
-        device: Optional[str] = None,
-        model_kwargs: Optional[dict[str, Any]] = {},
-        tokenizer_kwargs: Optional[dict[str, Any]] = {},
+        model: str | PreTrainedModel,
+        attribution_method: str | None = None,
+        tokenizer: str | PreTrainedTokenizerBase | None = None,
+        device: str | None = None,
+        model_kwargs: dict[str, Any] | None = {},
+        tokenizer_kwargs: dict[str, Any] | None = {},
         **kwargs,
     ) -> None:
         """AttributionModel subclass for Huggingface-compatible models.
@@ -142,12 +142,12 @@ class HuggingfaceModel(AttributionModel):
 
     @staticmethod
     def load(
-        model: Union[str, PreTrainedModel],
-        attribution_method: Optional[str] = None,
-        tokenizer: Union[str, PreTrainedTokenizerBase, None] = None,
+        model: str | PreTrainedModel,
+        attribution_method: str | None = None,
+        tokenizer: str | PreTrainedTokenizerBase | None = None,
         device: str = None,
-        model_kwargs: Optional[dict[str, Any]] = {},
-        tokenizer_kwargs: Optional[dict[str, Any]] = {},
+        model_kwargs: dict[str, Any] | None = {},
+        tokenizer_kwargs: dict[str, Any] | None = {},
         **kwargs,
     ) -> "HuggingfaceModel":
         """Loads a HuggingFace model and tokenizer and wraps them in the appropriate AttributionModel."""
@@ -204,12 +204,12 @@ class HuggingfaceModel(AttributionModel):
     @batched
     def generate(
         self,
-        inputs: Union[TextInput, BatchEncoding],
+        inputs: TextInput | BatchEncoding,
         return_generation_output: bool = False,
         skip_special_tokens: bool = True,
         output_generated_only: bool = False,
         **kwargs,
-    ) -> Union[list[str], tuple[list[str], ModelOutput]]:
+    ) -> list[str] | tuple[list[str], ModelOutput]:
         """Wrapper of model.generate to handle tokenization and decoding.
 
         Args:
@@ -244,7 +244,7 @@ class HuggingfaceModel(AttributionModel):
         return texts
 
     @staticmethod
-    def output2logits(forward_output: Union[Seq2SeqLMOutput, CausalLMOutput]) -> LogitsTensor:
+    def output2logits(forward_output: Seq2SeqLMOutput | CausalLMOutput) -> LogitsTensor:
         # Full logits for last position of every sentence:
         # (batch_size, tgt_seq_len, vocab_size) => (batch_size, vocab_size)
         return forward_output.logits[:, -1, :].squeeze(1)
@@ -302,7 +302,7 @@ class HuggingfaceModel(AttributionModel):
 
     def decode(
         self,
-        ids: Union[list[int], list[list[int]], IdsTensor],
+        ids: list[int] | list[list[int]] | IdsTensor,
         skip_special_tokens: bool = True,
     ) -> list[str]:
         return self.tokenizer.batch_decode(
@@ -331,7 +331,7 @@ class HuggingfaceModel(AttributionModel):
         return tokens
 
     def convert_ids_to_tokens(
-        self, ids: IdsTensor, skip_special_tokens: Optional[bool] = True
+        self, ids: IdsTensor, skip_special_tokens: bool | None = True
     ) -> OneOrMoreTokenSequences:
         if ids.ndim < 2:
             return self._convert_ids_to_tokens(ids, skip_special_tokens)
@@ -350,7 +350,7 @@ class HuggingfaceModel(AttributionModel):
     ) -> TextInput:
         if isinstance(tokens, list) and len(tokens) == 0:
             return ""
-        elif isinstance(tokens[0], (bytes, str)):
+        elif isinstance(tokens[0], bytes | str):
             tmp_decode_state = self.tokenizer._decode_use_source_tokenizer
             self.tokenizer._decode_use_source_tokenizer = not as_targets
             out_strings = self.tokenizer.convert_tokens_to_string(
@@ -396,7 +396,7 @@ class HuggingfaceModel(AttributionModel):
         """
         if isinstance(tokens, list) and len(tokens) == 0:
             return []
-        elif isinstance(tokens[0], (bytes, str)):
+        elif isinstance(tokens[0], bytes | str):
             clean_tokens = []
             for tok in tokens:
                 clean_tok = self.convert_tokens_to_string(
@@ -489,12 +489,12 @@ class HuggingfaceDecoderOnlyModel(HuggingfaceModel, DecoderOnlyAttributionModel)
 
     def __init__(
         self,
-        model: Union[str, PreTrainedModel],
-        attribution_method: Optional[str] = None,
-        tokenizer: Union[str, PreTrainedTokenizerBase, None] = None,
+        model: str | PreTrainedModel,
+        attribution_method: str | None = None,
+        tokenizer: str | PreTrainedTokenizerBase | None = None,
         device: str = None,
-        model_kwargs: Optional[dict[str, Any]] = {},
-        tokenizer_kwargs: Optional[dict[str, Any]] = {},
+        model_kwargs: dict[str, Any] | None = {},
+        tokenizer_kwargs: dict[str, Any] | None = {},
         **kwargs,
     ) -> NoReturn:
         super().__init__(model, attribution_method, tokenizer, device, model_kwargs, tokenizer_kwargs, **kwargs)

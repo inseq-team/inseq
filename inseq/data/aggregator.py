@@ -1,7 +1,7 @@
 import logging
 from abc import ABC, abstractmethod
-from collections.abc import Sequence
-from typing import TYPE_CHECKING, Callable, Optional, TypeVar, Union
+from collections.abc import Callable, Sequence
+from typing import TYPE_CHECKING, TypeVar
 
 import torch
 
@@ -45,7 +45,7 @@ class DictWithDefault(dict):
             )
         return AggregationFunction.available_classes()[name]()
 
-    def __init__(self, default: Union[str, Callable], **kwargs):
+    def __init__(self, default: str | Callable, **kwargs):
         super().__init__(**kwargs)
         self.default = self._get_fn(default) if isinstance(default, str) else default
 
@@ -127,8 +127,8 @@ class Aggregator(Registry):
 
 def _get_aggregators_from_id(
     aggregator: str,
-    aggregate_fn: Optional[str] = None,
-) -> tuple[type[Aggregator], Optional[AggregationFunction]]:
+    aggregate_fn: str | None = None,
+) -> tuple[type[Aggregator], AggregationFunction | None]:
     if aggregator in available_classes(Aggregator):
         aggregator = Aggregator.available_classes()[aggregator]
     elif aggregator in available_classes(AggregationFunction):
@@ -158,8 +158,8 @@ def _get_aggregators_from_id(
 class AggregatorPipeline:
     def __init__(
         self,
-        aggregators: list[Union[str, type[Aggregator]]],
-        aggregate_fn: Optional[list[Union[str, Callable]]] = None,
+        aggregators: list[str | type[Aggregator]],
+        aggregate_fn: list[str | Callable] | None = None,
     ):
         self.aggregators: list[type[Aggregator]] = []
         self.aggregate_fn: list[Callable] = []
@@ -186,7 +186,7 @@ class AggregatorPipeline:
         if do_pre_aggregation_checks:
             for aggregator in self.aggregators:
                 aggregator.start_aggregation_hook(tensors, **kwargs)
-        for aggregator, aggregate_fn in zip(self.aggregators, self.aggregate_fn):
+        for aggregator, aggregate_fn in zip(self.aggregators, self.aggregate_fn, strict=False):
             curr_aggregation_kwargs = kwargs.copy()
             if aggregate_fn is not None:
                 curr_aggregation_kwargs["aggregate_fn"] = aggregate_fn
@@ -199,7 +199,7 @@ class AggregatorPipeline:
         return tensors
 
 
-AggregatorInput = Union[AggregatorPipeline, type[Aggregator], str, Sequence[Union[str, type[Aggregator]]], None]
+AggregatorInput = AggregatorPipeline | type[Aggregator] | str | Sequence[str | type[Aggregator]] | None
 
 
 def list_aggregators() -> list[str]:
@@ -208,12 +208,12 @@ def list_aggregators() -> list[str]:
 
 
 class AggregableMixin(ABC):
-    _aggregator: Union[AggregatorPipeline, type[Aggregator]]
+    _aggregator: AggregatorPipeline | type[Aggregator]
 
     def aggregate(
         self: AggregableMixinClass,
         aggregator: AggregatorInput = None,
-        aggregate_fn: Union[str, Sequence[str], None] = None,
+        aggregate_fn: str | Sequence[str] | None = None,
         do_pre_aggregation_checks: bool = True,
         do_post_aggregation_checks: bool = True,
         **kwargs,
@@ -230,7 +230,7 @@ class AggregableMixin(ABC):
         if aggregator is None:
             aggregator = self._aggregator
         if isinstance(aggregator, str):
-            if isinstance(aggregate_fn, (list, tuple)):
+            if isinstance(aggregate_fn, list | tuple):
                 raise ValueError(
                     "If a single aggregator is used, aggregate_fn should also be a string identifier for the "
                     "corresponding aggregation function if defined."
@@ -238,11 +238,11 @@ class AggregableMixin(ABC):
             aggregator, aggregate_fn = _get_aggregators_from_id(aggregator, aggregate_fn)
             if aggregate_fn is not None:
                 kwargs["aggregate_fn"] = aggregate_fn
-        elif isinstance(aggregator, (list, tuple)):
-            if all(isinstance(a, (str, type)) for a in aggregator):
+        elif isinstance(aggregator, list | tuple):
+            if all(isinstance(a, str | type) for a in aggregator):
                 aggregator = AggregatorPipeline(aggregator, aggregate_fn)
             elif all(isinstance(agg, tuple) for agg in aggregator):
-                if all(isinstance(idx, (str, type)) for agg in aggregator for idx in agg):
+                if all(isinstance(idx, str | type) for agg in aggregator for idx in agg):
                     aggregator = AggregatorPipeline([a[0] for a in aggregator], [a[1] for a in aggregator])
             else:
                 raise ValueError(
@@ -280,7 +280,7 @@ class SequenceAttributionAggregator(Aggregator):
 
     @classmethod
     def _aggregate(
-        cls, attr: "FeatureAttributionSequenceOutput", aggregate_fn: Union[str, Callable, None] = None, **kwargs
+        cls, attr: "FeatureAttributionSequenceOutput", aggregate_fn: str | Callable | None = None, **kwargs
     ) -> "FeatureAttributionSequenceOutput":
         if aggregate_fn is None and isinstance(attr._dict_aggregate_fn, dict):
             aggregate_fn = DictWithDefault(default=cls.default_fn, **attr._dict_aggregate_fn)
@@ -307,9 +307,9 @@ class SequenceAttributionAggregator(Aggregator):
         cls,
         attr: "FeatureAttributionSequenceOutput",
         aggregate_fn: AggregationFunction,
-        select_idx: Optional[OneOrMoreIndices] = None,
-        normalize: Optional[bool] = None,
-        rescale: Optional[bool] = None,
+        select_idx: OneOrMoreIndices | None = None,
+        normalize: bool | None = None,
+        rescale: bool | None = None,
         **kwargs,
     ):
         if normalize and rescale:
@@ -375,7 +375,7 @@ class SequenceAttributionAggregator(Aggregator):
         cls,
         attr: "FeatureAttributionSequenceOutput",
         aggregate_fn: AggregationFunction,
-        select_idx: Optional[OneOrMoreIndices] = None,
+        select_idx: OneOrMoreIndices | None = None,
         normalize: bool = True,
         rescale: bool = False,
         **kwargs,
@@ -390,7 +390,7 @@ class SequenceAttributionAggregator(Aggregator):
         cls,
         attr: "FeatureAttributionSequenceOutput",
         aggregate_fn: AggregationFunction,
-        select_idx: Optional[OneOrMoreIndices] = None,
+        select_idx: OneOrMoreIndices | None = None,
         normalize: bool = True,
         rescale: bool = False,
         **kwargs,
@@ -409,7 +409,7 @@ class SequenceAttributionAggregator(Aggregator):
         cls,
         attr: "FeatureAttributionSequenceOutput",
         aggregate_fn: AggregationFunction,
-        select_idx: Optional[OneOrMoreIndices] = None,
+        select_idx: OneOrMoreIndices | None = None,
         **kwargs,
     ):
         if aggregate_fn.takes_sequence_scores:
@@ -450,7 +450,7 @@ class SequenceAttributionAggregator(Aggregator):
     def _filter_scores(
         scores: torch.Tensor,
         dim: int = -1,
-        indices: Optional[OneOrMoreIndices] = None,
+        indices: OneOrMoreIndices | None = None,
     ) -> torch.Tensor:
         indexed = scores.index_select(dim, validate_indices(scores, dim, indices).to(scores.device))
         if isinstance(indices, int):
@@ -459,11 +459,11 @@ class SequenceAttributionAggregator(Aggregator):
 
     @staticmethod
     def _aggregate_scores(
-        scores: Union[torch.Tensor, tuple[torch.Tensor, ...]],
+        scores: torch.Tensor | tuple[torch.Tensor, ...],
         aggregate_fn: AggregationFunction,
         dim: int = -1,
         **kwargs,
-    ) -> Union[torch.Tensor, tuple[torch.Tensor, ...]]:
+    ) -> torch.Tensor | tuple[torch.Tensor, ...]:
         if isinstance(scores, tuple) and aggregate_fn.takes_single_tensor:
             return tuple(aggregate_fn(score, dim=dim, **kwargs) for score in scores)
         return aggregate_fn(scores, dim=dim, **kwargs)
@@ -492,8 +492,8 @@ class ContiguousSpanAggregator(SequenceAttributionAggregator):
     def start_aggregation_hook(
         cls,
         attr: "FeatureAttributionSequenceOutput",
-        source_spans: Optional[IndexSpan] = None,
-        target_spans: Optional[IndexSpan] = None,
+        source_spans: IndexSpan | None = None,
+        target_spans: IndexSpan | None = None,
         **kwargs,
     ):
         super().start_aggregation_hook(attr, **kwargs)
@@ -508,8 +508,8 @@ class ContiguousSpanAggregator(SequenceAttributionAggregator):
     def aggregate(
         cls,
         attr: "FeatureAttributionSequenceOutput",
-        source_spans: Optional[IndexSpan] = None,
-        target_spans: Optional[IndexSpan] = None,
+        source_spans: IndexSpan | None = None,
+        target_spans: IndexSpan | None = None,
         **kwargs,
     ):
         """Spans can be:
@@ -530,7 +530,7 @@ class ContiguousSpanAggregator(SequenceAttributionAggregator):
         return [spans] if isinstance(spans[0], int) else spans
 
     @classmethod
-    def validate_spans(cls, span_sequence: list[TokenWithId], spans: Optional[IndexSpan] = None):
+    def validate_spans(cls, span_sequence: list[TokenWithId], spans: IndexSpan | None = None):
         if not spans:
             return
         allmatch = lambda l, type: all(isinstance(x, type) for x in l)
@@ -685,7 +685,7 @@ class SubwordAggregator(ContiguousSpanAggregator):
         attr: "FeatureAttributionSequenceOutput",
         aggregate_source: bool = True,
         aggregate_target: bool = True,
-        special_chars: Union[str, tuple[str, ...]] = "▁",
+        special_chars: str | tuple[str, ...] = "▁",
         is_suffix_symbol: bool = False,
         **kwargs,
     ):
@@ -698,7 +698,7 @@ class SubwordAggregator(ContiguousSpanAggregator):
         return super().aggregate(attr, source_spans=source_spans, target_spans=target_spans, **kwargs)
 
     @staticmethod
-    def get_spans(tokens: list[TokenWithId], special_chars: Union[str, tuple[str, ...]], is_suffix_symbol: bool):
+    def get_spans(tokens: list[TokenWithId], special_chars: str | tuple[str, ...], is_suffix_symbol: bool):
         spans = []
         last_prefix_idx = 0
         has_special_chars = any(sym in token.token for token in tokens for sym in special_chars)
@@ -828,8 +828,8 @@ class SliceAggregator(ContiguousSpanAggregator):
     def aggregate(
         cls,
         attr: "FeatureAttributionSequenceOutput",
-        source_spans: Optional[IndexSpan] = None,
-        target_spans: Optional[IndexSpan] = None,
+        source_spans: IndexSpan | None = None,
+        target_spans: IndexSpan | None = None,
         **kwargs,
     ):
         """Spans can be:

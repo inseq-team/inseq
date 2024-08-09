@@ -1,13 +1,13 @@
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Callable, Literal, Optional, Union
+from typing import TYPE_CHECKING, Literal
 
 import torch
 from captum.attr._utils.attribution import Attribution
 from jaxtyping import Float, Float32, Int64
 from transformers import PreTrainedModel
 
-TextInput = Union[str, Sequence[str]]
+TextInput = str | Sequence[str]
 
 if TYPE_CHECKING:
     from inseq.models import AttributionModel
@@ -21,7 +21,7 @@ class TokenWithId:
     def __str__(self):
         return self.token
 
-    def __eq__(self, other: Union[str, int, "TokenWithId"]):
+    def __eq__(self, other: "str | int | TokenWithId"):
         if isinstance(other, str):
             return self.token == other
         elif isinstance(other, int):
@@ -63,7 +63,7 @@ class InseqAttribution(Attribution):
 @dataclass
 class TextSequences:
     targets: TextInput
-    sources: Optional[TextInput] = None
+    sources: TextInput | None = None
 
 
 OneOrMoreIdSequences = Sequence[Sequence[int]]
@@ -73,8 +73,8 @@ OneOrMoreAttributionSequences = Sequence[Sequence[float]]
 
 ScorePrecision = Literal["float32", "float16", "float8"]
 
-IndexSpan = Union[tuple[int, int], Sequence[tuple[int, int]]]
-OneOrMoreIndices = Union[int, list[int], tuple[int, int]]
+IndexSpan = tuple[int, int] | Sequence[tuple[int, int]]
+OneOrMoreIndices = int | list[int] | tuple[int, int]
 OneOrMoreIndicesDict = dict[int, OneOrMoreIndices]
 
 IdsTensor = Int64[torch.Tensor, "batch_size seq_len"]
@@ -107,7 +107,7 @@ GranularStepAttributionTensor = EmbeddingsTensor
 # or produced by methods that work at token-level (e.g. attention)
 TokenStepAttributionTensor = MultipleScoresPerStepTensor
 
-StepAttributionTensor = Union[GranularStepAttributionTensor, TokenStepAttributionTensor]
+StepAttributionTensor = GranularStepAttributionTensor | TokenStepAttributionTensor
 
 # One attribution score per embedding value for every attributed token in attributed_seq
 # for all generated tokens in generated_seq. Produced by aggregating GranularStepAttributionTensor
@@ -119,7 +119,7 @@ GranularSequenceAttributionTensor = Float32[torch.Tensor, "attributed_seq_len ge
 # or by aggregating TokenStepAttributionTensor across multiple steps and separating batches.
 TokenSequenceAttributionTensor = MultipleScoresPerSequenceTensor
 
-SequenceAttributionTensor = Union[GranularSequenceAttributionTensor, TokenSequenceAttributionTensor]
+SequenceAttributionTensor = GranularSequenceAttributionTensor | TokenSequenceAttributionTensor
 
 # For Huggingface it's a string identifier e.g. "t5-base", "Helsinki-NLP/opus-mt-en-it"
 # For Fairseq it's a tuple of strings containing repo and model name
@@ -127,9 +127,6 @@ SequenceAttributionTensor = Union[GranularSequenceAttributionTensor, TokenSequen
 ModelIdentifier = str  # Union[str, Tuple[str, str]]
 ModelClass = PreTrainedModel
 
-AttributionForwardInputs = Union[IdsTensor, EmbeddingsTensor]
-AttributionForwardInputsPair = Union[
-    tuple[IdsTensor, IdsTensor],
-    tuple[EmbeddingsTensor, EmbeddingsTensor],
-]
-OneOrTwoAttributionForwardInputs = Union[AttributionForwardInputs, AttributionForwardInputsPair]
+AttributionForwardInputs = IdsTensor | EmbeddingsTensor
+AttributionForwardInputsPair = tuple[IdsTensor, IdsTensor] | tuple[EmbeddingsTensor, EmbeddingsTensor]
+OneOrTwoAttributionForwardInputs = AttributionForwardInputs | AttributionForwardInputsPair

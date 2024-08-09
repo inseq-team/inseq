@@ -18,9 +18,12 @@
 
 import random
 import string
-from typing import Literal, Optional, Union
+from typing import TYPE_CHECKING, Literal
 
 import numpy as np
+import treescope as ts
+import treescope.figures as fg
+import treescope.rendering_parts as rp
 from matplotlib.colors import Colormap
 from rich import box
 from rich.color import Color
@@ -36,26 +39,38 @@ from rich.text import Text
 from tqdm.std import tqdm
 
 from ..utils import isnotebook
+from ..utils.misc import clean_tokens
 from ..utils.typing import TextSequences
 from ..utils.viz_utils import (
     final_plot_html,
     get_colors,
     get_instance_html,
+    maybe_add_linebreak,
     red_transparent_blue_colormap,
     saliency_heatmap_html,
     saliency_heatmap_table_header,
     sanitize_html,
+    test_dim,
+    treescope_cmap,
 )
-from .attribution import FeatureAttributionSequenceOutput
+
+if TYPE_CHECKING:
+    from .attribution import FeatureAttributionSequenceOutput
+
+if isnotebook():
+    cmap = treescope_cmap()
+    ts.basic_interactive_setup(autovisualize_arrays=True)
+    ts.default_diverging_colormap.set_globally(cmap)
+    ts.default_sequential_colormap.set_globally(cmap)
 
 
 def show_attributions(
-    attributions: FeatureAttributionSequenceOutput,
-    min_val: Optional[int] = None,
-    max_val: Optional[int] = None,
+    attributions: "FeatureAttributionSequenceOutput",
+    min_val: int | None = None,
+    max_val: int | None = None,
     display: bool = True,
-    return_html: Optional[bool] = False,
-) -> Optional[str]:
+    return_html: bool | None = False,
+) -> str | None:
     """Core function allowing for visualization of feature attribution maps in console/HTML format.
 
     Args:
@@ -74,6 +89,8 @@ def show_attributions(
     Returns:
         `Optional[str]`: Returns the HTML output if `return_html=True`
     """
+    from inseq.data.attribution import FeatureAttributionSequenceOutput
+
     if isinstance(attributions, FeatureAttributionSequenceOutput):
         attributions = [attributions]
     html_out = ""
@@ -128,14 +145,243 @@ def show_attributions(
         return html_out
 
 
+def show_granular_attributions(
+    attributions: "FeatureAttributionSequenceOutput",
+    max_show_size: int = 20,
+    min_val: int | None = None,
+    max_val: int | None = None,
+    show_dim: int | str | None = None,
+    slice_dims: dict[int | str, tuple[int, int]] | None = None,
+    display: bool = True,
+    return_html: bool | None = False,
+    return_figure: bool = False,
+) -> str | None:
+    """Visualizes granular attribution heatmaps in HTML format.
+
+    Args:
+        attributions (:class:`~inseq.data.attribution.FeatureAttributionSequenceOutput`):
+            Sequence attributions to be visualized. Does not require pre-aggregation.
+        min_val (:obj:`int`, *optional*, defaults to None):
+            Lower attribution score threshold for color map.
+        max_val (:obj:`int`, *optional*, defaults to None):
+            Upper attribution score threshold for color map.
+        max_show_size (:obj:`int`, *optional*, defaults to None):
+            Maximum dimension size for additional dimensions to be visualized. Default: 20.
+        show_dim (:obj:`int` or :obj:`str`, *optional*, defaults to None):
+            Dimension to be visualized along with the source and target tokens. Can be either the dimension index or
+            the dimension name. Works only if the dimension size is less than or equal to `max_show_size`.
+        slice_dims (:obj:`dict[int or str, tuple[int, int]]`, *optional*, defaults to None):
+            Dimensions to be sliced and visualized along with the source and target tokens. The dictionary should
+            contain the dimension index or name as the key and the slice range as the value.
+        display (:obj:`bool`, *optional*, defaults to True):
+            Whether to show the output of the visualization function.
+        return_html (:obj:`bool`, *optional*, defaults to False):
+            If true, returns the HTML corresponding to the notebook visualization of the attributions in
+            string format, for saving purposes.
+        return_figure (:obj:`bool`, *optional*, defaults to False):
+            If true, returns the Treescope figure object for further manipulation.
+
+    Returns:
+        `str`: Returns the HTML output if `return_html=True`
+    """
+    from inseq.data.attribution import FeatureAttributionSequenceOutput
+
+    if isinstance(attributions, FeatureAttributionSequenceOutput):
+        attributions: list["FeatureAttributionSequenceOutput"] = [attributions]
+    if not isnotebook() and display:
+        raise ValueError(
+            "Granular attribution heatmaps visualization is  only supported in Jupyter notebooks. "
+            "Please set `display=False` and `return_html=True` to avoid this error."
+        )
+    if return_html and return_figure:
+        raise ValueError("Only one of `return_html` and `return_figure` can be set to True.")
+    items_to_render = []
+    for attribution in attributions:
+        if attribution.source_attributions is not None:
+            items_to_render += [
+                fg.bolded("Source Saliency Heatmap"),
+                get_saliency_heatmap_treescope(
+                    attribution.source_attributions.numpy(),
+                    [t.token for t in attribution.target[attribution.attr_pos_start : attribution.attr_pos_end]],
+                    [t.token for t in attribution.source],
+                    attribution._attribution_dim_names["source_attributions"],
+                    max_show_size=max_show_size,
+                    max_val=max_val,
+                    min_val=min_val,
+                    show_dim=show_dim,
+                    slice_dims=slice_dims,
+                ),
+            ]
+        if attribution.target_attributions is not None:
+            items_to_render += [
+                fg.bolded("Target Saliency Heatmap"),
+                get_saliency_heatmap_treescope(
+                    attribution.target_attributions.numpy(),
+                    [t.token for t in attribution.target[attribution.attr_pos_start : attribution.attr_pos_end]],
+                    [t.token for t in attribution.target],
+                    attribution._attribution_dim_names["target_attributions"],
+                    max_show_size=max_show_size,
+                    max_val=max_val,
+                    min_val=min_val,
+                    show_dim=show_dim,
+                    slice_dims=slice_dims,
+                ),
+            ]
+        items_to_render.append("")
+    fig = fg.inline(*items_to_render)
+    if return_figure:
+        return fig
+    if display:
+        ts.show(fig)
+    if return_html:
+        return ts.render_to_html(fig)
+
+
+def show_token_attributions(
+    attributions: "FeatureAttributionSequenceOutput",
+    min_val: int | None = None,
+    max_val: int | None = None,
+    display: bool = True,
+    return_html: bool | None = False,
+    return_figure: bool = False,
+    replace_char: dict[str, str] | None = None,
+    wrap_after: int | str | list[str] | tuple[str] | None = None,
+    step_score_highlight: str | None = None,
+):
+    """Visualizes token-level attributions in HTML format.
+
+    Args:
+        attributions (:class:`~inseq.data.attribution.FeatureAttributionSequenceOutput`):
+            Sequence attributions to be visualized.
+        min_val (:obj:`Optional[int]`, *optional*, defaults to None):
+            Lower attribution score threshold for color map.
+        max_val (`Optional[int]`, *optional*, defaults to None):
+            Upper attribution score threshold for color map.
+        display (`bool`, *optional*, defaults to True):
+            Whether to show the output of the visualization function.
+        return_html (`Optional[bool]`, *optional*, defaults to False):
+            If true, returns the HTML corresponding to the notebook visualization of the attributions in string format,
+            for saving purposes.
+        return_figure (`Optional[bool]`, *optional*, defaults to False):
+            If true, returns the Treescope figure object for further manipulation.
+        replace_char (`Optional[dict[str, str]]`, *optional*, defaults to None):
+            Dictionary mapping strings to be replaced to replacement options, used for cleaning special characters.
+            Default: {}.
+        wrap_after (`Optional[int | str | list[str] | tuple[str]]`, *optional*, defaults to None):
+            Token indices or tokens after which to wrap lines. E.g. 10 = wrap after every 10 tokens, "hi" = wrap after
+            word hi occurs, ["." "!", "?"] or ".!?" = wrap after every sentence-ending punctuation.
+        step_score_highlight (`Optional[str]`, *optional*, defaults to None):
+            Name of the step score to use to highlight generated tokens in the visualization. If None, no highlights are
+            shown. Default: None.
+    """
+    from inseq.data.attribution import FeatureAttributionSequenceOutput
+
+    if isinstance(attributions, FeatureAttributionSequenceOutput):
+        attributions: list["FeatureAttributionSequenceOutput"] = [attributions]
+    if not isnotebook() and display:
+        raise ValueError(
+            "Token attribution visualization is only supported in Jupyter notebooks. "
+            "Please set `display=False` and `return_html=True` to avoid this error."
+        )
+    if return_html and return_figure:
+        raise ValueError("Only one of `return_html` and `return_figure` can be set to True.")
+    if replace_char is None:
+        replace_char = {}
+    if max_val is None:
+        max_val = max(attribution.maximum for attribution in attributions)
+    if step_score_highlight is not None and (
+        attributions[0].step_scores is None or step_score_highlight not in attributions[0].step_scores
+    ):
+        raise ValueError(
+            f'The requested step score "{step_score_highlight}" is not available for highlights in the provided '
+            "attribution object. Please set `step_score_highlight=None` or recompute `model.attribute` by passing "
+            f'`step_scores=["{step_score_highlight}"].'
+        )
+    generated_token_parts = []
+    for attr in attributions:
+        cleaned_generated_tokens = clean_tokens(t.token for t in attr.target[attr.attr_pos_start : attr.attr_pos_end])
+        cleaned_input_tokens = clean_tokens(t.token for t in attr.source)
+        cleaned_target_tokens = clean_tokens(t.token for t in attr.target)
+        step_scores = None
+        title = "Generated text:\n\n"
+        if step_score_highlight is not None:
+            step_scores = attr.step_scores[step_score_highlight]
+            scores_vmax = step_scores.max().item()
+            # Use different cmap to differentiate from attribution scores
+            scores_cmap = (
+                treescope_cmap("greens") if all(x >= 0 for x in step_scores) else treescope_cmap("brown_to_green")
+            )
+            title = f"Generated text with {step_score_highlight} highlights:\n\n"
+        generated_token_parts.append(rp.custom_style(rp.text(title), css_style="font-weight: bold;"))
+        for gen_idx, curr_gen_tok in enumerate(cleaned_generated_tokens):
+            attributed_token_parts = [rp.text("\n")]
+            if attr.source_attributions is not None:
+                attributed_token_parts.append(
+                    get_tokens_heatmap_treescope(
+                        tokens=cleaned_input_tokens,
+                        scores=attr.source_attributions[:, gen_idx].numpy(),
+                        title=f'Source attributions for "{curr_gen_tok}"',
+                        title_style="font-style: italic; color: #888888;",
+                        min_val=min_val,
+                        max_val=max_val,
+                        wrap_after=wrap_after,
+                    )
+                )
+                attributed_token_parts.append(rp.text("\n\n"))
+            if attr.target_attributions is not None:
+                attributed_token_parts.append(
+                    get_tokens_heatmap_treescope(
+                        tokens=cleaned_target_tokens[: attr.attr_pos_start + gen_idx],
+                        scores=attr.target_attributions[:, gen_idx].numpy(),
+                        title=f'Target attributions for "{curr_gen_tok}"',
+                        title_style="font-style: italic; color: #888888;",
+                        min_val=min_val,
+                        max_val=max_val,
+                        wrap_after=wrap_after,
+                    )
+                )
+                attributed_token_parts.append(rp.text("\n\n"))
+            if step_scores is not None:
+                gen_tok_label = fg.treescope_part_from_display_object(
+                    fg.text_on_color(
+                        curr_gen_tok,
+                        value=round(step_scores[gen_idx].item(), 4),
+                        vmax=scores_vmax,
+                        colormap=scores_cmap,
+                    )
+                )
+            else:
+                gen_tok_label = rp.text(curr_gen_tok)
+            generated_token_parts.append(
+                rp.build_full_line_with_annotations(
+                    rp.build_custom_foldable_tree_node(
+                        label=gen_tok_label,
+                        contents=rp.fold_condition(
+                            collapsed=rp.text(" "),
+                            expanded=rp.indented_children([rp.siblings(*attributed_token_parts)]),
+                        ),
+                    )
+                )
+            )
+    fig = fg.figure_from_treescope_rendering_part(
+        rp.custom_style(rp.siblings(*generated_token_parts), css_style="white-space: pre-wrap")
+    )
+    if return_figure:
+        return fig
+    if display:
+        ts.show(fig)
+    if return_html:
+        return ts.render_to_html(fig)
+
+
 def get_attribution_colors(
-    attributions: list[FeatureAttributionSequenceOutput],
-    min_val: Optional[int] = None,
-    max_val: Optional[int] = None,
-    cmap: Union[str, Colormap, None] = None,
+    attributions: list["FeatureAttributionSequenceOutput"],
+    min_val: int | None = None,
+    max_val: int | None = None,
+    cmap: str | Colormap | None = None,
     return_alpha: bool = True,
     return_strings: bool = True,
-) -> list[list[list[Union[str, tuple[float, float, float]]]]]:
+) -> list[list[list[str | tuple[float, float, float]]]]:
     """A list (one element = one sentence) of lists (one element = attributions for one token)
     of lists (one element = one attribution) of colors. Colors are either strings or RGB(A) tuples.
     """
@@ -161,7 +407,7 @@ def get_attribution_colors(
 
 
 def get_heatmap_type(
-    attribution: FeatureAttributionSequenceOutput,
+    attribution: "FeatureAttributionSequenceOutput",
     colors,
     heatmap_type: Literal["Source", "Target"] = "Source",
     use_html: bool = False,
@@ -197,13 +443,13 @@ def get_heatmap_type(
 
 
 def get_saliency_heatmap_html(
-    scores: Union[np.ndarray, None],
+    scores: np.ndarray | None,
     column_labels: list[str],
     row_labels: list[str],
     input_colors: list[list[str]],
-    step_scores: Optional[dict[str, np.ndarray]] = None,
+    step_scores: dict[str, np.ndarray] | None = None,
     label: str = "",
-    step_scores_threshold: Union[float, dict[str, float]] = 0.5,
+    step_scores_threshold: float | dict[str, float] = 0.5,
 ):
     # unique ID added to HTML elements and function to avoid collision of differnent instances
     uuid = "".join(random.choices(string.ascii_lowercase, k=20))
@@ -250,13 +496,13 @@ def get_saliency_heatmap_html(
 
 
 def get_saliency_heatmap_rich(
-    scores: Union[np.ndarray, None],
+    scores: np.ndarray | None,
     column_labels: list[str],
     row_labels: list[str],
     input_colors: list[list[str]],
-    step_scores: Optional[dict[str, np.ndarray]] = None,
+    step_scores: dict[str, np.ndarray] | None = None,
     label: str = "",
-    step_scores_threshold: Union[float, dict[str, float]] = 0.5,
+    step_scores_threshold: float | dict[str, float] = 0.5,
 ):
     columns = [
         Column(header="", justify="right", overflow="fold"),
@@ -297,6 +543,87 @@ def get_saliency_heatmap_rich(
     return table
 
 
+def get_saliency_heatmap_treescope(
+    scores: np.ndarray | None,
+    column_labels: list[str],
+    row_labels: list[str],
+    dim_names: dict[int, str] | None = None,
+    max_show_size: int | None = None,
+    max_val: float | None = None,
+    min_val: float | None = None,
+    show_dim: int | str | None = None,
+    slice_dims: dict[int | str, tuple[int, int]] | None = None,
+):
+    if max_show_size is None:
+        max_show_size = 20
+    if dim_names is None:
+        dim_names = {}
+    item_labels_dict = {0: row_labels, 1: column_labels}
+    rev_dim_names = {v: k for k, v in dim_names.items()}
+    col_dims = [1]
+    slider_dims = []
+    if slice_dims is not None:
+        slices = [slice(None)] * scores.ndim
+        for dim_name, slice_idxs in slice_dims.items():
+            dim_idx = test_dim(dim_name, dim_names, rev_dim_names, scores)
+            slices[dim_idx] = slice(slice_idxs[0], slice_idxs[1])
+        scores = scores[tuple(slices)]
+    if show_dim is not None:
+        show_dim_idx = test_dim(show_dim, dim_names, rev_dim_names, scores)
+        if scores.shape[show_dim_idx] > max_show_size:
+            raise ValueError(
+                f"Dimension {show_dim_idx} has size {scores.shape[show_dim_idx]} which is greater than the maximum "
+                f"show size {max_show_size}. Please choose a different dimension or slice the tensor before "
+                "visualizing it using SliceAggregator."
+            )
+        col_dims.append(show_dim_idx)
+    for dim_idx, dim_name in dim_names.items():
+        if dim_idx > 1:
+            if scores.shape[dim_idx] <= max_show_size and len(col_dims) < 2:
+                col_dims.append(dim_idx)
+            else:
+                slider_dims.append(dim_idx)
+            item_labels_dict[dim_idx] = [f"{dim_name} #{i}" for i in range(scores.shape[dim_idx])]
+    return ts.render_array(
+        scores,
+        rows=[0],
+        columns=col_dims,
+        sliders=slider_dims,
+        axis_labels={k: f"{v}: {scores.shape[k]}" for k, v in dim_names.items()},
+        axis_item_labels=item_labels_dict,
+        vmax=max_val,
+        vmin=min_val,
+    )
+
+
+def get_tokens_heatmap_treescope(
+    tokens: list[str],
+    scores: np.ndarray,
+    title: str | None = None,
+    title_style: str | None = None,
+    min_val: float | None = None,
+    max_val: float | None = None,
+    wrap_after: int | str | list[str] | tuple[str] | None = None,
+):
+    parts = []
+    if title is not None:
+        parts.append(
+            rp.custom_style(
+                rp.text(title + ":\n"),
+                css_style=title_style,
+            )
+        )
+    for idx, tok in enumerate(tokens):
+        if not np.isnan(scores[idx]):
+            parts.append(
+                fg.treescope_part_from_display_object(
+                    fg.text_on_color(tok, value=round(scores[idx], 4), vmin=min_val, vmax=max_val)
+                )
+            )
+            parts += maybe_add_linebreak(tok, idx, wrap_after)
+    return rp.siblings(*parts)
+
+
 # Progress bar utilities
 
 
@@ -308,7 +635,7 @@ def get_progress_bar(
     pretty: bool,
     attr_pos_start: int,
     attr_pos_end: int,
-) -> Union[tqdm, tuple[Progress, Live], None]:
+) -> tqdm | tuple[Progress, Live] | None:
     if not show:
         return None
     elif show and not pretty:
@@ -324,7 +651,7 @@ def get_progress_bar(
             TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
             TimeRemainingColumn(),
         )
-        for idx, (tgt, tgt_len) in enumerate(zip(sequences.targets, target_lengths)):
+        for idx, (tgt, tgt_len) in enumerate(zip(sequences.targets, target_lengths, strict=False)):
             clean_tgt = escape(tgt.replace("\n", "\\n"))
             job_progress.add_task(f"{idx}. {clean_tgt}", total=tgt_len)
         progress_table = Table.grid()
@@ -356,11 +683,11 @@ def get_progress_bar(
 
 
 def update_progress_bar(
-    pbar: Union[tqdm, tuple[Progress, Live], None],
-    skipped_prefixes: Optional[list[str]] = None,
-    attributed_sentences: Optional[list[str]] = None,
-    unattributed_suffixes: Optional[list[str]] = None,
-    skipped_suffixes: Optional[list[str]] = None,
+    pbar: tqdm | tuple[Progress, Live] | None,
+    skipped_prefixes: list[str] | None = None,
+    attributed_sentences: list[str] | None = None,
+    unattributed_suffixes: list[str] | None = None,
+    skipped_suffixes: list[str] | None = None,
     whitespace_indexes: list[list[int]] = None,
     show: bool = False,
     pretty: bool = False,
@@ -376,7 +703,7 @@ def update_progress_bar(
                 pbar[0].advance(job.id)
                 formatted_desc = f"{job.id}. "
                 past_length = 0
-                for split, color in zip(split_targets, ["grey58", "green", "orange1", "grey58"]):
+                for split, color in zip(split_targets, ["grey58", "green", "orange1", "grey58"], strict=False):
                     if split[job.id]:
                         formatted_desc += f"[{color}]" + escape(split[job.id].replace("\n", "\\n")) + "[/]"
                         past_length += len(split[job.id])
@@ -386,7 +713,7 @@ def update_progress_bar(
                 pbar[0].update(job.id, description=formatted_desc, refresh=True)
 
 
-def close_progress_bar(pbar: Union[tqdm, tuple[Progress, Live], None], show: bool, pretty: bool) -> None:
+def close_progress_bar(pbar: tqdm | tuple[Progress, Live] | None, show: bool, pretty: bool) -> None:
     if not show:
         return
     elif show and not pretty:

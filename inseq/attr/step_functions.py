@@ -1,7 +1,7 @@
 import logging
 from dataclasses import dataclass
 from inspect import signature
-from typing import TYPE_CHECKING, Any, Optional, Protocol, Union
+from typing import TYPE_CHECKING, Any, Protocol
 
 import torch
 import torch.nn.functional as F
@@ -70,7 +70,7 @@ class StepFunctionDecoderOnlyArgs(StepFunctionBaseArgs):
     pass
 
 
-StepFunctionArgs = Union[StepFunctionEncoderDecoderArgs, StepFunctionDecoderOnlyArgs]
+StepFunctionArgs = StepFunctionEncoderDecoderArgs | StepFunctionDecoderOnlyArgs
 
 
 class StepFunction(Protocol):
@@ -128,9 +128,9 @@ def perplexity_fn(args: StepFunctionArgs) -> SingleScorePerStepTensor:
 @contrast_fn_docstring()
 def contrast_logits_fn(
     args: StepFunctionArgs,
-    contrast_sources: Optional[FeatureAttributionInput] = None,
-    contrast_targets: Optional[FeatureAttributionInput] = None,
-    contrast_targets_alignments: Optional[list[list[tuple[int, int]]]] = None,
+    contrast_sources: FeatureAttributionInput | None = None,
+    contrast_targets: FeatureAttributionInput | None = None,
+    contrast_targets_alignments: list[list[tuple[int, int]]] | None = None,
     contrast_force_inputs: bool = False,
     skip_special_tokens: bool = False,
 ):
@@ -153,9 +153,9 @@ def contrast_logits_fn(
 @contrast_fn_docstring()
 def contrast_prob_fn(
     args: StepFunctionArgs,
-    contrast_sources: Optional[FeatureAttributionInput] = None,
-    contrast_targets: Optional[FeatureAttributionInput] = None,
-    contrast_targets_alignments: Optional[list[list[tuple[int, int]]]] = None,
+    contrast_sources: FeatureAttributionInput | None = None,
+    contrast_targets: FeatureAttributionInput | None = None,
+    contrast_targets_alignments: list[list[tuple[int, int]]] | None = None,
     logprob: bool = False,
     contrast_force_inputs: bool = False,
     skip_special_tokens: bool = False,
@@ -179,9 +179,9 @@ def contrast_prob_fn(
 @contrast_fn_docstring()
 def pcxmi_fn(
     args: StepFunctionArgs,
-    contrast_sources: Optional[FeatureAttributionInput] = None,
-    contrast_targets: Optional[FeatureAttributionInput] = None,
-    contrast_targets_alignments: Optional[list[list[tuple[int, int]]]] = None,
+    contrast_sources: FeatureAttributionInput | None = None,
+    contrast_targets: FeatureAttributionInput | None = None,
+    contrast_targets_alignments: list[list[tuple[int, int]]] | None = None,
     contrast_force_inputs: bool = False,
     skip_special_tokens: bool = False,
 ) -> SingleScorePerStepTensor:
@@ -205,9 +205,9 @@ def pcxmi_fn(
 @contrast_fn_docstring()
 def kl_divergence_fn(
     args: StepFunctionArgs,
-    contrast_sources: Optional[FeatureAttributionInput] = None,
-    contrast_targets: Optional[FeatureAttributionInput] = None,
-    contrast_targets_alignments: Optional[list[list[tuple[int, int]]]] = None,
+    contrast_sources: FeatureAttributionInput | None = None,
+    contrast_targets: FeatureAttributionInput | None = None,
+    contrast_targets_alignments: list[list[tuple[int, int]]] | None = None,
     top_k: int = 0,
     top_p: float = 1.0,
     min_tokens_to_keep: int = 1,
@@ -266,9 +266,9 @@ def kl_divergence_fn(
 @contrast_fn_docstring()
 def contrast_prob_diff_fn(
     args: StepFunctionArgs,
-    contrast_sources: Optional[FeatureAttributionInput] = None,
-    contrast_targets: Optional[FeatureAttributionInput] = None,
-    contrast_targets_alignments: Optional[list[list[tuple[int, int]]]] = None,
+    contrast_sources: FeatureAttributionInput | None = None,
+    contrast_targets: FeatureAttributionInput | None = None,
+    contrast_targets_alignments: list[list[tuple[int, int]]] | None = None,
     logprob: bool = False,
     contrast_force_inputs: bool = False,
     skip_special_tokens: bool = False,
@@ -296,9 +296,9 @@ def contrast_prob_diff_fn(
 @contrast_fn_docstring()
 def contrast_logits_diff_fn(
     args: StepFunctionArgs,
-    contrast_sources: Optional[FeatureAttributionInput] = None,
-    contrast_targets: Optional[FeatureAttributionInput] = None,
-    contrast_targets_alignments: Optional[list[list[tuple[int, int]]]] = None,
+    contrast_sources: FeatureAttributionInput | None = None,
+    contrast_targets: FeatureAttributionInput | None = None,
+    contrast_targets_alignments: list[list[tuple[int, int]]] | None = None,
     contrast_force_inputs: bool = False,
     skip_special_tokens: bool = False,
 ):
@@ -320,9 +320,9 @@ def contrast_logits_diff_fn(
 @contrast_fn_docstring()
 def in_context_pvi_fn(
     args: StepFunctionArgs,
-    contrast_sources: Optional[FeatureAttributionInput] = None,
-    contrast_targets: Optional[FeatureAttributionInput] = None,
-    contrast_targets_alignments: Optional[list[list[tuple[int, int]]]] = None,
+    contrast_sources: FeatureAttributionInput | None = None,
+    contrast_targets: FeatureAttributionInput | None = None,
+    contrast_targets_alignments: list[list[tuple[int, int]]] | None = None,
     contrast_force_inputs: bool = False,
     skip_special_tokens: bool = False,
 ):
@@ -440,7 +440,7 @@ def get_step_scores(
 
 
 def get_step_scores_args(
-    score_identifiers: list[str], kwargs: dict[str, Any], default_args: Optional[dict[str, Any]] = None
+    score_identifiers: list[str], kwargs: dict[str, Any], default_args: dict[str, Any] | None = None
 ) -> dict[str, Any]:
     step_scores_args = {}
     for step_fn_id in score_identifiers:
@@ -468,7 +468,7 @@ def list_step_functions() -> list[str]:
 def register_step_function(
     fn: StepFunction,
     identifier: str,
-    aggregate_map: Optional[dict[str, str]] = None,
+    aggregate_map: dict[str, str] | None = None,
     overwrite: bool = False,
 ) -> None:
     """Registers a function to be used to compute step scores and store them in the

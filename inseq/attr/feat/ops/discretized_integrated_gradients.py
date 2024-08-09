@@ -16,8 +16,9 @@
 # WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
 # OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable, Union
+from typing import Any
 
 import torch
 from captum._utils.common import (
@@ -94,9 +95,9 @@ class DiscretetizedIntegratedGradients(IntegratedGradients):
         additional_forward_args: Any = None,
         n_steps: int = 50,
         method: str = "greedy",
-        internal_batch_size: Union[None, int] = None,
+        internal_batch_size: None | int = None,
         return_convergence_delta: bool = False,
-    ) -> Union[TensorOrTupleOfTensorsGeneric, tuple[TensorOrTupleOfTensorsGeneric, Tensor]]:
+    ) -> TensorOrTupleOfTensorsGeneric | tuple[TensorOrTupleOfTensorsGeneric, Tensor]:
         n_examples = inputs[0].shape[0]
         # Keeps track whether original input is a tuple or not before
         # converting it into a tuple.
@@ -112,7 +113,7 @@ class DiscretetizedIntegratedGradients(IntegratedGradients):
                 n_steps=n_steps,
                 scale_strategy=method,
             )
-            for input_tensor, baseline_tensor in zip(inputs, baselines)
+            for input_tensor, baseline_tensor in zip(inputs, baselines, strict=False)
         )
         if internal_batch_size is not None:
             attributions = _batch_attribution(
@@ -181,7 +182,7 @@ class DiscretetizedIntegratedGradients(IntegratedGradients):
         # total_grads has the same dimensionality as the original inputs
         total_grads = tuple(
             _reshape_and_sum(scaled_grad, n_steps, grad.shape[0] // n_steps, grad.shape[1:])
-            for (scaled_grad, grad) in zip(scaled_grads, grads)
+            for (scaled_grad, grad) in zip(scaled_grads, grads, strict=False)
         )
         # computes attribution for each tensor in input_tuple
         # attributions has the same dimensionality as the original inputs
@@ -191,5 +192,5 @@ class DiscretetizedIntegratedGradients(IntegratedGradients):
             inputs, baselines = self.get_inputs_baselines(scaled_features_tpl, n_steps)
             return tuple(
                 total_grad * (input - baseline)
-                for (total_grad, input, baseline) in zip(total_grads, inputs, baselines)
+                for (total_grad, input, baseline) in zip(total_grads, inputs, baselines, strict=False)
             )

@@ -1,12 +1,14 @@
 import base64
 import logging
+from collections.abc import Callable
 from copy import deepcopy
 from dataclasses import dataclass, field
 from os import PathLike
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Optional, Union
+from typing import TYPE_CHECKING, Any
 
 import torch
+import treescope as ts
 
 from ..utils import (
     convert_from_safetensor,
@@ -36,14 +38,21 @@ from .aggregation_functions import DEFAULT_ATTRIBUTION_AGGREGATE_DICT
 from .aggregator import AggregableMixin, Aggregator, AggregatorPipeline
 from .batch import Batch, BatchEmbedding, BatchEncoding, DecoderOnlyBatch, EncoderDecoderBatch
 from .data_utils import TensorWrapper
+from .viz import get_saliency_heatmap_treescope, get_tokens_heatmap_treescope
 
 if TYPE_CHECKING:
     from ..models import AttributionModel
 
-FeatureAttributionInput = Union[TextInput, BatchEncoding, Batch]
+FeatureAttributionInput = TextInput | BatchEncoding | Batch
 
 
 logger = logging.getLogger(__name__)
+
+
+DEFAULT_ATTRIBUTION_DIM_NAMES = {
+    "source_attributions": {0: "Input Tokens", 1: "Generated Tokens"},
+    "target_attributions": {0: "Input Tokens", 1: "Generated Tokens"},
+}
 
 
 def get_batch_from_inputs(
@@ -56,7 +65,7 @@ def get_batch_from_inputs(
     if isinstance(inputs, Batch):
         batch = inputs
     else:
-        if isinstance(inputs, (str, list)):
+        if isinstance(inputs, str | list):
             encodings: BatchEncoding = attribution_model.encode(
                 inputs,
                 as_targets=as_targets,
@@ -149,14 +158,15 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
 
     source: list[TokenWithId]
     target: list[TokenWithId]
-    source_attributions: Optional[SequenceAttributionTensor] = None
-    target_attributions: Optional[SequenceAttributionTensor] = None
-    step_scores: Optional[dict[str, SingleScoresPerSequenceTensor]] = None
-    sequence_scores: Optional[dict[str, MultipleScoresPerSequenceTensor]] = None
+    source_attributions: SequenceAttributionTensor | None = None
+    target_attributions: SequenceAttributionTensor | None = None
+    step_scores: dict[str, SingleScoresPerSequenceTensor] | None = None
+    sequence_scores: dict[str, MultipleScoresPerSequenceTensor] | None = None
     attr_pos_start: int = 0
-    attr_pos_end: Optional[int] = None
-    _aggregator: Union[str, list[str], None] = None
-    _dict_aggregate_fn: Optional[dict[str, str]] = None
+    attr_pos_end: int | None = None
+    _aggregator: str | list[str] | None = None
+    _dict_aggregate_fn: dict[str, str] | None = None
+    _attribution_dim_names: dict[str, dict[int, str]] | None = None
 
     def __post_init__(self):
         if self._dict_aggregate_fn is None:
@@ -164,12 +174,17 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
         default_aggregate_fn = DEFAULT_ATTRIBUTION_AGGREGATE_DICT
         default_aggregate_fn.update(self._dict_aggregate_fn)
         self._dict_aggregate_fn = default_aggregate_fn
+        if self._attribution_dim_names is None:
+            self._attribution_dim_names = {}
+        default_dim_names = DEFAULT_ATTRIBUTION_DIM_NAMES
+        default_dim_names.update(self._attribution_dim_names)
+        self._attribution_dim_names = default_dim_names
         if self._aggregator is None:
             self._aggregator = "scores"
         if self.attr_pos_end is None or self.attr_pos_end > len(self.target):
             self.attr_pos_end = len(self.target)
 
-    def __getitem__(self, s: Union[slice, int]) -> "FeatureAttributionSequenceOutput":
+    def __getitem__(self, s: slice | int) -> "FeatureAttributionSequenceOutput":
         source_spans = None if self.source_attributions is None else (s.start, s.stop)
         target_spans = None if self.source_attributions is not None else (s.start, s.stop)
         return self.aggregate("slices", source_spans=source_spans, target_spans=target_spans)
@@ -178,6 +193,72 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
         if not isinstance(other, self.__class__):
             raise ValueError(f"Cannot compare {type(other)} with {type(self)}")
         return self.aggregate("pair", paired_attr=other, do_post_aggregation_checks=False)
+
+    def __treescope_repr__(
+        self,
+        path: str,
+        subtree_renderer: Callable[[Any, str | None], ts.rendering_parts.Rendering],
+    ) -> ts.rendering_parts.Rendering:
+        def granular_attribution_visualizer(
+            value: Any,
+            path: tuple[Any, ...] | None,
+        ):
+            if isinstance(value, torch.Tensor):
+                tname = path.split(".")[-1]
+                column_labels = [t.token for t in self.target[self.attr_pos_start : self.attr_pos_end]]
+                if tname == "source_attributions":
+                    row_labels = [t.token for t in self.source]
+                elif tname == "target_attributions":
+                    row_labels = [t.token for t in self.target]
+                elif tname.startswith("sequence_scores"):
+                    tname = tname[17:].split("_")[0]
+                    if tname.startswith("encoder"):
+                        row_labels = [t.token for t in self.source]
+                        column_labels = [t.token for t in self.source]
+                    elif tname.startswith("decoder"):
+                        row_labels = [t.token for t in self.target]
+                        column_labels = [t.token for t in self.target]
+                adapter = ts.type_registries.lookup_ndarray_adapter(value)
+                if value.ndim >= 2:
+                    return ts.IPythonVisualization(
+                        ts.figures.inline(
+                            adapter.get_array_summary(value, fast=False),
+                            get_saliency_heatmap_treescope(
+                                scores=value.numpy(),
+                                column_labels=column_labels,
+                                row_labels=row_labels,
+                                dim_names=self._attribution_dim_names.get(tname, None),
+                            ),
+                        ),
+                        replace=True,
+                    )
+                else:
+                    return ts.IPythonVisualization(
+                        ts.figures.inline(
+                            adapter.get_array_summary(value, fast=False) + "\n\n",
+                            ts.figures.figure_from_treescope_rendering_part(
+                                ts.rendering_parts.indented_children(
+                                    [
+                                        get_tokens_heatmap_treescope(
+                                            tokens=column_labels,
+                                            scores=value.numpy(),
+                                            max_val=value.max().item(),
+                                        )
+                                    ]
+                                )
+                            ),
+                        ),
+                        replace=True,
+                    )
+
+        with ts.active_autovisualizer.set_scoped(granular_attribution_visualizer):
+            return ts.repr_lib.render_object_constructor(
+                object_type=type(self),
+                attributes=self.__dict__,
+                path=path,
+                subtree_renderer=subtree_renderer,
+                roundtrippable=True,
+            )
 
     def _convert_to_safetensors(self, scores_precision: ScorePrecision = "float32"):
         """
@@ -249,8 +330,8 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
         cls,
         attributions: list["FeatureAttributionStepOutput"],
         tokenized_target_sentences: list[list[TokenWithId]],
-        pad_token: Optional[Any] = None,
-        attr_pos_end: Optional[int] = None,
+        pad_token: Any | None = None,
+        attr_pos_end: int | None = None,
     ) -> list["FeatureAttributionSequenceOutput"]:
         """Converts a list of :class:`~inseq.data.attribution.FeatureAttributionStepOutput` objects containing multiple
         examples outputs per step into a list of :class:`~inseq.data.attribution.FeatureAttributionSequenceOutput` with
@@ -267,7 +348,6 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
         num_sequences = len(attr.prefix)
         if not all(len(attr.prefix) == num_sequences for attr in attributions):
             raise ValueError("All the attributions must include the same number of sequences.")
-        seq_attributions: list[FeatureAttributionSequenceOutput] = []
         sources = []
         targets = []
         pos_start = []
@@ -288,22 +368,13 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
             # If the model is decoder-only, the source is the input prefix
             curr_pos_start = min(len(tokenized_target_sentences[seq_idx]), attr_pos_end) - len(targets[seq_idx])
             pos_start.append(curr_pos_start)
-            source = tokenized_target_sentences[seq_idx][:curr_pos_start] if not sources else sources[seq_idx]
-            curr_seq_attribution: FeatureAttributionSequenceOutput = attr.get_sequence_cls(
-                source=source,
-                target=tokenized_target_sentences[seq_idx],
-                attr_pos_start=pos_start[seq_idx],
-                attr_pos_end=attr_pos_end,
-            )
-            seq_attributions.append(curr_seq_attribution)
         if attr.source_attributions is not None:
             source_attributions = get_sequences_from_batched_steps([att.source_attributions for att in attributions])
             for seq_id in range(num_sequences):
                 # Remove padding from tensor
-                filtered_source_attribution = source_attributions[seq_id][
+                source_attributions[seq_id] = source_attributions[seq_id][
                     : len(sources[seq_id]), : len(targets[seq_id]), ...
                 ]
-                seq_attributions[seq_id].source_attributions = filtered_source_attribution
         if attr.target_attributions is not None:
             target_attributions = get_sequences_from_batched_steps(
                 [att.target_attributions for att in attributions], padding_dims=[1]
@@ -316,7 +387,6 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
                 ]
                 if target_attributions[seq_id].shape[0] != len(tokenized_target_sentences[seq_id]):
                     target_attributions[seq_id] = pad_with_nan(target_attributions[seq_id], dim=0, pad_size=1)
-                seq_attributions[seq_id].target_attributions = target_attributions[seq_id]
         if attr.step_scores is not None:
             step_scores = [{} for _ in range(num_sequences)]
             for step_score_name in attr.step_scores.keys():
@@ -325,8 +395,6 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
                 )
                 for seq_id in range(num_sequences):
                     step_scores[seq_id][step_score_name] = out_step_scores[seq_id][: len(targets[seq_id])]
-            for seq_id in range(num_sequences):
-                seq_attributions[seq_id].step_scores = step_scores[seq_id]
         if attr.sequence_scores is not None:
             seq_scores = [{} for _ in range(num_sequences)]
             for seq_score_name in attr.sequence_scores.keys():
@@ -335,7 +403,7 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
                 # that are not source-to-target (default for encoder-decoder) or target-to-target
                 # (default for decoder only).
                 remove_pad_fn = cls.get_remove_pad_fn(attr, seq_score_name)
-                if seq_score_name.startswith("encoder"):
+                if seq_score_name.startswith("encoder") or seq_score_name.startswith("decoder"):
                     out_seq_scores = [attr.sequence_scores[seq_score_name][i, ...] for i in range(num_sequences)]
                 else:
                     out_seq_scores = get_sequences_from_batched_steps(
@@ -343,20 +411,37 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
                     )
                 for seq_id in range(num_sequences):
                     seq_scores[seq_id][seq_score_name] = remove_pad_fn(out_seq_scores, sources, targets, seq_id)
-            for seq_id in range(num_sequences):
-                seq_attributions[seq_id].sequence_scores = seq_scores[seq_id]
+        seq_attributions: list[FeatureAttributionSequenceOutput] = []
+        for seq_idx in range(num_sequences):
+            curr_seq_attribution: FeatureAttributionSequenceOutput = attr.get_sequence_cls(
+                source=deepcopy(
+                    tokenized_target_sentences[seq_idx][: pos_start[seq_idx]] if not sources else sources[seq_idx]
+                ),
+                target=deepcopy(tokenized_target_sentences[seq_idx]),
+                source_attributions=source_attributions[seq_idx] if attr.source_attributions is not None else None,
+                target_attributions=target_attributions[seq_idx] if attr.target_attributions is not None else None,
+                step_scores=step_scores[seq_idx] if attr.step_scores is not None else None,
+                sequence_scores=seq_scores[seq_idx] if attr.sequence_scores is not None else None,
+                attr_pos_start=pos_start[seq_idx],
+                attr_pos_end=attr_pos_end,
+            )
+            seq_attributions.append(curr_seq_attribution)
         return seq_attributions
 
     def show(
         self,
-        min_val: Optional[int] = None,
-        max_val: Optional[int] = None,
+        min_val: int | None = None,
+        max_val: int | None = None,
+        max_show_size: int | None = None,
+        show_dim: int | str | None = None,
+        slice_dims: dict[int | str, tuple[int, int]] | None = None,
         display: bool = True,
-        return_html: Optional[bool] = False,
-        aggregator: Union[AggregatorPipeline, type[Aggregator]] = None,
+        return_html: bool | None = False,
+        return_figure: bool = False,
+        aggregator: AggregatorPipeline | type[Aggregator] = None,
         do_aggregation: bool = True,
         **kwargs,
-    ) -> Optional[str]:
+    ) -> str | None:
         """Visualize the attributions.
 
         Args:
@@ -366,11 +451,24 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
             max_val (:obj:`int`, *optional*, defaults to None):
                 Maximum value in the color range of the visualization. If None, the maximum value of the attributions
                 across all visualized examples is used.
+            max_show_size (:obj:`int`, *optional*, defaults to None):
+                For granular visualization, this parameter specifies the maximum dimension size for additional dimensions
+                to be visualized. Default: 20.
+            show_dim (:obj:`int` or :obj:`str`, *optional*, defaults to None):
+                For granular visualization, this parameter specifies the dimension that should be visualized along with
+                the source and target tokens. Can be either the dimension index or the dimension name. Works only if
+                the dimension size is less than or equal to `max_show_size`.
+            slice_dims (:obj:`dict[int or str, tuple[int, int]]`, *optional*, defaults to None):
+                For granular visualization, this parameter specifies the dimensions that should be sliced and visualized
+                along with the source and target tokens. The dictionary should contain the dimension index or name as the
+                key and the slice range as the value.
             display (:obj:`bool`, *optional*, defaults to True):
                 Whether to display the visualization. Can be set to False if the visualization is produced and stored
                 for later use.
             return_html (:obj:`bool`, *optional*, defaults to False):
                 Whether to return the HTML code of the visualization.
+            return_figure (:obj:`bool`, *optional*, defaults to False):
+                For granular visualization, whether to return the Treescope figure object for further manipulation.
             aggregator (:obj:`AggregatorPipeline`, *optional*, defaults to None):
                 Aggregates attributions before visualizing them. If not specified, the default aggregator for the class
                 is used.
@@ -381,7 +479,7 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
         Returns:
             :obj:`str`: The HTML code of the visualization if :obj:`return_html` is set to True, otherwise None.
         """
-        from inseq import show_attributions
+        from inseq import show_attributions, show_granular_attributions
 
         # If no aggregator is specified, the default aggregator for the class is used
         aggregated = self.aggregate(aggregator, **kwargs) if do_aggregation else self
@@ -390,8 +488,132 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
         ):
             tokens = "".join(tid.token for tid in self.target)
             logger.warning(f"Found empty attributions, skipping attribution matching generation: {tokens}")
+        if (
+            (aggregated.source_attributions is not None and aggregated.source_attributions.ndim == 2)
+            or (aggregated.target_attributions is not None and aggregated.target_attributions.ndim == 2)
+            or (aggregated.source_attributions is None and aggregated.target_attributions is None)
+        ):
+            return show_attributions(
+                attributions=aggregated, min_val=min_val, max_val=max_val, display=display, return_html=return_html
+            )
         else:
-            return show_attributions(aggregated, min_val, max_val, display, return_html)
+            return show_granular_attributions(
+                attributions=aggregated,
+                max_show_size=max_show_size,
+                min_val=min_val,
+                max_val=max_val,
+                show_dim=show_dim,
+                display=display,
+                return_html=return_html,
+                return_figure=return_figure,
+                slice_dims=slice_dims,
+            )
+
+    def show_granular(
+        self,
+        min_val: int | None = None,
+        max_val: int | None = None,
+        max_show_size: int | None = None,
+        show_dim: int | str | None = None,
+        slice_dims: dict[int | str, tuple[int, int]] | None = None,
+        display: bool = True,
+        return_html: bool | None = False,
+        return_figure: bool = False,
+    ) -> str | None:
+        """Visualizes granular attribution heatmaps in HTML format.
+
+        Args:
+            min_val (:obj:`int`, *optional*, defaults to None):
+                Lower attribution score threshold for color map.
+            max_val (:obj:`int`, *optional*, defaults to None):
+                Upper attribution score threshold for color map.
+            max_show_size (:obj:`int`, *optional*, defaults to None):
+                Maximum dimension size for additional dimensions to be visualized. Default: 20.
+            show_dim (:obj:`int` or :obj:`str`, *optional*, defaults to None):
+                Dimension to be visualized along with the source and target tokens. Can be either the dimension index or
+                the dimension name. Works only if the dimension size is less than or equal to `max_show_size`.
+            slice_dims (:obj:`dict[int or str, tuple[int, int]]`, *optional*, defaults to None):
+                Dimensions to be sliced and visualized along with the source and target tokens. The dictionary should
+                contain the dimension index or name as the key and the slice range as the value.
+            display (:obj:`bool`, *optional*, defaults to True):
+                Whether to show the output of the visualization function.
+            return_html (:obj:`bool`, *optional*, defaults to False):
+                If true, returns the HTML corresponding to the notebook visualization of the attributions in
+                string format, for saving purposes.
+            return_figure (:obj:`bool`, *optional*, defaults to False):
+                If true, returns the Treescope figure object for further manipulation.
+
+        Returns:
+            `str`: Returns the HTML output if `return_html=True`
+        """
+        from inseq import show_granular_attributions
+
+        return show_granular_attributions(
+            attributions=self,
+            max_show_size=max_show_size,
+            min_val=min_val,
+            max_val=max_val,
+            show_dim=show_dim,
+            slice_dims=slice_dims,
+            display=display,
+            return_html=return_html,
+            return_figure=return_figure,
+        )
+
+    def show_tokens(
+        self,
+        min_val: int | None = None,
+        max_val: int | None = None,
+        display: bool = True,
+        return_html: bool | None = False,
+        return_figure: bool = False,
+        replace_char: dict[str, str] | None = None,
+        wrap_after: int | str | list[str] | tuple[str] | None = None,
+        step_score_highlight: str | None = None,
+        aggregator: AggregatorPipeline | type[Aggregator] = None,
+        do_aggregation: bool = True,
+        **kwargs,
+    ) -> str | None:
+        """Visualizes token-level attributions in HTML format.
+
+        Args:
+            attributions (:class:`~inseq.data.attribution.FeatureAttributionSequenceOutput`):
+                Sequence attributions to be visualized.
+            min_val (:obj:`int`, *optional*, defaults to None):
+                Lower attribution score threshold for color map.
+            max_val (:obj:`int`, *optional*, defaults to None):
+                Upper attribution score threshold for color map.
+            display (:obj:`bool`, *optional*, defaults to True):
+                Whether to show the output of the visualization function.
+            return_html (:obj:`bool`, *optional*, defaults to False):
+                If true, returns the HTML corresponding to the notebook visualization of the attributions in string format,
+                for saving purposes.
+            return_figure (:obj:`bool`, *optional*, defaults to False):
+                If true, returns the Treescope figure object for further manipulation.
+            replace_char (:obj:`dict[str, str]`, *optional*, defaults to None):
+                Dictionary mapping strings to be replaced to replacement options, used for cleaning special characters.
+                Default: {}.
+            wrap_after (:obj:`int` or :obj:`str` or :obj:`list[str]` :obj:`tuple[str]]`, *optional*, defaults to None):
+                Token indices or tokens after which to wrap lines. E.g. 10 = wrap after every 10 tokens, "hi" = wrap after
+                word hi occurs, ["." "!", "?"] or ".!?" = wrap after every sentence-ending punctuation.
+            step_score_highlight (`str`, *optional*, defaults to None):
+                Name of the step score to use to highlight generated tokens in the visualization. If None, no highlights are
+                shown. Default: None.
+        """
+        from inseq import show_token_attributions
+
+        aggregated = self.aggregate(aggregator, **kwargs) if do_aggregation else self
+        return show_token_attributions(
+            attributions=aggregated,
+            min_val=min_val,
+            max_val=max_val,
+            display=display,
+            return_html=return_html,
+            return_figure=return_figure,
+            replace_char=replace_char,
+            wrap_after=wrap_after,
+            step_score_highlight=step_score_highlight,
+        )
 
     @property
     def minimum(self) -> float:
@@ -432,7 +654,7 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
 
     def get_scores_dicts(
         self,
-        aggregator: Union[AggregatorPipeline, type[Aggregator]] = None,
+        aggregator: AggregatorPipeline | type[Aggregator] = None,
         do_aggregation: bool = True,
         **kwargs,
     ) -> dict[str, dict[str, dict[str, float]]]:
@@ -467,13 +689,13 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
 class FeatureAttributionStepOutput(TensorWrapper):
     """Output of a single step of feature attribution, plus extra information related to what was attributed."""
 
-    source_attributions: Optional[StepAttributionTensor] = None
-    step_scores: Optional[dict[str, SingleScorePerStepTensor]] = None
-    target_attributions: Optional[StepAttributionTensor] = None
-    sequence_scores: Optional[dict[str, MultipleScoresPerStepTensor]] = None
-    source: Optional[OneOrMoreTokenWithIdSequences] = None
-    prefix: Optional[OneOrMoreTokenWithIdSequences] = None
-    target: Optional[OneOrMoreTokenWithIdSequences] = None
+    source_attributions: StepAttributionTensor | None = None
+    step_scores: dict[str, SingleScorePerStepTensor] | None = None
+    target_attributions: StepAttributionTensor | None = None
+    sequence_scores: dict[str, MultipleScoresPerStepTensor] | None = None
+    source: OneOrMoreTokenWithIdSequences | None = None
+    prefix: OneOrMoreTokenWithIdSequences | None = None
+    target: OneOrMoreTokenWithIdSequences | None = None
     _sequence_cls: type["FeatureAttributionSequenceOutput"] = FeatureAttributionSequenceOutput
 
     def __post_init__(self):
@@ -489,7 +711,7 @@ class FeatureAttributionStepOutput(TensorWrapper):
     def remap_from_filtered(
         self,
         target_attention_mask: TargetIdsTensor,
-        batch: Union[DecoderOnlyBatch, EncoderDecoderBatch],
+        batch: DecoderOnlyBatch | EncoderDecoderBatch,
         is_final_step_method: bool = False,
     ) -> None:
         """Remaps the attributions to the original shape of the input sequence."""
@@ -571,7 +793,7 @@ class FeatureAttributionOutput:
     ]
 
     sequence_attributions: list[FeatureAttributionSequenceOutput]
-    step_attributions: Optional[list[FeatureAttributionStepOutput]] = None
+    step_attributions: list[FeatureAttributionStepOutput] | None = None
     info: dict[str, Any] = field(default_factory=dict)
 
     def __str__(self):
@@ -581,11 +803,11 @@ class FeatureAttributionOutput:
         return self.__str__()
 
     def __eq__(self, other):
-        for self_seq, other_seq in zip(self.sequence_attributions, other.sequence_attributions):
+        for self_seq, other_seq in zip(self.sequence_attributions, other.sequence_attributions, strict=False):
             if self_seq != other_seq:
                 return False
         if self.step_attributions is not None and other.step_attributions is not None:
-            for self_step, other_step in zip(self.step_attributions, other.step_attributions):
+            for self_step, other_step in zip(self.step_attributions, other.step_attributions, strict=False):
                 if self_step != other_step:
                     return False
         if self.info != other.info:
@@ -665,7 +887,7 @@ class FeatureAttributionOutput:
             ]
             save_outs.append(self_out)
             paths.append(path)
-        for attr_out, path_out in zip(save_outs, paths):
+        for attr_out, path_out in zip(save_outs, paths, strict=False):
             with open(path_out, f"w{'b' if compress else ''}") as f:
                 json_advanced_dump(
                     attr_out,
@@ -703,7 +925,7 @@ class FeatureAttributionOutput:
 
     def aggregate(
         self,
-        aggregator: Union[AggregatorPipeline, type[Aggregator]] = None,
+        aggregator: AggregatorPipeline | type[Aggregator] = None,
         **kwargs,
     ) -> "FeatureAttributionOutput":
         """Aggregate the sequence attributions using one or more aggregators.
@@ -723,21 +945,29 @@ class FeatureAttributionOutput:
 
     def show(
         self,
-        min_val: Optional[int] = None,
-        max_val: Optional[int] = None,
+        min_val: int | None = None,
+        max_val: int | None = None,
+        max_show_size: int | None = None,
+        show_dim: int | str | None = None,
+        slice_dims: dict[int | str, tuple[int, int]] | None = None,
         display: bool = True,
-        return_html: Optional[bool] = False,
-        aggregator: Union[AggregatorPipeline, type[Aggregator]] = None,
+        return_html: bool | None = False,
+        return_figure: bool = False,
+        aggregator: AggregatorPipeline | type[Aggregator] = None,
         do_aggregation: bool = True,
         **kwargs,
-    ) -> Optional[str]:
+    ) -> str | list | None:
         """Visualize the sequence attributions.
 
         Args:
             min_val (int, optional): Minimum value for color scale.
             max_val (int, optional): Maximum value for color scale.
+            max_show_size (int, optional): Maximum size of the dimension to show.
+            show_dim (int or str, optional): Dimension to show.
+            slice_dims (dict[int or str, tuple[int, int]], optional): Dimensions to slice.
             display (bool, optional): If True, display the attribution visualization.
             return_html (bool, optional): If True, return the attribution visualization as HTML.
+            return_figure (bool, optional): If True, return the Treescope figure object for further manipulation.
             aggregator (:obj:`AggregatorPipeline` or :obj:`Type[Aggregator]`, optional): Aggregator
                 or pipeline to use. If not provided, the default aggregator for every sequence attribution
                 is used.
@@ -746,23 +976,163 @@ class FeatureAttributionOutput:
                 attributions are already aggregated.
 
         Returns:
-            str: Attribution visualization as HTML if `return_html=True`, None otherwise.
+            str: Attribution visualization as HTML if `return_html=True`
+            list: List of Treescope figure objects if `return_figure=True`
+            None if `return_html=False` and `return_figure=False`
+
         """
         out_str = ""
+        out_figs = []
         for attr in self.sequence_attributions:
+            curr_out = attr.show(
+                min_val=min_val,
+                max_val=max_val,
+                max_show_size=max_show_size,
+                show_dim=show_dim,
+                slice_dims=slice_dims,
+                display=display,
+                return_html=return_html,
+                return_figure=return_figure,
+                aggregator=aggregator,
+                do_aggregation=do_aggregation,
+                **kwargs,
+            )
             if return_html:
-                out_str += attr.show(min_val, max_val, display, return_html, aggregator, do_aggregation, **kwargs)
-            else:
-                attr.show(min_val, max_val, display, return_html, aggregator, do_aggregation, **kwargs)
+                out_str += curr_out
+            if return_figure:
+                out_figs.append(curr_out)
         if return_html:
             return out_str
+        if return_figure:
+            return out_figs
+
+    def show_granular(
+        self,
+        min_val: int | None = None,
+        max_val: int | None = None,
+        max_show_size: int | None = None,
+        show_dim: int | str | None = None,
+        slice_dims: dict[int | str, tuple[int, int]] | None = None,
+        display: bool = True,
+        return_html: bool = False,
+        return_figure: bool = False,
+    ) -> str | None:
+        """Visualizes granular attribution heatmaps in HTML format.
+
+        Args:
+            min_val (:obj:`int`, *optional*, defaults to None):
+                Lower attribution score threshold for color map.
+            max_val (:obj:`int`, *optional*, defaults to None):
+                Upper attribution score threshold for color map.
+            max_show_size (:obj:`int`, *optional*, defaults to None):
+                Maximum dimension size for additional dimensions to be visualized. Default: 20.
+            show_dim (:obj:`int` or :obj:`str`, *optional*, defaults to None):
+                Dimension to be visualized along with the source and target tokens. Can be either the dimension index or
+                the dimension name. Works only if the dimension size is less than or equal to `max_show_size`.
+            slice_dims (:obj:`dict[int or str, tuple[int, int]]`, *optional*, defaults to None):
+                Dimensions to be sliced and visualized along with the source and target tokens. The dictionary should
+                contain the dimension index or name as the key and the slice range as the value.
+            display (:obj:`bool`, *optional*, defaults to True):
+                Whether to show the output of the visualization function.
+            return_html (:obj:`bool`, *optional*, defaults to False):
+                If true, returns the HTML corresponding to the notebook visualization of the attributions in
+                string format, for saving purposes.
+            return_figure (:obj:`bool`, *optional*, defaults to False):
+                If true, returns the Treescope figure object for further manipulation.
+
+        Returns:
+            `str`: Returns the HTML output if `return_html=True`
+        """
+        out_str = ""
+        out_figs = []
+        for attr in self.sequence_attributions:
+            curr_out = attr.show_granular(
+                min_val=min_val,
+                max_val=max_val,
+                max_show_size=max_show_size,
+                show_dim=show_dim,
+                slice_dims=slice_dims,
+                display=display,
+                return_html=return_html,
+            )
+            if return_html:
+                out_str += curr_out
+            if return_figure:
+                out_figs.append(curr_out)
+        if return_html:
+            return out_str
+        if return_figure:
+            return out_figs
+
+    def show_tokens(
+        self,
+        min_val: int | None = None,
+        max_val: int | None = None,
+        display: bool = True,
+        return_html: bool = False,
+        return_figure: bool = False,
+        replace_char: dict[str, str] | None = None,
+        wrap_after: int | str | list[str] | tuple[str] | None = None,
+        step_score_highlight: str | None = None,
+        aggregator: AggregatorPipeline | type[Aggregator] = None,
+        do_aggregation: bool = True,
+        **kwargs,
+    ) -> str | None:
+        """Visualizes token-level attributions in HTML format.
+
+        Args:
+            min_val (:obj:`int`, *optional*, defaults to None):
+                Lower attribution score threshold for color map.
+            max_val (:obj:`int`, *optional*, defaults to None):
+                Upper attribution score threshold for color map.
+            display (:obj:`bool`, *optional*, defaults to True):
+                Whether to show the output of the visualization function.
+            return_html (:obj:`bool`, *optional*, defaults to False):
+                If true, returns the HTML corresponding to the notebook visualization of the attributions in string format,
+                for saving purposes.
+            return_figure (:obj:`bool`, *optional*, defaults to False):
+                If true, returns the Treescope figure object for further manipulation.
+            replace_char (:obj:`dict[str, str]`, *optional*, defaults to None):
+                Dictionary mapping strings to be replaced to replacement options, used for cleaning special characters.
+                Default: {}.
+            wrap_after (:obj:`int` or :obj:`str` or :obj:`list[str]` :obj:`tuple[str]]`, *optional*, defaults to None):
+                Token indices or tokens after which to wrap lines. E.g. 10 = wrap after every 10 tokens, "hi" = wrap after
+                word hi occurs, ["." "!", "?"] or ".!?" = wrap after every sentence-ending punctuation.
+            step_score_highlight (`str`, *optional*, defaults to None):
+                Name of the step score to use to highlight generated tokens in the visualization. If None, no highlights are
+                shown. Default: None.
+        """
+        out_str = ""
+        out_figs = []
+        for attr in self.sequence_attributions:
+            curr_out = attr.show_tokens(
+                min_val=min_val,
+                max_val=max_val,
+                display=display,
+                return_html=return_html,
+                return_figure=return_figure,
+                replace_char=replace_char,
+                wrap_after=wrap_after,
+                step_score_highlight=step_score_highlight,
+                aggregator=aggregator,
+                do_aggregation=do_aggregation,
+                **kwargs,
+            )
+            if return_html:
+                out_str += curr_out
+            if return_figure:
+                out_figs.append(curr_out)
+        if return_html:
+            return out_str
+        if return_figure:
+            return out_figs
 
     def weight_attributions(self, step_score_id: str):
         for i, attr in enumerate(self.sequence_attributions):
             self.sequence_attributions[i] = attr.weight_attributions(step_score_id)
 
     def get_scores_dicts(
-        self, aggregator: Union[AggregatorPipeline, type[Aggregator]] = None, do_aggregation: bool = True, **kwargs
+        self, aggregator: AggregatorPipeline | type[Aggregator] = None, do_aggregation: bool = True, **kwargs
     ) -> list[dict[str, dict[str, dict[str, float]]]]:
         """Get all computed scores (attributions and step scores) for all sequences as a list of dictionaries.
 
@@ -801,6 +1171,10 @@ class GranularFeatureAttributionSequenceOutput(FeatureAttributionSequenceOutput)
         self._dict_aggregate_fn["target_attributions"]["scores"] = "vnorm"
         if "deltas" not in self._dict_aggregate_fn["step_scores"]["spans"]:
             self._dict_aggregate_fn["step_scores"]["spans"]["deltas"] = "absmax"
+        self._attribution_dim_names = {
+            "source_attributions": {0: "Input Tokens", 1: "Generated Tokens", 2: "Embedding Dimension"},
+            "target_attributions": {0: "Input Tokens", 1: "Generated Tokens", 2: "Embedding Dimension"},
+        }
 
 
 @dataclass(eq=False, repr=False)
@@ -844,6 +1218,15 @@ class MultiDimensionalFeatureAttributionSequenceOutput(FeatureAttributionSequenc
     def __post_init__(self):
         super().__post_init__()
         self._aggregator = ["mean"] * self._num_dimensions
+        self._attribution_dim_names = {
+            "source_attributions": {0: "Input Tokens", 1: "Generated Tokens", 2: "Model Layer"},
+            "target_attributions": {0: "Input Tokens", 1: "Generated Tokens", 2: "Model Layer"},
+            "encoder": {0: "Input Tokens", 1: "Input Tokens", 2: "Model Layer"},
+            "decoder": {0: "Generated Tokens", 1: "Generated Tokens", 2: "Model Layer"},
+        }
+        if self._num_dimensions == 2:
+            for key in self._attribution_dim_names.keys():
+                self._attribution_dim_names[key][3] = "Attention Head"
 
 
 @dataclass(eq=False, repr=False)

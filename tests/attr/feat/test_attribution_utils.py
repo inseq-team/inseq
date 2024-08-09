@@ -29,7 +29,7 @@ def test_get_step_prediction_probabilities(m2m100_model, encoder_decoder_batches
     ]
     # fmt: on
     for i, (batch, next_batch) in enumerate(
-        zip(encoder_decoder_batches["batches"][1:], encoder_decoder_batches["batches"][2:])
+        zip(encoder_decoder_batches["batches"][1:], encoder_decoder_batches["batches"][2:], strict=False)
     ):
         output = m2m100_model.get_forward_output(
             batch.to(m2m100_model.device), use_embeddings=m2m100_model.attribution_method.forward_batch_embeds
@@ -43,7 +43,9 @@ def test_get_step_prediction_probabilities(m2m100_model, encoder_decoder_batches
 
 
 def test_crossentropy_nlll_equivalence(m2m100_model, encoder_decoder_batches):
-    for batch, next_batch in zip(encoder_decoder_batches["batches"][1:], encoder_decoder_batches["batches"][2:]):
+    for batch, next_batch in zip(
+        encoder_decoder_batches["batches"][1:], encoder_decoder_batches["batches"][2:], strict=False
+    ):
         batch.to(m2m100_model.device)
         next_batch.to(m2m100_model.device)
         output = m2m100_model.model(

@@ -23,7 +23,7 @@ import os
 from enum import Enum
 from itertools import islice
 from pathlib import Path
-from typing import Any, Optional, Union
+from typing import Any
 
 import torch
 from jaxtyping import Float, Int
@@ -85,7 +85,7 @@ class MonotonicPathBuilder:
     @staticmethod
     @cache_results
     def compute_embeddings_knn(
-        vocabulary_embeddings: Optional[VocabularyEmbeddingsTensor],
+        vocabulary_embeddings: VocabularyEmbeddingsTensor | None,
         n_neighbors: int = 50,
         mode: str = "distance",
         n_jobs: int = -1,
@@ -111,7 +111,7 @@ class MonotonicPathBuilder:
         save_cache: bool = True,
         overwrite_cache: bool = False,
         cache_dir: Path = INSEQ_ARTIFACTS_CACHE / "path_knn",
-        vocabulary_embeddings: Optional[VocabularyEmbeddingsTensor] = None,
+        vocabulary_embeddings: VocabularyEmbeddingsTensor | None = None,
         special_tokens: list[int] = [],
         embedding_scaling: int = 1,
     ) -> "MonotonicPathBuilder":
@@ -140,8 +140,8 @@ class MonotonicPathBuilder:
         self,
         input_ids: Int[torch.Tensor, "batch_size seq_len"],
         baseline_ids: Int[torch.Tensor, "batch_size seq_len"],
-        n_steps: Optional[int] = None,
-        scale_strategy: Optional[str] = None,
+        n_steps: int | None = None,
+        scale_strategy: str | None = None,
     ) -> MultiStepEmbeddingsTensor:
         """Generate paths required by DIG."""
         if n_steps is None:
@@ -186,8 +186,8 @@ class MonotonicPathBuilder:
         self,
         word_idx: int,
         baseline_idx: int,
-        n_steps: Optional[int] = 30,
-        strategy: Optional[str] = "greedy",
+        n_steps: int | None = 30,
+        strategy: str | None = "greedy",
     ) -> list[int]:
         """Find a monotonic path from a word to a baseline."""
         # if word_idx is a special token copy it and return
@@ -260,7 +260,7 @@ class MonotonicPathBuilder:
         baseline_idx: int,
         original_idx: int,
         n_steps: int,
-    ) -> Union[float, int]:
+    ) -> float | int:
         """Get the distance between the anchor word and the baseline word."""
         if strategy == PathBuildingStrategies.GREEDY.value:
             # calculate the distance of the monotonized vec from the interpolated point
@@ -299,7 +299,7 @@ class MonotonicPathBuilder:
         anchor: torch.Tensor,
         baseline: torch.Tensor,
         input: torch.Tensor,
-        n_steps: Optional[int] = 30,
+        n_steps: int | None = 30,
     ) -> torch.Tensor:
         """Create a new monotonic vector w.r.t. input and baseline from an existing anchor."""
         non_monotonic_dims = ~cls.get_monotonic_dims(anchor, baseline, input)
