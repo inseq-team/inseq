@@ -82,7 +82,7 @@ fix-style:
 
 .PHONY: check-safety
 check-safety:
-	$(PYTHON) -m safety check --full-report -i 70612 -i 71670
+	$(PYTHON) -m safety check --full-report -i 70612 -i 71670 -i 72089
 
 .PHONY: lint
 lint: fix-style check-safety

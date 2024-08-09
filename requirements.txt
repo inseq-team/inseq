@@ -2,7 +2,7 @@
 #    uv pip compile pyproject.toml -o requirements.txt
 captum==0.7.0
     # via inseq (pyproject.toml)
-certifi==2024.6.2
+certifi==2024.7.4
     # via requests
 charset-normalizer==3.3.2
     # via requests

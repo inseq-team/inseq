@@ -24,7 +24,7 @@ beautifulsoup4==4.12.3
     # via furo
 captum==0.7.0
     # via inseq (pyproject.toml)
-certifi==2024.6.2
+certifi==2024.7.4
     # via requests
 cffi==1.16.0
     # via cryptography
