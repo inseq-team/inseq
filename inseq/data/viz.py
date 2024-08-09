@@ -307,6 +307,10 @@ def show_token_attributions(
         if step_score_highlight is not None:
             step_scores = attr.step_scores[step_score_highlight]
             scores_vmax = step_scores.max().item()
+            # Use different cmap to differentiate from attribution scores
+            scores_cmap = (
+                treescope_cmap("greens") if all(x >= 0 for x in step_scores) else treescope_cmap("brown_to_green")
+            )
             title = f"Generated text with {step_score_highlight} highlights:\n\n"
         generated_token_parts.append(rp.custom_style(rp.text(title), css_style="font-weight: bold;"))
         for gen_idx, curr_gen_tok in enumerate(cleaned_generated_tokens):
@@ -339,7 +343,12 @@ def show_token_attributions(
                 attributed_token_parts.append(rp.text("\n\n"))
             if step_scores is not None:
                 gen_tok_label = fg.treescope_part_from_display_object(
-                    fg.text_on_color(curr_gen_tok, value=round(step_scores[gen_idx].item(), 4), vmax=scores_vmax)
+                    fg.text_on_color(
+                        curr_gen_tok,
+                        value=round(step_scores[gen_idx].item(), 4),
+                        vmax=scores_vmax,
+                        colormap=scores_cmap,
+                    )
                 )
             else:
                 gen_tok_label = rp.text(curr_gen_tok)

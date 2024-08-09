@@ -17,53 +17,64 @@
 # OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
+from collections.abc import Callable
+from functools import wraps
+from typing import Any, Literal
+
 import matplotlib.pyplot as plt
 import numpy as np
 import treescope as ts
 from matplotlib.colors import Colormap, LinearSegmentedColormap
 from numpy.typing import NDArray
 
-from .misc import ordinal_str
+from .misc import isnotebook, ordinal_str
 from .typing import TokenWithId
+
+red = (178, 24, 43)
+beige = (247, 252, 253)
+blue = (33, 102, 172)
+green = (0, 109, 44)
+brown = (140, 81, 10)
 
 
 def get_instance_html(i: int):
     return "<br/><b>" + ordinal_str(i) + " instance:</b><br/>"
 
 
+def interpolate_color(color1, color2, t):
+    return tuple(int(c1 + (c2 - c1) * t) for c1, c2 in zip(color1, color2, strict=False))
+
+
+def generate_colormap(start_color, end_color, num_colors):
+    return [interpolate_color(start_color, end_color, t) for t in np.linspace(0, 1, num_colors)]
+
+
 def red_transparent_blue_colormap():
     colors = []
     for l in np.linspace(1, 0, 100):
-        colors.append((30.0 / 255, 136.0 / 255, 229.0 / 255, l))
+        colors.append((*(float(c) / 255 for c in blue), l))
     for l in np.linspace(0, 1, 100):
-        colors.append((255.0 / 255, 13.0 / 255, 87.0 / 255, l))
+        colors.append((*(float(c) / 255 for c in red), l))
     return LinearSegmentedColormap.from_list("red_transparent_blue", colors)
 
 
-def treescope_cmap():
-    return list(
-        reversed(
-            [
-                (96, 14, 34),
-                (134, 14, 41),
-                (167, 36, 36),
-                (186, 72, 46),
-                (198, 107, 77),
-                (208, 139, 115),
-                (218, 171, 155),
-                (228, 203, 196),
-                (241, 236, 235),
-                (202, 212, 216),
-                (161, 190, 200),
-                (117, 170, 190),
-                (75, 148, 186),
-                (38, 123, 186),
-                (12, 94, 190),
-                (41, 66, 162),
-                (37, 47, 111),
-            ]
-        )
-    )
+def treescope_cmap(colors: Literal["blue_to_red", "brown_to_green", "greens", "blues"] = "blue_to_red", n: int = 200):
+    match colors:
+        case "blue_to_red":
+            first_half = generate_colormap(blue, beige, n // 2)
+            second_half = generate_colormap(beige, red, n - len(first_half))
+            cmap = first_half + second_half
+        case "brown_to_green":
+            first_half = generate_colormap(brown, beige, n // 2)
+            second_half = generate_colormap(beige, green, n - len(first_half))
+            cmap = first_half + second_half
+        case "greens":
+            cmap = generate_colormap(beige, green, n)
+        case "blues":
+            cmap = generate_colormap(beige, blue, n)
+        case _:
+            raise ValueError(f"Invalid color scheme {colors}: valid options are 'blue_to_red', 'greens', 'blues'")
+    return cmap
 
 
 def get_color(
@@ -137,6 +148,23 @@ def maybe_add_linebreak(tok: str, i: int, wrap_after: int | str | list[str] | tu
         return [ts.rendering_parts.text("\n")]
     else:
         return []
+
+
+def treescope_ignore(f: Callable[..., Any]) -> Callable[..., Any]:
+    @wraps(f)
+    def treescope_unhooked_wrapper(self, *args, **kwargs):
+        if isnotebook():
+            # Unhook the treescope visualization to allow `rich.jupyter.JupyterRenderable` to render correctly
+            import IPython
+
+            del IPython.get_ipython().display_formatter.formatters["text/html"].type_printers[object]
+        out = f(self, *args, **kwargs)
+        if isnotebook():
+            # Re-hook the treescope visualization
+            ts.register_as_default()
+        return out
+
+    return treescope_unhooked_wrapper
 
 
 # Full plot

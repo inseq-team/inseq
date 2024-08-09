@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import torch
-import treescope
+import treescope as ts
 
 from ..utils import (
     convert_from_safetensor,
@@ -197,8 +197,8 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
     def __treescope_repr__(
         self,
         path: str,
-        subtree_renderer: Callable[[Any, str | None], treescope.rendering_parts.Rendering],
-    ) -> treescope.rendering_parts.Rendering:
+        subtree_renderer: Callable[[Any, str | None], ts.rendering_parts.Rendering],
+    ) -> ts.rendering_parts.Rendering:
         def granular_attribution_visualizer(
             value: Any,
             path: tuple[Any, ...] | None,
@@ -218,10 +218,10 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
                     elif tname.startswith("decoder"):
                         row_labels = [t.token for t in self.target]
                         column_labels = [t.token for t in self.target]
-                adapter = treescope.type_registries.lookup_ndarray_adapter(value)
+                adapter = ts.type_registries.lookup_ndarray_adapter(value)
                 if value.ndim >= 2:
-                    return treescope.IPythonVisualization(
-                        treescope.figures.inline(
+                    return ts.IPythonVisualization(
+                        ts.figures.inline(
                             adapter.get_array_summary(value, fast=False),
                             get_saliency_heatmap_treescope(
                                 scores=value.numpy(),
@@ -233,11 +233,11 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
                         replace=True,
                     )
                 else:
-                    return treescope.IPythonVisualization(
-                        treescope.figures.inline(
+                    return ts.IPythonVisualization(
+                        ts.figures.inline(
                             adapter.get_array_summary(value, fast=False) + "\n\n",
-                            treescope.figures.figure_from_treescope_rendering_part(
-                                treescope.rendering_parts.indented_children(
+                            ts.figures.figure_from_treescope_rendering_part(
+                                ts.rendering_parts.indented_children(
                                     [
                                         get_tokens_heatmap_treescope(
                                             tokens=column_labels,
@@ -251,8 +251,8 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
                         replace=True,
                     )
 
-        with treescope.active_autovisualizer.set_scoped(granular_attribution_visualizer):
-            return treescope.repr_lib.render_object_constructor(
+        with ts.active_autovisualizer.set_scoped(granular_attribution_visualizer):
+            return ts.repr_lib.render_object_constructor(
                 object_type=type(self),
                 attributes=self.__dict__,
                 path=path,

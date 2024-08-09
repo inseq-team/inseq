@@ -5,6 +5,7 @@ from rich.console import Console
 
 from ... import load_model
 from ...models import HuggingfaceModel
+from ...utils.viz_utils import treescope_ignore
 from .attribute_context_args import AttributeContextArgs
 from .attribute_context_helpers import (
     AttributeContextOutput,
@@ -117,6 +118,7 @@ def get_formatted_attribute_context_results(
     return out_string
 
 
+@treescope_ignore
 def visualize_attribute_context(
     output: AttributeContextOutput,
     model: HuggingfaceModel | str | None = None,
@@ -126,7 +128,6 @@ def visualize_attribute_context(
     if output.info is None:
         raise ValueError("Cannot visualize attribution results without args. Set add_output_info = True.")
     console = Console(record=True)
-    viz = get_formatted_procedure_details(output.info)
     if model is None:
         model = output.info.model_name_or_path
     if isinstance(model, str):
@@ -140,15 +141,16 @@ def visualize_attribute_context(
         raise TypeError(f"Unsupported model type {type(model)} for visualization.")
     if cti_threshold is None and len(output.cti_scores) > 1:
         cti_threshold = get_scores_threshold(output.cti_scores, output.info.context_sensitivity_std_threshold)
+    viz = get_formatted_procedure_details(output.info)
     viz += "\n\n" + get_formatted_attribute_context_results(model, output.info, output, cti_threshold)
     with console.capture() as _:
+        console.print(viz, soft_wrap=False)
+    if output.info.show_viz:
         console.print(viz, soft_wrap=False)
     html = console.export_html()
     if output.info.viz_path:
         with open(output.info.viz_path, "w", encoding="utf-8") as f:
             f.write(html)
-    if output.info.show_viz:
-        console.print(viz, soft_wrap=False)
     if return_html:
         return html
     return None
