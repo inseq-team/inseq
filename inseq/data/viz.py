@@ -299,9 +299,11 @@ def show_token_attributions(
         )
     generated_token_parts = []
     for attr in attributions:
-        cleaned_generated_tokens = clean_tokens(t.token for t in attr.target[attr.attr_pos_start : attr.attr_pos_end])
-        cleaned_input_tokens = clean_tokens(t.token for t in attr.source)
-        cleaned_target_tokens = clean_tokens(t.token for t in attr.target)
+        cleaned_generated_tokens = clean_tokens(
+            [t.token for t in attr.target[attr.attr_pos_start : attr.attr_pos_end]], replace_chars=replace_char
+        )
+        cleaned_input_tokens = clean_tokens([t.token for t in attr.source], replace_chars=replace_char)
+        cleaned_target_tokens = clean_tokens([t.token for t in attr.target], replace_chars=replace_char)
         step_scores = None
         title = "Generated text:\n\n"
         if step_score_highlight is not None:
@@ -604,6 +606,7 @@ def get_tokens_heatmap_treescope(
     min_val: float | None = None,
     max_val: float | None = None,
     wrap_after: int | str | list[str] | tuple[str] | None = None,
+    colormap: str | list[tuple[int, int, int]] | None = None,
 ):
     parts = []
     if title is not None:
@@ -613,11 +616,18 @@ def get_tokens_heatmap_treescope(
                 css_style=title_style,
             )
         )
+    if colormap is None:
+        colormap = treescope_cmap("blue_to_red")
+    elif isinstance(colormap, str):
+        colormap = treescope_cmap(colormap)
+    elif not isinstance(colormap, list):
+        raise ValueError("If specified, colormap must be a string or a list of RGB tuples.")
+
     for idx, tok in enumerate(tokens):
-        if not np.isnan(scores[idx]):
+        if not np.isnan(scores[idx]) and tok != "":
             parts.append(
                 fg.treescope_part_from_display_object(
-                    fg.text_on_color(tok, value=round(scores[idx], 4), vmin=min_val, vmax=max_val)
+                    fg.text_on_color(tok, value=round(scores[idx], 4), vmin=min_val, vmax=max_val, colormap=colormap)
                 )
             )
             parts += maybe_add_linebreak(tok, idx, wrap_after)
