@@ -344,14 +344,13 @@ def show_token_attributions(
                 )
                 attributed_token_parts.append(rp.text("\n\n"))
             if step_scores is not None:
-                gen_tok_label = fg.treescope_part_from_display_object(
-                    fg.text_on_color(
-                        curr_gen_tok,
-                        value=round(step_scores[gen_idx].item(), 4),
-                        vmax=scores_vmax,
-                        colormap=scores_cmap,
-                    )
-                )
+                gen_tok_label = get_single_token_heatmap_treescope(
+                    curr_gen_tok,
+                    step_scores[gen_idx].item(),
+                    max_val=scores_vmax,
+                    colormap=scores_cmap,
+                    show_empty_tokens=True,
+                )[0]
             else:
                 gen_tok_label = rp.text(curr_gen_tok)
             generated_token_parts.append(
@@ -598,39 +597,73 @@ def get_saliency_heatmap_treescope(
     )
 
 
+def get_single_token_heatmap_treescope(
+    token: str,
+    score: float,
+    min_val: float | None = None,
+    max_val: float = 1,
+    rounding: int = 4,
+    colormap: list[tuple[int, int, int]] | None = None,
+    strip_chars: dict[str, str] = {},
+    show_empty_tokens: bool = False,
+    return_highlighted_idx: bool = False,
+) -> list[rp.RenderableTreePart] | tuple[list[rp.RenderableTreePart], int]:
+    parts = [None]
+    idx_highlight = 0
+    curr_tok = token
+    for char, repl in strip_chars.items():
+        if curr_tok.startswith(char):
+            curr_tok = curr_tok.lstrip(char)
+            parts = [rp.text(repl)] + parts
+            idx_highlight += 1
+        if curr_tok.endswith(char):
+            curr_tok = curr_tok.rstrip(char)
+            parts.append(rp.text(repl))
+    if (show_empty_tokens and token != "") or curr_tok != "":
+        show_token = token if show_empty_tokens and curr_tok == "" else curr_tok
+        highlighted_text = fg.treescope_part_from_display_object(
+            fg.text_on_color(show_token, value=round(score, rounding), vmin=min_val, vmax=max_val, colormap=colormap)
+        )
+        parts[idx_highlight] = highlighted_text
+    else:
+        parts.pop(idx_highlight)
+    if return_highlighted_idx:
+        return parts, idx_highlight
+    return parts
+
+
 def get_tokens_heatmap_treescope(
     tokens: list[str],
     scores: np.ndarray,
     title: str | None = None,
     title_style: str | None = None,
     min_val: float | None = None,
-    max_val: float | None = None,
+    max_val: float = 1,
+    rounding: int = 4,
     wrap_after: int | str | list[str] | tuple[str] | None = None,
-    colormap: str | list[tuple[int, int, int]] | None = None,
+    colormap: str | list[tuple[int, int, int]] = "blue_to_red",
+    strip_chars: dict[str, str] = {},
+    show_empty_tokens: bool = True,
 ):
     parts = []
     if title is not None:
-        parts.append(
-            rp.custom_style(
-                rp.text(title + ":\n"),
-                css_style=title_style,
-            )
-        )
-    if colormap is None:
-        colormap = treescope_cmap("blue_to_red")
-    elif isinstance(colormap, str):
+        parts.append(rp.custom_style(rp.text(title + ":\n"), css_style=title_style))
+    if isinstance(colormap, str):
         colormap = treescope_cmap(colormap)
-    elif not isinstance(colormap, list):
+    if not isinstance(colormap, list):
         raise ValueError("If specified, colormap must be a string or a list of RGB tuples.")
-
-    for idx, tok in enumerate(tokens):
-        if not np.isnan(scores[idx]) and tok != "":
-            parts.append(
-                fg.treescope_part_from_display_object(
-                    fg.text_on_color(tok, value=round(scores[idx], 4), vmin=min_val, vmax=max_val, colormap=colormap)
-                )
-            )
-            parts += maybe_add_linebreak(tok, idx, wrap_after)
+    for tok_idx, tok in enumerate(tokens):
+        parts += get_single_token_heatmap_treescope(
+            tok,
+            scores[tok_idx],
+            min_val=min_val,
+            max_val=max_val,
+            rounding=rounding,
+            colormap=colormap,
+            strip_chars=strip_chars,
+            show_empty_tokens=show_empty_tokens,
+        )
+        parts += maybe_add_linebreak(tok, tok_idx, wrap_after)
     return rp.siblings(*parts)
 
 

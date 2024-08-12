@@ -58,6 +58,8 @@ def attribute_context(args: AttributeContextArgs) -> AttributeContextOutput:
         model_kwargs=deepcopy(args.model_kwargs),
         tokenizer_kwargs=deepcopy(args.tokenizer_kwargs),
     )
+    if not isinstance(args.model_name_or_path, str):
+        args.model_name_or_path = model.model_name
     return attribute_context_with_model(args, model)
 
 
@@ -241,7 +243,7 @@ def attribute_context_with_model(args: AttributeContextArgs, model: HuggingfaceM
         )
         output.cci_scores.append(cci_out)
     if args.show_viz or args.viz_path:
-        visualize_attribute_context(output, model, cti_threshold)
+        visualize_attribute_context(output, model, cti_threshold, args.show_viz, args.viz_path)
     if not args.add_output_info:
         output.info = None
     if args.save_path:
