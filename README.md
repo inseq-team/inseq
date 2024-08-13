@@ -252,7 +252,7 @@ All commands support the full range of parameters available for `attribute`, att
 
   **Result:**
 
-  <img src="https://raw.githubusercontent.com/inseq-team/inseq/main/docs/source/images/attribute_context_hospital_output.png" style="width:300px">
+  <img src="https://raw.githubusercontent.com/inseq-team/inseq/main/docs/source/images/attribute_context_hospital_output.png" style="width:500px">
 </details>
 
 ## Planned Development
