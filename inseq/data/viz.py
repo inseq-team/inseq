@@ -628,7 +628,7 @@ def get_single_token_heatmap_treescope(
     else:
         parts.pop(idx_highlight)
     if return_highlighted_idx:
-        return parts, idx_highlight
+        return parts, idx_highlight, show_token
     return parts
 
 

@@ -24,7 +24,8 @@ class CCIOutput:
     cti_token: str
     cti_score: float
     contextual_output: str
-    contextless_output: str
+    contrast_token: str | None = None
+    contextless_output: str | None = None
     input_context_scores: list[float] | None = None
     output_context_scores: list[float] | None = None
 

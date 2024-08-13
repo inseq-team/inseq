@@ -288,7 +288,7 @@ def visualize_attribute_context_treescope(
     replace_chars = {"Ġ": " ", "Ċ": "\n", "▁": " "}
     cci_idx_map = {cci.cti_idx: cci for cci in output.cci_scores} if output.cci_scores is not None else {}
     for curr_tok_idx, curr_tok in enumerate(output.output_current_tokens):
-        curr_tok_parts, highlighted_idx = get_single_token_heatmap_treescope(
+        curr_tok_parts, highlighted_idx, cleaned_curr_tok = get_single_token_heatmap_treescope(
             curr_tok,
             score=output.cti_scores[curr_tok_idx],
             max_val=output.max_cti,
@@ -300,12 +300,26 @@ def visualize_attribute_context_treescope(
         if curr_tok_idx in cci_idx_map:
             cci_parts = [rp.text("\n")]
             cci = cci_idx_map[curr_tok_idx]
+            if cci.contrast_token is not None:
+                contrast_token = cci.contrast_token
+                for char in replace_chars.keys():
+                    contrast_token = contrast_token.strip(char)
+                if contrast_token != cleaned_curr_tok:
+                    cci_parts += [
+                        rp.custom_style(
+                            rp.text("Contrastive alternative: "),
+                            css_style="font-weight: bold; font-style: italic; color: #888888;",
+                        ),
+                        rp.custom_style(
+                            rp.text(contrast_token + "\n\n"), css_style="font-style: italic; color: #888888;"
+                        ),
+                    ]
             if cci.input_context_scores is not None:
                 cci_parts.append(
                     get_tokens_heatmap_treescope(
                         tokens=output.input_context_tokens,
                         scores=cci.input_context_scores,
-                        title=f'Input context CCI scores for "{cci.cti_token}"',
+                        title=f'Input contextual cues for "{cleaned_curr_tok}"',
                         title_style="font-style: italic; color: #888888;",
                         min_val=output.min_cci,
                         max_val=output.max_cci,
@@ -320,7 +334,7 @@ def visualize_attribute_context_treescope(
                     get_tokens_heatmap_treescope(
                         tokens=output.output_context_tokens,
                         scores=cci.output_context_scores,
-                        title=f'Output context CCI scores for "{cci.cti_token}"',
+                        title=f'Output contextual cue for "{cleaned_curr_tok}"',
                         title_style="font-style: italic; color: #888888;",
                         min_val=output.min_cci,
                         max_val=output.max_cci,
