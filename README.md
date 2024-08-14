@@ -240,11 +240,11 @@ All commands support the full range of parameters available for `attribute`, att
 <details>
   <summary><code>inseq attribute-context</code> example</summary>
 
-  The following example uses a GPT-2 model to generate a continuation of <code>input_current_text</code>, and uses the additional context provided by <code>input_context_text</code> to estimate its influence on the the generation. In this case, the output <code>"to the hospital. He said he was fine"</code> is produced, and the generation of token <code>hospital</code> is found to be dependent on context token <code>sick</code> according to the <code>contrast_prob_diff</code> step function.
+  The following example uses a small LM to generate a continuation of <code>input_current_text</code>, and uses the additional context provided by <code>input_context_text</code> to estimate its influence on the the generation. In this case, the output <code>"to the hospital. He said he was fine"</code> is produced, and the generation of token <code>hospital</code> is found to be dependent on context token <code>sick</code> according to the <code>contrast_prob_diff</code> step function.
 
   ```bash
   inseq attribute-context \
-    --model_name_or_path gpt2 \
+    --model_name_or_path HuggingFaceTB/SmolLM-135M \
     --input_context_text "George was sick yesterday." \
     --input_current_text "His colleagues asked him to come" \
     --attributed_fn "contrast_prob_diff"
@@ -252,18 +252,7 @@ All commands support the full range of parameters available for `attribute`, att
 
   **Result:**
 
-  ```
-  Context with [contextual cues] (std λ=1.00) followed by output sentence with {context-sensitive target spans} (std λ=1.00)
-  (CTI = "kl_divergence", CCI = "saliency" w/ "contrast_prob_diff" target)
-
-  Input context:  George was sick yesterday.
-  Input current: His colleagues asked him to come
-  Output current: to the hospital. He said he was fine
-
-  #1.
-  Generated output (CTI > 0.428): to the {hospital}(0.548). He said he was fine
-  Input context (CCI > 0.460):    George was [sick](0.516) yesterday.
-  ```
+  <img src="https://raw.githubusercontent.com/inseq-team/inseq/main/docs/source/images/attribute_context_hospital_output.png" style="width:500px">
 </details>
 
 ## Planned Development
@@ -280,7 +269,7 @@ Our vision for Inseq is to create a centralized, comprehensive and robust set of
 
 ## Citing Inseq
 
-If you use Inseq in your research we suggest to include a mention to the specific release (e.g. v0.6.0) and we kindly ask you to cite our reference paper as:
+If you use Inseq in your research we suggest including a mention of the specific release (e.g. v0.6.0) and we kindly ask you to cite our reference paper as:
 
 ```bibtex
 @inproceedings{sarti-etal-2023-inseq,
@@ -308,7 +297,7 @@ If you use Inseq in your research we suggest to include a mention to the specifi
 Inseq has been used in various research projects. A list of known publications that use Inseq to conduct interpretability analyses of generative models is shown below.
 
 > [!TIP]
-> Last update: June 2024. Please open a pull request to add your publication to the list.
+> Last update: August 2024. Please open a pull request to add your publication to the list.
 
 <details>
   <summary><b>2023</b></summary>
@@ -318,7 +307,6 @@ Inseq has been used in various research projects. A list of known publications t
     <li> <a href="https://aclanthology.org/2023.nlp4convai-1.1/">Response Generation in Longitudinal Dialogues: Which Knowledge Representation Helps?</a> (Mousavi et al., 2023)  </li>
     <li> <a href="https://openreview.net/forum?id=XTHfNGI3zT">Quantifying the Plausibility of Context Reliance in Neural Machine Translation</a> (Sarti et al., 2023)</li>
     <li> <a href="https://aclanthology.org/2023.emnlp-main.243/">A Tale of Pronouns: Interpretability Informs Gender Bias Mitigation for Fairer Instruction-Tuned Machine Translation</a> (Attanasio et al., 2023)</li>
-    <li> <a href="https://arxiv.org/abs/2310.09820">Assessing the Reliability of Large Language Model Knowledge</a> (Wang et al., 2023)</li>
     <li> <a href="https://aclanthology.org/2023.conll-1.18/">Attribution and Alignment: Effects of Local Context Repetition on Utterance Production and Comprehension in Dialogue</a> (Molnar et al., 2023)</li>
   </ol>
 
@@ -327,13 +315,15 @@ Inseq has been used in various research projects. A list of known publications t
 <details>
   <summary><b>2024</b></summary>
   <ol>
-    <li><a href="https://arxiv.org/abs/2401.12576">LLMCheckup: Conversational Examination of Large Language Models via Interpretability Tools</a> (Wang et al., 2024)</li>
+    <li> <a href="https://aclanthology.org/2024.naacl-long.46/">Assessing the Reliability of Large Language Model Knowledge</a> (Wang et al., 2024)</li>
+    <li><a href="https://aclanthology.org/2024.hcinlp-1.9">LLMCheckup: Conversational Examination of Large Language Models via Interpretability Tools</a> (Wang et al., 2024)</li>
     <li><a href="https://arxiv.org/abs/2402.00794">ReAGent: A Model-agnostic Feature Attribution Method for Generative Language Models</a> (Zhao et al., 2024)</li>
-    <li><a href="https://arxiv.org/abs/2404.02421">Revisiting subword tokenization: A case study on affixal negation in large language models</a> (Truong et al., 2024)</li>
+    <li><a href="https://aclanthology.org/2024.naacl-long.284">Revisiting subword tokenization: A case study on affixal negation in large language models</a> (Truong et al., 2024)</li>
     <li><a href="https://hal.science/hal-04581586">Exploring NMT Explainability for Translators Using NMT Visualising Tools</a> (Gonzalez-Saez et al., 2024)</li>
-    <li><a href="https://arxiv.org/abs/2405.14899">DETAIL: Task DEmonsTration Attribution for Interpretable In-context Learning</a> (Zhou et al., 2024)</li>
+    <li><a href="https://openreview.net/forum?id=uILj5HPrag">DETAIL: Task DEmonsTration Attribution for Interpretable In-context Learning</a> (Zhou et al., 2024)</li>
     <li><a href="https://arxiv.org/abs/2406.06399">Should We Fine-Tune or RAG? Evaluating Different Techniques to Adapt LLMs for Dialogue</a> (Alghisi et al., 2024)</li>
     <li><a href="https://arxiv.org/abs/2406.13663">Model Internals-based Answer Attribution for Trustworthy Retrieval-Augmented Generation</a> (Qi, Sarti et al., 2024)</li>
+    <li><a href="https://link.springer.com/chapter/10.1007/978-3-031-63787-2_14">NoNE Found: Explaining the Output of Sequence-to-Sequence Models When No Named Entity Is Recognized</a> (dela Cruz et al., 2024)</li>
   </ol>
 
 </details>

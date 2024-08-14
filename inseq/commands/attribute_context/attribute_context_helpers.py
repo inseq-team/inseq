@@ -24,7 +24,8 @@ class CCIOutput:
     cti_token: str
     cti_score: float
     contextual_output: str
-    contextless_output: str
+    contrast_token: str | None = None
+    contextless_output: str | None = None
     input_context_scores: list[float] | None = None
     output_context_scores: list[float] | None = None
 
@@ -33,6 +34,33 @@ class CCIOutput:
 
     def to_dict(self) -> dict[str, Any]:
         return dict(self.__dict__.items())
+
+    @property
+    def minimum(self) -> float:
+        scores = [0]
+        if self.input_context_scores:
+            scores.extend(self.input_context_scores)
+        if self.output_context_scores:
+            scores.extend(self.output_context_scores)
+        return min(scores)
+
+    @property
+    def maximum(self) -> float:
+        scores = [0]
+        if self.input_context_scores:
+            scores.extend(self.input_context_scores)
+        if self.output_context_scores:
+            scores.extend(self.output_context_scores)
+        return max(scores)
+
+    @property
+    def all_scores(self) -> list[float]:
+        scores = []
+        if self.input_context_scores:
+            scores.extend(self.input_context_scores)
+        if self.output_context_scores:
+            scores.extend(self.output_context_scores)
+        return scores
 
 
 @dataclass
@@ -52,6 +80,13 @@ class AttributeContextOutput:
     def __repr__(self):
         return f"{self.__class__.__name__}({pretty_dict(self.__dict__)})"
 
+    def __treescope_repr__(self, *args, **kwargs):
+        from inseq.commands.attribute_context.attribute_context_viz_helpers import (
+            visualize_attribute_context_treescope,
+        )
+
+        return visualize_attribute_context_treescope(self)
+
     def to_dict(self) -> dict[str, Any]:
         out_dict = {k: v for k, v in self.__dict__.items() if k not in ["cci_scores", "info"]}
         out_dict["cci_scores"] = [cci_out.to_dict() for cci_out in self.cci_scores]
@@ -70,6 +105,72 @@ class AttributeContextOutput:
             field_names = [f.name for f in fields(AttributeContextArgs)]
             out.info = AttributeContextArgs(**{k: v for k, v in out_dict["info"].items() if k in field_names})
         return out
+
+    @property
+    def min_cti(self) -> float:
+        if self.cti_scores is None:
+            return -1
+        return min(self.cti_scores)
+
+    @property
+    def max_cti(self) -> float:
+        if self.cti_scores is None:
+            return -1
+        return max(self.cti_scores)
+
+    @property
+    def mean_cti(self) -> float:
+        if self.cti_scores is None:
+            return 0
+        return sum(self.cti_scores) / len(self.cti_scores)
+
+    @property
+    def std_cti(self) -> float:
+        if self.cti_scores is None:
+            return 0
+        return tensor(self.cti_scores).std().item()
+
+    @property
+    def min_cci(self) -> float:
+        if self.cci_scores is None:
+            return -1
+        return min(cci.minimum for cci in self.cci_scores)
+
+    @property
+    def max_cci(self) -> float:
+        if self.cci_scores is None:
+            return -1
+        return max(cci.maximum for cci in self.cci_scores)
+
+    @property
+    def cci_all_scores(self) -> list[float]:
+        if self.cci_scores is None:
+            return []
+        return [score for cci in self.cci_scores for score in cci.all_scores]
+
+    @property
+    def mean_cci(self) -> float:
+        if self.cci_scores is None:
+            return 0
+        return sum(self.cci_all_scores) / len(self.cci_all_scores)
+
+    @property
+    def std_cci(self) -> float:
+        if self.cci_scores is None:
+            return 0
+        return tensor(self.cci_all_scores).std().item()
+
+    @property
+    def input_context_scores(self) -> list[float] | None:
+        if self.cci_scores is None or self.cci_scores[0].input_context_scores is None:
+            return None
+        return [cci.input_context_scores for cci in self.cci_scores]
+
+    @property
+    def output_context_scores(self) -> list[float] | None:
+        if self.cci_scores is None or self.cci_scores[0].output_context_scores is None:
+            return None
+        return [cci.output_context_scores for cci in self.cci_scores]
 
 
 def concat_with_sep(s1: str, s2: str, sep: str) -> bool:

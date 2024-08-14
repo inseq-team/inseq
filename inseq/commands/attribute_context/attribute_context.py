@@ -58,6 +58,8 @@ def attribute_context(args: AttributeContextArgs) -> AttributeContextOutput:
         model_kwargs=deepcopy(args.model_kwargs),
         tokenizer_kwargs=deepcopy(args.tokenizer_kwargs),
     )
+    if not isinstance(args.model_name_or_path, str):
+        args.model_name_or_path = model.model_name
     return attribute_context_with_model(args, model)
 
 
@@ -167,6 +169,7 @@ def attribute_context_with_model(args: AttributeContextArgs, model: HuggingfaceM
             )
         cci_kwargs = {}
         contextless_output = None
+        contrast_token = None
         if args.attributed_fn is not None and is_contrastive_step_function(args.attributed_fn):
             if not model.is_encoder_decoder:
                 formatted_input_current_text = concat_with_sep(
@@ -191,6 +194,7 @@ def attribute_context_with_model(args: AttributeContextArgs, model: HuggingfaceM
                 contextless_output, skip_special_tokens=False, as_targets=model.is_encoder_decoder
             )
             tok_pos = -2 if model.is_encoder_decoder else -1
+            contrast_token = output_ctxless_tokens[tok_pos]
             if args.attributed_fn == "kl_divergence" or output_ctx_tokens[tok_pos] == output_ctxless_tokens[tok_pos]:
                 cci_kwargs["contrast_force_inputs"] = True
         bos_offset = int(model.is_encoder_decoder or output_ctx_tokens[0] == model.bos_token)
@@ -233,6 +237,7 @@ def attribute_context_with_model(args: AttributeContextArgs, model: HuggingfaceM
         cci_out = CCIOutput(
             cti_idx=cti_idx,
             cti_token=cti_tok,
+            contrast_token=contrast_token,
             cti_score=cti_score,
             contextual_output=contextual_output,
             contextless_output=contextless_output,
@@ -241,7 +246,7 @@ def attribute_context_with_model(args: AttributeContextArgs, model: HuggingfaceM
         )
         output.cci_scores.append(cci_out)
     if args.show_viz or args.viz_path:
-        visualize_attribute_context(output, model, cti_threshold)
+        visualize_attribute_context(output, model, cti_threshold, args.show_viz, args.viz_path)
     if not args.add_output_info:
         output.info = None
     if args.save_path:

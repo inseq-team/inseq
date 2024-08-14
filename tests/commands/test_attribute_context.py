@@ -59,6 +59,7 @@ def test_in_out_ctx_encdec_whitespace_sep(encdec_model: MarianMTModel):
             CCIOutput(
                 cti_idx=0,
                 cti_token="▁Où",
+                contrast_token="▁Où",
                 cti_score=1.36,
                 contextual_output="Où",
                 contextless_output="Où",
@@ -95,6 +96,7 @@ def test_in_ctx_deconly(deconly_model: GPT2LMHeadModel):
             CCIOutput(
                 cti_idx=2,
                 cti_token="Ġhospital",
+                contrast_token="Ġoffice",
                 cti_score=0.55,
                 contextual_output="George was sick yesterday. His colleagues asked him to come to the hospital",
                 contextless_output="His colleagues asked him to come to the office",
@@ -164,6 +166,7 @@ def test_out_ctx_deconly(deconly_model: GPT2LMHeadModel):
             CCIOutput(
                 cti_idx=1,
                 cti_token="Ġpairs",
+                contrast_token="Ġhorses",
                 cti_score=1.39,
                 contextual_output="Question: How many pairs of legs do 10 horses have?\nLet's think step by step:\n1. A horse has 4 legs.\n2. 10 horses have 40 legs.\n3. 40 legs make 20 pairs of legs.\n\nAnswer:\n20 pairs",
                 contextless_output="Question: How many pairs of legs do 10 horses have?\nAnswer:\n20 horses",
@@ -230,6 +233,7 @@ def test_in_out_ctx_deconly(deconly_model: GPT2LMHeadModel):
             CCIOutput(
                 cti_idx=2,
                 cti_token="Ġfine",
+                contrast_token="Ġa",
                 cti_score=1.5,
                 contextual_output="George was sick yesterday. His colleagues asked him if something was wrong. He said he was fine",
                 contextless_output="His colleagues asked him if he was a",
@@ -269,6 +273,7 @@ def test_in_ctx_encdec_special_sep():
             CCIOutput(
                 cti_idx=3,
                 cti_token="elles",
+                contrast_token="elles",
                 cti_score=0.32,
                 contextual_output="Où sont-elles",
                 contextless_output="Où sont-elles",
@@ -310,6 +315,7 @@ def test_in_out_ctx_encdec_special_sep():
             CCIOutput(
                 cti_idx=3,
                 cti_token="elles",
+                contrast_token="ils",
                 cti_score=3.99,
                 contextual_output="Les filles étaient parties.<brk>  Où sont-elles",
                 contextless_output="Où sont-ils",
@@ -352,6 +358,7 @@ def test_in_out_ctx_encdec_langtag_whitespace_sep():
             CCIOutput(
                 cti_idx=4,
                 cti_token="elles",
+                contrast_token="ils",
                 cti_score=4.49,
                 contextual_output="Les filles étaient loin. Où sont-elles",
                 contextless_output="Où sont-ils",
