@@ -234,7 +234,7 @@ def show_granular_attributions(
     if display:
         ts.show(fig)
     if return_html:
-        return ts.render_to_html(fig)
+        return ts.lowering.render_to_html_as_root(fg.treescope_part_from_display_object(fig))
 
 
 def show_token_attributions(
@@ -372,7 +372,7 @@ def show_token_attributions(
     if display:
         ts.show(fig)
     if return_html:
-        return ts.render_to_html(fig)
+        return ts.lowering.render_to_html_as_root(fg.treescope_part_from_display_object(fig))
 
 
 def get_attribution_colors(
@@ -621,12 +621,12 @@ def get_single_token_heatmap_treescope(
             parts.append(rp.text(repl))
     if (show_empty_tokens and token != "") or curr_tok != "":
         show_token = token if show_empty_tokens and curr_tok == "" else curr_tok
-        highlighted_text = fg.treescope_part_from_display_object(
-            fg.text_on_color(show_token, value=round(score, rounding), vmin=min_val, vmax=max_val, colormap=colormap)
-        )
-        parts[idx_highlight] = highlighted_text
     else:
-        parts.pop(idx_highlight)
+        show_token = " "
+    highlighted_text = fg.treescope_part_from_display_object(
+        fg.text_on_color(show_token, value=round(score, rounding), vmin=min_val, vmax=max_val, colormap=colormap)
+    )
+    parts[idx_highlight] = highlighted_text
     if return_highlighted_idx:
         return parts, idx_highlight, show_token
     return parts

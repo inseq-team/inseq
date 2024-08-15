@@ -326,6 +326,7 @@ def visualize_attribute_context_treescope(
                         rounding=10,
                         colormap=cmap_cci,
                         strip_chars=replace_chars,
+                        show_empty_tokens=False,
                     )
                 )
                 cci_parts.append(rp.text("\n\n"))
@@ -341,6 +342,7 @@ def visualize_attribute_context_treescope(
                         rounding=10,
                         colormap=cmap_cci,
                         strip_chars=replace_chars,
+                        show_empty_tokens=False,
                     )
                 )
                 cci_parts.append(rp.text("\n\n"))
