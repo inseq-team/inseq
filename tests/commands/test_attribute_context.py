@@ -90,7 +90,7 @@ def test_in_ctx_deconly(deconly_model: GPT2LMHeadModel):
         output_context=None,
         output_context_tokens=None,
         output_current="to the hospital. He said he was fine",
-        output_current_tokens=["to", "Ġthe", "Ġhospital", ".", "ĠHe", "Ġsaid", "Ġhe", "Ġwas", "Ġfine"],
+        output_current_tokens=["Ġto", "Ġthe", "Ġhospital", ".", "ĠHe", "Ġsaid", "Ġhe", "Ġwas", "Ġfine"],
         cti_scores=[0.31, 0.25, 0.55, 0.16, 0.43, 0.19, 0.13, 0.07, 0.37],
         cci_scores=[
             CCIOutput(
@@ -227,7 +227,7 @@ def test_in_out_ctx_deconly(deconly_model: GPT2LMHeadModel):
         output_context="something was wrong. He said",
         output_context_tokens=["something", "Ġwas", "Ġwrong", ".", "ĠHe", "Ġsaid"],
         output_current="he was fine.",
-        output_current_tokens=["he", "Ġwas", "Ġfine", "."],
+        output_current_tokens=["Ġhe", "Ġwas", "Ġfine", "."],
         cti_scores=[1.2, 0.72, 1.5, 0.49],
         cci_scores=[
             CCIOutput(
