@@ -178,6 +178,7 @@ class FeatureAttribution(Registry):
         step_scores: list[str] = [],
         include_eos_baseline: bool = False,
         skip_special_tokens: bool = False,
+        clean_special_chars: bool = False,
         attributed_fn: str | Callable[..., SingleScorePerStepTensor] | None = None,
         attribution_args: dict[str, Any] = {},
         attributed_fn_args: dict[str, Any] = {},
@@ -210,6 +211,8 @@ class FeatureAttribution(Registry):
                 attribution. By default the EOS token is not used for attribution. Defaults to False.
             skip_special_tokens (:obj:`bool`, `optional`): Whether to skip special tokens when encoding the input.
                 Defaults to False.
+            clean_special_chars (:obj:`bool`, `optional`): Whether to clean special characters from the input and the
+                generated tokens. Defaults to False.
             attributed_fn (:obj:`str` or :obj:`Callable[..., SingleScorePerStepTensor]`, `optional`): The identifier or
                 function of model outputs representing what should be attributed (e.g. output probits of model best
                 prediction after softmax). If it is a string, it must be a valid function.
@@ -252,6 +255,7 @@ class FeatureAttribution(Registry):
             attribute_target=attribute_target,
             step_scores=step_scores,
             skip_special_tokens=skip_special_tokens,
+            clean_special_chars=clean_special_chars,
             attribution_args=attribution_args,
             attributed_fn_args=attributed_fn_args,
             step_scores_args=step_scores_args,
@@ -368,6 +372,7 @@ class FeatureAttribution(Registry):
         attribute_target: bool = False,
         step_scores: list[str] = [],
         skip_special_tokens: bool = False,
+        clean_special_chars: bool = False,
         attribution_args: dict[str, Any] = {},
         attributed_fn_args: dict[str, Any] = {},
         step_scores_args: dict[str, Any] = {},
@@ -397,6 +402,8 @@ class FeatureAttribution(Registry):
                 step scores can be added by using the :meth:`~inseq.register_step_function` function.
             skip_special_tokens (:obj:`bool`, `optional`): Whether to skip special tokens when encoding the input.
                 Defaults to False.
+            clean_special_chars (:obj:`bool`, `optional`): Whether to clean special characters from the input and the
+                generated tokens. Defaults to False.
             attribution_args (:obj:`dict`, `optional`): Additional arguments to pass to the attribution method.
             attributed_fn_args (:obj:`dict`, `optional`): Additional arguments to pass to the attributed function.
             step_scores_args (:obj:`dict`, `optional`): Additional arguments to pass to the step scores function.
@@ -522,6 +529,20 @@ class FeatureAttribution(Registry):
                 attr_pos_start=attr_pos_start,
                 attr_pos_end=iter_pos_end,
             )
+        if clean_special_chars:
+            for out in attribution_outputs:
+                out.source = self.attribution_model.clean_tokens(out.source) if out.source is not None else None
+                out.prefix = (
+                    self.attribution_model.clean_tokens(out.prefix, as_targets=True)
+                    if out.prefix is not None
+                    else None
+                )
+                out.target = (
+                    self.attribution_model.clean_tokens(out.target, as_targets=True)
+                    if out.target is not None
+                    else None
+                )
+            target_tokens_with_ids = self.attribution_model.clean_tokens(target_tokens_with_ids, as_targets=True)
         out = FeatureAttributionOutput(
             sequence_attributions=FeatureAttributionSequenceOutput.from_step_attributions(
                 attributions=attribution_outputs,

@@ -27,6 +27,10 @@ class BatchEncoding(TensorWrapper):
     def __len__(self) -> int:
         return len(self.input_tokens)
 
+    @property
+    def num_sequences(self) -> int:
+        return self.input_ids.shape[0]
+
 
 @dataclass(eq=False, repr=False)
 class BatchEmbedding(TensorWrapper):
