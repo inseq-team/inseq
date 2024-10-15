@@ -4,17 +4,19 @@
 
 ## 🚀 Features
 
-- Added [treescope](https://github.com/google-deepmind/treescope) for interactive model and tensor visualization. ([#283](https://github.com/inseq-team/inseq/pull/283))
+- Added [treescope](https://github.com/google-deepmind/treescope) for interactive model and tensor visualization ([#283](https://github.com/inseq-team/inseq/pull/283)).
 
-- New `treescope`-powered methods `FeatureAttributionOutput.show_granular` and `FeatureAttributionSequenceOutput.show_tokens` for interactive visualization of multidimensional attribution tensors and token highlights. ([#283](https://github.com/inseq-team/inseq/pull/283))
+- New `treescope`-powered methods `FeatureAttributionOutput.show_granular` and `FeatureAttributionSequenceOutput.show_tokens` for interactive visualization of multidimensional attribution tensors and token highlights ([#283](https://github.com/inseq-team/inseq/pull/283)).
 
-- Added new models `DbrxForCausalLM`, `OlmoForCausalLM`, `Phi3ForCausalLM`, `Qwen2MoeForCausalLM`, `Gemma2ForCausalLM` to model config.
+- Added new models `DbrxForCausalLM`, `OlmoForCausalLM`, `Phi3ForCausalLM`, `Qwen2MoeForCausalLM`, `Gemma2ForCausalLM`, `OlmoeForCausalLM`, `GraniteForCausalLM`, `GraniteMoeForCausalLM` to model config.
 
 - Add `rescale_attributions` to Inseq CLI commands for `rescale=True` ([#280](https://github.com/inseq-team/inseq/pull/280)).
 
-- Rows and columns in the visualization now have indices alongside tokens to facilitate index-based slicing, aggregation and alignment [#282](https://github.com/inseq-team/inseq/pull/282)
+- Rows and columns in the visualization now have indices alongside tokens to facilitate index-based slicing, aggregation and alignment ([#282](https://github.com/inseq-team/inseq/pull/282)).
 
-- Added a `scores_precision` to `FeatureAttributionOutput.save` to enable efficient saving in `float16` and `float8` formats. This is useful for saving large attribution outputs in a more memory-efficient way. [#273](https://github.com/inseq-team/inseq/pull/273)
+- New parameter `clean_special_chars` in `model.attribute` to automatically clean special characters from output tokens, such as `▁` and `Ġ` ([#289](https://github.com/inseq-team/inseq/pull/289)).
+
+- Added a `scores_precision` to `FeatureAttributionOutput.save` to enable efficient saving in `float16` and `float8` formats. This is useful for saving large attribution outputs in a more memory-efficient way ([#273](https://github.com/inseq-team/inseq/pull/273)).
 
 ```python
 import inseq
@@ -53,7 +55,7 @@ out_sliced = out.aggregate("slices", target_spans=(13,73))
 out_sliced = out[13:73]
 ```
 
-- The `__sub__` method in `FeatureAttributionSequenceOutput` is now used as a shortcut for `PairAggregator` [#282](https://github.com/inseq-team/inseq/pull/282)
+- The `__sub__` method in `FeatureAttributionSequenceOutput` is now used as a shortcut for `PairAggregator` ([#282](https://github.com/inseq-team/inseq/pull/282)).
 
 
 ```python
@@ -84,7 +86,9 @@ out_female = attrib_model.attribute(
 
 - Fix multi-device support and duplicate BOS for chat template models ([#280](https://github.com/inseq-team/inseq/pull/280)).
 
-- The directions of generated/attributed tokens were clarified in the visualization using arrows instead of x/y [#282](https://github.com/inseq-team/inseq/pull/282)
+- The directions of generated/attributed tokens were clarified in the visualization using arrows instead of x/y ([#282](https://github.com/inseq-team/inseq/pull/282)).
+
+- Fix support for multi-EOS tokens (e.g. LLaMA 3.2, see [#287](https://github.com/inseq-team/inseq/issues/287)).
 
 ## 📝 Documentation and Tutorials
 
@@ -92,4 +96,4 @@ out_female = attrib_model.attribute(
 
 ## 💥 Breaking Changes
 
-- Dropped support for Python 3.9. Please use Python >= 3.10. ([#283](https://github.com/inseq-team/inseq/pull/283))
+- Dropped support for Python 3.9. Current support is Python >= 3.10, <= 3.12 ([#283](https://github.com/inseq-team/inseq/pull/283)).
