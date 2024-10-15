@@ -300,6 +300,47 @@ class AttributionModel(ABC, torch.nn.Module):
             attributed_fn = STEP_SCORES_MAP[attributed_fn]
         return attributed_fn
 
+    def validate_attribute_args(
+        self,
+        input_texts: TextInput,
+        generated_texts: TextInput,
+        has_generated_texts: bool,
+        attribution_method: FeatureAttribution,
+        batch_size: int,
+        attr_pos_start: int | None,
+        attr_pos_end: int | None,
+    ) -> int:
+        logger.debug(f"reference_texts={generated_texts}")
+        if not self.is_encoder_decoder:
+            error_input_gen_mismatch = "Forced generations of decoder-only models must start with the input texts:\n\n"
+            mismatch_seqs = []
+            for idx in range(len(input_texts)):
+                if not generated_texts[idx].startswith(input_texts[idx]):
+                    mismatch_seqs.append(f"{repr(input_texts[idx])}\n!=\n{repr(generated_texts[idx])}")
+            assert len(mismatch_seqs) == 0, error_input_gen_mismatch + "\n\n".join(mismatch_seqs)
+            if has_generated_texts and len(input_texts) > 1:
+                logger.warning(
+                    "Batched constrained decoding is currently not supported for decoder-only models."
+                    " Using batch size of 1."
+                )
+                batch_size = 1
+            if len(input_texts) > 1 and (attr_pos_start is not None or attr_pos_end is not None):
+                logger.warning(
+                    "Custom attribution positions are currently not supported when batching generations for"
+                    " decoder-only models. Using batch size of 1."
+                )
+                batch_size = 1
+        elif attribution_method.is_final_step_method and len(input_texts) > 1:
+            logger.warning(
+                "Batched attribution with encoder-decoder models currently not supported for final-step methods."
+                " Using batch size of 1."
+            )
+            batch_size = 1
+        if attribution_method.method_name == "lime":
+            logger.warning("Batched attribution currently not supported for LIME. Using batch size of 1.")
+            batch_size = 1
+        return batch_size
+
     def attribute(
         self,
         input_texts: TextInput,
@@ -319,6 +360,7 @@ class AttributionModel(ABC, torch.nn.Module):
         batch_size: int | None = None,
         generate_from_target_prefix: bool = False,
         skip_special_tokens: bool = False,
+        clean_special_chars: bool = False,
         generation_args: dict[str, Any] = {},
         **kwargs,
     ) -> FeatureAttributionOutput:
@@ -370,6 +412,8 @@ class AttributionModel(ABC, torch.nn.Module):
                 achieved by modifying the input texts for decoder-only models. Default: False.
             skip_special_tokens (:obj:`bool`, `optional`): Whether to skip special tokens when attributing the input
                 texts. Default: False.
+            clean_special_chars (:obj:`bool`, `optional`): Whether to clean special characters from the input and
+                generated texts. Default: False.
             **kwargs: Additional keyword arguments. These can include keyword arguments for the attribution method, for
                 the generation process or for the attributed function. Generation arguments can be provided explicitly
                 as a dictionary named ``generation_args``.
@@ -445,32 +489,15 @@ class AttributionModel(ABC, torch.nn.Module):
             logger.warning(
                 f"Generation arguments {generation_args} are provided, but will be ignored (constrained decoding)."
             )
-        logger.debug(f"reference_texts={generated_texts}")
-        if not self.is_encoder_decoder:
-            assert all(
-                generated_texts[idx].startswith(input_texts[idx]) for idx in range(len(input_texts))
-            ), "Forced generations with decoder-only models must start with the input texts."
-            if has_generated_texts and len(input_texts) > 1:
-                logger.warning(
-                    "Batched constrained decoding is currently not supported for decoder-only models."
-                    " Using batch size of 1."
-                )
-                batch_size = 1
-            if len(input_texts) > 1 and (attr_pos_start is not None or attr_pos_end is not None):
-                logger.warning(
-                    "Custom attribution positions are currently not supported when batching generations for"
-                    " decoder-only models. Using batch size of 1."
-                )
-                batch_size = 1
-        elif attribution_method.is_final_step_method and len(input_texts) > 1:
-            logger.warning(
-                "Batched attribution with encoder-decoder models currently not supported for final-step methods."
-                " Using batch size of 1."
-            )
-            batch_size = 1
-        if attribution_method.method_name == "lime":
-            logger.warning("Batched attribution currently not supported for LIME. Using batch size of 1.")
-            batch_size = 1
+        batch_size = self.validate_attribute_args(
+            input_texts=input_texts,
+            generated_texts=generated_texts,
+            has_generated_texts=has_generated_texts,
+            attribution_method=attribution_method,
+            batch_size=batch_size,
+            attr_pos_start=attr_pos_start,
+            attr_pos_end=attr_pos_end,
+        )
         attribution_outputs = attribution_method.prepare_and_attribute(
             input_texts,
             generated_texts,
@@ -484,6 +511,7 @@ class AttributionModel(ABC, torch.nn.Module):
             step_scores=step_scores,
             include_eos_baseline=include_eos_baseline,
             skip_special_tokens=skip_special_tokens,
+            clean_special_chars=clean_special_chars,
             attributed_fn=attributed_fn,
             attribution_args=attribution_args,
             attributed_fn_args=attributed_fn_args,

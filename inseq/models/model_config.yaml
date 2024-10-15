@@ -38,6 +38,12 @@ GPTNeoForCausalLM:
 GPTNeoXForCausalLM:
     self_attention_module: "attention"
     value_vector: "value"
+GraniteForCausalLM:
+    self_attention_module: "self_attn"
+    value_vector: "value_states"
+GraniteMoeForCausalLM:
+    self_attention_module: "self_attn"
+    value_vector: "value_states"
 LlamaForCausalLM:
     self_attention_module: "self_attn"
     value_vector: "value_states"
@@ -47,10 +53,16 @@ MistralForCausalLM:
 MixtralForCausalLM:
     self_attention_module: "self_attn"
     value_vector: "value_states"
+NemotronForCausalLM:
+    self_attention_module: "self_attn"
+    value_vector: "value_states"
 MptForCausalLM:
     self_attention_module: "attn"
     value_vector: "value_states"
 OlmoForCausalLM:
+    self_attention_module: "self_attn"
+    value_vector: "value_states"
+OlmoeForCausalLM:
     self_attention_module: "self_attn"
     value_vector: "value_states"
 OpenAIGPTLMHeadModel:

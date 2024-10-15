@@ -26,7 +26,9 @@ from ..utils.typing import (
     MultiLayerMultiUnitScoreTensor,
     OneOrMoreIdSequences,
     OneOrMoreTokenSequences,
+    OneOrMoreTokenWithIdSequences,
     TextInput,
+    TokenWithId,
     VocabularyEmbeddingsTensor,
 )
 from .attribution_model import AttributionModel
@@ -110,6 +112,8 @@ class HuggingfaceModel(AttributionModel):
         else:
             self.tokenizer = AutoTokenizer.from_pretrained(tokenizer, **tokenizer_kwargs)
         self.eos_token_id = getattr(self.model.config, "eos_token_id", None)
+        if isinstance(self.eos_token_id, list):
+            self.eos_token_id = self.eos_token_id[0]
         pad_token_id = self.model.config.pad_token_id
         if pad_token_id is None:
             if self.tokenizer.pad_token_id is None:
@@ -118,6 +122,8 @@ class HuggingfaceModel(AttributionModel):
             else:
                 pad_token_id = self.tokenizer.pad_token_id
         self.pad_token = self._convert_ids_to_tokens(pad_token_id, skip_special_tokens=False)
+        if isinstance(self.pad_token, list):
+            self.pad_token = self.pad_token[0]
         if self.tokenizer.pad_token is None:
             self.tokenizer.pad_token = self.pad_token
         if self.model.config.pad_token_id is None:
@@ -206,7 +212,7 @@ class HuggingfaceModel(AttributionModel):
         self,
         inputs: TextInput | BatchEncoding,
         return_generation_output: bool = False,
-        skip_special_tokens: bool = True,
+        skip_special_tokens: bool | None = None,
         output_generated_only: bool = False,
         **kwargs,
     ) -> list[str] | tuple[list[str], ModelOutput]:
@@ -229,7 +235,7 @@ class HuggingfaceModel(AttributionModel):
             isinstance(inputs, list) and len(inputs) > 0 and all(isinstance(x, str) for x in inputs)
         ):
             inputs = self.encode(inputs, add_special_tokens=not skip_special_tokens)
-        inputs = inputs.to(self.device)
+        inputs: BatchEncoding = inputs.to(self.device)
         generation_out = self.model.generate(
             inputs=inputs.input_ids,
             return_dict_in_generate=True,
@@ -238,6 +244,10 @@ class HuggingfaceModel(AttributionModel):
         sequences = generation_out.sequences
         if output_generated_only and not self.is_encoder_decoder:
             sequences = sequences[:, inputs.input_ids.shape[1] :]
+
+        # Left-padding in multi-sentence sequences is skipped by default.
+        if skip_special_tokens is None:
+            skip_special_tokens = inputs.num_sequences != 1 or self.is_encoder_decoder
         texts = self.decode(ids=sequences, skip_special_tokens=skip_special_tokens)
         if return_generation_output:
             return texts, generation_out
@@ -278,6 +288,15 @@ class HuggingfaceModel(AttributionModel):
             return_tensors="pt",
         ).to(self.device)
         baseline_ids = None
+
+        # Fix: If two BOS tokens are present (e.g. when using chat templates), the second one is removed.
+        if (
+            batch["input_ids"].shape[0] == 1
+            and len(batch["input_ids"][0]) >= 2
+            and batch["input_ids"][0][0] == batch["input_ids"][0][1] == self.bos_token_id
+        ):
+            batch["input_ids"] = batch["input_ids"][:, 1:]
+            batch["attention_mask"] = batch["attention_mask"][:, 1:]
         if return_baseline:
             if include_eos_baseline:
                 baseline_ids = torch.ones_like(batch["input_ids"]).long() * self.tokenizer.unk_token_id
@@ -377,7 +396,7 @@ class HuggingfaceModel(AttributionModel):
 
     def clean_tokens(
         self,
-        tokens: OneOrMoreTokenSequences,
+        tokens: OneOrMoreTokenSequences | OneOrMoreTokenWithIdSequences,
         skip_special_tokens: bool = False,
         as_targets: bool = False,
     ) -> OneOrMoreTokenSequences:
@@ -396,16 +415,17 @@ class HuggingfaceModel(AttributionModel):
         """
         if isinstance(tokens, list) and len(tokens) == 0:
             return []
-        elif isinstance(tokens[0], bytes | str):
+        elif isinstance(tokens[0], bytes | str | TokenWithId):
             clean_tokens = []
             for tok in tokens:
-                clean_tok = self.convert_tokens_to_string(
-                    [tok], skip_special_tokens=skip_special_tokens, as_targets=as_targets
+                str_tok = tok.token if isinstance(tok, TokenWithId) else tok
+                clean_str_tok = self.convert_tokens_to_string(
+                    [str_tok], skip_special_tokens=skip_special_tokens, as_targets=as_targets
                 )
-                if clean_tok:
-                    clean_tokens.append(clean_tok)
-                elif tok:
-                    clean_tokens.append(" ")
+                if not clean_str_tok and tok:
+                    clean_str_tok = tok
+                clean_tok = TokenWithId(clean_str_tok, tok.id) if isinstance(tok, TokenWithId) else clean_str_tok
+                clean_tokens.append(clean_tok)
             return clean_tokens
         return [self.clean_tokens(token_seq, skip_special_tokens, as_targets) for token_seq in tokens]
 
