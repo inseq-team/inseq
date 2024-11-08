@@ -167,6 +167,7 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
     _aggregator: str | list[str] | None = None
     _dict_aggregate_fn: dict[str, str] | None = None
     _attribution_dim_names: dict[str, dict[int, str]] | None = None
+    _num_dimensions: int | None = None
 
     def __post_init__(self):
         if self._dict_aggregate_fn is None:
@@ -181,6 +182,8 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
         self._attribution_dim_names = default_dim_names
         if self._aggregator is None:
             self._aggregator = "scores"
+        if self._num_dimensions is None:
+            self._num_dimensions = 0
         if self.attr_pos_end is None or self.attr_pos_end > len(self.target):
             self.attr_pos_end = len(self.target)
 
@@ -308,6 +311,10 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
                 k: convert_from_safetensor(base64.b64decode(v)) for k, v in self.sequence_scores.items()
             }
         return self
+
+    @property
+    def config(self) -> dict[str, Any]:
+        return {k: v for k, v in self.__dict__.items() if k.startswith("_")}
 
     @staticmethod
     def get_remove_pad_fn(attr: "FeatureAttributionStepOutput", name: str) -> Callable:
@@ -696,10 +703,13 @@ class FeatureAttributionStepOutput(TensorWrapper):
     source: OneOrMoreTokenWithIdSequences | None = None
     prefix: OneOrMoreTokenWithIdSequences | None = None
     target: OneOrMoreTokenWithIdSequences | None = None
+    _num_dimensions: int | None = None
     _sequence_cls: type["FeatureAttributionSequenceOutput"] = FeatureAttributionSequenceOutput
 
     def __post_init__(self):
         self.to(torch.float32)
+        if self._num_dimensions is None:
+            self._num_dimensions = 0
         if self.step_scores is None:
             self.step_scores = {}
         if self.sequence_scores is None:
@@ -1213,8 +1223,6 @@ class MultiDimensionalFeatureAttributionSequenceOutput(FeatureAttributionSequenc
     attention head and per layer for every source-target token pair in the source attributions (i.e. 2 dimensions).
     """
 
-    _num_dimensions: int = 2
-
     def __post_init__(self):
         super().__post_init__()
         self._aggregator = ["mean"] * self._num_dimensions
@@ -1233,7 +1241,6 @@ class MultiDimensionalFeatureAttributionSequenceOutput(FeatureAttributionSequenc
 class MultiDimensionalFeatureAttributionStepOutput(FeatureAttributionStepOutput):
     """Raw output of a single step of multi-dimensional feature attribution."""
 
-    _num_dimensions: int = 2
     _sequence_cls: type["FeatureAttributionSequenceOutput"] = MultiDimensionalFeatureAttributionSequenceOutput
 
     def get_sequence_cls(self, **kwargs):

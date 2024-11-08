@@ -300,7 +300,7 @@ class SequenceAttributionAggregator(Aggregator):
                     kwargs["aggregate_fn"] = kwargs["aggregate_fn"][cls.aggregator_family]
             field_func = getattr(cls, f"aggregate_{field}")
             aggregated_sequence_attribution_fields[field] = field_func(attr, **kwargs)
-        return attr.__class__(**aggregated_sequence_attribution_fields)
+        return attr.__class__(**aggregated_sequence_attribution_fields, **attr.config)
 
     @classmethod
     def _process_attribution_scores(
@@ -344,6 +344,12 @@ class SequenceAttributionAggregator(Aggregator):
     @classmethod
     def post_aggregate_hook(cls, attr: "FeatureAttributionSequenceOutput", **kwargs):
         super().post_aggregate_hook(attr, **kwargs)
+        if attr.source_attributions is not None:
+            attr._num_dimensions = attr.source_attributions.ndim
+        elif attr.target_attributions is not None:
+            attr._num_dimensions = attr.target_attributions.ndim
+        else:
+            attr._num_dimensions = 0
         cls.is_compatible(attr)
 
     @classmethod
