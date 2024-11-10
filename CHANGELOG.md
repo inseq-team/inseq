@@ -55,6 +55,17 @@ out_sliced = out.aggregate("slices", target_spans=(13,73))
 out_sliced = out[13:73]
 ```
 
+- A new `StringSplitAggregator` (`"split"`) is added to allow for supporting more complex aggregation procedures beyond simple subword merging  in`FeatureAttributionSequenceOutput` objects. More specifically, splitting supports regex expression to match split points even when these are (potentially overlapping) parts of existing tokens. The `split_mode` parameter can be set to `"single"` (default) to keep tokens containing matched split points separate while aggregating the rest, or `"start"` or `"end"` to concatenate them to the preceding/following aggregated token sequence. [#290](https://github.com/inseq-team/inseq/pull/290)
+
+```python
+# Split on newlines. Default split_mode = "single".
+out.aggregate("split", split_pattern="\n").aggregate("sum").show(do_aggregation=False)
+
+# Split on whitespace-separated words of length 5.
+# Note: this works if clean_special_chars = True is used, otherwise the split_pattern should be adjusted to split on special characters like "Ġ" or "▁".
+out.aggregate("split", split_pattern=r"\s(\w{5})(?=\s)", split_mode="end")
+```
+
 - The `__sub__` method in `FeatureAttributionSequenceOutput` is now used as a shortcut for `PairAggregator` ([#282](https://github.com/inseq-team/inseq/pull/282)).
 
 
@@ -89,6 +100,8 @@ out_female = attrib_model.attribute(
 - The directions of generated/attributed tokens were clarified in the visualization using arrows instead of x/y ([#282](https://github.com/inseq-team/inseq/pull/282)).
 
 - Fix support for multi-EOS tokens (e.g. LLaMA 3.2, see [#287](https://github.com/inseq-team/inseq/issues/287)).
+
+- Fix copying configuration parameters to aggregated `FeatureAttributionSequenceOutput` objects ([#292](https://github.com/inseq-team/inseq/pull/292)).
 
 ## 📝 Documentation and Tutorials
 
