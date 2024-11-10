@@ -426,8 +426,10 @@ urllib3==2.2.2
     # via
     #   requests
     #   safety
-virtualenv==20.25.0
-    # via pre-commit
+virtualenv==20.27.1
+    # via
+    #   inseq (pyproject.toml)
+    #   pre-commit
 wcwidth==0.2.13
     # via prompt-toolkit
 widgetsnbextension==4.0.10
