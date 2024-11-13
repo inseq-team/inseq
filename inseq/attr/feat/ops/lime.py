@@ -260,7 +260,7 @@ class Lime(LimeBase):
             )
 
             def detach_to_list(t):
-                return t.detach().cpu().numpy().tolist() if type(t) == torch.Tensor else t
+                return t.detach().float().cpu().numpy().tolist() if type(t) == torch.Tensor else t
 
             # Additionally remove special_token_ids
             mask_special_token_ids = torch.Tensor(
