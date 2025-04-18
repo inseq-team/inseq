@@ -23,6 +23,9 @@ GemmaForCausalLM:
 Gemma2ForCausalLM:
     self_attention_module: "self_attn"
     value_vector: "value_states"
+Gemma3ForCausalLM:
+    self_attention_module: "self_attn"
+    value_vector: "value_states"
 GPTBigCodeForCausalLM:
     self_attention_module: "attn"
     value_vector: "value"
