@@ -15,7 +15,7 @@ jobs:
         python-version: ["3.10", "3.11", "3.12"]
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v4.3.0
@@ -27,7 +27,7 @@ jobs:
         make uv-download
 
     - name: Set up cache
-      uses: actions/cache@v3.0.11
+      uses: actions/cache@v4
       with:
         path: .venv
         key: venv-${{ matrix.python-version }}-${{ hashFiles('pyproject.toml') }}
