@@ -77,7 +77,7 @@ lint = [
   "bandit>=1.7.4",
   "safety>=3.1.0",
   "pydoclint>=0.4.0",
-  "pre-commit>=2.19.0",
+  "pre-commit>=3.20.0",
   "pytest>=7.2.0",
   "pytest-cov>=4.0.0",
   "pytest-xdist>=3.5.0",
@@ -204,6 +204,8 @@ ignore = [
   "PLR0913", # too many arguments
   "PLR0915", # too many statements
   "W191", # indentation contains tabs (handled by format)
+  "PLC0415", # import outside top-level
+  "PLW1641", # object does not implement __hash__
 ]
 select = [
   "E", # pycodestyle errors

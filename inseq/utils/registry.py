@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-from abc import ABC
 from typing import TypeVar
 
 R = TypeVar("R", bound="Registry")
 
 
-class Registry(ABC):
+class Registry:
     registry_attr = "None"  # Override in child classes
 
     def __init__(self) -> None:

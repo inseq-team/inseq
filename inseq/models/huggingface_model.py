@@ -1,19 +1,21 @@
 """HuggingFace Seq2seq model."""
+
 import logging
 from abc import abstractmethod
 from typing import Any, NoReturn
 
 import torch
 from torch import long
-from transformers import (
+from transformers.modeling_outputs import CausalLMOutput, Seq2SeqLMOutput
+from transformers.modeling_utils import PreTrainedModel
+from transformers.models.auto import (
     AutoConfig,
     AutoModelForCausalLM,
     AutoModelForSeq2SeqLM,
     AutoTokenizer,
-    PreTrainedModel,
-    PreTrainedTokenizerBase,
 )
-from transformers.modeling_outputs import CausalLMOutput, ModelOutput, Seq2SeqLMOutput
+from transformers.tokenization_utils_base import PreTrainedTokenizerBase
+from transformers.utils.generic import ModelOutput
 
 from ..attr.attribution_decorators import batched
 from ..data import BatchEncoding
@@ -90,6 +92,8 @@ class HuggingfaceModel(AttributionModel):
             **kwargs: additional arguments for the model and the tokenizer.
         """
         super().__init__(**kwargs)
+        if "attn_implementation" not in model_kwargs:
+            model_kwargs["attn_implementation"] = "eager"
         if self._autoclass is None or self._autoclass not in SUPPORTED_AUTOCLASSES:
             raise ValueError(
                 f"Invalid autoclass {self._autoclass}. Must be one of {[x.__name__ for x in SUPPORTED_AUTOCLASSES]}."

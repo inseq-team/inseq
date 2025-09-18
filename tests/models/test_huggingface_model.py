@@ -2,7 +2,6 @@
 since it is bugged is not very elegant, this will need to be refactored.
 """
 
-
 import pytest
 import torch
 from pytest import fixture, mark

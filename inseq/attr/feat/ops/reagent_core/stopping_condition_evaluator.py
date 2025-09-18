@@ -2,7 +2,7 @@ import logging
 from abc import ABC, abstractmethod
 
 import torch
-from transformers import AutoModelForCausalLM
+from transformers.models.auto import AutoModelForCausalLM
 
 from .....utils.typing import IdsTensor, MultipleScoresPerStepTensor, TargetIdsTensor
 from .token_replacer import RankingTokenReplacer
@@ -98,7 +98,7 @@ class TopKStoppingConditionEvaluator(StoppingConditionEvaluator):
             input_ids_replaced = ids_replaced[:, : input_ids.shape[1]]
             decoder_input_ids_replaced = ids_replaced[:, input_ids.shape[1] :]
 
-        logging.debug(f"Replacing mask based on importance score -> { mask_replacing }")
+        logging.debug(f"Replacing mask based on importance score -> {mask_replacing}")
 
         # Whether the result \hat{y^{(e)}_{t+1}} consistent with y_{t+1}
         assert not input_ids_replaced.requires_grad, "Error: auto-diff engine not disabled"
