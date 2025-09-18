@@ -1382,7 +1382,7 @@ requires-dist = [
     { name = "sphinxext-opengraph", marker = "extra == 'docs'", specifier = ">=0.4.2" },
     { name = "torch", specifier = ">=2.0" },
     { name = "tqdm", specifier = ">=4.64.0" },
-    { name = "transformers", extras = ["sentencepiece", "tokenizers"], specifier = ">=4.22.0" },
+    { name = "transformers", extras = ["sentencepiece", "tokenizers"], specifier = ">=4.53.0" },
     { name = "treescope", specifier = ">=0.1.0" },
     { name = "typeguard", specifier = "<=2.13.3" },
     { name = "virtualenv", marker = "extra == 'lint'", specifier = ">=20.26.6" },

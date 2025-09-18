@@ -104,7 +104,9 @@ gitdb==4.0.11
     # via gitpython
 gitpython==3.1.41
     # via sphinx-gitstamp
-huggingface-hub==0.20.3
+hf-xet==1.1.10
+    # via huggingface-hub
+huggingface-hub==0.35.0
     # via
     #   datasets
     #   tokenizers
@@ -312,7 +314,7 @@ ruamel-yaml-clib==0.2.8
     # via ruamel-yaml
 ruff==0.13.0
     # via inseq (pyproject.toml)
-safetensors==0.4.2
+safetensors==0.6.2
     # via transformers
 safety==3.1.0
     # via inseq (pyproject.toml)
@@ -380,7 +382,7 @@ sympy==1.12
     # via torch
 threadpoolctl==3.2.0
     # via scikit-learn
-tokenizers==0.15.2
+tokenizers==0.22.0
     # via transformers
 tomli==2.2.1
     # via
@@ -413,7 +415,7 @@ traitlets==5.14.1
     #   jupyter-client
     #   jupyter-core
     #   matplotlib-inline
-transformers==4.38.1
+transformers==4.56.1
     # via inseq (pyproject.toml)
 treescope==0.1.0
     # via inseq (pyproject.toml)
