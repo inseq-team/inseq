@@ -93,11 +93,11 @@ sentencepiece==0.2.0
     # via transformers
 six==1.16.0
     # via python-dateutil
-sympy==1.12
+sympy==1.14.0
     # via torch
 tokenizers==0.22.0
     # via transformers
-torch==2.3.1
+torch==2.8.0
     # via
     #   inseq (pyproject.toml)
     #   captum
@@ -115,7 +115,7 @@ typeguard==2.13.3
     # via
     #   inseq (pyproject.toml)
     #   jaxtyping
-typing-extensions==4.9.0
+typing-extensions==4.15.0
     # via
     #   huggingface-hub
     #   jaxtyping

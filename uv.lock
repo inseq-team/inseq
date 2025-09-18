@@ -1380,7 +1380,7 @@ requires-dist = [
     { name = "sphinx-gitstamp", marker = "extra == 'docs'", specifier = ">=0.3.2" },
     { name = "sphinxemoji", marker = "extra == 'docs'", specifier = ">=0.2.0" },
     { name = "sphinxext-opengraph", marker = "extra == 'docs'", specifier = ">=0.4.2" },
-    { name = "torch", specifier = ">=2.0" },
+    { name = "torch", specifier = ">=2.6" },
     { name = "tqdm", specifier = ">=4.64.0" },
     { name = "transformers", extras = ["sentencepiece", "tokenizers"], specifier = ">=4.53.0" },
     { name = "treescope", specifier = ">=0.1.0" },

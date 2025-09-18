@@ -378,7 +378,7 @@ stack-data==0.6.3
     # via ipython
 stevedore==5.1.0
     # via bandit
-sympy==1.12
+sympy==1.14.0
     # via torch
 threadpoolctl==3.2.0
     # via scikit-learn
@@ -390,7 +390,7 @@ tomli==2.2.1
     #   dparse
     #   pydoclint
     #   pytest
-torch==2.3.1
+torch==2.8.0
     # via
     #   inseq (pyproject.toml)
     #   captum
@@ -425,7 +425,7 @@ typeguard==2.13.3
     #   jaxtyping
 typer==0.9.0
     # via safety
-typing-extensions==4.9.0
+typing-extensions==4.15.0
     # via
     #   exceptiongroup
     #   huggingface-hub
