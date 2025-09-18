@@ -5,6 +5,7 @@ from functools import wraps
 from typing import Any, Protocol, TypeVar
 
 import torch
+import treescope as ts
 
 from ..attr import STEP_SCORES_MAP, StepFunctionArgs
 from ..attr.feat import FeatureAttribution, extract_args, join_token_ids
@@ -59,8 +60,7 @@ class ForwardMethod(Protocol):
         use_embeddings: bool,
         attributed_fn_argnames: list[str] | None,
         *args,
-    ) -> CustomForwardOutput:
-        ...
+    ) -> CustomForwardOutput: ...
 
 
 class InputFormatter:
@@ -227,6 +227,12 @@ class AttributionModel(ABC, torch.nn.Module):
         self._default_attributed_fn_id: str = "probability"
         self.config: ModelConfig | None = None
         self.is_distributed: bool | None = None
+
+    def __repr__(self):
+        if isnotebook():
+            ts.display(self)
+            return ""
+        return super().__repr__()
 
     @property
     def device(self) -> str | None:

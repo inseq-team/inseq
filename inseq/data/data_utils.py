@@ -4,9 +4,10 @@ from typing import Any, TypeVar
 
 import numpy as np
 import torch
+import treescope as ts
 from jaxtyping import Int
 
-from ..utils import pretty_dict
+from ..utils import isnotebook, pretty_dict
 
 TensorClass = TypeVar("TensorClass", bound="TensorWrapper")
 
@@ -186,7 +187,10 @@ class TensorWrapper:
         return f"{self.__class__.__name__}({pretty_dict(self.to_dict())})"
 
     def __repr__(self):
-        return f"{self.__class__.__name__}({pretty_dict(self.__dict__)})"
+        if isnotebook():
+            ts.display(self)
+            return ""
+        return self.__str__()
 
     def __eq__(self, other):
         equals = {field: self._eq(val, getattr(other, field)) for field, val in self.__dict__.items()}
