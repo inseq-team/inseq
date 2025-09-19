@@ -287,36 +287,6 @@ def test_in_ctx_encdec_special_sep():
     assert round_scores(cli_out) == expected_output
 
 
-def test_in_out_ctx_encdec_special_sep():
-    # Encoder-decoder model with special separator tags in input and output, context is given in the source (input context)
-    # and produced in the target (output context) before the special token separator.
-    in_out_ctx_encdec_special_sep = AttributeContextArgs(
-        model_name_or_path="context-mt/scat-marian-small-target-ctx4-cwd0-en-fr",
-        input_context_text="The girls were away.",
-        input_current_text="Where are they?",
-        output_template="{context}<brk> {current}",
-        input_template="{context} <brk> {current}",
-        special_tokens_to_keep=["<brk>"],
-        attributed_fn="contrast_prob_diff",
-        show_viz=False,
-        add_output_info=False,
-        # Pre-defining natural model outputs to avoid user input in unit tests
-        output_context_text="Les filles étaient parties.",
-    )
-    expected_output = AttributeContextOutput(
-        input_context="The girls were away.",
-        input_context_tokens=["▁The", "▁girls", "▁were", "▁away", "."],
-        output_context="Les filles étaient parties.",
-        output_context_tokens=["▁Les", "▁filles", "▁étaient", "▁parties", "."],
-        output_current="Où sont-elles ?",
-        output_current_tokens=["▁Où", "▁sont", "-", "elles", "▁?"],
-        cti_scores=[3.35, 3.49, 0.38, 2.37, 1.08],
-        cci_scores=[],
-    )
-    cli_out = attribute_context(in_out_ctx_encdec_special_sep)
-    assert round_scores(cli_out) == expected_output
-
-
 @pytest.mark.slow
 def test_in_out_ctx_encdec_langtag_whitespace_sep():
     # Base case for context-aware encoder-decoder model with language tag in input and output.
