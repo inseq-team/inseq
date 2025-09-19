@@ -1279,8 +1279,11 @@ name = "inseq"
 version = "0.7.0.dev0"
 source = { editable = "." }
 dependencies = [
+    { name = "aiohttp" },
     { name = "captum" },
+    { name = "cryptography" },
     { name = "jaxtyping" },
+    { name = "jinja2" },
     { name = "matplotlib" },
     { name = "numpy" },
     { name = "nvidia-cublas-cu11", marker = "sys_platform == 'Linux'" },
@@ -1295,12 +1298,17 @@ dependencies = [
     { name = "nvidia-nccl-cu11", marker = "sys_platform == 'Linux'" },
     { name = "nvidia-nvtx-cu11", marker = "sys_platform == 'Linux'" },
     { name = "protobuf" },
+    { name = "regex" },
+    { name = "requests" },
     { name = "rich" },
+    { name = "setuptools" },
     { name = "torch" },
+    { name = "tornado" },
     { name = "tqdm" },
     { name = "transformers", extra = ["sentencepiece", "tokenizers"] },
     { name = "treescope" },
     { name = "typeguard" },
+    { name = "urllib3" },
 ]
 
 [package.optional-dependencies]
@@ -1342,13 +1350,16 @@ sklearn = [
 
 [package.metadata]
 requires-dist = [
+    { name = "aiohttp", specifier = ">=3.12.14" },
     { name = "bandit", marker = "extra == 'lint'", specifier = ">=1.7.4" },
     { name = "captum", specifier = ">=0.7.0" },
+    { name = "cryptography", specifier = ">=44.0.1" },
     { name = "datasets", marker = "extra == 'datasets'", specifier = ">=2.17.0" },
     { name = "furo", marker = "extra == 'docs'", specifier = ">=2022.12.7" },
     { name = "ipykernel", marker = "extra == 'notebook'", specifier = ">=6.29.2" },
     { name = "ipywidgets", marker = "extra == 'notebook'", specifier = ">=8.1.2" },
     { name = "jaxtyping", specifier = ">=0.2.25" },
+    { name = "jinja2", specifier = ">=3.1.5" },
     { name = "joblib", marker = "extra == 'sklearn'", specifier = ">=1.3.2" },
     { name = "matplotlib", specifier = ">=3.5.3" },
     { name = "nltk", marker = "extra == 'nltk'", specifier = ">=3.8.1" },
@@ -1365,15 +1376,18 @@ requires-dist = [
     { name = "nvidia-nccl-cu11", marker = "sys_platform == 'Linux'", specifier = ">=2.14.3" },
     { name = "nvidia-nvtx-cu11", marker = "sys_platform == 'Linux'", specifier = ">=11.7.91" },
     { name = "pre-commit", marker = "extra == 'lint'", specifier = ">=3.20.0" },
-    { name = "protobuf", specifier = ">=3.20.1" },
+    { name = "protobuf", specifier = ">=4.25.8" },
     { name = "pydoclint", marker = "extra == 'lint'", specifier = ">=0.4.0" },
     { name = "pytest", marker = "extra == 'lint'", specifier = ">=7.2.0" },
     { name = "pytest-cov", marker = "extra == 'lint'", specifier = ">=4.0.0" },
     { name = "pytest-xdist", marker = "extra == 'lint'", specifier = ">=3.5.0" },
+    { name = "regex", specifier = ">=2025.2.10" },
+    { name = "requests", specifier = ">=2.32.4" },
     { name = "rich", specifier = ">=10.13.0" },
     { name = "ruff", marker = "extra == 'lint'", specifier = ">=0.13.0" },
     { name = "safety", marker = "extra == 'lint'", specifier = ">=3.1.0" },
     { name = "scikit-learn", marker = "extra == 'sklearn'", specifier = ">=1.5.1" },
+    { name = "setuptools", specifier = ">=78.1.1" },
     { name = "sphinx", marker = "extra == 'docs'", specifier = ">=5.3.0" },
     { name = "sphinx-copybutton", marker = "extra == 'docs'", specifier = ">=0.4.0" },
     { name = "sphinx-design", marker = "extra == 'docs'", specifier = ">=0.4.1" },
@@ -1381,10 +1395,12 @@ requires-dist = [
     { name = "sphinxemoji", marker = "extra == 'docs'", specifier = ">=0.2.0" },
     { name = "sphinxext-opengraph", marker = "extra == 'docs'", specifier = ">=0.4.2" },
     { name = "torch", specifier = ">=2.6" },
+    { name = "tornado", specifier = ">=6.5.0" },
     { name = "tqdm", specifier = ">=4.64.0" },
     { name = "transformers", extras = ["sentencepiece", "tokenizers"], specifier = ">=4.53.0" },
     { name = "treescope", specifier = ">=0.1.0" },
     { name = "typeguard", specifier = "<=2.13.3" },
+    { name = "urllib3", specifier = ">=2.5.0" },
     { name = "virtualenv", marker = "extra == 'lint'", specifier = ">=20.26.6" },
 ]
 provides-extras = ["docs", "lint", "sklearn", "datasets", "notebook", "nltk"]

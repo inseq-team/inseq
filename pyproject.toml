@@ -41,7 +41,6 @@ classifiers = [
 dependencies = [
   "rich>=10.13.0",
   "transformers[sentencepiece,tokenizers]>=4.53.0",
-  "protobuf>=3.20.1",
   "captum>=0.7.0",
   "numpy>=1.21.6",
   "jaxtyping>=0.2.25",
@@ -61,6 +60,16 @@ dependencies = [
   "nvidia-cusparse-cu11>=11.7.4.91; sys_platform=='Linux'",
   "nvidia-nccl-cu11>=2.14.3; sys_platform=='Linux'",
   "nvidia-nvtx-cu11>=11.7.91; sys_platform=='Linux'",
+  # Pinned to avoid vulnerabilities in older versions
+  "protobuf>=4.25.8",
+  "urllib3>=2.5.0",
+  "tornado>=6.5.0",
+  "setuptools>=78.1.1",
+  "requests>=2.32.4",
+  "regex>=2025.2.10",
+  "jinja2>=3.1.5",
+  "cryptography>=44.0.1",
+  "aiohttp>=3.12.14",
 ]
 
 [project.optional-dependencies]
