@@ -10,6 +10,8 @@ async-timeout==5.0.1
     # via aiohttp
 attrs==25.3.0
     # via aiohttp
+authlib==1.6.5
+    # via inseq (pyproject.toml)
 captum==0.7.0
     # via inseq (pyproject.toml)
 certifi==2024.7.4
@@ -21,7 +23,9 @@ charset-normalizer==3.3.2
 contourpy==1.2.0
     # via matplotlib
 cryptography==46.0.1
-    # via inseq (pyproject.toml)
+    # via
+    #   inseq (pyproject.toml)
+    #   authlib
 cycler==0.12.1
     # via matplotlib
 filelock==3.13.1
