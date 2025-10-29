@@ -484,9 +484,7 @@ class AttributionModel(ABC, torch.nn.Module):
                 add_special_tokens=not skip_special_tokens,
             )
             if generate_from_target_prefix:
-                decoder_input = self.encode(
-                    generated_texts, as_targets=True, add_special_tokens=not skip_special_tokens
-                )
+                decoder_input = self.encode(generated_texts, as_targets=True, add_special_tokens=False)
                 generation_args["decoder_input_ids"] = decoder_input.input_ids
             generated_texts = self.generate(
                 encoded_input, return_generation_output=False, batch_size=batch_size, **generation_args
