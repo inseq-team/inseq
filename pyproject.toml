@@ -70,6 +70,7 @@ dependencies = [
   "jinja2>=3.1.5",
   "cryptography>=44.0.1",
   "aiohttp>=3.12.14",
+  "authlib>=1.6.4"
 ]
 
 [project.optional-dependencies]
