@@ -231,7 +231,7 @@ def generate_model_output(
 ) -> str:
     """Generate the model output, validating the presence of a prefix/suffix and stripping them from the generation."""
     output_gen = generate_with_special_tokens(
-        model, model_input, special_tokens_to_keep, output_generated_only=False, **generation_kwargs
+        model, model_input, special_tokens_to_keep, output_generated_only=True, **generation_kwargs
     )
     if prefix:
         if not output_gen.startswith(prefix):
