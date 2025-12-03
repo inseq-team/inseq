@@ -81,7 +81,6 @@ networkx==3.2.1
     # via torch
 numpy==1.26.4
     # via
-    #   inseq (pyproject.toml)
     #   captum
     #   contourpy
     #   jaxtyping
@@ -139,9 +138,7 @@ sympy==1.14.0
 tokenizers==0.22.0
     # via transformers
 torch==2.8.0
-    # via
-    #   inseq (pyproject.toml)
-    #   captum
+    # via captum
 tornado==6.5.2
     # via inseq (pyproject.toml)
 tqdm==4.66.4
