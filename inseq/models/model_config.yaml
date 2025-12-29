@@ -11,8 +11,14 @@ CodeGenForCausalLM:
 CohereForCausalLM:
     self_attention_module: "self_attn"
     value_vector: "value_states"
+Cohere2ForCausalLM:
+    self_attention_module: "self_attn"
+    value_vector: "value_states"
 DbrxForCausalLM:
     self_attention_module: "attn"
+    value_vector: "value_states"
+DeepseekV3ForCausalLM:
+    self_attention_module: "self_attn"
     value_vector: "value_states"
 FalconForCausalLM:
     self_attention_module: "self_attention"
@@ -50,6 +56,9 @@ GraniteMoeForCausalLM:
 LlamaForCausalLM:
     self_attention_module: "self_attn"
     value_vector: "value_states"
+Llama4ForCausalLM:
+    self_attention_module: "self_attn"
+    value_vector: "value_states"
 MistralForCausalLM:
     self_attention_module: "self_attn"
     value_vector: "value_states"
@@ -84,6 +93,12 @@ Qwen2ForCausalLM:
     self_attention_module: "self_attn"
     value_vector: "value_states"
 Qwen2MoeForCausalLM:
+    self_attention_module: "self_attn"
+    value_vector: "value_states"
+Qwen3ForCausalLM:
+    self_attention_module: "self_attn"
+    value_vector: "value_states"
+Qwen3MoeForCausalLM:
     self_attention_module: "self_attn"
     value_vector: "value_states"
 StableLmForCausalLM:
