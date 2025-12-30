@@ -209,9 +209,7 @@ def format_input_texts(
     reference_texts = [ref_texts] if isinstance(ref_texts, str) else ref_texts
     if reference_texts and texts and len(texts) != len(reference_texts):
         raise LengthMismatchError(
-            "Length mismatch for texts and reference_texts.Input length: {}, reference length: {} ".format(
-                len(texts), len(reference_texts)
-            )
+            f"Length mismatch for texts and reference_texts.Input length: {len(texts)}, reference length: {len(reference_texts)} "
         )
     if skip_special_tokens:
         for special_token in special_tokens:

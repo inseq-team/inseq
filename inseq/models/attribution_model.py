@@ -59,8 +59,7 @@ class ForwardMethod(Protocol):
         use_embeddings: bool,
         attributed_fn_argnames: list[str] | None,
         *args,
-    ) -> CustomForwardOutput:
-        ...
+    ) -> CustomForwardOutput: ...
 
 
 class InputFormatter:

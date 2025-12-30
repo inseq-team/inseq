@@ -104,9 +104,9 @@ def merge_attributions(attributions: list["FeatureAttributionOutput"]) -> "Featu
     Returns:
         :class:`~inseq.data.FeatureAttributionOutput`: Merged object.
     """
-    assert all(
-        isinstance(x, FeatureAttributionOutput) for x in attributions
-    ), "Only FeatureAttributionOutput objects can be merged."
+    assert all(isinstance(x, FeatureAttributionOutput) for x in attributions), (
+        "Only FeatureAttributionOutput objects can be merged."
+    )
     first = attributions[0]
     for match_field in FeatureAttributionOutput._merge_match_info_fields:
         assert all(
@@ -673,9 +673,9 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
             if aggr.source_attributions is not None:
                 return_dict["source_attributions"][(tgt_idx, tgt_tok.token)] = {}
                 for src_idx, src_tok in enumerate(aggr.source):
-                    return_dict["source_attributions"][(tgt_idx, tgt_tok.token)][
-                        (src_idx, src_tok.token)
-                    ] = aggr.source_attributions[src_idx, tgt_idx - aggr.attr_pos_start].item()
+                    return_dict["source_attributions"][(tgt_idx, tgt_tok.token)][(src_idx, src_tok.token)] = (
+                        aggr.source_attributions[src_idx, tgt_idx - aggr.attr_pos_start].item()
+                    )
             if aggr.target_attributions is not None:
                 return_dict["target_attributions"][(tgt_idx, tgt_tok.token)] = {}
                 for tgt_idx_attr in range(aggr.attr_pos_end):

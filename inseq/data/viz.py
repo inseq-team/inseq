@@ -187,7 +187,7 @@ def show_granular_attributions(
     from inseq.data.attribution import FeatureAttributionSequenceOutput
 
     if isinstance(attributions, FeatureAttributionSequenceOutput):
-        attributions: list["FeatureAttributionSequenceOutput"] = [attributions]
+        attributions: list[FeatureAttributionSequenceOutput] = [attributions]
     if not isnotebook() and display:
         raise ValueError(
             "Granular attribution heatmaps visualization is  only supported in Jupyter notebooks. "
@@ -277,7 +277,7 @@ def show_token_attributions(
     from inseq.data.attribution import FeatureAttributionSequenceOutput
 
     if isinstance(attributions, FeatureAttributionSequenceOutput):
-        attributions: list["FeatureAttributionSequenceOutput"] = [attributions]
+        attributions: list[FeatureAttributionSequenceOutput] = [attributions]
     if not isnotebook() and display:
         raise ValueError(
             "Token attribution visualization is only supported in Jupyter notebooks. "
@@ -486,7 +486,7 @@ def get_saliency_heatmap_html(
                 else:
                     score = step_score_values[col_index].item()
                 is_bold = style(score, threshold)
-                out += f'<th>{"<b>" if is_bold else ""}{score}{"</b>" if is_bold else ""}</th>'
+                out += f"<th>{'<b>' if is_bold else ''}{score}{'</b>' if is_bold else ''}</th>"
     out += "</table>"
     saliency_heatmap_markup = saliency_heatmap_html.format(uuid=uuid, content=out, label=label)
     plot_uuid = "".join(random.choices(string.ascii_lowercase, k=20))
