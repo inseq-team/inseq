@@ -8,7 +8,7 @@ from inseq.models.model_config import MODEL_CONFIGS, ModelConfig
 
 class MockModelConfig(ModelConfig):
     def __init__(self):
-        super().__init__(**{field: "test" for field in ModelConfig.__dataclass_fields__.keys()})
+        super().__init__(**dict.fromkeys(ModelConfig.__dataclass_fields__.keys(), "test"))
 
 
 class MockRequireConfigAttribution(DummyAttribution):

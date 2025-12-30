@@ -78,8 +78,7 @@ class StepFunction(Protocol):
         self,
         args: StepFunctionArgs,
         **kwargs,
-    ) -> SingleScorePerStepTensor:
-        ...
+    ) -> SingleScorePerStepTensor: ...
 
 
 def logit_fn(args: StepFunctionArgs) -> SingleScorePerStepTensor:

@@ -542,17 +542,17 @@ class ContiguousSpanAggregator(SequenceAttributionAggregator):
         if not spans:
             return
         allmatch = lambda l, type: all(isinstance(x, type) for x in l)
-        assert allmatch(spans, int) or allmatch(
-            spans, tuple
-        ), f"All items must be either indices (int) or spans (tuple), got {spans}"
+        assert allmatch(spans, int) or allmatch(spans, tuple), (
+            f"All items must be either indices (int) or spans (tuple), got {spans}"
+        )
         spans = cls.format_spans(spans)
         prev_span_max = -1
         for span in spans:
             assert len(span) == 2, f"Spans must contain two indexes, got {spans}"
             assert span[1] >= span[0] + 1, f"Spans must be non-empty, got {spans}"
-            assert (
-                span[0] >= prev_span_max
-            ), f"Spans must be postive-valued, non-overlapping and in ascending order, got {spans}"
+            assert span[0] >= prev_span_max, (
+                f"Spans must be postive-valued, non-overlapping and in ascending order, got {spans}"
+            )
             assert span[1] <= len(span_sequence), f"Span values must be indexes of the original span, got {spans}"
             prev_span_max = span[1]
 
@@ -895,13 +895,13 @@ class PairAggregator(SequenceAttributionAggregator):
         assert len(attr.source) == len(paired_attr.source), "Source sequences must be the same length."
         assert len(attr.target) == len(paired_attr.target), "Target sequences must be the same length."
         if attr.source_attributions is not None:
-            assert (
-                attr.source_attributions.shape == paired_attr.source_attributions.shape
-            ), "Source attributions must be the same shape."
+            assert attr.source_attributions.shape == paired_attr.source_attributions.shape, (
+                "Source attributions must be the same shape."
+            )
         if attr.target_attributions is not None:
-            assert (
-                attr.target_attributions.shape == paired_attr.target_attributions.shape
-            ), "Target attributions must be the same shape."
+            assert attr.target_attributions.shape == paired_attr.target_attributions.shape, (
+                "Target attributions must be the same shape."
+            )
         if attr.step_scores is not None:
             assert paired_attr.step_scores is not None, "Paired attribution must have step scores."
             for key, value in attr.step_scores.items():
@@ -911,9 +911,9 @@ class PairAggregator(SequenceAttributionAggregator):
             assert paired_attr.sequence_scores is not None, "Paired attribution must have sequence scores."
             for key, value in attr.sequence_scores.items():
                 assert key in paired_attr.sequence_scores, f"Sequence score {key} must be in paired attribution."
-                assert (
-                    value.shape == paired_attr.sequence_scores[key].shape
-                ), f"Sequence score {key} must be the same shape."
+                assert value.shape == paired_attr.sequence_scores[key].shape, (
+                    f"Sequence score {key} must be the same shape."
+                )
 
     @staticmethod
     def aggregate_source(attr, paired_attr, **kwargs):

@@ -107,9 +107,9 @@ class DeltaProbImportanceScoreEvaluator(BaseImportanceScoreEvaluator):
             input_ids_replaced = ids_replaced[:, : input_ids.shape[1]]
             decoder_input_ids_replaced = ids_replaced[:, input_ids.shape[1] :]
 
-        logging.debug(f"Replacing mask:     { mask_replacing }")
+        logging.debug(f"Replacing mask:     {mask_replacing}")
         logging.debug(
-            f"Replaced sequence:  { [[ self.tokenizer.decode(seq[i]) for i in range(input_ids_replaced.shape[1]) ] for seq in input_ids_replaced ] }"
+            f"Replaced sequence:  {[[self.tokenizer.decode(seq[i]) for i in range(input_ids_replaced.shape[1])] for seq in input_ids_replaced]}"
         )
 
         # Inference \hat{p^{(y)}} = p(y_{t+1}|\hat{y_{1...t}})
@@ -121,7 +121,7 @@ class DeltaProbImportanceScoreEvaluator(BaseImportanceScoreEvaluator):
 
         # Compute changes delta = p^{(y)} - \hat{p^{(y)}}
         delta_prob_target = prob_original_target - prob_replaced_target
-        logging.debug(f"likelihood delta: { delta_prob_target }")
+        logging.debug(f"likelihood delta: {delta_prob_target}")
 
         # Update importance scores based on delta (magnitude) and replacement (direction)
         delta_score = mask_replacing * delta_prob_target + ~mask_replacing * -delta_prob_target
@@ -129,7 +129,7 @@ class DeltaProbImportanceScoreEvaluator(BaseImportanceScoreEvaluator):
         # Rescaling from [-1, 1] to [0, 1] before logit function
         logit_delta_score = torch.logit(delta_score * 0.5 + 0.5)
         logit_importance_score = logit_importance_score + logit_delta_score
-        logging.debug(f"Updated importance score: { torch.softmax(logit_importance_score, -1) }")
+        logging.debug(f"Updated importance score: {torch.softmax(logit_importance_score, -1)}")
         return logit_importance_score
 
     @override
@@ -168,7 +168,7 @@ class DeltaProbImportanceScoreEvaluator(BaseImportanceScoreEvaluator):
             logit_importance_score = torch.rand(
                 (input_ids.shape[0], input_ids.shape[1] + decoder_input_ids.shape[1]), device=input_ids.device
             )
-        logging.debug(f"Initialize importance score -> { torch.softmax(logit_importance_score, -1) }")
+        logging.debug(f"Initialize importance score -> {torch.softmax(logit_importance_score, -1)}")
 
         # TODO: limit max steps
         self.num_steps = 0

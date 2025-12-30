@@ -3,19 +3,19 @@
 ## Dependencies
 
 We use [`uv`](https://github.com/astral-sh/uv) to manage Inseq dependencies.
-If you dont have `uv`, you should install with `make uv-download`.
+If you don't have `uv`, you should install it with `make uv-download`.
 
-To install dependencies and prepare [`pre-commit`](https://pre-commit.com/) hooks you would need to run `install` command:
+To install dependencies and prepare [`pre-commit`](https://pre-commit.com/) hooks you would need to run the `install` command:
 
 ```bash
+# Install base dependencies
 make install
 
-or
-
+# Install all dependencies including dev extras
 make install-dev
 ```
 
-To activate your `virtualenv` run `make uv-activate`.
+The `install` commands use `uv sync` to install dependencies from `pyproject.toml`. To activate your `virtualenv` run `source .venv/bin/activate`.
 
 ## Codestyle
 

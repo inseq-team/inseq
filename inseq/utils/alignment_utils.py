@@ -33,7 +33,9 @@ class AlignedSequences:
         )
 
     def __str__(self) -> str:
-        return f"{', '.join([f'{a}→{b} ({self.source_tokens[a]}→{self.target_tokens[b]})'for a,b in self.alignments])}"
+        return (
+            f"{', '.join([f'{a}→{b} ({self.source_tokens[a]}→{self.target_tokens[b]})' for a, b in self.alignments])}"
+        )
 
 
 class AlignmentMethod(Enum):

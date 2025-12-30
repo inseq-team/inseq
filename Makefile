@@ -10,9 +10,8 @@ VERSION := latest
 help:
 	@echo "Commands:"
 	@echo "uv-download     : downloads and installs the uv package manager"
-	@echo "install         : installs required dependencies"
-	@echo "install-dev     : installs the dev dependencies for the project"
-	@echo "update-deps     : updates the dependencies and writes them to requirements.txt"
+	@echo "install         : installs required dependencies using uv sync"
+	@echo "install-dev     : installs all dependencies including dev extras"
 	@echo "check-style     : run checks on all files without fixing them."
 	@echo "fix-style       : run checks on files and potentially modifies them."
 	@echo "check-safety    : run safety checks on all tests."
@@ -51,21 +50,15 @@ uv-activate:
 
 .PHONY: install
 install:
-	make uv-activate && uv pip install -r requirements.txt && uv pip install -e .
+	uv sync
 
 .PHONY: install-dev
 install-dev:
-	make uv-activate && uv pip install -r requirements-dev.txt && pre-commit install && pre-commit autoupdate
-
+	uv sync --all-extras && pre-commit install && pre-commit autoupdate
 
 .PHONY: install-ci
 install-ci:
-	make uv-activate && uv pip install -r requirements-dev.txt
-
-.PHONY: update-deps
-update-deps:
-	uv pip compile pyproject.toml -o requirements.txt
-	uv pip compile --all-extras pyproject.toml -o requirements-dev.txt
+	uv sync --all-extras
 
 #* Linting
 .PHONY: check-style

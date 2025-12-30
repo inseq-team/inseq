@@ -1,4 +1,5 @@
 """Adapted from https://github.com/huggingface/transformers/blob/main/src/transformers/commands/transformers_cli.py."""
+
 import sys
 
 from ..utils import InseqArgumentParser

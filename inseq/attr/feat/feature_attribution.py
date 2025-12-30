@@ -16,6 +16,7 @@
 Todo:
     * 🟡: Allow custom arguments for model loading in the :class:`FeatureAttribution` :meth:`load` method.
 """
+
 import logging
 from collections.abc import Callable
 from datetime import datetime

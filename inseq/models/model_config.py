@@ -89,5 +89,5 @@ def register_model_config(
             "Set allow_partial=True to allow partial configuration."
         )
     if allow_partial:
-        config = {**{field: None for field in diff}, **config}
+        config = {**dict.fromkeys(diff), **config}
     MODEL_CONFIGS[model_type] = ModelConfig(**config)
