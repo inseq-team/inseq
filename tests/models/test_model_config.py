@@ -48,18 +48,18 @@ def test_default_decoder_only_config():
     """Test default decoder-only configuration values."""
     with pytest.warns(UserWarning, match="Using default decoder-only configuration"):
         config = get_model_config("UnknownDecoderModel", is_encoder_decoder=False)
-    assert config.self_attention_module == "attn"
-    assert config.value_vector == "value"
-    assert config.cross_attention_module is None
+    assert config.self_attention_module == DEFAULT_DECODER_ONLY_CONFIG.self_attention_module
+    assert config.value_vector == DEFAULT_DECODER_ONLY_CONFIG.value_vector
+    assert config.cross_attention_module == DEFAULT_DECODER_ONLY_CONFIG.cross_attention_module
 
 
 def test_default_encoder_decoder_config():
     """Test default encoder-decoder configuration values."""
     with pytest.warns(UserWarning, match="Using default encoder-decoder configuration"):
         config = get_model_config("UnknownEncoderDecoderModel", is_encoder_decoder=True)
-    assert config.self_attention_module == "self_attn"
-    assert config.value_vector == "value"
-    assert config.cross_attention_module == "cross_attention"
+    assert config.self_attention_module == DEFAULT_ENCODER_DECODER_CONFIG.self_attention_module
+    assert config.value_vector == DEFAULT_ENCODER_DECODER_CONFIG.value_vector
+    assert config.cross_attention_module == DEFAULT_ENCODER_DECODER_CONFIG.cross_attention_module
 
 
 def test_known_model_no_warning():
