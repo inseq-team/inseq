@@ -1,4 +1,5 @@
 import logging
+import warnings
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -31,20 +32,52 @@ class ModelConfig:
     cross_attention_module: str | None = None
 
 
+# Default configurations for models not in the config file
+DEFAULT_DECODER_ONLY_CONFIG = ModelConfig(
+    self_attention_module="attn",
+    value_vector="value",
+)
+
+DEFAULT_ENCODER_DECODER_CONFIG = ModelConfig(
+    self_attention_module="self_attn",
+    cross_attention_module="cross_attention",
+    value_vector="value",
+)
+
 MODEL_CONFIGS = {
     model_type: ModelConfig(**cfg)
     for model_type, cfg in yaml.safe_load(open(Path(__file__).parent / "model_config.yaml", encoding="utf8")).items()
 }
 
 
-def get_model_config(model_type: str) -> ModelConfig:
+def get_model_config(model_type: str, is_encoder_decoder: bool = False) -> ModelConfig:
+    """Get the model configuration for the given model type.
+
+    Args:
+        model_type (`str`):
+            The class name of the model (e.g. ``GPT2LMHeadModel``).
+        is_encoder_decoder (`bool`, *optional*, defaults to False):
+            Whether the model is an encoder-decoder model. Used to determine the default configuration
+            when the model type is not found in the config.
+
+    Returns:
+        :class:`~inseq.models.ModelConfig`: The model configuration.
+    """
     if model_type not in MODEL_CONFIGS:
-        raise ValueError(
-            f"A configuration for the {model_type} model is not defined. "
-            "You can register a configuration with :meth:`~inseq.models.register_model_config`, "
-            "or request it to be added to the library by opening an issue on GitHub: "
-            "https://github.com/inseq-team/inseq/issues"
+        default_config = DEFAULT_ENCODER_DECODER_CONFIG if is_encoder_decoder else DEFAULT_DECODER_ONLY_CONFIG
+        warnings.warn(
+            f"Model configuration for '{model_type}' not found. Using default "
+            f"{'encoder-decoder' if is_encoder_decoder else 'decoder-only'} configuration "
+            f"(self_attention_module='{default_config.self_attention_module}', "
+            f"value_vector='{default_config.value_vector}'"
+            + (f", cross_attention_module='{default_config.cross_attention_module}'" if is_encoder_decoder else "")
+            + "). If this doesn't work for your model, you can register a custom configuration with "
+            ":meth:`~inseq.register_model_config`, or request it to be added to the library by opening an issue "
+            "on GitHub: https://github.com/inseq-team/inseq/issues",
+            UserWarning,
+            stacklevel=2,
         )
+        return default_config
     return MODEL_CONFIGS[model_type]
 
 
