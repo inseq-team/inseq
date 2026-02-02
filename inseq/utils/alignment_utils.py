@@ -6,7 +6,9 @@ from functools import lru_cache
 from itertools import chain
 
 import torch
-from transformers import AutoModel, AutoTokenizer, PreTrainedModel, PreTrainedTokenizerBase
+from transformers.modeling_utils import PreTrainedModel
+from transformers.models.auto import AutoModel, AutoTokenizer
+from transformers.tokenization_utils_base import PreTrainedTokenizerBase
 
 from .misc import clean_tokens
 
@@ -33,7 +35,9 @@ class AlignedSequences:
         )
 
     def __str__(self) -> str:
-        return f"{', '.join([f'{a}→{b} ({self.source_tokens[a]}→{self.target_tokens[b]})'for a,b in self.alignments])}"
+        return (
+            f"{', '.join([f'{a}→{b} ({self.source_tokens[a]}→{self.target_tokens[b]})' for a, b in self.alignments])}"
+        )
 
 
 class AlignmentMethod(Enum):

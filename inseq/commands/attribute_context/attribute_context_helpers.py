@@ -230,7 +230,9 @@ def generate_model_output(
     suffix: str,
 ) -> str:
     """Generate the model output, validating the presence of a prefix/suffix and stripping them from the generation."""
-    output_gen = generate_with_special_tokens(model, model_input, special_tokens_to_keep, **generation_kwargs)
+    output_gen = generate_with_special_tokens(
+        model, model_input, special_tokens_to_keep, output_generated_only=True, **generation_kwargs
+    )
     if prefix:
         if not output_gen.startswith(prefix):
             raise ValueError(
@@ -350,8 +352,7 @@ def prepare_outputs(
         else:
             model_input = concat_with_sep(input_full_text, output_current_prefix, decoder_input_output_separator)
             output_current_prefix = model_input
-
-    if not model.is_encoder_decoder:
+    elif not model.is_encoder_decoder:
         model_input = concat_with_sep(input_full_text, "", decoder_input_output_separator)
 
     output_gen = generate_model_output(

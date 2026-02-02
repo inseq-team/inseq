@@ -34,19 +34,17 @@ classifiers = [
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
   "Topic :: Scientific/Engineering :: Artificial Intelligence",
   "Topic :: Scientific/Engineering :: Visualization",
   "Typing :: Typed"
 ]
 dependencies = [
   "rich>=10.13.0",
-  "transformers[sentencepiece,tokenizers]>=4.22.0",
-  "protobuf>=3.20.1",
+  "transformers[sentencepiece,tokenizers]>=4.53.0",
   "captum>=0.7.0",
-  "numpy>=1.21.6",
   "jaxtyping>=0.2.25",
   "typeguard<=2.13.3",
-  "torch>=2.0",
   "matplotlib>=3.5.3",
   "tqdm>=4.64.0",
   "treescope>=0.1.0",
@@ -61,6 +59,20 @@ dependencies = [
   "nvidia-cusparse-cu11>=11.7.4.91; sys_platform=='Linux'",
   "nvidia-nccl-cu11>=2.14.3; sys_platform=='Linux'",
   "nvidia-nvtx-cu11>=11.7.91; sys_platform=='Linux'",
+  # Pinned to avoid vulnerabilities in older versions
+  "protobuf>=4.25.8",
+  "urllib3>=2.6.0",
+  "tornado>=6.5.0",
+  "setuptools>=78.1.1",
+  "requests>=2.32.4",
+  "regex>=2025.2.10",
+  "jinja2>=3.1.5",
+  "cryptography>=44.0.1",
+  "aiohttp>=3.12.14",
+  "authlib>=1.6.5",
+  "marshmallow>=3.26.2,!=4.0.0,!=4.0.1,!=4.1.0,!=4.1.1",
+  "fonttools>=4.61.0",
+  "filelock>=3.20.1"
 ]
 
 [project.optional-dependencies]
@@ -77,11 +89,11 @@ lint = [
   "bandit>=1.7.4",
   "safety>=3.1.0",
   "pydoclint>=0.4.0",
-  "pre-commit>=2.19.0",
+  "pre-commit>=3.20.0",
   "pytest>=7.2.0",
   "pytest-cov>=4.0.0",
   "pytest-xdist>=3.5.0",
-  "ruff>=0.2.0",
+  "ruff>=0.13.0",
   "virtualenv>=20.26.6"
 ]
 sklearn = [
@@ -204,6 +216,8 @@ ignore = [
   "PLR0913", # too many arguments
   "PLR0915", # too many statements
   "W191", # indentation contains tabs (handled by format)
+  "PLC0415", # import outside top-level
+  "PLW1641", # object does not implement __hash__
 ]
 select = [
   "E", # pycodestyle errors

@@ -1,19 +1,21 @@
 """HuggingFace Seq2seq model."""
+
 import logging
 from abc import abstractmethod
 from typing import Any, NoReturn
 
 import torch
 from torch import long
-from transformers import (
+from transformers.modeling_outputs import CausalLMOutput, Seq2SeqLMOutput
+from transformers.modeling_utils import PreTrainedModel
+from transformers.models.auto import (
     AutoConfig,
     AutoModelForCausalLM,
     AutoModelForSeq2SeqLM,
     AutoTokenizer,
-    PreTrainedModel,
-    PreTrainedTokenizerBase,
 )
-from transformers.modeling_outputs import CausalLMOutput, ModelOutput, Seq2SeqLMOutput
+from transformers.tokenization_utils_base import PreTrainedTokenizerBase
+from transformers.utils.generic import ModelOutput
 
 from ..attr.attribution_decorators import batched
 from ..data import BatchEncoding
@@ -90,6 +92,8 @@ class HuggingfaceModel(AttributionModel):
             **kwargs: additional arguments for the model and the tokenizer.
         """
         super().__init__(**kwargs)
+        if "attn_implementation" not in model_kwargs:
+            model_kwargs["attn_implementation"] = "eager"
         if self._autoclass is None or self._autoclass not in SUPPORTED_AUTOCLASSES:
             raise ValueError(
                 f"Invalid autoclass {self._autoclass}. Must be one of {[x.__name__ for x in SUPPORTED_AUTOCLASSES]}."
@@ -341,20 +345,68 @@ class HuggingfaceModel(AttributionModel):
             embeddings = self.get_embedding_layer()(ids)
         return embeddings * self.embed_scale
 
-    def _convert_ids_to_tokens(self, ids: IdsTensor, skip_special_tokens: bool = True) -> OneOrMoreTokenSequences:
+    def _convert_ids_to_tokens(
+        self,
+        ids: IdsTensor | int,
+        skip_special_tokens: bool = True,
+        decode_tokens: bool = False,
+    ) -> OneOrMoreTokenSequences | str:
+        """Convert token IDs to token strings.
+
+        Args:
+            ids: Token IDs to convert. Can be a single int, list, or tensor.
+            skip_special_tokens: Whether to skip special tokens.
+            decode_tokens: If True, uses tokenizer.decode() for each token to get human-readable
+                strings. This is especially important for byte-level tokenizers (e.g., Qwen) where
+                convert_ids_to_tokens returns raw vocabulary entries that may be unreadable.
+                If False, uses convert_ids_to_tokens which returns raw vocabulary tokens.
+
+        Returns:
+            Token string (single ID) or list of token strings.
+        """
+        # Handle single token ID
+        if isinstance(ids, int):
+            if decode_tokens:
+                return self.tokenizer.decode([ids])
+            token = self.tokenizer.convert_ids_to_tokens(ids)
+            return token.decode("utf-8") if isinstance(token, bytes) else token
+
+        if decode_tokens:
+            # Use decode for each token to get human-readable strings
+            # This handles byte-level tokenizers (like Qwen) correctly
+            ids_list = ids.tolist() if hasattr(ids, "tolist") else list(ids)
+            special_ids = set(self.tokenizer.all_special_ids) if skip_special_tokens else set()
+            return [self.tokenizer.decode([tid]) for tid in ids_list if tid not in special_ids]
+
+        # Use convert_ids_to_tokens for raw vocabulary tokens
         tokens = self.tokenizer.convert_ids_to_tokens(ids, skip_special_tokens=skip_special_tokens)
         if isinstance(tokens, bytes) and not isinstance(tokens, str):
             return tokens.decode("utf-8")
-        elif isinstance(tokens, list):
+        if isinstance(tokens, list):
             return [t.decode("utf-8") if isinstance(t, bytes) else t for t in tokens]
         return tokens
 
     def convert_ids_to_tokens(
-        self, ids: IdsTensor, skip_special_tokens: bool | None = True
+        self,
+        ids: IdsTensor,
+        skip_special_tokens: bool | None = True,
+        decode_tokens: bool = False,
     ) -> OneOrMoreTokenSequences:
+        """Convert token IDs to token strings.
+
+        Args:
+            ids: Token IDs to convert. Can be 1D or 2D tensor.
+            skip_special_tokens: Whether to skip special tokens.
+            decode_tokens: If True, uses tokenizer.decode() for each token to get human-readable
+                strings. This is especially important for byte-level tokenizers (e.g., Qwen) where
+                convert_ids_to_tokens returns raw vocabulary entries that may be unreadable.
+
+        Returns:
+            List of token strings (1D input) or list of lists of token strings (2D input).
+        """
         if ids.ndim < 2:
-            return self._convert_ids_to_tokens(ids, skip_special_tokens)
-        return [self._convert_ids_to_tokens(id_slice, skip_special_tokens) for id_slice in ids]
+            return self._convert_ids_to_tokens(ids, skip_special_tokens, decode_tokens)
+        return [self._convert_ids_to_tokens(id_slice, skip_special_tokens, decode_tokens) for id_slice in ids]
 
     def convert_tokens_to_ids(self, tokens: TextInput) -> OneOrMoreIdSequences:
         if isinstance(tokens[0], str):
@@ -370,12 +422,18 @@ class HuggingfaceModel(AttributionModel):
         if isinstance(tokens, list) and len(tokens) == 0:
             return ""
         elif isinstance(tokens[0], bytes | str):
-            tmp_decode_state = self.tokenizer._decode_use_source_tokenizer
-            self.tokenizer._decode_use_source_tokenizer = not as_targets
-            out_strings = self.tokenizer.convert_tokens_to_string(
+            filtered_tokens = (
                 tokens if not skip_special_tokens else [t for t in tokens if t not in self.special_tokens]
             )
-            self.tokenizer._decode_use_source_tokenizer = tmp_decode_state
+            # _decode_use_source_tokenizer was removed in transformers v5.0.0
+            # For older versions, we temporarily set it to control source/target tokenization
+            if hasattr(self.tokenizer, "_decode_use_source_tokenizer"):
+                tmp_decode_state = self.tokenizer._decode_use_source_tokenizer
+                self.tokenizer._decode_use_source_tokenizer = not as_targets
+                out_strings = self.tokenizer.convert_tokens_to_string(filtered_tokens)
+                self.tokenizer._decode_use_source_tokenizer = tmp_decode_state
+            else:
+                out_strings = self.tokenizer.convert_tokens_to_string(filtered_tokens)
             return out_strings
         return [self.convert_tokens_to_string(token_slice, skip_special_tokens, as_targets) for token_slice in tokens]
 

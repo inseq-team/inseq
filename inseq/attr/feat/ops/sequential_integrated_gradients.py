@@ -124,8 +124,7 @@ class SequentialIntegratedGradients(GradientAttribution):
         method: str = "gausslegendre",
         internal_batch_size: None | int = None,
         return_convergence_delta: Literal[False] = False,
-    ) -> TensorOrTupleOfTensorsGeneric:
-        ...
+    ) -> TensorOrTupleOfTensorsGeneric: ...
 
     @typing.overload
     def attribute(
@@ -139,8 +138,7 @@ class SequentialIntegratedGradients(GradientAttribution):
         internal_batch_size: None | int = None,
         *,
         return_convergence_delta: Literal[True],
-    ) -> tuple[TensorOrTupleOfTensorsGeneric, Tensor]:
-        ...
+    ) -> tuple[TensorOrTupleOfTensorsGeneric, Tensor]: ...
 
     def attribute(  # type: ignore
         self,
@@ -304,9 +302,9 @@ class SequentialIntegratedGradients(GradientAttribution):
 
         _validate_input(inputs, baselines, n_steps, method)
 
-        assert all(
-            x.shape[1] == inputs[0].shape[1] for x in inputs
-        ), "All inputs must have the same sequential dimension. (dimension 1)"
+        assert all(x.shape[1] == inputs[0].shape[1] for x in inputs), (
+            "All inputs must have the same sequential dimension. (dimension 1)"
+        )
 
         indexes = range(inputs[0].shape[1])
 

@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any, Protocol
 
 import torch
 import torch.nn.functional as F
-from transformers.modeling_outputs import ModelOutput
+from transformers.utils.generic import ModelOutput
 
 from ..data import FeatureAttributionInput
 from ..data.aggregation_functions import DEFAULT_ATTRIBUTION_AGGREGATE_DICT
@@ -78,8 +78,7 @@ class StepFunction(Protocol):
         self,
         args: StepFunctionArgs,
         **kwargs,
-    ) -> SingleScorePerStepTensor:
-        ...
+    ) -> SingleScorePerStepTensor: ...
 
 
 def logit_fn(args: StepFunctionArgs) -> SingleScorePerStepTensor:

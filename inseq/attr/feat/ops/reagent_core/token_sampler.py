@@ -5,7 +5,8 @@ from pathlib import Path
 from typing import Any
 
 import torch
-from transformers import AutoTokenizer, PreTrainedTokenizerBase
+from transformers.models.auto import AutoTokenizer
+from transformers.tokenization_utils_base import PreTrainedTokenizerBase
 from typing_extensions import override
 
 from .....utils import INSEQ_ARTIFACTS_CACHE, cache_results, is_nltk_available

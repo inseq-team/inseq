@@ -15,6 +15,7 @@ from ..utils import (
     convert_to_safetensor,
     drop_padding,
     get_sequences_from_batched_steps,
+    isnotebook,
     json_advanced_dump,
     json_advanced_load,
     pad_with_nan,
@@ -104,9 +105,9 @@ def merge_attributions(attributions: list["FeatureAttributionOutput"]) -> "Featu
     Returns:
         :class:`~inseq.data.FeatureAttributionOutput`: Merged object.
     """
-    assert all(
-        isinstance(x, FeatureAttributionOutput) for x in attributions
-    ), "Only FeatureAttributionOutput objects can be merged."
+    assert all(isinstance(x, FeatureAttributionOutput) for x in attributions), (
+        "Only FeatureAttributionOutput objects can be merged."
+    )
     first = attributions[0]
     for match_field in FeatureAttributionOutput._merge_match_info_fields:
         assert all(
@@ -221,11 +222,9 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
                     elif tname.startswith("decoder"):
                         row_labels = [t.token for t in self.target]
                         column_labels = [t.token for t in self.target]
-                adapter = ts.type_registries.lookup_ndarray_adapter(value)
                 if value.ndim >= 2:
                     return ts.IPythonVisualization(
                         ts.figures.inline(
-                            adapter.get_array_summary(value, fast=False),
                             get_saliency_heatmap_treescope(
                                 scores=value.numpy(),
                                 column_labels=column_labels,
@@ -238,7 +237,6 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
                 else:
                     return ts.IPythonVisualization(
                         ts.figures.inline(
-                            adapter.get_array_summary(value, fast=False) + "\n\n",
                             ts.figures.figure_from_treescope_rendering_part(
                                 ts.rendering_parts.indented_children(
                                     [
@@ -659,6 +657,34 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
         self._aggregator = []
         return self
 
+    def decode_tokens(self, tokenizer) -> "FeatureAttributionSequenceOutput":
+        """Decode tokens in place using the tokenizer for human-readable display.
+
+        This is especially useful for byte-level tokenizers (e.g., Qwen) where raw vocabulary tokens
+        may be unreadable. Each token's string representation is replaced with the decoded version
+        while preserving the token ID.
+
+        Args:
+            tokenizer: The tokenizer to use for decoding. Should have a `decode` method
+                that accepts a list of token IDs.
+
+        Returns:
+            self: The modified attribution output (for method chaining).
+
+        Example:
+            >>> out = model.attribute("你好世界")
+            >>> out.sequence_attributions[0].decode_tokens(model.tokenizer)
+            >>> print([t.token for t in out.sequence_attributions[0].source])
+            ['你好', '世界']  # Instead of garbled bytes
+        """
+        for token in self.source:
+            if token.id >= 0:
+                token.token = tokenizer.decode([token.id])
+        for token in self.target:
+            if token.id >= 0:
+                token.token = tokenizer.decode([token.id])
+        return self
+
     def get_scores_dicts(
         self,
         aggregator: AggregatorPipeline | type[Aggregator] = None,
@@ -673,9 +699,9 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
             if aggr.source_attributions is not None:
                 return_dict["source_attributions"][(tgt_idx, tgt_tok.token)] = {}
                 for src_idx, src_tok in enumerate(aggr.source):
-                    return_dict["source_attributions"][(tgt_idx, tgt_tok.token)][
-                        (src_idx, src_tok.token)
-                    ] = aggr.source_attributions[src_idx, tgt_idx - aggr.attr_pos_start].item()
+                    return_dict["source_attributions"][(tgt_idx, tgt_tok.token)][(src_idx, src_tok.token)] = (
+                        aggr.source_attributions[src_idx, tgt_idx - aggr.attr_pos_start].item()
+                    )
             if aggr.target_attributions is not None:
                 return_dict["target_attributions"][(tgt_idx, tgt_tok.token)] = {}
                 for tgt_idx_attr in range(aggr.attr_pos_end):
@@ -810,6 +836,9 @@ class FeatureAttributionOutput:
         return f"{self.__class__.__name__}({pretty_dict(self.__dict__)})"
 
     def __repr__(self):
+        if isnotebook():
+            ts.display(self)
+            return ""
         return self.__str__()
 
     def __eq__(self, other):
@@ -838,6 +867,30 @@ class FeatureAttributionOutput:
 
     def __radd__(self, other) -> "FeatureAttributionOutput":
         return self.__add__(other)
+
+    def decode_tokens(self, tokenizer) -> "FeatureAttributionOutput":
+        """Decode tokens in all sequence attributions for human-readable display.
+
+        This is especially useful for byte-level tokenizers (e.g., Qwen) where raw vocabulary tokens
+        may be unreadable. Each token's string representation is replaced with the decoded version
+        while preserving the token ID.
+
+        Args:
+            tokenizer: The tokenizer to use for decoding. Should have a `decode` method
+                that accepts a list of token IDs.
+
+        Returns:
+            self: The modified attribution output (for method chaining).
+
+        Example:
+            >>> out = model.attribute("你好世界")
+            >>> out.decode_tokens(model.tokenizer)
+            >>> print([t.token for t in out[0].source])
+            ['你好', '世界']  # Instead of garbled bytes
+        """
+        for seq_attr in self.sequence_attributions:
+            seq_attr.decode_tokens(tokenizer)
+        return self
 
     def save(
         self,

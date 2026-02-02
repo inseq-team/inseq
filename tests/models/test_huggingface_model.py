@@ -2,7 +2,6 @@
 since it is bugged is not very elegant, this will need to be refactored.
 """
 
-
 import pytest
 import torch
 from pytest import fixture, mark
@@ -455,7 +454,7 @@ def test_attention_attribution_decoder(
     )
     assert isinstance(out, FeatureAttributionOutput)
     assert isinstance(out.sequence_attributions[0], FeatureAttributionSequenceOutput)
-    assert out.info["model_name"] == "gpt2"
+    assert out.info["model_name"] == "distilgpt2"
     assert out.info["constrained_decoding"] is False
     assert out.info["attribution_method"] == "attention"
     assert out.sequence_attributions[0].target_attributions.ndim == 2

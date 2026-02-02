@@ -16,6 +16,7 @@
 Todo:
     * 🟡: Allow custom arguments for model loading in the :class:`FeatureAttribution` :meth:`load` method.
 """
+
 import logging
 from collections.abc import Callable
 from datetime import datetime
@@ -709,7 +710,10 @@ class FeatureAttribution(Registry):
         from ...models.model_config import get_model_config
 
         if self.use_model_config and self.attribution_model is not None:
-            self.attribution_model.config = get_model_config(self.attribution_model.info["model_class"])
+            self.attribution_model.config = get_model_config(
+                self.attribution_model.info["model_class"],
+                is_encoder_decoder=self.attribution_model.is_encoder_decoder,
+            )
 
     @unset_hook
     def unhook(self, **kwargs) -> None:

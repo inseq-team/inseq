@@ -1,8 +1,6 @@
 default_language_version:
   python: python3
-
-default_stages: [commit, push]
-
+default_stages: [pre-commit, pre-push]
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
@@ -17,13 +15,11 @@ repos:
         args: ['--fix=lf']
       - id: end-of-file-fixer
         exclude: LICENSE
-
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.11.2
+    rev: v0.13.0
     hooks:
       - id: ruff-format
       - id: ruff
-
   - repo: local
     hooks:
       - id: fast-test
@@ -38,9 +34,6 @@ repos:
         args: ["clean"]
         language: system
         pass_filenames: false
-
-  - repo: local
-    hooks:
       - id: docs
         name: build docs
         entry: make

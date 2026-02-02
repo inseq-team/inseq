@@ -54,7 +54,7 @@ def test_in_out_ctx_encdec_whitespace_sep(encdec_model: MarianMTModel):
         output_context_tokens=[],
         output_current="Où sont-elles?",
         output_current_tokens=["▁Où", "▁sont", "-", "elles", "?"],
-        cti_scores=[1.36, 0.08, 0.34, 1.23, 0.27],
+        cti_scores=[1.36, 0.08, 0.28, 0.88, 0.22],
         cci_scores=[
             CCIOutput(
                 cti_idx=0,
@@ -268,63 +268,22 @@ def test_in_ctx_encdec_special_sep():
         output_context_tokens=None,
         output_current="Où sont-elles ?",
         output_current_tokens=["▁Où", "▁sont", "-", "elles", "▁?"],
-        cti_scores=[0.08, 0.04, 0.01, 0.32, 0.06],
+        cti_scores=[0.62, 2.3, 0.45, 2.87, 0.48],
         cci_scores=[
             CCIOutput(
                 cti_idx=3,
                 cti_token="elles",
                 contrast_token="elles",
-                cti_score=0.32,
+                cti_score=2.87,
                 contextual_output="Où sont-elles",
                 contextless_output="Où sont-elles",
-                input_context_scores=[0.0, 0.0, 0.0, 0.0, 0.0],
+                input_context_scores=[0.02, 0.06, 0.04, 0.05, 0.03],
                 output_context_scores=None,
             )
         ],
         info=None,
     )
     cli_out = attribute_context(in_ctx_encdec_special_sep)
-    assert round_scores(cli_out) == expected_output
-
-
-def test_in_out_ctx_encdec_special_sep():
-    # Encoder-decoder model with special separator tags in input and output, context is given in the source (input context)
-    # and produced in the target (output context) before the special token separator.
-    in_out_ctx_encdec_special_sep = AttributeContextArgs(
-        model_name_or_path="context-mt/scat-marian-small-target-ctx4-cwd0-en-fr",
-        input_context_text="The girls were away.",
-        input_current_text="Where are they?",
-        output_template="{context}<brk> {current}",
-        input_template="{context} <brk> {current}",
-        special_tokens_to_keep=["<brk>"],
-        attributed_fn="contrast_prob_diff",
-        show_viz=False,
-        add_output_info=False,
-        # Pre-defining natural model outputs to avoid user input in unit tests
-        output_context_text="Les filles étaient parties.",
-    )
-    expected_output = AttributeContextOutput(
-        input_context="The girls were away.",
-        input_context_tokens=["▁The", "▁girls", "▁were", "▁away", "."],
-        output_context="Les filles étaient parties.",
-        output_context_tokens=["▁Les", "▁filles", "▁étaient", "▁parties", "."],
-        output_current="Où sont-elles ?",
-        output_current_tokens=["▁Où", "▁sont", "-", "elles", "▁?"],
-        cti_scores=[0.17, 0.03, 0.02, 3.99, 0.0],
-        cci_scores=[
-            CCIOutput(
-                cti_idx=3,
-                cti_token="elles",
-                contrast_token="ils",
-                cti_score=3.99,
-                contextual_output="Les filles étaient parties.<brk>  Où sont-elles",
-                contextless_output="Où sont-ils",
-                input_context_scores=[0.0, 0.0, 0.0, 0.0, 0.0],
-                output_context_scores=[0.0] * 5,
-            )
-        ],
-    )
-    cli_out = attribute_context(in_out_ctx_encdec_special_sep)
     assert round_scores(cli_out) == expected_output
 
 

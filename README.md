@@ -30,7 +30,7 @@ Inseq is a Pytorch-based hackable toolkit to democratize access to common post-h
 
 ## Installation
 
-Inseq is available on PyPI and can be installed with `pip` for Python >= 3.10, <= 3.12:
+Inseq is available on PyPI and can be installed with `pip` for Python >= 3.10, <= 3.13:
 
 ```bash
 # Install latest stable version
@@ -48,8 +48,8 @@ To install the package, clone the repository and run the following commands:
 
 ```bash
 cd inseq
-make uv-download # Download and install the UV package manager
-make install # Installs the package and all dependencies
+make uv-download # Download and install the uv package manager
+make install # Installs the package and all dependencies via uv sync
 ```
 
 For library developers, you can use the `make install-dev` command to install all development dependencies (quality, docs, extras).
@@ -255,14 +255,6 @@ All commands support the full range of parameters available for `attribute`, att
   <img src="https://raw.githubusercontent.com/inseq-team/inseq/main/docs/source/images/attribute_context_hospital_output.png" style="width:500px">
 </details>
 
-## Planned Development
-
-- ⚙️ Support more attention-based and occlusion-based feature attribution methods (documented in [#107](https://github.com/inseq-team/inseq/issues/107) and [#108](https://github.com/inseq-team/inseq/issues/108)).
-
-- ⚙️ Interoperability with [ferret](https://ferret.readthedocs.io/en/latest/) for attribution plausibility and faithfulness evaluation.
-
-- ⚙️ Rich and interactive visualizations in a tabbed interface using [Gradio Blocks](https://gradio.app/docs/#blocks).
-
 ## Contributing
 
 Our vision for Inseq is to create a centralized, comprehensive and robust set of tools to enable fair and reproducible comparisons in the study of sequence generation models. To achieve this goal, contributions from researchers and developers interested in these topics are more than welcome. Please see our [contributing guidelines](CONTRIBUTING.md) and our [code of conduct](CODE_OF_CONDUCT.md) for more information.
@@ -289,7 +281,6 @@ If you use Inseq in your research we suggest including a mention of the specific
     doi = "10.18653/v1/2023.acl-demo.40",
     pages = "421--435",
 }
-
 ```
 
 ## Research using Inseq
@@ -324,6 +315,18 @@ Inseq has been used in various research projects. A list of known publications t
     <li><a href="https://arxiv.org/abs/2406.06399">Should We Fine-Tune or RAG? Evaluating Different Techniques to Adapt LLMs for Dialogue</a> (Alghisi et al., 2024)</li>
     <li><a href="https://arxiv.org/abs/2406.13663">Model Internals-based Answer Attribution for Trustworthy Retrieval-Augmented Generation</a> (Qi, Sarti et al., 2024)</li>
     <li><a href="https://link.springer.com/chapter/10.1007/978-3-031-63787-2_14">NoNE Found: Explaining the Output of Sequence-to-Sequence Models When No Named Entity Is Recognized</a> (dela Cruz et al., 2024)</li>
+    <li><a href="https://dl.acm.org/doi/full/10.1145/3701268.3701274">Reimagining Student Success Prediction: Applying LLMs in Educational AI with XAI</a> (Riello et al., 2024)</li>
+  </ol>
+
+</details>
+
+<details>
+  <summary><b>2025</b></summary>
+  <ol>
+    <li> <a href="https://aclanthology.org/2025.findings-naacl.390/">Reinforcement Learning for Aligning Large Language Models Agents with Interactive Environments: Quantifying and Mitigating Prompt Overfitting</a> (Aissi et al., 2025)</li>
+    <li> <a href="https://dl.acm.org/doi/full/10.1145/3729237">Towards AI-Assisted Inclusive Language Writing in Italian Formal Communications</a> (Greco et al. 2025)</li>
+    <li> <a href="https://arxiv.org/abs/2508.08661">Hallucinations in Code Change to Natural Language Generation: Prevalence and Evaluation of Detection Metrics</a> (Liu et al. 2025)</li>
+    <li> <a href="https://arxiv.org/abs/2503.05810">A Transformer Model for Predicting Chemical Reaction Products from Generic Templates</a> (Ozer et al. 2025)</li>
   </ol>
 
 </details>

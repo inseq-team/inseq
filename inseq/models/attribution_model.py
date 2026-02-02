@@ -5,6 +5,7 @@ from functools import wraps
 from typing import Any, Protocol, TypeVar
 
 import torch
+import treescope as ts
 
 from ..attr import STEP_SCORES_MAP, StepFunctionArgs
 from ..attr.feat import FeatureAttribution, extract_args, join_token_ids
@@ -59,8 +60,7 @@ class ForwardMethod(Protocol):
         use_embeddings: bool,
         attributed_fn_argnames: list[str] | None,
         *args,
-    ) -> CustomForwardOutput:
-        ...
+    ) -> CustomForwardOutput: ...
 
 
 class InputFormatter:
@@ -227,6 +227,12 @@ class AttributionModel(ABC, torch.nn.Module):
         self._default_attributed_fn_id: str = "probability"
         self.config: ModelConfig | None = None
         self.is_distributed: bool | None = None
+
+    def __repr__(self):
+        if isnotebook():
+            ts.display(self)
+            return ""
+        return super().__repr__()
 
     @property
     def device(self) -> str | None:
@@ -478,9 +484,7 @@ class AttributionModel(ABC, torch.nn.Module):
                 add_special_tokens=not skip_special_tokens,
             )
             if generate_from_target_prefix:
-                decoder_input = self.encode(
-                    generated_texts, as_targets=True, add_special_tokens=not skip_special_tokens
-                )
+                decoder_input = self.encode(generated_texts, as_targets=True, add_special_tokens=False)
                 generation_args["decoder_input_ids"] = decoder_input.input_ids
             generated_texts = self.generate(
                 encoded_input, return_generation_output=False, batch_size=batch_size, **generation_args
@@ -590,8 +594,22 @@ class AttributionModel(ABC, torch.nn.Module):
 
     @abstractmethod
     def convert_ids_to_tokens(
-        self, ids: torch.Tensor, skip_special_tokens: bool | None = True
+        self,
+        ids: torch.Tensor,
+        skip_special_tokens: bool | None = True,
+        decode_tokens: bool = False,
     ) -> OneOrMoreTokenSequences:
+        """Convert token IDs to token strings.
+
+        Args:
+            ids: Token IDs to convert.
+            skip_special_tokens: Whether to skip special tokens.
+            decode_tokens: If True, uses tokenizer.decode() for each token to get human-readable
+                strings. This handles byte-level tokenizers (e.g., Qwen) correctly.
+
+        Returns:
+            List of token strings.
+        """
         pass
 
     @abstractmethod

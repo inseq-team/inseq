@@ -4,6 +4,8 @@
 
 ## 🚀 Features
 
+- Added support for Python 3.13.
+
 - Added [treescope](https://github.com/google-deepmind/treescope) for interactive model and tensor visualization ([#283](https://github.com/inseq-team/inseq/pull/283)).
 
 - New `treescope`-powered methods `FeatureAttributionOutput.show_granular` and `FeatureAttributionSequenceOutput.show_tokens` for interactive visualization of multidimensional attribution tensors and token highlights ([#283](https://github.com/inseq-team/inseq/pull/283)).
@@ -109,4 +111,4 @@ out_female = attrib_model.attribute(
 
 ## 💥 Breaking Changes
 
-- Dropped support for Python 3.9. Current support is Python >= 3.10, <= 3.12 ([#283](https://github.com/inseq-team/inseq/pull/283)).
+- Dropped support for Python 3.9. Current support is Python >= 3.10, <= 3.13 ([#283](https://github.com/inseq-team/inseq/pull/283)).

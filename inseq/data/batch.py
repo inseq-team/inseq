@@ -46,10 +46,10 @@ class BatchEmbedding(TensorWrapper):
     input_embeds: EmbeddingsTensor | None = None
     baseline_embeds: EmbeddingsTensor | None = None
 
-    def __len__(self) -> int | None:
+    def __len__(self) -> int:
         if self.input_embeds is not None:
             return self.input_embeds.shape[0]
-        return None
+        return 0
 
 
 @dataclass(eq=False, repr=False)

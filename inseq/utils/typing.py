@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Literal
 import torch
 from captum.attr._utils.attribution import Attribution
 from jaxtyping import Float, Float32, Int64
-from transformers import PreTrainedModel
+from transformers.modeling_utils import PreTrainedModel
 
 TextInput = str | Sequence[str]
 
