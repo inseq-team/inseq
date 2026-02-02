@@ -594,8 +594,22 @@ class AttributionModel(ABC, torch.nn.Module):
 
     @abstractmethod
     def convert_ids_to_tokens(
-        self, ids: torch.Tensor, skip_special_tokens: bool | None = True
+        self,
+        ids: torch.Tensor,
+        skip_special_tokens: bool | None = True,
+        decode_tokens: bool = False,
     ) -> OneOrMoreTokenSequences:
+        """Convert token IDs to token strings.
+
+        Args:
+            ids: Token IDs to convert.
+            skip_special_tokens: Whether to skip special tokens.
+            decode_tokens: If True, uses tokenizer.decode() for each token to get human-readable
+                strings. This handles byte-level tokenizers (e.g., Qwen) correctly.
+
+        Returns:
+            List of token strings.
+        """
         pass
 
     @abstractmethod

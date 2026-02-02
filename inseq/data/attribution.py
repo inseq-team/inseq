@@ -657,6 +657,34 @@ class FeatureAttributionSequenceOutput(TensorWrapper, AggregableMixin):
         self._aggregator = []
         return self
 
+    def decode_tokens(self, tokenizer) -> "FeatureAttributionSequenceOutput":
+        """Decode tokens in place using the tokenizer for human-readable display.
+
+        This is especially useful for byte-level tokenizers (e.g., Qwen) where raw vocabulary tokens
+        may be unreadable. Each token's string representation is replaced with the decoded version
+        while preserving the token ID.
+
+        Args:
+            tokenizer: The tokenizer to use for decoding. Should have a `decode` method
+                that accepts a list of token IDs.
+
+        Returns:
+            self: The modified attribution output (for method chaining).
+
+        Example:
+            >>> out = model.attribute("你好世界")
+            >>> out.sequence_attributions[0].decode_tokens(model.tokenizer)
+            >>> print([t.token for t in out.sequence_attributions[0].source])
+            ['你好', '世界']  # Instead of garbled bytes
+        """
+        for token in self.source:
+            if token.id >= 0:
+                token.token = tokenizer.decode([token.id])
+        for token in self.target:
+            if token.id >= 0:
+                token.token = tokenizer.decode([token.id])
+        return self
+
     def get_scores_dicts(
         self,
         aggregator: AggregatorPipeline | type[Aggregator] = None,
@@ -839,6 +867,30 @@ class FeatureAttributionOutput:
 
     def __radd__(self, other) -> "FeatureAttributionOutput":
         return self.__add__(other)
+
+    def decode_tokens(self, tokenizer) -> "FeatureAttributionOutput":
+        """Decode tokens in all sequence attributions for human-readable display.
+
+        This is especially useful for byte-level tokenizers (e.g., Qwen) where raw vocabulary tokens
+        may be unreadable. Each token's string representation is replaced with the decoded version
+        while preserving the token ID.
+
+        Args:
+            tokenizer: The tokenizer to use for decoding. Should have a `decode` method
+                that accepts a list of token IDs.
+
+        Returns:
+            self: The modified attribution output (for method chaining).
+
+        Example:
+            >>> out = model.attribute("你好世界")
+            >>> out.decode_tokens(model.tokenizer)
+            >>> print([t.token for t in out[0].source])
+            ['你好', '世界']  # Instead of garbled bytes
+        """
+        for seq_attr in self.sequence_attributions:
+            seq_attr.decode_tokens(tokenizer)
+        return self
 
     def save(
         self,

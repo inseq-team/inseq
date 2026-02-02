@@ -345,20 +345,77 @@ class HuggingfaceModel(AttributionModel):
             embeddings = self.get_embedding_layer()(ids)
         return embeddings * self.embed_scale
 
-    def _convert_ids_to_tokens(self, ids: IdsTensor, skip_special_tokens: bool = True) -> OneOrMoreTokenSequences:
-        tokens = self.tokenizer.convert_ids_to_tokens(ids, skip_special_tokens=skip_special_tokens)
-        if isinstance(tokens, bytes) and not isinstance(tokens, str):
-            return tokens.decode("utf-8")
-        elif isinstance(tokens, list):
-            return [t.decode("utf-8") if isinstance(t, bytes) else t for t in tokens]
-        return tokens
+    def _convert_ids_to_tokens(
+        self,
+        ids: IdsTensor | int,
+        skip_special_tokens: bool = True,
+        decode_tokens: bool = False,
+    ) -> OneOrMoreTokenSequences | str:
+        """Convert token IDs to token strings.
+
+        Args:
+            ids: Token IDs to convert. Can be a single int, list, or tensor.
+            skip_special_tokens: Whether to skip special tokens.
+            decode_tokens: If True, uses tokenizer.decode() for each token to get human-readable
+                strings. This is especially important for byte-level tokenizers (e.g., Qwen) where
+                convert_ids_to_tokens returns raw vocabulary entries that may be unreadable.
+                If False, uses convert_ids_to_tokens which returns raw vocabulary tokens.
+
+        Returns:
+            Token string (single ID) or list of token strings.
+        """
+        # Handle single token ID
+        if isinstance(ids, int):
+            if decode_tokens:
+                return self.tokenizer.decode([ids])
+            else:
+                token = self.tokenizer.convert_ids_to_tokens(ids)
+                if isinstance(token, bytes):
+                    return token.decode("utf-8")
+                return token
+
+        if decode_tokens:
+            # Use decode for each token to get human-readable strings
+            # This handles byte-level tokenizers (like Qwen) correctly
+            ids_list = ids.tolist() if hasattr(ids, "tolist") else list(ids)
+            tokens = []
+            special_ids = set(self.tokenizer.all_special_ids) if skip_special_tokens else set()
+            for token_id in ids_list:
+                if token_id in special_ids:
+                    continue
+                decoded = self.tokenizer.decode([token_id])
+                tokens.append(decoded)
+            return tokens
+        else:
+            # Use convert_ids_to_tokens for raw vocabulary tokens
+            tokens = self.tokenizer.convert_ids_to_tokens(ids, skip_special_tokens=skip_special_tokens)
+            if isinstance(tokens, bytes) and not isinstance(tokens, str):
+                return tokens.decode("utf-8")
+            elif isinstance(tokens, list):
+                return [t.decode("utf-8") if isinstance(t, bytes) else t for t in tokens]
+            return tokens
 
     def convert_ids_to_tokens(
-        self, ids: IdsTensor, skip_special_tokens: bool | None = True
+        self,
+        ids: IdsTensor,
+        skip_special_tokens: bool | None = True,
+        decode_tokens: bool = False,
     ) -> OneOrMoreTokenSequences:
+        """Convert token IDs to token strings.
+
+        Args:
+            ids: Token IDs to convert. Can be 1D or 2D tensor.
+            skip_special_tokens: Whether to skip special tokens.
+            decode_tokens: If True, uses tokenizer.decode() for each token to get human-readable
+                strings. This is especially important for byte-level tokenizers (e.g., Qwen) where
+                convert_ids_to_tokens returns raw vocabulary entries that may be unreadable.
+
+        Returns:
+            List of token strings (1D input) or list of lists of token strings (2D input).
+        """
         if ids.ndim < 2:
-            return self._convert_ids_to_tokens(ids, skip_special_tokens)
-        return [self._convert_ids_to_tokens(id_slice, skip_special_tokens) for id_slice in ids]
+            return self._convert_ids_to_tokens(ids, skip_special_tokens, decode_tokens)
+        return [self._convert_ids_to_tokens(id_slice, skip_special_tokens, decode_tokens) for id_slice in ids]
 
     def convert_tokens_to_ids(self, tokens: TextInput) -> OneOrMoreIdSequences:
         if isinstance(tokens[0], str):
