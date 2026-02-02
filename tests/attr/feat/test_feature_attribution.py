@@ -23,7 +23,8 @@ def saliency_gpt_model_larger() -> HuggingfaceDecoderOnlyModel:
 
 @fixture(scope="session")
 def saliency_mt_model() -> HuggingfaceEncoderDecoderModel:
-    return inseq.load_model("hf-internal-testing/tiny-random-MarianMTModel", "saliency")
+    # tiny-random-MarianMTModel has invalid padding_idx in transformers v5.0.0+
+    return inseq.load_model("hf-internal-testing/tiny-random-t5", "saliency")
 
 
 @fixture(scope="session")

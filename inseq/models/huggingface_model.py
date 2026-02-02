@@ -431,12 +431,16 @@ class HuggingfaceModel(AttributionModel):
         if isinstance(tokens, list) and len(tokens) == 0:
             return ""
         elif isinstance(tokens[0], bytes | str):
-            tmp_decode_state = self.tokenizer._decode_use_source_tokenizer
-            self.tokenizer._decode_use_source_tokenizer = not as_targets
-            out_strings = self.tokenizer.convert_tokens_to_string(
-                tokens if not skip_special_tokens else [t for t in tokens if t not in self.special_tokens]
-            )
-            self.tokenizer._decode_use_source_tokenizer = tmp_decode_state
+            filtered_tokens = tokens if not skip_special_tokens else [t for t in tokens if t not in self.special_tokens]
+            # _decode_use_source_tokenizer was removed in transformers v5.0.0
+            # For older versions, we temporarily set it to control source/target tokenization
+            if hasattr(self.tokenizer, "_decode_use_source_tokenizer"):
+                tmp_decode_state = self.tokenizer._decode_use_source_tokenizer
+                self.tokenizer._decode_use_source_tokenizer = not as_targets
+                out_strings = self.tokenizer.convert_tokens_to_string(filtered_tokens)
+                self.tokenizer._decode_use_source_tokenizer = tmp_decode_state
+            else:
+                out_strings = self.tokenizer.convert_tokens_to_string(filtered_tokens)
             return out_strings
         return [self.convert_tokens_to_string(token_slice, skip_special_tokens, as_targets) for token_slice in tokens]
 
