@@ -368,32 +368,23 @@ class HuggingfaceModel(AttributionModel):
         if isinstance(ids, int):
             if decode_tokens:
                 return self.tokenizer.decode([ids])
-            else:
-                token = self.tokenizer.convert_ids_to_tokens(ids)
-                if isinstance(token, bytes):
-                    return token.decode("utf-8")
-                return token
+            token = self.tokenizer.convert_ids_to_tokens(ids)
+            return token.decode("utf-8") if isinstance(token, bytes) else token
 
         if decode_tokens:
             # Use decode for each token to get human-readable strings
             # This handles byte-level tokenizers (like Qwen) correctly
             ids_list = ids.tolist() if hasattr(ids, "tolist") else list(ids)
-            tokens = []
             special_ids = set(self.tokenizer.all_special_ids) if skip_special_tokens else set()
-            for token_id in ids_list:
-                if token_id in special_ids:
-                    continue
-                decoded = self.tokenizer.decode([token_id])
-                tokens.append(decoded)
-            return tokens
-        else:
-            # Use convert_ids_to_tokens for raw vocabulary tokens
-            tokens = self.tokenizer.convert_ids_to_tokens(ids, skip_special_tokens=skip_special_tokens)
-            if isinstance(tokens, bytes) and not isinstance(tokens, str):
-                return tokens.decode("utf-8")
-            elif isinstance(tokens, list):
-                return [t.decode("utf-8") if isinstance(t, bytes) else t for t in tokens]
-            return tokens
+            return [self.tokenizer.decode([tid]) for tid in ids_list if tid not in special_ids]
+
+        # Use convert_ids_to_tokens for raw vocabulary tokens
+        tokens = self.tokenizer.convert_ids_to_tokens(ids, skip_special_tokens=skip_special_tokens)
+        if isinstance(tokens, bytes) and not isinstance(tokens, str):
+            return tokens.decode("utf-8")
+        if isinstance(tokens, list):
+            return [t.decode("utf-8") if isinstance(t, bytes) else t for t in tokens]
+        return tokens
 
     def convert_ids_to_tokens(
         self,
@@ -431,7 +422,9 @@ class HuggingfaceModel(AttributionModel):
         if isinstance(tokens, list) and len(tokens) == 0:
             return ""
         elif isinstance(tokens[0], bytes | str):
-            filtered_tokens = tokens if not skip_special_tokens else [t for t in tokens if t not in self.special_tokens]
+            filtered_tokens = (
+                tokens if not skip_special_tokens else [t for t in tokens if t not in self.special_tokens]
+            )
             # _decode_use_source_tokenizer was removed in transformers v5.0.0
             # For older versions, we temporarily set it to control source/target tokenization
             if hasattr(self.tokenizer, "_decode_use_source_tokenizer"):
