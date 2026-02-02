@@ -30,7 +30,7 @@ Inseq is a Pytorch-based hackable toolkit to democratize access to common post-h
 
 ## Installation
 
-Inseq is available on PyPI and can be installed with `pip` for Python >= 3.10, <= 3.12:
+Inseq is available on PyPI and can be installed with `pip` for Python >= 3.10, <= 3.13:
 
 ```bash
 # Install latest stable version
