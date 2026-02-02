@@ -13,10 +13,13 @@
 ## Quick Start Commands
 
 ```bash
-# Install package
+# Download and install uv package manager
+make uv-download
+
+# Install package (uses uv sync)
 make install
 
-# Install with all development dependencies
+# Install with all development dependencies (uses uv sync --all-extras)
 make install-dev
 
 # Run all tests
@@ -40,6 +43,14 @@ make build-docs
 # Serve docs locally
 make serve-docs
 ```
+
+## Dependency Management
+
+This project uses [uv](https://github.com/astral-sh/uv) for fast, reliable Python package management:
+
+- **`uv sync`** - Install core dependencies from `pyproject.toml`
+- **`uv sync --all-extras`** - Install all optional dependencies (dev, docs, sklearn, etc.)
+- **`uv.lock`** - Lock file ensuring reproducible installations
 
 ## Directory Structure
 

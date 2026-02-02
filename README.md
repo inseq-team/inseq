@@ -48,8 +48,8 @@ To install the package, clone the repository and run the following commands:
 
 ```bash
 cd inseq
-make uv-download # Download and install the UV package manager
-make install # Installs the package and all dependencies
+make uv-download # Download and install the uv package manager
+make install # Installs the package and all dependencies via uv sync
 ```
 
 For library developers, you can use the `make install-dev` command to install all development dependencies (quality, docs, extras).

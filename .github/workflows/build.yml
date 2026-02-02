@@ -18,19 +18,19 @@ jobs:
     - uses: actions/checkout@v4
 
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v4.3.0
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
 
     - name: Install uv
-      run: |
-        make uv-download
+      uses: astral-sh/setup-uv@v5
 
     - name: Set up cache
       uses: actions/cache@v4
       with:
         path: .venv
-        key: venv-${{ matrix.python-version }}-${{ hashFiles('pyproject.toml') }}
+        key: venv-${{ matrix.python-version }}-${{ hashFiles('pyproject.toml', 'uv.lock') }}
+
     - name: Install dependencies
       run: |
         make install-ci
