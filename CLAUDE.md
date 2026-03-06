@@ -4,7 +4,7 @@
 
 **Inseq** is a PyTorch-based interpretability toolkit for analyzing and explaining sequence generation models. It democratizes access to common post-hoc interpretability analyses for generative language models.
 
-- **Version:** 0.7.0.dev0
+- **Version:** 0.7.1
 - **Python Support:** 3.10, 3.11, 3.12, 3.13
 - **License:** Apache License 2.0
 - **Documentation:** https://inseq.org

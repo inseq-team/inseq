@@ -102,6 +102,24 @@ class HuggingfaceModel(AttributionModel):
             self.model = model
         else:
             self.model = self._autoclass.from_pretrained(model, **model_kwargs)
+        # In transformers v5+, checkpoints containing both shared.weight and lm_head.weight
+        # are loaded without tying them, even when tie_word_embeddings=True. This causes
+        # scale_decoder_outputs=True to double-scale the logits (the untied lm_head already
+        # encodes the scaling). Detect this case and disable the redundant scaling.
+        if (
+            getattr(self.model.config, "tie_word_embeddings", False)
+            and getattr(self.model.config, "scale_decoder_outputs", False)
+            and hasattr(self.model, "lm_head")
+            and hasattr(self.model, "get_input_embeddings")
+        ):
+            embed_layer = self.model.get_input_embeddings()
+            if embed_layer is not None and hasattr(embed_layer, "weight") and hasattr(self.model.lm_head, "weight"):
+                if embed_layer.weight.data_ptr() != self.model.lm_head.weight.data_ptr():
+                    logger.warning(
+                        "tie_word_embeddings=True but weights are not tied. "
+                        "Disabling scale_decoder_outputs to avoid double-scaling logits."
+                    )
+                    self.model.config.scale_decoder_outputs = False
         self.model_name = self.model.config.name_or_path
         self.tokenizer_name = tokenizer if isinstance(tokenizer, str) else None
         if tokenizer is None:
