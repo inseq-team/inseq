@@ -1,3 +1,4 @@
+import logging
 import math
 from abc import ABC, abstractmethod
 
@@ -7,6 +8,8 @@ from typing_extensions import override
 
 from .....utils.typing import IdsTensor, TargetIdsTensor
 from .importance_score_evaluator import BaseImportanceScoreEvaluator
+
+logger = logging.getLogger(__name__)
 
 
 class BaseRationalizer(ABC):
@@ -101,12 +104,23 @@ class AggregateRationalizer(BaseRationalizer):
         batch_importance_score = self.importance_score_evaluator(
             batch_input_ids, target_id, batch_decoder_input_ids, attribute_target
         )
-        importance_score_masked = batch_importance_score * torch.unsqueeze(
-            self.importance_score_evaluator.stop_mask, -1
-        )
-        self.mean_importance_score = torch.sum(importance_score_masked, dim=0) / torch.sum(
-            self.importance_score_evaluator.stop_mask
-        )
+        stop_mask = self.importance_score_evaluator.stop_mask
+        num_converged = torch.sum(stop_mask)
+        if num_converged > 0:
+            importance_score_masked = batch_importance_score * torch.unsqueeze(stop_mask, -1)
+            self.mean_importance_score = torch.sum(importance_score_masked, dim=0) / num_converged
+        else:
+            # No probe reached the stopping condition within ``max_probe_steps`` — averaging
+            # over the (empty) set of converged probes would yield NaN. Fall back to the mean
+            # over all probes and warn the user so they can raise ``max_probe_steps`` or
+            # loosen the stopping condition (e.g. higher ``stopping_condition_top_k``).
+            logger.warning(
+                "ReAGent: no probe reached the stopping condition within max_probe_steps=%d. "
+                "Falling back to mean importance score over all probes. Consider increasing "
+                "max_probe_steps or stopping_condition_top_k for more reliable attributions.",
+                self.importance_score_evaluator.max_steps,
+            )
+            self.mean_importance_score = torch.mean(batch_importance_score, dim=0)
         pos_sorted = torch.argsort(batch_importance_score, dim=-1, descending=True)
         top_n = int(math.ceil(self.keep_ratio * input_ids.shape[-1])) if not self.keep_top_n else self.keep_top_n
         pos_top_n = pos_sorted[:, :top_n]
