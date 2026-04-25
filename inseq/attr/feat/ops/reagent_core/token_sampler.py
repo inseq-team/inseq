@@ -57,7 +57,12 @@ class POSTagTokenSampler(TokenSampler):
             tokenizer=self.tokenizer,
         )
         num_postags = len(self.pos2ids)
-        self.id2pos = torch.zeros([self.tokenizer.vocab_size], dtype=torch.long, device=device)
+        # Size by ``len(tokenizer)`` rather than ``tokenizer.vocab_size`` so that special /
+        # added tokens (e.g. ``<|start_header_id|>`` in Llama 3.1, ``<|im_start|>`` in Qwen)
+        # whose ids exceed ``vocab_size`` still have a valid lookup slot and do not trigger a
+        # CUDA out-of-bounds in ``self.id2pos[input_ids]`` below. They map to pos index 0,
+        # so they get replaced by tokens from the first POS group during probing.
+        self.id2pos = torch.zeros([len(self.tokenizer)], dtype=torch.long, device=device)
         for pos_idx, ids in enumerate(self.pos2ids.values()):
             self.id2pos[ids] = pos_idx
         self.num_ids_per_pos = torch.tensor(
