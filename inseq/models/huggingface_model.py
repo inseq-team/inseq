@@ -146,7 +146,9 @@ class HuggingfaceModel(AttributionModel):
         self.pad_token = self._convert_ids_to_tokens(pad_token_id, skip_special_tokens=False)
         if isinstance(self.pad_token, list):
             self.pad_token = self.pad_token[0]
-        if self.tokenizer.pad_token is None:
+        if self.pad_token is not None and not isinstance(self.pad_token, str):
+            self.pad_token = str(self.pad_token)
+        if self.tokenizer.pad_token is None and self.pad_token is not None:
             self.tokenizer.pad_token = self.pad_token
         if self.model.config.pad_token_id is None:
             self.model.config.pad_token_id = pad_token_id
@@ -598,7 +600,10 @@ class HuggingfaceDecoderOnlyModel(HuggingfaceModel, DecoderOnlyAttributionModel)
         self.tokenizer.truncation_side = "left"
         if self.pad_token is None:
             self.pad_token = self.tokenizer.bos_token
-            self.tokenizer.pad_token = self.tokenizer.bos_token
+            if self.pad_token is not None and not isinstance(self.pad_token, str):
+                self.pad_token = str(self.pad_token)
+            if self.pad_token is not None:
+                self.tokenizer.pad_token = self.pad_token
 
     def configure_embeddings_scale(self):
         if hasattr(self.model, "embed_scale"):
