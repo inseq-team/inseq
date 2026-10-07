@@ -144,16 +144,25 @@ class ValueZeroing(InseqAttribution):
             hidden_state_idx (:obj:`int`, optional): The index of the hidden state in the model output tuple.
         """
 
-        def states_extract_and_patch_forward_hook(module, args, output) -> None:
-            self.corrupted_block_output_states[block_idx] = output[hidden_state_idx].clone().float().detach().cpu()
-
-            # Rebuild the output tuple patching the clean states at the place of the corrupted ones
-            output = (
-                output[:hidden_state_idx]
-                + (self.clean_block_output_states[block_idx].to(output[hidden_state_idx].device),)
-                + output[hidden_state_idx + 1 :]
-            )
-            return output
+        def states_extract_and_patch_forward_hook(module, args, output):
+            # A block may return a Tensor (new Llama) or a tuple/list (older models).
+            if isinstance(output, torch.Tensor):
+                if hidden_state_idx != 0:
+                    raise ValueError("Tensor block outputs only support hidden_state_idx=0.")
+                states = output
+            elif isinstance(output, (tuple, list)):
+                states = output[hidden_state_idx]
+            else:
+                raise TypeError(f"Unsupported block output type: {type(output).__name__}")
+            self.corrupted_block_output_states[block_idx] = states.clone().float().detach().cpu()
+            clean_states = self.clean_block_output_states[block_idx].to(device=states.device, dtype=states.dtype)
+            if isinstance(output, torch.Tensor):
+                return clean_states
+            if isinstance(output, tuple):
+                return output[:hidden_state_idx] + (clean_states,) + output[hidden_state_idx + 1 :]
+            patched = list(output)
+            patched[hidden_state_idx] = clean_states
+            return patched
 
         return states_extract_and_patch_forward_hook
 
