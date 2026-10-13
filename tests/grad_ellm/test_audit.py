@@ -104,6 +104,8 @@ def test_explicit_method_keeps_settings_and_records_them(model, tokenizer):
     other = inseq.load_model(model, "grad_ellm", tokenizer=tokenizer, device="cpu")
     assert other.attribution_method.core.n_layers == 1
     assert other.attribution_method.core.normalize is True
+    assert other.attribution_method.core.kv_expansion == "grouped"
+    assert other.attribution_method.core.gradient_source == "pre_o"
 
 
 @pytest.mark.parametrize("keep_steps", [False, True])
