@@ -54,8 +54,8 @@ class GradELLMAttribution(InternalsAttributionRegistry):
         options = {
             "n_layers": 1,
             "normalize": True,
-            "kv_expansion": "legacy_repeat",
-            "gradient_source": "attention_output",
+            "kv_expansion": "grouped",
+            "gradient_source": "pre_o",
         }
         options.update(getattr(attribution_model, "_grad_ellm_options", {}))
         supplied = {
