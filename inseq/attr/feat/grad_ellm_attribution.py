@@ -33,10 +33,11 @@ class GradELLMAttribution(InternalsAttributionRegistry):
     """Per-token Grad-ELLM with standard Inseq output, generation, and step scores.
 
     Pass attributed_fn='logit' to model.attribute to match the supplied implementation.
-    Constructor defaults retain legacy GQA expansion and the post-o_proj gradient.
+    Options passed to model.attribute override constructor settings for that call only.
     """
 
     method_name = "grad_ellm"
+    _option_names = ("n_layers", "normalize", "kv_expansion", "gradient_source")
 
     def __init__(
         self,
@@ -75,20 +76,42 @@ class GradELLMAttribution(InternalsAttributionRegistry):
         self.method = GradELLMOperation(attribution_model, self.core)
         self.hook()
 
-    def attribute(self, *args, **kwargs):
-        out = super().attribute(*args, **kwargs)
-        for step in out.step_attributions or []:
-            step.step_scores = {
-                name: values.float() if values.dtype == torch.bfloat16 else values
-                for name, values in step.step_scores.items()
-            }
-        out.info["grad_ellm_options"] = {
-            "n_layers": self.core.n_layers,
-            "normalize": self.core.normalize,
-            "kv_expansion": self.core.kv_expansion,
-            "gradient_source": self.core.gradient_source,
-        }
-        return out
+    def get_attribution_args(self, **kwargs):
+        # Route call-time options even though the token-level operation only
+        # accepts inputs and forward arguments. Configure the core once per batch.
+        options = {name: kwargs.pop(name) for name in self._option_names if name in kwargs}
+        attribution_args, unused_args = super().get_attribution_args(**kwargs)
+        attribution_args.update(options)
+        return attribution_args, unused_args
+
+    def attribute(self, *args, attribution_args=None, **kwargs):
+        attribution_args = dict(attribution_args or {})
+        options = {name: getattr(self.core, name) for name in self._option_names}
+        overrides = {}
+        for name in self._option_names:
+            if name in attribution_args:
+                value = attribution_args.pop(name)
+                if value is not None:
+                    overrides[name] = value
+        options.update(overrides)
+
+        previous_core = self.core
+        if overrides:
+            # Validate before changing either reference. Avoid constructing a core
+            # for every output token, and leave saved constructor options intact.
+            call_core = GradELLMCore(self.attribution_model.model, **options)
+            self.core = self.method.core = call_core
+        try:
+            out = super().attribute(*args, attribution_args=attribution_args, **kwargs)
+            for step in out.step_attributions or []:
+                step.step_scores = {
+                    name: values.float() if values.dtype == torch.bfloat16 else values
+                    for name, values in step.step_scores.items()
+                }
+            out.info["grad_ellm_options"] = options
+            return out
+        finally:
+            self.core = self.method.core = previous_core
 
     def attribute_step(self, attribute_fn_main_args, attribution_args=None):
         scores = self.method.attribute(**attribute_fn_main_args, **(attribution_args or {}))
