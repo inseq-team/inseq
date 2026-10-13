@@ -57,20 +57,15 @@ def layer_scores(q: Tensor, k: Tensor, v: Tensor, grad: Tensor, mask: Tensor, no
 
 
 class GradELLMCore:
-    """Core for Llama/Mistral decoder-only Hugging Face models.
-
-    Defaults reproduce the supplied batch-size-one algorithm (apart from the
-    constant-similarity NaN guard). 'grouped' and 'pre_o' are explicit alternative
-    semantics and must be evaluated separately from the published results.
-    """
+    """Core for Llama/Mistral decoder-only Hugging Face models."""
 
     def __init__(
         self,
         model,
         n_layers: int = 1,
         normalize: bool = True,
-        kv_expansion: str = "legacy_repeat",
-        gradient_source: str = "attention_output",
+        kv_expansion: str = "grouped",
+        gradient_source: str = "pre_o",
     ):
         if getattr(model.config, "is_encoder_decoder", False):
             raise NotImplementedError("Grad-ELLM currently supports decoder-only Llama/Mistral models, not T5.")
