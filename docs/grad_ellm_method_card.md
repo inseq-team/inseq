@@ -17,12 +17,8 @@ over valid prefix positions. A layer score is
 `relu(sum_hidden(g * v_i * similarity_i))`; scores are summed over the last
 `n_layers` layers, without averaging. Padding has zero contribution.
 
-Defaults: n_layers=1, normalize=True, kv_expansion="legacy_repeat",
-gradient_source="attention_output". Legacy expansion repeats the entire flattened
-K/V vector by the dynamically inferred GQA ratio, matching the supplied code's
-ordering. Ordinary MHA has ratio 1 and performs no replication. `grouped`
-head replication and `pre_o` gradients are explicit algorithm variants, not the
-paper-reproduction defaults.
+Defaults: n_layers=1, normalize=True, kv_expansion="grouped",
+gradient_source="pre_o". 
 
 The method does not produce embedding-component or head-specific attributions:
 raw step scores have shape [batch, prefix_tokens], and decoder-only sequence
