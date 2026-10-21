@@ -366,17 +366,22 @@ def mc_dropout_prob_avg_fn(
     orig_prob = probability_fn(args, logprob=logprob)
 
     # Compute noisy predictions using the noisy model
-    # Important: must be in train mode to ensure noise for MCD
+    # Important: must be in train mode to ensure noise for MCD. Restore the previous mode afterwards, otherwise
+    # the original probability of later steps and every later attribution would also run with dropout.
+    was_training = args.attribution_model.training
     args.attribution_model.train()
     noisy_probs = []
-    for _ in range(n_mcd_steps):
-        aux_batch = args.attribution_model.formatter.convert_args_to_batch(args)
-        aux_output = args.attribution_model.get_forward_output(
-            aux_batch, use_embeddings=args.attribution_model.is_encoder_decoder
-        )
-        args.forward_output = aux_output
-        noisy_prob = probability_fn(args, logprob=logprob).to(orig_prob.device)
-        noisy_probs.append(noisy_prob)
+    try:
+        for _ in range(n_mcd_steps):
+            aux_batch = args.attribution_model.formatter.convert_args_to_batch(args)
+            aux_output = args.attribution_model.get_forward_output(
+                aux_batch, use_embeddings=args.attribution_model.is_encoder_decoder
+            )
+            args.forward_output = aux_output
+            noisy_prob = probability_fn(args, logprob=logprob).to(orig_prob.device)
+            noisy_probs.append(noisy_prob)
+    finally:
+        args.attribution_model.train(was_training)
     # Z-score the original based on the mean and standard deviation of MC dropout predictions
     return (orig_prob - torch.stack(noisy_probs).mean(0)).div(torch.stack(noisy_probs).std(0))
 
