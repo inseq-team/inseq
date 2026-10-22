@@ -62,7 +62,10 @@ def hook_count(model):
 @pytest.mark.parametrize("kv_heads", [2, 8])
 def test_legacy_matches_exact_tokens(family, normalize, kv_heads):
     model = tiny_model(family, kv_heads)
-    core = GradELLMCore(model, n_layers=2, normalize=normalize)
+    # Match the legacy reference explicitly, independently of the current defaults.
+    core = GradELLMCore(
+        model, n_layers=2, normalize=normalize, kv_expansion="legacy_repeat", gradient_source="attention_output"
+    )
     ids = torch.tensor([[1, 4, 5, 6, 7]])
     for target in [10, 11, 2]:
         expected = legacy_reference(model, ids, target, 2, normalize)
