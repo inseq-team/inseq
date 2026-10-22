@@ -121,7 +121,8 @@ def perplexity_fn(args: StepFunctionArgs) -> SingleScorePerStepTensor:
     trying to guess the next word it is as confused as if it had to pick between 100 words.
     Reference: https://chiaracampagnola.io/2020/05/17/perplexity-in-language-models/.
     """
-    return 2 ** crossentropy_fn(args)
+    # crossentropy_fn returns nats (natural log), so the matching base is e, not 2
+    return torch.exp(crossentropy_fn(args))
 
 
 @contrast_fn_docstring()
