@@ -343,3 +343,23 @@ def test_save_reload_attribute_context_outputs(tmp_path):
     with open(tmp_path / "test.json") as f:
         out_post_save = AttributeContextOutput.from_dict(json.load(f))
     assert out_pre_save == out_post_save
+
+
+def test_in_ctx_deconly_multitoken_character(deconly_model: GPT2LMHeadModel):
+    # GPT-2 splits the emoji into three byte-level tokens. Prefixes ending inside the emoji
+    # cannot be decoded losslessly, so CCI must skip those tokens instead of raising (#274).
+    in_ctx_deconly_emoji = AttributeContextArgs(
+        model_name_or_path=deconly_model,
+        input_context_text="Horses are great animals.",
+        input_current_text="What do you think about horses?",
+        input_template="{context} {current}",
+        contextless_input_current_text="{current}",
+        output_current_text="I love horses 🐴 a lot",
+        context_sensitivity_std_threshold=-100.0,
+        show_viz=False,
+        add_output_info=False,
+    )
+    cli_out = attribute_context(in_ctx_deconly_emoji)
+    assert cli_out.output_current_tokens == ["ĠI", "Ġlove", "Ġhorses", "ĠðŁ", "Ĳ", "´", "Ġa", "Ġlot"]
+    cci_idxs = sorted(cci.cti_idx for cci in cli_out.cci_scores)
+    assert cci_idxs == [0, 1, 2, 5, 6, 7]

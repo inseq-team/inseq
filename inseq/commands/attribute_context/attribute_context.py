@@ -167,6 +167,16 @@ def attribute_context_with_model(args: AttributeContextArgs, model: HuggingfaceM
             output_ctx_tokens = model.convert_string_to_tokens(
                 contextual_output, skip_special_tokens=False, as_targets=model.is_encoder_decoder
             )
+            # A byte-level BPE token can hold only part of a character (e.g. one byte of an emoji).
+            # Decoding a prefix that ends inside such a character yields U+FFFD, and re-tokenizing it
+            # gives fewer tokens than the prefix had, so the attribution start position would point
+            # past the end of the sequence. Skip CCI for this token instead of crashing (#274).
+            if contextual_output.endswith("\ufffd"):
+                logger.warning(
+                    f"Skipping contextual cues imputation for context-sensitive token {cti_tok!r} at position "
+                    f"{cti_idx}: it ends in the middle of a character that spans several tokens."
+                )
+                continue
         cci_kwargs = {}
         contextless_output = None
         contrast_token = None
