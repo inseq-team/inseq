@@ -252,14 +252,13 @@ def kl_divergence_fn(
         top_k=top_k,
         min_tokens_to_keep=min_tokens_to_keep,
     )
-    filtered_original_logprobs = F.log_softmax(filtered_original_logits, dim=-1)
-    filtered_contrast_logprobs = F.log_softmax(filtered_contrast_logits, dim=-1)
-    kl_divergence = torch.zeros(filtered_original_logprobs.size(0))
+    kl_scores = []
     for i in range(filtered_original_logits.size(0)):
-        kl_divergence[i] = F.kl_div(
-            filtered_contrast_logprobs[i], filtered_original_logprobs[i], reduction="sum", log_target=True
-        )
-    return kl_divergence
+        valid_mask = ~(torch.isneginf(filtered_original_logits[i]) & torch.isneginf(filtered_contrast_logits[i]))
+        orig_logprobs = F.log_softmax(filtered_original_logits[i][valid_mask], dim=-1)
+        contrast_logprobs = F.log_softmax(filtered_contrast_logits[i][valid_mask], dim=-1)
+        kl_scores.append(F.kl_div(contrast_logprobs, orig_logprobs, reduction="sum", log_target=True))
+    return torch.stack(kl_scores)
 
 
 @contrast_fn_docstring()
