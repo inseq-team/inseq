@@ -1,5 +1,7 @@
 """Interpretability for Sequence Generation Models 🔍."""
 
+from importlib.metadata import PackageNotFoundError, version
+
 from .attr import list_feature_attribution_methods, list_step_functions, register_step_function
 from .data import (
     FeatureAttributionOutput,
@@ -17,10 +19,8 @@ from .utils.id_utils import explain
 def get_version() -> str:
     """Returns the current version of the Inseq library."""
     try:
-        import pkg_resources
-
-        return pkg_resources.get_distribution("inseq").version
-    except pkg_resources.DistributionNotFound:
+        return version("inseq")
+    except PackageNotFoundError:
         return "unknown"
 
 
